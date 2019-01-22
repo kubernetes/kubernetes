@@ -19,11 +19,12 @@ package registry
 import (
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -42,14 +43,14 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 
 		s, d := generic.NewRawStorage(storageConfig)
 		if capacity == 0 {
-			glog.V(5).Infof("Storage caching is disabled for %T", objectType)
+			klog.V(5).Infof("Storage caching is disabled for %T", objectType)
 			return s, d
 		}
-		glog.V(5).Infof("Storage caching is enabled for %T with capacity %v", objectType, capacity)
+		klog.V(5).Infof("Storage caching is enabled for %T with capacity %v", objectType, capacity)
 
 		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 		// Currently it has two layers of same storage interface -- cacher and low level kv.
-		cacherConfig := storage.CacherConfig{
+		cacherConfig := cacherstorage.Config{
 			CacheCapacity:        capacity,
 			Storage:              s,
 			Versioner:            etcdstorage.APIObjectVersioner{},
@@ -61,7 +62,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			TriggerPublisherFunc: triggerFunc,
 			Codec:                storageConfig.Codec,
 		}
-		cacher := storage.NewCacherFromConfig(cacherConfig)
+		cacher := cacherstorage.NewCacherFromConfig(cacherConfig)
 		destroyFunc := func() {
 			cacher.Stop()
 			d()

@@ -1,8 +1,13 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: bind
+  labels:
+    service: bind
 spec:
+  selector:
+    matchLabels:
+      service: bind
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -24,4 +29,4 @@ spec:
               namespaces: []
       containers:
       - name: kubernetes-pause
-        image: gcr.io/google-containers/pause:2.0
+        image: k8s.gcr.io/pause:2.0

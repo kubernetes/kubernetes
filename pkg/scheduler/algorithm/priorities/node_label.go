@@ -21,17 +21,18 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
+// NodeLabelPrioritizer contains information to calculate node label priority.
 type NodeLabelPrioritizer struct {
 	label    string
 	presence bool
 }
 
-func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+// NewNodeLabelPriority creates a NodeLabelPrioritizer.
+func NewNodeLabelPriority(label string, presence bool) (PriorityMapFunction, PriorityReduceFunction) {
 	labelPrioritizer := &NodeLabelPrioritizer{
 		label:    label,
 		presence: presence,
@@ -39,10 +40,10 @@ func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFun
 	return labelPrioritizer.CalculateNodeLabelPriorityMap, nil
 }
 
-// CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
+// CalculateNodeLabelPriorityMap checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")

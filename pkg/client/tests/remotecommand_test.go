@@ -38,7 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
@@ -108,7 +108,7 @@ func (ex *fakeExecutor) run(name string, uid types.UID, container string, cmd []
 	return nil
 }
 
-func fakeServer(t *testing.T, testName string, exec bool, stdinData, stdoutData, stderrData, errorData string, tty bool, messageCount int, serverProtocols []string) http.HandlerFunc {
+func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, exec bool, stdinData, stdoutData, stderrData, errorData string, tty bool, messageCount int, serverProtocols []string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		executor := &fakeExecutor{
 			t:            t,
@@ -134,6 +134,7 @@ func fakeServer(t *testing.T, testName string, exec bool, stdinData, stdoutData,
 		if e, a := strings.Repeat(stdinData, messageCount), executor.stdinReceived.String(); e != a {
 			t.Errorf("%s: stdin: expected %q, got %q", testName, e, a)
 		}
+		close(requestReceived)
 	})
 }
 
@@ -162,6 +163,15 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Stderr:          "c",
 			MessageCount:    100,
+			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
+			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
+		},
+		{
+			TestName:        "oversized stdin",
+			Stdin:           strings.Repeat("a", 20*1024*1024),
+			Stdout:          "b",
+			Stderr:          "",
+			MessageCount:    1,
 			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 		},
@@ -218,12 +228,13 @@ func TestStream(t *testing.T) {
 			localOut := &bytes.Buffer{}
 			localErr := &bytes.Buffer{}
 
-			server := httptest.NewServer(fakeServer(t, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
+			requestReceived := make(chan struct{})
+			server := httptest.NewServer(fakeServer(t, requestReceived, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
 
 			url, _ := url.ParseRequestURI(server.URL)
 			config := restclient.ContentConfig{
 				GroupVersion:         &schema.GroupVersion{Group: "x"},
-				NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+				NegotiatedSerializer: legacyscheme.Codecs,
 			}
 			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
 			if err != nil {
@@ -303,6 +314,12 @@ func TestStream(t *testing.T) {
 				if e, a := strings.Repeat(testCase.Stderr, testCase.MessageCount), localErr; e != a.String() {
 					t.Errorf("%s: expected stderr data %q, got %q", name, e, a)
 				}
+			}
+
+			select {
+			case <-requestReceived:
+			case <-time.After(time.Minute):
+				t.Errorf("%s: expected fakeServerInstance to receive request", name)
 			}
 
 			server.Close()

@@ -43,9 +43,9 @@ func TestVirtualMachine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vc := &VSphereConnection{GoVmomiClient: c}
+	vc := &VSphereConnection{Client: c.Client}
 
-	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
+	dc, err := GetDatacenter(ctx, vc, TestDefaultDatacenter)
 	if err != nil {
 		t.Error(err)
 	}
@@ -90,7 +90,7 @@ func TestVirtualMachine(t *testing.T) {
 
 		options := &VolumeOptions{SCSIControllerType: PVSCSIControllerType}
 
-		for _, expect := range []bool{true} { // TODO: vcsim needs to honor FileOperation to attach an existing disk
+		for _, expect := range []bool{true, false} {
 			attached, err := vm.IsDiskAttached(ctx, diskPath)
 			if err != nil {
 				t.Error(err)

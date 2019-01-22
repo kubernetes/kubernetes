@@ -40,4 +40,17 @@ func (e TypeElement) GetValues() map[string]Element {
 	return e.Values
 }
 
+// HasConflict returns ConflictError if some elements in type conflict.
+func (e TypeElement) HasConflict() error {
+	for _, item := range e.GetValues() {
+		if item, ok := item.(ConflictDetector); ok {
+			if err := item.HasConflict(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 var _ Element = &TypeElement{}
+var _ ConflictDetector = &TypeElement{}

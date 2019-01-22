@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -48,7 +48,7 @@ const (
 // orphan dependents by default.
 type GarbageCollectionDeleteStrategy interface {
 	// DefaultGarbageCollectionPolicy returns the default garbage collection behavior.
-	DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) GarbageCollectionPolicy
+	DefaultGarbageCollectionPolicy(ctx context.Context) GarbageCollectionPolicy
 }
 
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports
@@ -56,7 +56,7 @@ type GarbageCollectionDeleteStrategy interface {
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
-	CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
+	CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
 // BeforeDelete tests whether the object can be gracefully deleted.
@@ -68,13 +68,13 @@ type RESTGracefulDeleteStrategy interface {
 // where we set deletionTimestamp is pkg/registry/generic/registry/store.go.
 // This function is responsible for setting deletionTimestamp during gracefulDeletion,
 // other one for cascading deletions.
-func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) (graceful, gracefulPending bool, err error) {
+func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) (graceful, gracefulPending bool, err error) {
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return false, false, kerr
 	}
 	if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
-		return false, false, errors.NewInvalid(schema.GroupKind{}, "", errs)
+		return false, false, errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 	}
 	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
 	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.GetUID() {

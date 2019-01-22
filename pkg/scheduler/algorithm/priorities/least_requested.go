@@ -18,22 +18,22 @@ package priorities
 
 import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 var (
 	leastResourcePriority = &ResourceAllocationPriority{"LeastResourceAllocation", leastResourceScorer}
 
-	// LeastRequestedPriority is a priority function that favors nodes with fewer requested resources.
+	// LeastRequestedPriorityMap is a priority function that favors nodes with fewer requested resources.
 	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and
 	// prioritizes based on the minimum of the average of the fraction of requested to capacity.
 	//
 	// Details:
-	// cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity)/2
+	// (cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity))/2
 	LeastRequestedPriorityMap = leastResourcePriority.PriorityMap
 )
 
-func leastResourceScorer(requested, allocable *schedulercache.Resource) int64 {
+func leastResourceScorer(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 	return (leastRequestedScore(requested.MilliCPU, allocable.MilliCPU) +
 		leastRequestedScore(requested.Memory, allocable.Memory)) / 2
 }

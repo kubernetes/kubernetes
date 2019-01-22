@@ -22,8 +22,8 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -58,7 +58,7 @@ func TestRoundTrip(t *testing.T) {
 
 		// internal -> go-openapi
 		openAPITypes := &spec.Schema{}
-		if err := convertJSONSchemaProps(internal, openAPITypes); err != nil {
+		if err := ConvertJSONSchemaProps(internal, openAPITypes); err != nil {
 			t.Fatal(err)
 		}
 

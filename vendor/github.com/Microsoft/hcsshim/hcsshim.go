@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//go:generate go run mksyscall_windows.go -output zhcsshim.go hcsshim.go
+//go:generate go run mksyscall_windows.go -output zhcsshim.go hcsshim.go safeopen.go
 
 //sys coTaskMemFree(buffer unsafe.Pointer) = ole32.CoTaskMemFree
 //sys SetCurrentThreadCompartmentId(compartmentId uint32) (hr error) = iphlpapi.SetCurrentThreadCompartmentId

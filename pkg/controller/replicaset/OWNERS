@@ -7,3 +7,5 @@ reviewers:
 - lavalamp
 - tnozicka
 - enisoc
+labels:
+- sig/apps

@@ -15,7 +15,7 @@ library when implementing their API servers.
 ## APIs
 
 This repository contains types and clients for several APIs.  For more
-details on implemenations of these apis, see
+details on implementations of these apis, see
 [IMPLEMENTATIONS.md](IMPLEMENTATIONS.md).
 
 ### Custom Metrics API
@@ -56,7 +56,7 @@ page](http://kubernetes.io/community/).
 
 You can reach the maintainers of this repository at:
 
-- Slack: #sig-instrumention (on https://kubernetes.slack.com -- get an
+- Slack: #sig-instrumentation (on https://kubernetes.slack.com -- get an
   invite at slack.kubernetes.io)
 - Mailing List:
   https://groups.google.com/forum/#!forum/kubernetes-sig-instrumentation

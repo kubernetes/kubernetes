@@ -10,14 +10,14 @@ go_test(
     name = "go_default_test",
     srcs = ["runtime_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/runtime",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["runtime.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/runtime",
     importpath = "k8s.io/apimachinery/pkg/util/runtime",
-    deps = ["//vendor/github.com/golang/glog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 filegroup(

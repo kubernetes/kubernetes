@@ -65,11 +65,13 @@ func (v replaceStrategy) MergeEmpty(e apply.EmptyElement) (apply.Result, error) 
 // replace returns the local value if specified, otherwise it returns the remote value
 // this works regardless of the approach
 func (v replaceStrategy) doReplace(e apply.Element) (apply.Result, error) {
-	// TODO: Check for conflicts
+
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
 	}
-
+	if err := v.doConflictDetect(e); err != nil {
+		return apply.Result{}, err
+	}
 	if e.HasLocal() {
 		// Specified locally, set the local value
 		return apply.Result{Operation: apply.SET, MergedResult: e.GetLocal()}, nil
@@ -95,6 +97,11 @@ func (v replaceStrategy) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 	}
 
 	return apply.Result{}, false
+}
+
+// doConflictDetect returns error if element has conflict
+func (v replaceStrategy) doConflictDetect(e apply.Element) error {
+	return v.strategic.doConflictDetect(e)
 }
 
 var _ apply.Strategy = &replaceStrategy{}

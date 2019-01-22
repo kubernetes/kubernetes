@@ -9,6 +9,7 @@ approvers:
 - sttts
 reviewers:
 - lavalamp
+- cheftako
 - smarterclayton
 - wojtek-t
 - deads2k
@@ -19,3 +20,9 @@ reviewers:
 - nikhiljindal
 - ncdc
 - sttts
+- hzxuzhonghu
+- CaoShuFeng
+- yue9944882
+labels:
+- sig/api-machinery
+- area/apiserver

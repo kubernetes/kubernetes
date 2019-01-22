@@ -10,12 +10,12 @@ go_test(
     name = "go_default_test",
     srcs = ["deep_equal_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/third_party/forked/golang/reflect",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["deep_equal.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
     importpath = "k8s.io/apimachinery/third_party/forked/golang/reflect",
 )
 

@@ -17,9 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"context"
 	"net/http"
-
-	"golang.org/x/net/context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"

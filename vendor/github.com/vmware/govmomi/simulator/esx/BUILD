@@ -6,6 +6,7 @@ go_library(
         "authorization_manager.go",
         "datacenter.go",
         "doc.go",
+        "event_manager.go",
         "host_config_info.go",
         "host_firewall_system.go",
         "host_hardware_info.go",
@@ -18,6 +19,7 @@ go_library(
         "setting.go",
         "virtual_device.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator/esx",
     importpath = "github.com/vmware/govmomi/simulator/esx",
     visibility = ["//visibility:public"],
     deps = [

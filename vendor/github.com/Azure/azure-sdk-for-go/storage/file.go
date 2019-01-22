@@ -28,6 +28,10 @@ import (
 const fourMB = uint64(4194304)
 const oneTB = uint64(1099511627776)
 
+// Export maximum range and file sizes
+const MaxRangeSize = fourMB
+const MaxFileSize = oneTB
+
 // File represents a file on a share.
 type File struct {
 	fsc                *FileServiceClient
@@ -183,9 +187,9 @@ func (f *File) Delete(options *FileRequestOptions) error {
 func (f *File) DeleteIfExists(options *FileRequestOptions) (bool, error) {
 	resp, err := f.fsc.deleteResourceNoClose(f.buildPath(), resourceFile, options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
@@ -207,11 +211,11 @@ func (f *File) DownloadToStream(options *FileRequestOptions) (io.ReadCloser, err
 		return nil, err
 	}
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
-		readAndCloseBody(resp.body)
+	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
+		drainRespBody(resp)
 		return nil, err
 	}
-	return resp.body, nil
+	return resp.Body, nil
 }
 
 // DownloadRangeToStream operation downloads the specified range of this file with optional MD5 hash.
@@ -237,14 +241,14 @@ func (f *File) DownloadRangeToStream(fileRange FileRange, options *GetFileOption
 		return fs, err
 	}
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK, http.StatusPartialContent}); err != nil {
-		readAndCloseBody(resp.body)
+	if err = checkRespCode(resp, []int{http.StatusOK, http.StatusPartialContent}); err != nil {
+		drainRespBody(resp)
 		return fs, err
 	}
 
-	fs.Body = resp.body
+	fs.Body = resp.Body
 	if options != nil && options.GetContentMD5 {
-		fs.ContentMD5 = resp.headers.Get("Content-MD5")
+		fs.ContentMD5 = resp.Header.Get("Content-MD5")
 	}
 	return fs, nil
 }
@@ -310,20 +314,20 @@ func (f *File) ListRanges(options *ListRangesOptions) (*FileRanges, error) {
 		return nil, err
 	}
 
-	defer resp.body.Close()
+	defer resp.Body.Close()
 	var cl uint64
-	cl, err = strconv.ParseUint(resp.headers.Get("x-ms-content-length"), 10, 64)
+	cl, err = strconv.ParseUint(resp.Header.Get("x-ms-content-length"), 10, 64)
 	if err != nil {
-		ioutil.ReadAll(resp.body)
+		ioutil.ReadAll(resp.Body)
 		return nil, err
 	}
 
 	var out FileRanges
 	out.ContentLength = cl
-	out.ETag = resp.headers.Get("ETag")
-	out.LastModified = resp.headers.Get("Last-Modified")
+	out.ETag = resp.Header.Get("ETag")
+	out.LastModified = resp.Header.Get("Last-Modified")
 
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	return &out, err
 }
 
@@ -371,8 +375,8 @@ func (f *File) modifyRange(bytes io.Reader, fileRange FileRange, timeout *uint, 
 	if err != nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.body)
-	return resp.headers, checkRespCode(resp.statusCode, []int{http.StatusCreated})
+	defer drainRespBody(resp)
+	return resp.Header, checkRespCode(resp, []int{http.StatusCreated})
 }
 
 // SetMetadata replaces the metadata for this file.

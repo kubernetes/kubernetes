@@ -36,6 +36,7 @@ func stringFlagFor(s string) flag.StringFlag {
 
 func TestCreateAuthInfoOptions(t *testing.T) {
 	tests := []struct {
+		name            string
 		flags           []string
 		wantParseErr    bool
 		wantCompleteErr bool
@@ -44,6 +45,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 		wantOptions *createAuthInfoOptions
 	}{
 		{
+			name: "test1",
 			flags: []string{
 				"me",
 			},
@@ -52,6 +54,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test2",
 			flags: []string{
 				"me",
 				"--token=foo",
@@ -62,6 +65,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test3",
 			flags: []string{
 				"me",
 				"--username=jane",
@@ -74,6 +78,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test4",
 			// Cannot provide both token and basic auth.
 			flags: []string{
 				"me",
@@ -84,6 +89,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			wantValidateErr: true,
 		},
 		{
+			name: "test5",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id=foo",
@@ -101,6 +107,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test6",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id-",
@@ -118,6 +125,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test7",
 			flags: []string{
 				"--auth-provider-arg=client-id-", // auth provider name not required
 				"--auth-provider-arg=client-secret-",
@@ -133,6 +141,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test8",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id", // values must be of form 'key=value' or 'key-'
@@ -141,55 +150,58 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			wantCompleteErr: true,
 		},
 		{
+			name:  "test9",
 			flags: []string{
-			// No name for authinfo provided.
+				// No name for authinfo provided.
 			},
 			wantCompleteErr: true,
 		},
 	}
 
-	for i, test := range tests {
-		buff := new(bytes.Buffer)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buff := new(bytes.Buffer)
 
-		opts := new(createAuthInfoOptions)
-		cmd := newCmdConfigSetAuthInfo(buff, opts)
-		if err := cmd.ParseFlags(test.flags); err != nil {
-			if !test.wantParseErr {
-				t.Errorf("case %d: parsing error for flags %q: %v: %s", i, test.flags, err, buff)
+			opts := new(createAuthInfoOptions)
+			cmd := newCmdConfigSetAuthInfo(buff, opts)
+			if err := cmd.ParseFlags(tt.flags); err != nil {
+				if !tt.wantParseErr {
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+				}
+				return
 			}
-			continue
-		}
-		if test.wantParseErr {
-			t.Errorf("case %d: expected parsing error for flags %q: %s", i, test.flags, buff)
-			continue
-		}
-
-		if err := opts.complete(cmd, buff); err != nil {
-			if !test.wantCompleteErr {
-				t.Errorf("case %d: complete() error for flags %q: %s", i, test.flags, buff)
+			if tt.wantParseErr {
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				return
 			}
-			continue
-		}
-		if test.wantCompleteErr {
-			t.Errorf("case %d: complete() expected errors for flags %q: %s", i, test.flags, buff)
-			continue
-		}
 
-		if err := opts.validate(); err != nil {
-			if !test.wantValidateErr {
-				t.Errorf("case %d: flags %q: validate failed: %v", i, test.flags, err)
+			if err := opts.complete(cmd, buff); err != nil {
+				if !tt.wantCompleteErr {
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+				}
+				return
 			}
-			continue
-		}
+			if tt.wantCompleteErr {
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				return
+			}
 
-		if test.wantValidateErr {
-			t.Errorf("case %d: flags %q: expected validate to fail", i, test.flags)
-			continue
-		}
+			if err := opts.validate(); err != nil {
+				if !tt.wantValidateErr {
+					t.Errorf("case %s: flags %q: validate failed: %v", tt.name, tt.flags, err)
+				}
+				return
+			}
 
-		if !reflect.DeepEqual(opts, test.wantOptions) {
-			t.Errorf("case %d: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", i, test.flags, test.wantOptions, opts)
-		}
+			if tt.wantValidateErr {
+				t.Errorf("case %s: flags %q: expected validate to fail", tt.name, tt.flags)
+				return
+			}
+
+			if !reflect.DeepEqual(opts, tt.wantOptions) {
+				t.Errorf("case %s: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantOptions, opts)
+			}
+		})
 	}
 }
 

@@ -24,25 +24,10 @@ package goroutinemap
 import (
 	"fmt"
 	"sync"
-	"time"
 
-	"github.com/golang/glog"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-)
-
-const (
-	// initialDurationBeforeRetry is the amount of time after an error occurs
-	// that GoRoutineMap will refuse to allow another operation to start with
-	// the same operation name (if exponentialBackOffOnError is enabled). Each
-	// successive error results in a wait 2x times the previous.
-	initialDurationBeforeRetry = 500 * time.Millisecond
-
-	// maxDurationBeforeRetry is the maximum amount of time that
-	// durationBeforeRetry will grow to due to exponential backoff.
-	// Value is slightly offset from 2 minutes to make timeouts due to this
-	// constant recognizable.
-	maxDurationBeforeRetry = 2*time.Minute + 1*time.Second
 )
 
 // GoRoutineMap defines a type that can run named goroutines and track their
@@ -150,7 +135,7 @@ func (grm *goRoutineMap) operationComplete(
 		delete(grm.operations, operationName)
 		if *err != nil {
 			// Log error
-			glog.Errorf("operation for %q failed with: %v",
+			klog.Errorf("operation for %q failed with: %v",
 				operationName,
 				*err)
 		}
@@ -162,7 +147,7 @@ func (grm *goRoutineMap) operationComplete(
 		grm.operations[operationName] = existingOp
 
 		// Log error
-		glog.Errorf("%v",
+		klog.Errorf("%v",
 			existingOp.expBackoff.GenerateNoRetriesPermittedMsg(operationName))
 	}
 }

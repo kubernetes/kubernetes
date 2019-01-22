@@ -30,7 +30,7 @@ import (
 // Each of them can be nil to leave the feature unconfigured on ApplyTo.
 type RecommendedOptions struct {
 	Etcd           *EtcdOptions
-	SecureServing  *SecureServingOptions
+	SecureServing  *SecureServingOptionsWithLoopback
 	Authentication *DelegatingAuthenticationOptions
 	Authorization  *DelegatingAuthorizationOptions
 	Audit          *AuditOptions
@@ -41,12 +41,23 @@ type RecommendedOptions struct {
 	// admission plugin initializers to Admission.ApplyTo.
 	ExtraAdmissionInitializers func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error)
 	Admission                  *AdmissionOptions
+	// ProcessInfo is used to identify events created by the server.
+	ProcessInfo *ProcessInfo
+	Webhook     *WebhookOptions
 }
 
-func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
+func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *ProcessInfo) *RecommendedOptions {
+	sso := NewSecureServingOptions()
+
+	// We are composing recommended options for an aggregated api-server,
+	// whose client is typically a proxy multiplexing many operations ---
+	// notably including long-running ones --- into one HTTP/2 connection
+	// into this server.  So allow many concurrent operations.
+	sso.HTTP2MaxStreamsPerConnection = 1000
+
 	return &RecommendedOptions{
 		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:              NewSecureServingOptions(),
+		SecureServing:              sso.WithLoopback(),
 		Authentication:             NewDelegatingAuthenticationOptions(),
 		Authorization:              NewDelegatingAuthorizationOptions(),
 		Audit:                      NewAuditOptions(),
@@ -54,6 +65,8 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		CoreAPI:                    NewCoreAPIOptions(),
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
+		ProcessInfo:                processInfo,
+		Webhook:                    NewWebhookOptions(),
 	}
 }
 
@@ -75,16 +88,16 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.SecureServing.ApplyTo(&config.Config); err != nil {
+	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(&config.Config); err != nil {
+	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
 		return err
 	}
-	if err := o.Authorization.ApplyTo(&config.Config); err != nil {
+	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
 		return err
 	}
-	if err := o.Audit.ApplyTo(&config.Config); err != nil {
+	if err := o.Audit.ApplyTo(&config.Config, config.ClientConfig, config.SharedInformerFactory, o.ProcessInfo, o.Webhook); err != nil {
 		return err
 	}
 	if err := o.Features.ApplyTo(&config.Config); err != nil {

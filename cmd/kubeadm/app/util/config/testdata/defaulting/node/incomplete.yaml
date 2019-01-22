@@ -1,0 +1,11 @@
+apiVersion: kubeadm.k8s.io/v1alpha3
+discoveryToken: abcdef.0123456789abcdef
+discoveryTokenAPIServers:
+- kube-apiserver:6443
+discoveryTokenUnsafeSkipCAVerification: true
+kind: JoinConfiguration
+nodeRegistration:
+  criSocket: /var/run/dockershim.sock
+  name: thegopher
+tlsBootstrapToken: abcdef.0123456789abcdef
+token: abcdef.0123456789abcdef

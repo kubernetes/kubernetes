@@ -23,8 +23,10 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 )
 
+// FakePersistentVolumeClaimInfo declares a []v1.PersistentVolumeClaim type for testing.
 type FakePersistentVolumeClaimInfo []v1.PersistentVolumeClaim
 
+// GetPersistentVolumeClaimInfo gets PVC matching the namespace and PVC ID.
 func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*v1.PersistentVolumeClaim, error) {
 	for _, pvc := range pvcs {
 		if pvc.Name == pvcID && pvc.Namespace == namespace {
@@ -34,15 +36,19 @@ func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 	return nil, fmt.Errorf("Unable to find persistent volume claim: %s/%s", namespace, pvcID)
 }
 
+// FakeNodeInfo declares a v1.Node type for testing.
 type FakeNodeInfo v1.Node
 
+// GetNodeInfo return a fake node info object.
 func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	node := v1.Node(n)
 	return &node, nil
 }
 
+// FakeNodeListInfo declares a []v1.Node type for testing.
 type FakeNodeListInfo []v1.Node
 
+// GetNodeInfo returns a fake node object in the fake nodes.
 func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	for _, node := range nodes {
 		if node.Name == nodeName {
@@ -52,8 +58,10 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
 }
 
+// FakePersistentVolumeInfo declares a []v1.PersistentVolume type for testing.
 type FakePersistentVolumeInfo []v1.PersistentVolume
 
+// GetPersistentVolumeInfo returns a fake PV object in the fake PVs by PV ID.
 func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
 	for _, pv := range pvs {
 		if pv.Name == pvID {
@@ -63,8 +71,10 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
 }
 
+// FakeStorageClassInfo declares a []storagev1.StorageClass type for testing.
 type FakeStorageClassInfo []storagev1.StorageClass
 
+// GetStorageClassInfo returns a fake storage class object in the fake storage classes by name.
 func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1.StorageClass, error) {
 	for _, sc := range classes {
 		if sc.Name == name {

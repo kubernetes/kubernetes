@@ -10,12 +10,12 @@ go_test(
     name = "go_default_test",
     srcs = ["integer_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/util/integer",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["integer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/integer",
     importpath = "k8s.io/client-go/util/integer",
 )
 

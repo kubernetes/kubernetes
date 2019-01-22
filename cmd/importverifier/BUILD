@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "importverifier",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/importverifier",
 )
 
 go_library(

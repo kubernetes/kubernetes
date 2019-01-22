@@ -17,8 +17,6 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
-	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,11 +27,9 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -316,30 +312,31 @@ func TestGetResourcesAndSelector(t *testing.T) {
 }
 
 func TestSelectorTest(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-			return nil, nil
-		}),
+	info := &resource.Info{
+		Object: &v1.Service{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "some-ns", Name: "cassandra"},
+		},
 	}
-	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdSelector(f, buf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("local", "true")
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
+	labelToSet, err := metav1.ParseToLabelSelector("environment=qa")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
-	cmd.Run(cmd, []string{"environment=qa"})
+	iostreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	o := &SetSelectorOptions{
+		selector:       labelToSet,
+		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),
+		Recorder:       genericclioptions.NoopRecorder{},
+		PrintObj:       (&printers.NamePrinter{}).PrintObj,
+		IOStreams:      iostreams,
+	}
 
-	if !strings.Contains(buf.String(), "services/cassandra") {
+	if err := o.RunSelector(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "service/cassandra") {
 		t.Errorf("did not set selector: %s", buf.String())
 	}
 }

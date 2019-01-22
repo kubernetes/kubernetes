@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment-resources
@@ -16,9 +16,9 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google-containers/nginx:test-cmd
+        image: k8s.gcr.io/nginx:test-cmd
         ports:
         - containerPort: 80
       - name: perl
-        image: gcr.io/google-containers/perl
+        image: k8s.gcr.io/perl
       terminationGracePeriodSeconds: 0

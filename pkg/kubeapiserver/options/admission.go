@@ -73,6 +73,7 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 		"The order of plugins in which they are passed to this flag does not matter. "+
 		"Comma-delimited list of: "+strings.Join(a.GenericAdmission.Plugins.Registered(), ", ")+".")
 	fs.MarkDeprecated("admission-control", "Use --enable-admission-plugins or --disable-admission-plugins instead. Will be removed in a future version.")
+	fs.Lookup("admission-control").Hidden = false
 
 	a.GenericAdmission.AddFlags(fs)
 }

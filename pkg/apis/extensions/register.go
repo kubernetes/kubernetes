@@ -19,8 +19,10 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // GroupName is the group name use in this package
@@ -48,18 +50,18 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
+		&apps.Deployment{},
+		&apps.DeploymentList{},
+		&apps.DeploymentRollback{},
 		&ReplicationControllerDummy{},
-		&DaemonSetList{},
-		&DaemonSet{},
+		&apps.DaemonSetList{},
+		&apps.DaemonSet{},
 		&Ingress{},
 		&IngressList{},
-		&ReplicaSet{},
-		&ReplicaSetList{},
-		&PodSecurityPolicy{},
-		&PodSecurityPolicyList{},
+		&apps.ReplicaSet{},
+		&apps.ReplicaSetList{},
+		&policy.PodSecurityPolicy{},
+		&policy.PodSecurityPolicyList{},
 		&autoscaling.Scale{},
 		&networking.NetworkPolicy{},
 		&networking.NetworkPolicyList{},

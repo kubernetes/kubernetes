@@ -28,16 +28,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/api/endpoints"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/endpoint"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
 // Leases is an interface which assists in managing the set of active masters
@@ -62,7 +62,7 @@ var _ Leases = &storageLeases{}
 
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
-	ipInfoList := &api.EndpointsList{}
+	ipInfoList := &corev1.EndpointsList{}
 	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		ipList[i] = ip.Subsets[0].Addresses[0].IP
 	}
 
-	glog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
 
 	return ipList, nil
 }
@@ -80,12 +80,12 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 // UpdateLease resets the TTL on a master IP in storage
 func (s *storageLeases) UpdateLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
-	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &api.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
+	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
-		existing := input.(*api.Endpoints)
-		existing.Subsets = []api.EndpointSubset{
+		existing := input.(*corev1.Endpoints)
+		existing.Subsets = []corev1.EndpointSubset{
 			{
-				Addresses: []api.EndpointAddress{{IP: ip}},
+				Addresses: []corev1.EndpointAddress{{IP: ip}},
 			},
 		}
 
@@ -98,7 +98,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		// changing a field.
 		existing.Generation++
 
-		glog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
+		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
 
 		return existing, &leaseTime, nil
 	})
@@ -106,7 +106,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
-	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &api.Endpoints{}, nil)
+	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil)
 }
 
 // NewLeases creates a new etcd-based Leases implementation.
@@ -119,16 +119,16 @@ func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duratio
 }
 
 type leaseEndpointReconciler struct {
-	endpointRegistry      endpoint.Registry
+	endpointClient        corev1client.EndpointsGetter
 	masterLeases          Leases
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
-func NewLeaseEndpointReconciler(endpointRegistry endpoint.Registry, masterLeases Leases) EndpointReconciler {
+func NewLeaseEndpointReconciler(endpointClient corev1client.EndpointsGetter, masterLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
-		endpointRegistry:      endpointRegistry,
+		endpointClient:        endpointClient,
 		masterLeases:          masterLeases,
 		stopReconcilingCalled: false,
 	}
@@ -141,7 +141,7 @@ func NewLeaseEndpointReconciler(endpointRegistry endpoint.Registry, masterLeases
 // expire. ReconcileEndpoints will notice that the endpoints object is
 // different from the directory listing, and update the endpoints object
 // accordingly.
-func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -159,20 +159,19 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	return r.doReconcile(serviceName, endpointPorts, reconcilePorts)
 }
 
-func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	ctx := apirequest.NewDefaultContext()
-
-	// Retrieve the current list of endpoints...
-	e, err := r.endpointRegistry.GetEndpoints(ctx, serviceName, &metav1.GetOptions{})
+func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+	e, err := r.endpointClient.Endpoints(corev1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
 		}
 
-		e = &api.Endpoints{
+		shouldCreate = true
+		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: api.NamespaceDefault,
+				Namespace: corev1.NamespaceDefault,
 			},
 		}
 	}
@@ -198,21 +197,21 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
-		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{},
+		e.Subsets = []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{},
 			Ports:     endpointPorts,
 		}}
 	}
 
 	if !formatCorrect || !ipCorrect {
 		// repopulate the addresses according to the expected IPs from etcd
-		e.Subsets[0].Addresses = make([]api.EndpointAddress, len(masterIPs))
+		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
 		for ind, ip := range masterIPs {
-			e.Subsets[0].Addresses[ind] = api.EndpointAddress{IP: ip}
+			e.Subsets[0].Addresses[ind] = corev1.EndpointAddress{IP: ip}
 		}
 
 		// Lexicographic order is retained by this step.
-		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 	}
 
 	if !portsCorrect {
@@ -220,8 +219,15 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
-	return r.endpointRegistry.UpdateEndpoints(ctx, e, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	if shouldCreate {
+		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
+			err = nil
+		}
+	} else {
+		_, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Update(e)
+	}
+	return err
 }
 
 // checkEndpointSubsetFormatWithLease determines if the endpoint is in the
@@ -232,7 +238,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 // * ipsCorrect when the addresses in the endpoints match the expected addresses list
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormatWithLease(e *api.Endpoints, expectedIPs []string, ports []api.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
@@ -277,7 +283,7 @@ func checkEndpointSubsetFormatWithLease(e *api.Endpoints, expectedIPs []string, 
 	return true, ipsCorrect, portsCorrect
 }
 
-func (r *leaseEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error {
+func (r *leaseEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 	r.stopReconcilingCalled = true

@@ -10,14 +10,14 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/authentication/serviceaccount",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/serviceaccount",
     importpath = "k8s.io/apiserver/pkg/authentication/serviceaccount",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/api/validation:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library"],
 )
 
 filegroup(

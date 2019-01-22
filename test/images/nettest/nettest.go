@@ -133,7 +133,7 @@ func (s *State) serveWrite(w http.ResponseWriter, r *http.Request) {
 		if s.Received == nil {
 			s.Received = map[string]int{}
 		}
-		s.Received[wp.Source] += 1
+		s.Received[wp.Source]++
 	}
 	s.appendErr(json.NewEncoder(w).Encode(&WriteResp{Hostname: s.Hostname}))
 }
@@ -164,7 +164,7 @@ func (s *State) appendSuccessfulSend(toHostname string) {
 	if s.Sent == nil {
 		s.Sent = map[string]int{}
 	}
-	s.Sent[toHostname] += 1
+	s.Sent[toHostname]++
 }
 
 var (
@@ -241,7 +241,7 @@ func contactOthers(state *State) {
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
-	// Double check that that worked by getting the server version.
+	// Double check that worked by getting the server version.
 	if v, err := client.Discovery().ServerVersion(); err != nil {
 		log.Fatalf("Unable to get server version: %v\n", err)
 	} else {

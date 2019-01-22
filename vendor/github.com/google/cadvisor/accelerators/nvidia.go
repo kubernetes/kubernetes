@@ -26,12 +26,15 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/golang/glog"
 	"github.com/mindprince/gonvml"
+	"k8s.io/klog"
 )
 
 type NvidiaManager struct {
-	sync.RWMutex
+	sync.Mutex
+
+	// true if there are NVIDIA devices present on the node
+	devicesPresent bool
 
 	// true if the NVML library (libnvidia-ml.so.1) was loaded successfully
 	nvmlInitialized bool
@@ -47,31 +50,20 @@ const nvidiaVendorId = "0x10de"
 // Setup initializes NVML if nvidia devices are present on the node.
 func (nm *NvidiaManager) Setup() {
 	if !detectDevices(nvidiaVendorId) {
-		glog.V(4).Info("No NVIDIA devices found.")
+		klog.V(4).Info("No NVIDIA devices found.")
 		return
 	}
 
-	nm.initializeNVML()
-	if nm.nvmlInitialized {
-		return
-	}
-	go func() {
-		glog.V(2).Info("Starting goroutine to initialize NVML")
-		// TODO: use globalHousekeepingInterval
-		for range time.Tick(time.Minute) {
-			nm.initializeNVML()
-			if nm.nvmlInitialized {
-				return
-			}
-		}
-	}()
+	nm.devicesPresent = true
+
+	initializeNVML(nm)
 }
 
 // detectDevices returns true if a device with given pci id is present on the node.
 func detectDevices(vendorId string) bool {
 	devices, err := ioutil.ReadDir(sysFsPCIDevicesPath)
 	if err != nil {
-		glog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
+		klog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
 		return false
 	}
 
@@ -79,11 +71,11 @@ func detectDevices(vendorId string) bool {
 		vendorPath := filepath.Join(sysFsPCIDevicesPath, device.Name(), "vendor")
 		content, err := ioutil.ReadFile(vendorPath)
 		if err != nil {
-			glog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
+			klog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
 			continue
 		}
 		if strings.EqualFold(strings.TrimSpace(string(content)), vendorId) {
-			glog.V(3).Infof("Found device with vendorId %q", vendorId)
+			klog.V(3).Infof("Found device with vendorId %q", vendorId)
 			return true
 		}
 	}
@@ -91,41 +83,35 @@ func detectDevices(vendorId string) bool {
 }
 
 // initializeNVML initializes the NVML library and sets up the nvmlDevices map.
-func (nm *NvidiaManager) initializeNVML() {
+// This is defined as a variable to help in testing.
+var initializeNVML = func(nm *NvidiaManager) {
 	if err := gonvml.Initialize(); err != nil {
 		// This is under a logging level because otherwise we may cause
 		// log spam if the drivers/nvml is not installed on the system.
-		glog.V(4).Infof("Could not initialize NVML: %v", err)
+		klog.V(4).Infof("Could not initialize NVML: %v", err)
 		return
 	}
+	nm.nvmlInitialized = true
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
-		glog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
-		nm.Lock()
-		// Even though we won't have GPU metrics, the library was initialized and should be shutdown when exiting.
-		nm.nvmlInitialized = true
-		nm.Unlock()
+		klog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
 		return
 	}
-	glog.V(1).Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
+	klog.V(1).Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
 	nm.nvidiaDevices = make(map[int]gonvml.Device, numDevices)
 	for i := 0; i < int(numDevices); i++ {
 		device, err := gonvml.DeviceHandleByIndex(uint(i))
 		if err != nil {
-			glog.Warningf("Failed to get nvidia device handle %d: %v", i, err)
+			klog.Warningf("Failed to get nvidia device handle %d: %v", i, err)
 			continue
 		}
 		minorNumber, err := device.MinorNumber()
 		if err != nil {
-			glog.Warningf("Failed to get nvidia device minor number: %v", err)
+			klog.Warningf("Failed to get nvidia device minor number: %v", err)
 			continue
 		}
 		nm.nvidiaDevices[int(minorNumber)] = device
 	}
-	nm.Lock()
-	// Doing this at the end to avoid race in accessing nvidiaDevices in GetCollector.
-	nm.nvmlInitialized = true
-	nm.Unlock()
 }
 
 // Destroy shuts down NVML.
@@ -139,12 +125,21 @@ func (nm *NvidiaManager) Destroy() {
 // present in the devices.list file in the given devicesCgroupPath.
 func (nm *NvidiaManager) GetCollector(devicesCgroupPath string) (AcceleratorCollector, error) {
 	nc := &NvidiaCollector{}
-	nm.RLock()
-	if !nm.nvmlInitialized || len(nm.nvidiaDevices) == 0 {
-		nm.RUnlock()
+
+	if !nm.devicesPresent {
 		return nc, nil
 	}
-	nm.RUnlock()
+	// Makes sure that we don't call initializeNVML() concurrently and
+	// that we only call initializeNVML() when it's not initialized.
+	nm.Lock()
+	if !nm.nvmlInitialized {
+		initializeNVML(nm)
+	}
+	if !nm.nvmlInitialized || len(nm.nvidiaDevices) == 0 {
+		nm.Unlock()
+		return nc, nil
+	}
+	nm.Unlock()
 	nvidiaMinorNumbers, err := parseDevicesCgroup(devicesCgroupPath)
 	if err != nil {
 		return nc, err

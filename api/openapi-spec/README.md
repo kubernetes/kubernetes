@@ -1,6 +1,6 @@
 # Kubernetes's OpenAPI Specification
 
-This folder contains an [OpenAPI specification][openapi] for Kubernetes API.
+This folder contains an [OpenAPI specification](https://github.com/OAI/OpenAPI-Specification) for Kubernetes API.
 
 ## Vendor Extensions
 
@@ -57,4 +57,4 @@ For example:
 ### `x-kubernetes-patch-strategy` and `x-kubernetes-patch-merge-key`
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see
-[strategic-merge-patch] (https://github.com/kubernetes/community/blob/master/contributors/devel/strategic-merge-patch.md).
+[strategic-merge-patch](https://git.k8s.io/community/contributors/devel/strategic-merge-patch.md).

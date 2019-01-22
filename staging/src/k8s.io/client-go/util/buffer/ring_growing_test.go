@@ -39,7 +39,7 @@ func TestGrowth(t *testing.T) {
 	}
 	assert.Equalf(t, x, read, "expected to have read %d items: %d", x, read)
 	assert.Zerof(t, g.readable, "expected readable to be zero: %d", g.readable)
-	assert.Equalf(t, g.n, 16, "expected N to be 16: %d", g.n)
+	assert.Equalf(t, 16, g.n, "expected N to be 16: %d", g.n)
 }
 
 func TestEmpty(t *testing.T) {

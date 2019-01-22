@@ -6,14 +6,14 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/client/clientset/versioned",
     importpath = "k8s.io/sample-controller/pkg/client/clientset/versioned",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/k8s.io/sample-controller/pkg/client/clientset/versioned/typed/samplecontroller/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/sample-controller/pkg/client/clientset/versioned/typed/samplecontroller/v1alpha1:go_default_library",
     ],
 )
 

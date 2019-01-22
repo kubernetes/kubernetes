@@ -394,3 +394,9 @@ func NewLoadBalancerV2(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 	sc.ResourceBase = sc.Endpoint + "v2.0/"
 	return sc, err
 }
+
+// NewClusteringV1 creates a ServiceClient that may be used with the v1 clustering
+// package.
+func NewClusteringV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "clustering")
+}

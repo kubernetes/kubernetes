@@ -45,6 +45,7 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&TokenReview{},
+		&TokenRequest{},
 	)
 	return nil
 }

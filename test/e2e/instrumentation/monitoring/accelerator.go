@@ -74,9 +74,6 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 
 	scheduling.SetupNVIDIAGPUNode(f, false)
 
-	// TODO: remove this after cAdvisor race is fixed.
-	time.Sleep(time.Minute)
-
 	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
@@ -103,7 +100,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	pollingFunction := checkForAcceleratorMetrics(projectId, gcmService, time.Now(), metricsMap)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		framework.Logf("Missing metrics: %+v\n", metricsMap)
+		framework.Logf("Missing metrics: %+v", metricsMap)
 	}
 	framework.ExpectNoError(err)
 }

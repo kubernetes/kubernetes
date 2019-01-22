@@ -33,6 +33,7 @@ import (
 
 func TestAccept(t *testing.T) {
 	tests := []struct {
+		name          string
 		acceptPaths   string
 		rejectPaths   string
 		acceptHosts   string
@@ -44,6 +45,7 @@ func TestAccept(t *testing.T) {
 	}{
 
 		{
+			name:          "test1",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -54,6 +56,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test2",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -64,6 +67,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test3",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -74,6 +78,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test4",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -84,6 +89,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test5",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -94,6 +100,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test7",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -104,6 +111,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test8",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -114,6 +122,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test9",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -124,6 +133,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test10",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -134,6 +144,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test11",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -144,6 +155,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test12",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -154,6 +166,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test13",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -164,6 +177,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test14",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -174,6 +188,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test15",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -184,6 +199,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test16",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -194,6 +210,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  true,
 		},
 		{
+			name:          "test17",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -204,6 +221,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test18",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -214,6 +232,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test19",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -224,6 +243,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test20",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -234,6 +254,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test21",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -244,6 +265,7 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 		{
+			name:          "test22",
 			acceptPaths:   DefaultPathAcceptRE,
 			rejectPaths:   DefaultPathRejectRE,
 			acceptHosts:   DefaultHostAcceptRE,
@@ -254,52 +276,61 @@ func TestAccept(t *testing.T) {
 			expectAccept:  false,
 		},
 	}
-	for _, test := range tests {
-		filter := &FilterServer{
-			AcceptPaths:   MakeRegexpArrayOrDie(test.acceptPaths),
-			RejectPaths:   MakeRegexpArrayOrDie(test.rejectPaths),
-			AcceptHosts:   MakeRegexpArrayOrDie(test.acceptHosts),
-			RejectMethods: MakeRegexpArrayOrDie(test.rejectMethods),
-		}
-		accept := filter.accept(test.method, test.path, test.host)
-		if accept != test.expectAccept {
-			t.Errorf("expected: %v, got %v for %#v", test.expectAccept, accept, test)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := &FilterServer{
+				AcceptPaths:   MakeRegexpArrayOrDie(tt.acceptPaths),
+				RejectPaths:   MakeRegexpArrayOrDie(tt.rejectPaths),
+				AcceptHosts:   MakeRegexpArrayOrDie(tt.acceptHosts),
+				RejectMethods: MakeRegexpArrayOrDie(tt.rejectMethods),
+			}
+			accept := filter.accept(tt.method, tt.path, tt.host)
+			if accept != tt.expectAccept {
+				t.Errorf("expected: %v, got %v for %#v", tt.expectAccept, accept, tt)
+			}
+		})
 	}
 }
 
 func TestRegexpMatch(t *testing.T) {
 	tests := []struct {
+		name        string
 		str         string
 		regexps     string
 		expectMatch bool
 	}{
 		{
+			name:        "test1",
 			str:         "foo",
 			regexps:     "bar,.*",
 			expectMatch: true,
 		},
 		{
+			name:        "test2",
 			str:         "foo",
 			regexps:     "bar,fo.*",
 			expectMatch: true,
 		},
 		{
+			name:        "test3",
 			str:         "bar",
 			regexps:     "bar,fo.*",
 			expectMatch: true,
 		},
 		{
+			name:        "test4",
 			str:         "baz",
 			regexps:     "bar,fo.*",
 			expectMatch: false,
 		},
 	}
-	for _, test := range tests {
-		match := matchesRegexp(test.str, MakeRegexpArrayOrDie(test.regexps))
-		if test.expectMatch != match {
-			t.Errorf("expected: %v, found: %v, for %s and %v", test.expectMatch, match, test.str, test.regexps)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			match := matchesRegexp(tt.str, MakeRegexpArrayOrDie(tt.regexps))
+			if tt.expectMatch != match {
+				t.Errorf("expected: %v, found: %v, for %s and %v", tt.expectMatch, match, tt.str, tt.regexps)
+			}
+		})
 	}
 }
 
@@ -363,29 +394,31 @@ func TestAPIRequests(t *testing.T) {
 	target.Path = "/"
 	proxy := newProxy(target)
 
-	tests := []struct{ method, body string }{
-		{"GET", ""},
-		{"DELETE", ""},
-		{"POST", "test payload"},
-		{"PUT", "test payload"},
+	tests := []struct{ name, method, body string }{
+		{"test1", "GET", ""},
+		{"test2", "DELETE", ""},
+		{"test3", "POST", "test payload"},
+		{"test4", "PUT", "test payload"},
 	}
 
 	const path = "/api/test?fields=ID%3Dfoo&labels=key%3Dvalue"
 	for i, tt := range tests {
-		r, err := http.NewRequest(tt.method, path, strings.NewReader(tt.body))
-		if err != nil {
-			t.Errorf("error creating request: %v", err)
-			continue
-		}
-		w := httptest.NewRecorder()
-		proxy.ServeHTTP(w, r)
-		if w.Code != http.StatusOK {
-			t.Errorf("%d: proxy.ServeHTTP w.Code = %d; want %d", i, w.Code, http.StatusOK)
-		}
-		want := strings.Join([]string{tt.method, path, tt.body}, " ")
-		if w.Body.String() != want {
-			t.Errorf("%d: response body = %q; want %q", i, w.Body.String(), want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := http.NewRequest(tt.method, path, strings.NewReader(tt.body))
+			if err != nil {
+				t.Errorf("error creating request: %v", err)
+				return
+			}
+			w := httptest.NewRecorder()
+			proxy.ServeHTTP(w, r)
+			if w.Code != http.StatusOK {
+				t.Errorf("%d: proxy.ServeHTTP w.Code = %d; want %d", i, w.Code, http.StatusOK)
+			}
+			want := strings.Join([]string{tt.method, path, tt.body}, " ")
+			if w.Body.String() != want {
+				t.Errorf("%d: response body = %q; want %q", i, w.Body.String(), want)
+			}
+		})
 	}
 }
 
@@ -396,48 +429,49 @@ func TestPathHandling(t *testing.T) {
 	defer ts.Close()
 
 	table := []struct {
+		name       string
 		prefix     string
 		reqPath    string
 		expectPath string
 	}{
-		{"/api/", "/metrics", "404 page not found\n"},
-		{"/api/", "/api/metrics", "/api/metrics"},
-		{"/api/", "/api/v1/pods/", "/api/v1/pods/"},
-		{"/", "/metrics", "/metrics"},
-		{"/", "/api/v1/pods/", "/api/v1/pods/"},
-		{"/custom/", "/metrics", "404 page not found\n"},
-		{"/custom/", "/api/metrics", "404 page not found\n"},
-		{"/custom/", "/api/v1/pods/", "404 page not found\n"},
-		{"/custom/", "/custom/api/metrics", "/api/metrics"},
-		{"/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
+		{"test1", "/api/", "/metrics", "404 page not found\n"},
+		{"test2", "/api/", "/api/metrics", "/api/metrics"},
+		{"test3", "/api/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"test4", "/", "/metrics", "/metrics"},
+		{"test5", "/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"test6", "/custom/", "/metrics", "404 page not found\n"},
+		{"test7", "/custom/", "/api/metrics", "404 page not found\n"},
+		{"test8", "/custom/", "/api/v1/pods/", "404 page not found\n"},
+		{"test9", "/custom/", "/custom/api/metrics", "/api/metrics"},
+		{"test10", "/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
 	}
 
 	cc := &rest.Config{
 		Host: ts.URL,
 	}
 
-	for _, item := range table {
-		func() {
-			p, err := NewServer("", item.prefix, "/not/used/for/this/test", nil, cc)
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := NewServer("", tt.prefix, "/not/used/for/this/test", nil, cc, 0)
 			if err != nil {
-				t.Fatalf("%#v: %v", item, err)
+				t.Fatalf("%#v: %v", tt, err)
 			}
 			pts := httptest.NewServer(p.handler)
 			defer pts.Close()
 
-			r, err := http.Get(pts.URL + item.reqPath)
+			r, err := http.Get(pts.URL + tt.reqPath)
 			if err != nil {
-				t.Fatalf("%#v: %v", item, err)
+				t.Fatalf("%#v: %v", tt, err)
 			}
 			body, err := ioutil.ReadAll(r.Body)
 			r.Body.Close()
 			if err != nil {
-				t.Fatalf("%#v: %v", item, err)
+				t.Fatalf("%#v: %v", tt, err)
 			}
-			if e, a := item.expectPath, string(body); e != a {
-				t.Errorf("%#v: Wanted %q, got %q", item, e, a)
+			if e, a := tt.expectPath, string(body); e != a {
+				t.Errorf("%#v: Wanted %q, got %q", tt, e, a)
 			}
-		}()
+		})
 	}
 }
 

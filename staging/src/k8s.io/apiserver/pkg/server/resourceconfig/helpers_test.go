@@ -20,16 +20,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
-	registry := newFakeRegistry()
+	scheme := newFakeScheme(t)
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {
 		runtimeConfig         map[string]string
@@ -66,7 +66,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		{
 			// version enabled by runtimeConfig override.
 			runtimeConfig: map[string]string{
-				"extensions/v1beta1": "",
+				"apps/v1": "",
 			},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
@@ -116,7 +116,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.EnableVersions(registry.RegisteredGroupVersions()...)
+				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
 				return config
 			},
 			err: false,
@@ -137,9 +137,68 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			err: false,
 		},
+		{
+			// enable specific extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable specific extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/ingresses": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable all extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable a non-extensions resource
+			runtimeConfig: map[string]string{
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			err: false, // no error for backwards compatibility
+		},
 	}
 	for index, test := range testCases {
-		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, registry)
+		t.Log(scheme.PrioritizedVersionsAllGroups())
+		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, scheme)
 		if err == nil && test.err {
 			t.Fatalf("expected error for test case: %v", index)
 		} else if err != nil && !test.err {
@@ -160,19 +219,25 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 	)
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+	)
+	ret.DisableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+	)
 
 	return ret
 }
 
-func newFakeRegistry() *registered.APIRegistrationManager {
-	registry := registered.NewOrDie("")
+func newFakeScheme(t *testing.T) *runtime.Scheme {
+	ret := runtime.NewScheme()
+	require.NoError(t, apiv1.AddToScheme(ret))
+	require.NoError(t, extensionsapiv1beta1.AddToScheme(ret))
 
-	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: apiv1.SchemeGroupVersion,
-	})
-	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: extensionsapiv1beta1.SchemeGroupVersion,
-	})
-	registry.RegisterVersions([]schema.GroupVersion{apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion})
-	return registry
+	require.NoError(t, ret.SetVersionPriority(apiv1.SchemeGroupVersion))
+	require.NoError(t, ret.SetVersionPriority(extensionsapiv1beta1.SchemeGroupVersion))
+
+	return ret
 }

@@ -2,29 +2,60 @@
 package quobyte
 
 import (
+	"log"
 	"net/http"
+	"regexp"
+)
+
+// retry policy codes
+const (
+	RetryNever         string = "NEVER"
+	RetryInteractive   string = "INTERACTIVE"
+	RetryInfinitely    string = "INFINITELY"
+	RetryOncePerTarget string = "ONCE_PER_TARGET"
 )
 
 type QuobyteClient struct {
-	client   *http.Client
-	url      string
-	username string
-	password string
+	client         *http.Client
+	url            string
+	username       string
+	password       string
+	apiRetryPolicy string
+}
+
+func (client *QuobyteClient) SetAPIRetryPolicy(retry string) {
+	client.apiRetryPolicy = retry
+}
+
+func (client *QuobyteClient) GetAPIRetryPolicy() string {
+	return client.apiRetryPolicy
 }
 
 // NewQuobyteClient creates a new Quobyte API client
 func NewQuobyteClient(url string, username string, password string) *QuobyteClient {
 	return &QuobyteClient{
-		client:   &http.Client{},
-		url:      url,
-		username: username,
-		password: password,
+		client:         &http.Client{},
+		url:            url,
+		username:       username,
+		password:       password,
+		apiRetryPolicy: RetryInteractive,
 	}
 }
 
 // CreateVolume creates a new Quobyte volume. Its root directory will be owned by given user and group
 func (client QuobyteClient) CreateVolume(request *CreateVolumeRequest) (string, error) {
 	var response volumeUUID
+
+	if request.TenantID != "" && !IsValidUUID(request.TenantID) {
+		log.Printf("Tenant name resolution: Resolving  %s to UUID\n", request.TenantID)
+		tenantUUID, err := client.ResolveTenantNameToUUID(request.TenantID)
+		if err != nil {
+			return "", err
+		}
+
+		request.TenantID = tenantUUID
+	}
+
 	if err := client.sendRequest("createVolume", request, &response); err != nil {
 		return "", err
 	}
@@ -80,6 +111,7 @@ func (client *QuobyteClient) GetClientList(tenant string) (GetClientListResponse
 	return response, nil
 }
 
+// SetVolumeQuota sets a Quota to the specified Volume
 func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64) error {
 	request := &setQuotaRequest{
 		Quotas: []*quota{
@@ -101,4 +133,71 @@ func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64)
 	}
 
 	return client.sendRequest("setQuota", request, nil)
+}
+
+// GetTenant returns the Tenant configuration for all specified tenants
+func (client *QuobyteClient) GetTenant(tenantIDs []string) (GetTenantResponse, error) {
+	request := &getTenantRequest{TenantIDs: tenantIDs}
+
+	var response GetTenantResponse
+	err := client.sendRequest("getTenant", request, &response)
+	if err != nil {
+		return response, err
+	}
+
+	return response, nil
+}
+
+// GetTenantMap returns a map that contains all tenant names and there ID's
+func (client *QuobyteClient) GetTenantMap() (map[string]string, error) {
+	result := map[string]string{}
+	response, err := client.GetTenant([]string{})
+
+	if err != nil {
+		return result, err
+	}
+
+	for _, tenant := range response.Tenants {
+		result[tenant.Name] = tenant.TenantID
+	}
+
+	return result, nil
+}
+
+// SetTenant creates a Tenant with the specified name
+func (client *QuobyteClient) SetTenant(tenantName string) (string, error) {
+	request := &setTenantRequest{
+		&TenantDomainConfiguration{
+			Name: tenantName,
+		},
+		retryPolicy{client.GetAPIRetryPolicy()},
+	}
+
+	var response setTenantResponse
+	err := client.sendRequest("setTenant", request, &response)
+	if err != nil {
+		return "", err
+	}
+
+	return response.TenantID, nil
+}
+
+// IsValidUUID Validates given uuid
+func IsValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
+}
+
+// ResolveTenantNameToUUID Returns UUID for given name, error if not found.
+func (client *QuobyteClient) ResolveTenantNameToUUID(name string) (string, error) {
+	request := &resolveTenantNameRequest{
+		TenantName: name,
+	}
+
+	var response resolveTenantNameResponse
+	err := client.sendRequest("resolveTenantName", request, &response)
+	if err != nil {
+		return "", err
+	}
+	return response.TenantID, nil
 }

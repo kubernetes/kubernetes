@@ -9,6 +9,7 @@ go_library(
         "order.go",
         "plural_namer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/gengo/namer",
     importpath = "k8s.io/gengo/namer",
     visibility = ["//visibility:public"],
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],

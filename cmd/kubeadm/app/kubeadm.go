@@ -17,20 +17,32 @@ limitations under the License.
 package app
 
 import (
+	"flag"
 	"os"
 
 	"github.com/spf13/pflag"
+	_ "k8s.io/klog"
 
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
 // Run creates and executes new kubeadm command
 func Run() error {
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+
+	pflag.Set("logtostderr", "true")
 	// We do not want these flags to show up in --help
+	// These MarkHidden calls must be after the lines above
 	pflag.CommandLine.MarkHidden("version")
-	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
+	pflag.CommandLine.MarkHidden("alsologtostderr")
+	pflag.CommandLine.MarkHidden("log-backtrace-at")
+	pflag.CommandLine.MarkHidden("log-dir")
+	pflag.CommandLine.MarkHidden("logtostderr")
+	pflag.CommandLine.MarkHidden("stderrthreshold")
+	pflag.CommandLine.MarkHidden("vmodule")
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()

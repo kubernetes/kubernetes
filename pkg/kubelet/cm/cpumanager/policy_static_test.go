@@ -87,16 +87,36 @@ func TestStaticPolicyStart(t *testing.T) {
 			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expPanic:        true,
 		},
+		{
+			description: "core 12 is not present in topology but is in state cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"0": cpuset.NewCPUSet(0, 1, 2),
+				"1": cpuset.NewCPUSet(3, 4),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10, 11, 12),
+			expPanic:        true,
+		},
+		{
+			description: "core 11 is present in topology but is not in state cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"0": cpuset.NewCPUSet(0, 1, 2),
+				"1": cpuset.NewCPUSet(3, 4),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10),
+			expPanic:        true,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			defer func() {
 				if err := recover(); err != nil {
 					if !testCase.expPanic {
-						t.Errorf("unexpected panic occured: %q", err)
+						t.Errorf("unexpected panic occurred: %q", err)
 					}
 				} else if testCase.expPanic {
-					t.Error("expected panic doesn't occured")
+					t.Error("expected panic doesn't occurred")
 				}
 			}()
 			policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs).(*staticPolicy)

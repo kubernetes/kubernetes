@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/examples/blob/master/staging/podsecuritypolicy/rbac/README.md](https://github.com/kubernetes/examples/blob/master/staging/podsecuritypolicy/rbac/README.md)

@@ -59,7 +59,7 @@ type SchemaVisitor interface {
 }
 
 // SchemaVisitorArbitrary is an additional visitor interface which handles
-// arbitrary types. For backwards compatability, it's a separate interface
+// arbitrary types. For backwards compatibility, it's a separate interface
 // which is checked for at runtime.
 type SchemaVisitorArbitrary interface {
 	SchemaVisitor
@@ -173,6 +173,8 @@ type Kind struct {
 	RequiredFields []string
 	// Maps field names to types.
 	Fields map[string]Schema
+	// FieldOrder reports the canonical order for the fields.
+	FieldOrder []string
 }
 
 var _ Schema = &Kind{}

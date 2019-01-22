@@ -21,25 +21,25 @@ import (
 	"testing"
 	"time"
 
-	extensions "k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-type UpdateReplicaSetFunc func(d *extensions.ReplicaSet)
+type UpdateReplicaSetFunc func(d *apps.ReplicaSet)
 
-func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*extensions.ReplicaSet, error) {
-	var rs *extensions.ReplicaSet
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
+	var rs *apps.ReplicaSet
 	var updateErr error
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
-		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Update(rs); err == nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).Update(rs); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}
@@ -53,10 +53,10 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newRS, err := clientSet.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -67,17 +67,17 @@ func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.Re
 	return nil
 }
 
-func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*extensions.ReplicaSet, error) {
-	var rs *extensions.ReplicaSet
+func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
+	var rs *apps.ReplicaSet
 	var updateErr error
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
-		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rs)
-		if rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).UpdateStatus(rs); err == nil {
+		if rs, err = c.AppsV1().ReplicaSets(namespace).UpdateStatus(rs); err == nil {
 			logf("Updating replica set %q", name)
 			return true, nil
 		}

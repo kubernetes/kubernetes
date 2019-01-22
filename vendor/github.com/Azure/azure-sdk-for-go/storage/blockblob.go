@@ -229,8 +229,8 @@ func (b *Blob) PutBlockList(blocks []Block, options *PutBlockListOptions) error 
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
 // GetBlockListOptions includes the options for a get block list operation
@@ -263,8 +263,8 @@ func (b *Blob) GetBlockList(blockType BlockListType, options *GetBlockListOption
 	if err != nil {
 		return out, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	return out, err
 }

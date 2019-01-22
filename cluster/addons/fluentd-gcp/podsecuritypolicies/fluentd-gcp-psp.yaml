@@ -1,11 +1,11 @@
-apiVersion: extensions/v1beta1
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: gce.fluentd-gcp
   annotations:
     kubernetes.io/description: 'Policy used by the fluentd-gcp addon.'
-    # TODO: fluentd-gcp should run with the default seccomp profile
-    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName:  'docker/default'
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default,docker/default'
     # 'runtime/default' is already the default, but must be filled in on the
     # pod to pass admission.
     apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
@@ -20,6 +20,7 @@ spec:
   - 'configMap'
   - 'hostPath'
   - 'secret'
+  - 'projected'
   allowedHostPaths:
     - pathPrefix: /var/log
     - pathPrefix: /var/lib/docker/containers

@@ -18,7 +18,6 @@ package unstructured
 
 import (
 	gojson "encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -34,17 +33,23 @@ import (
 // Returns false if the value is missing.
 // No error is returned for a nil field.
 func NestedFieldCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
 	return runtime.DeepCopyJSONValue(val), true, nil
 }
 
-func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+// NestedFieldNoCopy returns a reference to a nested field.
+// Returns false if value is not found and an error if unable
+// to traverse obj.
+func NestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
 	var val interface{} = obj
 
 	for i, field := range fields {
+		if val == nil {
+			return nil, false, nil
+		}
 		if m, ok := val.(map[string]interface{}); ok {
 			val, ok = m[field]
 			if !ok {
@@ -60,7 +65,7 @@ func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{
 // NestedString returns the string value of a nested field.
 // Returns false if value is not found and an error if not a string.
 func NestedString(obj map[string]interface{}, fields ...string) (string, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return "", found, err
 	}
@@ -74,7 +79,7 @@ func NestedString(obj map[string]interface{}, fields ...string) (string, bool, e
 // NestedBool returns the bool value of a nested field.
 // Returns false if value is not found and an error if not a bool.
 func NestedBool(obj map[string]interface{}, fields ...string) (bool, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return false, found, err
 	}
@@ -88,7 +93,7 @@ func NestedBool(obj map[string]interface{}, fields ...string) (bool, bool, error
 // NestedFloat64 returns the float64 value of a nested field.
 // Returns false if value is not found and an error if not a float64.
 func NestedFloat64(obj map[string]interface{}, fields ...string) (float64, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return 0, found, err
 	}
@@ -102,7 +107,7 @@ func NestedFloat64(obj map[string]interface{}, fields ...string) (float64, bool,
 // NestedInt64 returns the int64 value of a nested field.
 // Returns false if value is not found and an error if not an int64.
 func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return 0, found, err
 	}
@@ -116,7 +121,7 @@ func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool, err
 // NestedStringSlice returns a copy of []string value of a nested field.
 // Returns false if value is not found and an error if not a []interface{} or contains non-string items in the slice.
 func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
@@ -138,7 +143,7 @@ func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, 
 // NestedSlice returns a deep copy of []interface{} value of a nested field.
 // Returns false if value is not found and an error if not a []interface{}.
 func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
@@ -180,7 +185,7 @@ func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interfa
 // nestedMapNoCopy returns a map[string]interface{} value of a nested field.
 // Returns false if value is not found and an error if not a map[string]interface{}.
 func nestedMapNoCopy(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
@@ -433,43 +438,17 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	return nil
 }
 
-// UnstructuredObjectConverter is an ObjectConverter for use with
-// Unstructured objects. Since it has no schema or type information,
-// it will only succeed for no-op conversions. This is provided as a
-// sane implementation for APIs that require an object converter.
-type UnstructuredObjectConverter struct{}
-
-func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
-	unstructIn, ok := in.(*Unstructured)
-	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
-	}
-
-	unstructOut, ok := out.(*Unstructured)
-	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
-	}
-
-	// maybe deep copy the map? It is documented in the
-	// ObjectConverter interface that this function is not
-	// guaranteed to not mutate the input. Or maybe set the input
-	// object to nil.
-	unstructOut.Object = unstructIn.Object
-	return nil
+type JSONFallbackEncoder struct {
+	runtime.Encoder
 }
 
-func (UnstructuredObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
-	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
-		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
-		if !ok {
-			// TODO: should this be a typed error?
-			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
+func (c JSONFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	err := c.Encoder.Encode(obj, w)
+	if runtime.IsNotRegisteredError(err) {
+		switch obj.(type) {
+		case *Unstructured, *UnstructuredList:
+			return UnstructuredJSONScheme.Encode(obj, w)
 		}
-		in.GetObjectKind().SetGroupVersionKind(gvk)
 	}
-	return in, nil
-}
-
-func (UnstructuredObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	return "", "", errors.New("unstructured cannot convert field labels")
+	return err
 }

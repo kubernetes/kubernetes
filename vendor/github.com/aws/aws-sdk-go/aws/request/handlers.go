@@ -14,6 +14,7 @@ type Handlers struct {
 	Send             HandlerList
 	ValidateResponse HandlerList
 	Unmarshal        HandlerList
+	UnmarshalStream  HandlerList
 	UnmarshalMeta    HandlerList
 	UnmarshalError   HandlerList
 	Retry            HandlerList
@@ -30,6 +31,7 @@ func (h *Handlers) Copy() Handlers {
 		Send:             h.Send.copy(),
 		ValidateResponse: h.ValidateResponse.copy(),
 		Unmarshal:        h.Unmarshal.copy(),
+		UnmarshalStream:  h.UnmarshalStream.copy(),
 		UnmarshalError:   h.UnmarshalError.copy(),
 		UnmarshalMeta:    h.UnmarshalMeta.copy(),
 		Retry:            h.Retry.copy(),
@@ -45,6 +47,7 @@ func (h *Handlers) Clear() {
 	h.Send.Clear()
 	h.Sign.Clear()
 	h.Unmarshal.Clear()
+	h.UnmarshalStream.Clear()
 	h.UnmarshalMeta.Clear()
 	h.UnmarshalError.Clear()
 	h.ValidateResponse.Clear()
@@ -165,6 +168,21 @@ func (l *HandlerList) SwapNamed(n NamedHandler) (swapped bool) {
 	for i := 0; i < len(l.list); i++ {
 		if l.list[i].Name == n.Name {
 			l.list[i].Fn = n.Fn
+			swapped = true
+		}
+	}
+
+	return swapped
+}
+
+// Swap will swap out all handlers matching the name passed in. The matched
+// handlers will be swapped in. True is returned if the handlers were swapped.
+func (l *HandlerList) Swap(name string, replace NamedHandler) bool {
+	var swapped bool
+
+	for i := 0; i < len(l.list); i++ {
+		if l.list[i].Name == name {
+			l.list[i] = replace
 			swapped = true
 		}
 	}

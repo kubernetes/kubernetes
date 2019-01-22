@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package containerd.types;
 
-import "gogoproto/gogo.proto";
+import weak "gogoproto/gogo.proto";
 
 option go_package = "github.com/containerd/containerd/api/types;types";
 

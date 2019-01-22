@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginM
 		tmpDir,
 		fakeClient,
 		nil,
-		map[string]string{sdcGuidLabelName: "abc-123"},
+		map[string]string{sdcGUIDLabelName: "abc-123"},
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -206,9 +206,9 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Errorf("SetUp() - expecting multiple volume disabled by default")
 	}
 
-	// did we read sdcGuid label
-	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
-		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
+	// did we read sdcGUID label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGUID]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGUID, but did not find it")
 	}
 
 	// rebuild spec
@@ -263,8 +263,8 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Name = "testpvc"
@@ -296,7 +296,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	spec, err := provisioner.Provision()
+	spec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Fatalf("call to Provision() failed: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestVolumeProvisioner(t *testing.T) {
 		t.Errorf("expected volume name to be %s, got %s", actualVolName, vol.Name)
 	}
 	if vol.SizeInKb != 8*1024*1024 {
-		glog.V(4).Info(log("unexpected volume size"))
+		klog.V(4).Info(log("unexpected volume size"))
 	}
 
 	// mount dynamic vol
@@ -349,9 +349,9 @@ func TestVolumeProvisioner(t *testing.T) {
 		t.Fatalf("Expected success, got: %v", err)
 	}
 
-	// did we read sdcGuid label
-	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
-		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
+	// did we read sdcGUID label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGUID]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGUID, but did not find it")
 	}
 
 	// isMultiMap applied
@@ -384,7 +384,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 	if err := deleter.Delete(); err != nil {
-		t.Fatalf("failed while deleteing vol: %v", err)
+		t.Fatalf("failed while deleting vol: %v", err)
 	}
 	path := deleter.GetPath()
 	if _, err := os.Stat(path); err == nil {
@@ -408,9 +408,9 @@ func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -440,9 +440,9 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -467,7 +467,7 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	_, err = provisioner.Provision()
+	_, err = provisioner.Provision(nil, nil)
 	if err == nil {
 		t.Fatalf("call to Provision() should fail with invalid capacity")
 	}
@@ -488,9 +488,9 @@ func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 
@@ -516,7 +516,7 @@ func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	spec, err := sioVol.Provision()
+	spec, err := sioVol.Provision(nil, nil)
 	if err != nil {
 		t.Fatalf("call to Provision() failed: %v", err)
 	}

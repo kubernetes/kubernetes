@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -26,7 +26,7 @@ export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/centos/config-d
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.sed" kube-dns.yaml
+  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.sed" kube-dns.yaml
   sed -i -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" kube-dns.yaml
   sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" kube-dns.yaml
 

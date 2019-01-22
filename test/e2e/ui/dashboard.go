@@ -33,6 +33,11 @@ import (
 )
 
 var _ = SIGDescribe("Kubernetes Dashboard", func() {
+	BeforeEach(func() {
+		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
+		framework.SkipIfProviderIs("gke")
+	})
+
 	const (
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
@@ -86,16 +91,5 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 			return status == http.StatusOK, nil
 		})
 		Expect(err).NotTo(HaveOccurred())
-
-		By("Checking that the ApiServer /ui endpoint redirects to a valid server.")
-		var status int
-		err = f.ClientSet.CoreV1().RESTClient().Get().
-			AbsPath(uiRedirect).
-			Timeout(framework.SingleCallTimeout).
-			Do().
-			StatusCode(&status).
-			Error()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(status).To(Equal(http.StatusOK), "Unexpected status from /ui")
 	})
 })

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ package k8s.io.kube_aggregator.pkg.apis.apiregistration.v1beta1;
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -89,6 +88,8 @@ message APIServiceSpec {
   optional bool insecureSkipTLSVerify = 4;
 
   // CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
+  // If unspecified, system trust roots on the apiserver are used.
+  // +optional
   optional bytes caBundle = 5;
 
   // GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
@@ -101,8 +102,14 @@ message APIServiceSpec {
 
   // VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero.
   // The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10).
-  // The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
   // Since it's inside of a group, the number can be small, probably in the 10s.
+  // In case of equal version priorities, the version string will be used to compute the order inside a group.
+  // If the version string is "kube-like", it will sort above non "kube-like" version strings, which are ordered
+  // lexicographically. "Kube-like" versions start with a "v", then are followed by a number (the major version),
+  // then optionally the string "alpha" or "beta" and another number (the minor version). These are sorted first
+  // by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major
+  // version, then minor version. An example sorted list of versions:
+  // v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
   optional int32 versionPriority = 8;
 }
 

@@ -17,6 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
+
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -41,19 +43,20 @@ type statefulSetStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
 var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
-func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+// DefaultGarbageCollectionPolicy returns OrphanDependents for apps/v1beta1 and apps/v1beta2 for backwards compatibility,
+// and DeleteDependents for all other versions.
+func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		switch groupVersion {
-		case appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-			// for back compatibility
-			return rest.OrphanDependents
-		default:
-			return rest.DeleteDependents
-		}
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	return rest.OrphanDependents
+	switch groupVersion {
+	case appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all StatefulSet' need to be within a namespace.
@@ -62,25 +65,24 @@ func (statefulSetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an StatefulSet before creation.
-func (statefulSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status
 	statefulSet.Status = apps.StatefulSetStatus{}
 
 	statefulSet.Generation = 1
 
-	pod.DropDisabledAlphaFields(&statefulSet.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 	// Update is not allowed to set status
 	newStatefulSet.Status = oldStatefulSet.Status
 
-	pod.DropDisabledAlphaFields(&newStatefulSet.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldStatefulSet.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
@@ -92,7 +94,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 }
 
 // Validate validates a new StatefulSet.
-func (statefulSetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	return validation.ValidateStatefulSet(statefulSet)
 }
@@ -107,7 +109,7 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (statefulSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
 	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 	return append(validationErrorList, updateErrorList...)
@@ -125,7 +127,7 @@ type statefulSetStatusStrategy struct {
 var StatusStrategy = statefulSetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (statefulSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 	// status changes are not allowed to update spec
@@ -133,7 +135,7 @@ func (statefulSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context,
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (statefulSetStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (statefulSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
 	return validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 }

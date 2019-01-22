@@ -2,7 +2,6 @@ package hcsshim
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -90,7 +89,7 @@ func GetHNSNetworkByName(networkName string) (*HNSNetwork, error) {
 			return &hnsnetwork, nil
 		}
 	}
-	return nil, fmt.Errorf("Network %v not found", networkName)
+	return nil, NetworkNotFoundError{NetworkName: networkName}
 }
 
 // Create Network by sending NetworkRequest to HNS.

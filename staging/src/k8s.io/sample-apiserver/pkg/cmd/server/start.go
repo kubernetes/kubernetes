@@ -31,8 +31,8 @@ import (
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
-	clientset "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
+	clientset "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
@@ -47,7 +47,11 @@ type WardleServerOptions struct {
 
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("wardle-apiserver", "wardle"),
+		),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -57,9 +61,9 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 }
 
 // NewCommandStartWardleServer provides a CLI handler for 'start master' command
-func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewWardleServerOptions(out, errOut)
-
+// with a default WardleServerOptions.
+func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
@@ -90,13 +94,16 @@ func (o WardleServerOptions) Validate(args []string) error {
 }
 
 func (o *WardleServerOptions) Complete() error {
+	// register admission plugins
+	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+
+	// add admisison plugins to the RecommendedPluginOrder
+	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
+
 	return nil
 }
 
 func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
-	// register admission plugins
-	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
-
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -137,6 +144,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 
 	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
 		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+		o.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 

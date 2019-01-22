@@ -3,9 +3,10 @@ package yaml
 import (
 	"encoding/base64"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
+	"time"
 )
 
 type resolveMapItem struct {
@@ -74,11 +75,13 @@ func longTag(tag string) string {
 
 func resolvableTag(tag string) bool {
 	switch tag {
-	case "", yaml_STR_TAG, yaml_BOOL_TAG, yaml_INT_TAG, yaml_FLOAT_TAG, yaml_NULL_TAG:
+	case "", yaml_STR_TAG, yaml_BOOL_TAG, yaml_INT_TAG, yaml_FLOAT_TAG, yaml_NULL_TAG, yaml_TIMESTAMP_TAG:
 		return true
 	}
 	return false
 }
+
+var yamlStyleFloat = regexp.MustCompile(`^[-+]?[0-9]*\.?[0-9]+([eE][-+][0-9]+)?$`)
 
 func resolve(tag string, in string) (rtag string, out interface{}) {
 	if !resolvableTag(tag) {
@@ -89,6 +92,19 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 		switch tag {
 		case "", rtag, yaml_STR_TAG, yaml_BINARY_TAG:
 			return
+		case yaml_FLOAT_TAG:
+			if rtag == yaml_INT_TAG {
+				switch v := out.(type) {
+				case int64:
+					rtag = yaml_FLOAT_TAG
+					out = float64(v)
+					return
+				case int:
+					rtag = yaml_FLOAT_TAG
+					out = float64(v)
+					return
+				}
+			}
 		}
 		failf("cannot decode %s `%s` as a %s", shortTag(rtag), in, shortTag(tag))
 	}()
@@ -122,6 +138,15 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 
 		case 'D', 'S':
 			// Int, float, or timestamp.
+			// Only try values as a timestamp if the value is unquoted or there's an explicit
+			// !!timestamp tag.
+			if tag == "" || tag == yaml_TIMESTAMP_TAG {
+				t, ok := parseTimestamp(in)
+				if ok {
+					return yaml_TIMESTAMP_TAG, t
+				}
+			}
+
 			plain := strings.Replace(in, "_", "", -1)
 			intv, err := strconv.ParseInt(plain, 0, 64)
 			if err == nil {
@@ -135,9 +160,11 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 			if err == nil {
 				return yaml_INT_TAG, uintv
 			}
-			floatv, err := strconv.ParseFloat(plain, 64)
-			if err == nil {
-				return yaml_FLOAT_TAG, floatv
+			if yamlStyleFloat.MatchString(plain) {
+				floatv, err := strconv.ParseFloat(plain, 64)
+				if err == nil {
+					return yaml_FLOAT_TAG, floatv
+				}
 			}
 			if strings.HasPrefix(plain, "0b") {
 				intv, err := strconv.ParseInt(plain[2:], 2, 64)
@@ -153,28 +180,20 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 					return yaml_INT_TAG, uintv
 				}
 			} else if strings.HasPrefix(plain, "-0b") {
-				intv, err := strconv.ParseInt(plain[3:], 2, 64)
+				intv, err := strconv.ParseInt("-" + plain[3:], 2, 64)
 				if err == nil {
-					if intv == int64(int(intv)) {
-						return yaml_INT_TAG, -int(intv)
+					if true || intv == int64(int(intv)) {
+						return yaml_INT_TAG, int(intv)
 					} else {
-						return yaml_INT_TAG, -intv
+						return yaml_INT_TAG, intv
 					}
 				}
 			}
-			// XXX Handle timestamps here.
-
 		default:
 			panic("resolveTable item not yet handled: " + string(rune(hint)) + " (with " + in + ")")
 		}
 	}
-	if tag == yaml_BINARY_TAG {
-		return yaml_BINARY_TAG, in
-	}
-	if utf8.ValidString(in) {
-		return yaml_STR_TAG, in
-	}
-	return yaml_BINARY_TAG, encodeBase64(in)
+	return yaml_STR_TAG, in
 }
 
 // encodeBase64 encodes s as base64 that is broken up into multiple lines
@@ -200,4 +219,40 @@ func encodeBase64(s string) string {
 		}
 	}
 	return string(out[:k])
+}
+
+// This is a subset of the formats allowed by the regular expression
+// defined at http://yaml.org/type/timestamp.html.
+var allowedTimestampFormats = []string{
+	"2006-1-2T15:4:5.999999999Z07:00", // RCF3339Nano with short date fields.
+	"2006-1-2t15:4:5.999999999Z07:00", // RFC3339Nano with short date fields and lower-case "t".
+	"2006-1-2 15:4:5.999999999",       // space separated with no time zone
+	"2006-1-2",                        // date only
+	// Notable exception: time.Parse cannot handle: "2001-12-14 21:59:43.10 -5"
+	// from the set of examples.
+}
+
+// parseTimestamp parses s as a timestamp string and
+// returns the timestamp and reports whether it succeeded.
+// Timestamp formats are defined at http://yaml.org/type/timestamp.html
+func parseTimestamp(s string) (time.Time, bool) {
+	// TODO write code to check all the formats supported by
+	// http://yaml.org/type/timestamp.html instead of using time.Parse.
+
+	// Quick check: all date formats start with YYYY-.
+	i := 0
+	for ; i < len(s); i++ {
+		if c := s[i]; c < '0' || c > '9' {
+			break
+		}
+	}
+	if i != 4 || i == len(s) || s[i] != '-' {
+		return time.Time{}, false
+	}
+	for _, format := range allowedTimestampFormats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }

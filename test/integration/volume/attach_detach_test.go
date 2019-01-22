@@ -17,24 +17,28 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -73,7 +77,67 @@ func fakePodWithVol(namespace string) *v1.Pod {
 	return fakePod
 }
 
+func fakePodWithPVC(name, pvcName, namespace string) (*v1.Pod, *v1.PersistentVolumeClaim) {
+	fakePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "fake-container",
+					Image: "nginx",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "fake-mount",
+							MountPath: "/var/www/html",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "fake-mount",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
+						},
+					},
+				},
+			},
+			NodeName: "node-sandbox",
+		},
+	}
+	class := "fake-sc"
+	fakePVC := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      pvcName,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("5Gi"),
+				},
+			},
+			StorageClassName: &class,
+		},
+	}
+	return fakePod, fakePVC
+}
+
 type podCountFunc func(int) bool
+
+var defaultTimerConfig = attachdetach.TimerConfig{
+	ReconcilerLoopPeriod:                              100 * time.Millisecond,
+	ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,
+	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Second,
+	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
+}
 
 // Via integration test we can verify that if pod delete
 // event is somehow missed by AttachDetach controller - it still
@@ -86,7 +150,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
@@ -94,7 +158,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
@@ -152,7 +216,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
@@ -160,7 +224,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -219,8 +283,8 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation:  "true",
-				volumehelper.KeepTerminatedPodVolumesAnnotation: "true",
+				util.ControllerManagedAttachAnnotation:  "true",
+				util.KeepTerminatedPodVolumesAnnotation: "true",
 			},
 		},
 	}
@@ -228,7 +292,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -320,10 +384,10 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, attachdetach.AttachDetachController, informers.SharedInformerFactory) {
+func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, informers.SharedInformerFactory) {
 	config := restclient.Config{
 		Host:          server.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           1000000,
 		Burst:         1000000,
 	}
@@ -346,14 +410,9 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
 	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
-	timers := attachdetach.TimerConfig{
-		ReconcilerLoopPeriod:                              100 * time.Millisecond,
-		ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,
-		DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Second,
-		DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
-	}
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
+		nil, /* csiClient */
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
@@ -368,7 +427,27 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
 	}
-	return testClient, ctrl, informers
+
+	// create pv controller
+	controllerOptions := persistentvolumeoptions.NewPersistentVolumeControllerOptions()
+	params := persistentvolume.ControllerParameters{
+		KubeClient:                testClient,
+		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
+		VolumePlugins:             plugins,
+		Cloud:                     nil,
+		ClusterName:               "volume-test-cluster",
+		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
+		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             informers.Storage().V1().StorageClasses(),
+		PodInformer:               informers.Core().V1().Pods(),
+		NodeInformer:              informers.Core().V1().Nodes(),
+		EnableDynamicProvisioning: false,
+	}
+	pvCtrl, err := persistentvolume.NewController(params)
+	if err != nil {
+		t.Fatalf("Failed to create PV controller: %v", err)
+	}
+	return testClient, ctrl, pvCtrl, informers
 }
 
 // Via integration test we can verify that if pod add
@@ -383,7 +462,7 @@ func TestPodAddedByDswp(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
@@ -391,7 +470,7 @@ func TestPodAddedByDswp(t *testing.T) {
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -445,4 +524,92 @@ func TestPodAddedByDswp(t *testing.T) {
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 200*time.Second, "expected 2 pods in dsw after pod addition", 2)
 
 	close(stopCh)
+}
+
+func TestPVCBoundWithADC(t *testing.T) {
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer closeFn()
+	namespaceName := "test-pod-deletion"
+
+	ns := framework.CreateTestingNamespace(namespaceName, server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	testClient, ctrl, pvCtrl, informers := createAdClients(ns, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
+		ReconcilerLoopPeriod:                        100 * time.Millisecond,
+		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
+		DesiredStateOfWorldPopulatorLoopSleepPeriod: 24 * time.Hour,
+		// Use high duration to disable DesiredStateOfWorldPopulator.findAndAddActivePods loop in test.
+		DesiredStateOfWorldPopulatorListPodsRetryDuration: 24 * time.Hour,
+	})
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-sandbox",
+			Annotations: map[string]string{
+				util.ControllerManagedAttachAnnotation: "true",
+			},
+		},
+	}
+	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+		t.Fatalf("Failed to created node : %v", err)
+	}
+
+	// pods with pvc not bound
+	pvcs := []*v1.PersistentVolumeClaim{}
+	for i := 0; i < 3; i++ {
+		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
+		if _, err := testClient.Core().Pods(pod.Namespace).Create(pod); err != nil {
+			t.Errorf("Failed to create pod : %v", err)
+		}
+		if _, err := testClient.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
+			t.Errorf("Failed to create pvc : %v", err)
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	// pod with no pvc
+	podNew := fakePodWithVol(namespaceName)
+	podNew.SetName("fakepod")
+	if _, err := testClient.Core().Pods(podNew.Namespace).Create(podNew); err != nil {
+		t.Errorf("Failed to create pod : %v", err)
+	}
+
+	// start controller loop
+	stopCh := make(chan struct{})
+	informers.Start(stopCh)
+	informers.WaitForCacheSync(stopCh)
+	go ctrl.Run(stopCh)
+	go pvCtrl.Run(stopCh)
+
+	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4)
+	// Give attachdetach controller enough time to populate pods into DSWP.
+	time.Sleep(10 * time.Second)
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 1 pod in dsw", 1)
+	for _, pvc := range pvcs {
+		createPVForPVC(t, testClient, pvc)
+	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 4 pods in dsw after PVCs are bound", 4)
+	close(stopCh)
+}
+
+// Create PV for PVC, pv controller will bind them together.
+func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.PersistentVolumeClaim) {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("fakepv-%s", pvc.Name),
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:    pvc.Spec.Resources.Requests,
+			AccessModes: pvc.Spec.AccessModes,
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/www/html",
+				},
+			},
+			ClaimRef:         &v1.ObjectReference{Name: pvc.Name, Namespace: pvc.Namespace},
+			StorageClassName: *pvc.Spec.StorageClassName,
+		},
+	}
+	if _, err := testClient.Core().PersistentVolumes().Create(pv); err != nil {
+		t.Errorf("Failed to create pv : %v", err)
+	}
 }

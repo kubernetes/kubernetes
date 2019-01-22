@@ -53,22 +53,29 @@ func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	return perfData
 }
 
-// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
-func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
-	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
-	item := perftype.DataItem{
+func latencyToPerfData(l LatencyMetric, name string) perftype.DataItem {
+	return perftype.DataItem{
 		Data: map[string]float64{
-			"Perc50":  float64(latency.Latency.Perc50) / 1000000, // us -> ms
-			"Perc90":  float64(latency.Latency.Perc90) / 1000000,
-			"Perc99":  float64(latency.Latency.Perc99) / 1000000,
-			"Perc100": float64(latency.Latency.Perc100) / 1000000,
+			"Perc50":  float64(l.Perc50) / 1000000, // us -> ms
+			"Perc90":  float64(l.Perc90) / 1000000,
+			"Perc99":  float64(l.Perc99) / 1000000,
+			"Perc100": float64(l.Perc100) / 1000000,
 		},
 		Unit: "ms",
 		Labels: map[string]string{
-			"Metric": "pod_startup",
+			"Metric": name,
 		},
 	}
-	perfData.DataItems = append(perfData.DataItems, item)
+}
+
+// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
+func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
+	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
+	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.CreateToScheduleLatency, "create_to_schedule"))
+	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToRunLatency, "schedule_to_run"))
+	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.RunToWatchLatency, "run_to_watch"))
+	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToWatchLatency, "schedule_to_watch"))
+	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.E2ELatency, "pod_startup"))
 	return perfData
 }
 

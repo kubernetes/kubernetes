@@ -37,7 +37,7 @@ func parseTimeOrDie(ts string) metav1.Time {
 	return metav1.Time{Time: t}
 }
 
-var benchmarkPod api.Pod = api.Pod{
+var benchmarkPod = api.Pod{
 	TypeMeta: metav1.TypeMeta{
 		Kind:       "Pod",
 		APIVersion: "v1",
@@ -64,7 +64,7 @@ var benchmarkPod api.Pod = api.Pod{
 		Containers: []api.Container{
 			{
 				Name:  "etcd-container",
-				Image: "gcr.io/google_containers/etcd:2.0.9",
+				Image: "k8s.gcr.io/etcd:2.0.9",
 				Command: []string{
 					"/usr/local/bin/etcd",
 					"--addr",
@@ -120,7 +120,7 @@ var benchmarkPod api.Pod = api.Pod{
 				},
 				Ready:        true,
 				RestartCount: 0,
-				Image:        "gcr.io/google_containers/etcd:2.0.9",
+				Image:        "k8s.gcr.io/etcd:2.0.9",
 				ImageID:      "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
 				ContainerID:  "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d",
 			},

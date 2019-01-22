@@ -6,6 +6,7 @@ go_library(
         "base64.go",
         "bcrypt.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/bcrypt",
     importpath = "golang.org/x/crypto/bcrypt",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/crypto/blowfish:go_default_library"],

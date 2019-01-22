@@ -31,10 +31,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 const (
@@ -131,7 +132,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 			}
 			break
 		}
-		glog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
+		klog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
 	It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func() {
@@ -169,7 +170,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		replicas1 := additionalNodes1 * replicasPerNode
 		replicas2 := additionalNodes2 * replicasPerNode
 
-		glog.Infof("cores per node: %v", coresPerNode)
+		klog.Infof("cores per node: %v", coresPerNode)
 
 		// saturate cluster
 		initialReplicas := nodeCount
@@ -177,7 +178,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		defer reservationCleanup()
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
-		glog.Infof("Reserved successfully")
+		klog.Infof("Reserved successfully")
 
 		// configure pending pods & expected scale up #1
 		rcConfig := reserveMemoryRCConfig(f, "extra-pod-1", replicas1, additionalNodes1*perNodeReservation, largeScaleUpTimeout)
@@ -190,7 +191,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		testCleanup1 := simpleScaleUpTestWithTolerance(f, config, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup1()
 
-		glog.Infof("Scaled up once")
+		klog.Infof("Scaled up once")
 
 		// configure pending pods & expected scale up #2
 		rcConfig2 := reserveMemoryRCConfig(f, "extra-pod-2", replicas2, additionalNodes2*perNodeReservation, largeScaleUpTimeout)
@@ -203,7 +204,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		testCleanup2 := simpleScaleUpTestWithTolerance(f, config2, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup2()
 
-		glog.Infof("Scaled up twice")
+		klog.Infof("Scaled up twice")
 	})
 
 	It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func() {
@@ -326,7 +327,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 		By("Checking if the number of nodes is as expected")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		glog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
+		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
 		Expect(len(nodes.Items)).Should(Equal(totalNodes))
 	})
 
@@ -347,7 +348,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		timeToWait := 5 * time.Minute
 		podsConfig := reserveMemoryRCConfig(f, "unschedulable-pod", unschedulablePodReplicas, totalMemReservation, timeToWait)
 		framework.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, podsConfig.Name)
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, podsConfig.Name)
 
 		// Ensure that no new nodes have been added so far.
 		Expect(framework.NumberOfReadyNodes(f.ClientSet)).To(Equal(nodeCount))
@@ -366,26 +367,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 	})
 
 })
-
-func makeUnschedulable(f *framework.Framework, nodes []v1.Node) error {
-	for _, node := range nodes {
-		err := makeNodeUnschedulable(f.ClientSet, &node)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func makeSchedulable(f *framework.Framework, nodes []v1.Node) error {
-	for _, node := range nodes {
-		err := makeNodeSchedulable(f.ClientSet, &node, false)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func anyKey(input map[string]int) string {
 	for k := range input {
@@ -409,7 +390,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	} else {
 		framework.ExpectNoError(framework.WaitForReadyNodes(f.ClientSet, config.expectedResult.nodes, scaleUpTimeout))
 	}
-	glog.Infof("cluster is increased")
+	klog.Infof("cluster is increased")
 	if tolerateMissingPodCount > 0 {
 		framework.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, tolerateMissingPodCount))
 	} else {
@@ -417,7 +398,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	}
 	timeTrack(start, fmt.Sprintf("Scale up to %v", config.expectedResult.nodes))
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, config.extraPods.Name)
+		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, config.extraPods.Name)
 	}
 }
 
@@ -432,7 +413,7 @@ func reserveMemoryRCConfig(f *framework.Framework, id string, replicas, megabyte
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        timeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		MemRequest:     int64(1024 * 1024 * megabytes / replicas),
 	}
@@ -492,7 +473,7 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        timeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		HostPorts:      map[string]int{"port1": port},
 		MemRequest:     request,
@@ -500,7 +481,7 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 	err := framework.RunRC(*config)
 	framework.ExpectNoError(err)
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, id)
+		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}
 }
 
@@ -540,11 +521,11 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 	framework.ExpectNoError(framework.RunRC(*rcConfig))
 	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, id)
+		return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}
 }
 
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
-	glog.Infof("%s took %s", name, elapsed)
+	klog.Infof("%s took %s", name, elapsed)
 }

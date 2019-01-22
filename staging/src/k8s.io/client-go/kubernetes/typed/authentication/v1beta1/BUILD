@@ -14,12 +14,13 @@ go_library(
         "tokenreview.go",
         "tokenreview_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     importpath = "k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     deps = [
-        "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/api/authentication/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

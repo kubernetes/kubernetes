@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
@@ -331,7 +333,7 @@ func TestDecodeObjects(t *testing.T) {
 	scheme := runtime.NewScheme()
 	for i, test := range testCases {
 		scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Carp{})
-		v1.AddToScheme(scheme)
+		require.NoError(t, v1.AddToScheme(scheme))
 		s := protobuf.NewSerializer(scheme, scheme, "application/protobuf")
 		obj, err := runtime.Decode(s, test.data)
 

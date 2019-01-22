@@ -140,9 +140,9 @@ func (b *Blob) Exists() (bool, error) {
 	headers := b.Container.bsc.client.getStandardHeaders()
 	resp, err := b.Container.bsc.client.exec(http.MethodHead, uri, headers, nil, b.Container.bsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusOK, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusOK, nil
 		}
 	}
 	return false, err
@@ -208,13 +208,13 @@ func (b *Blob) Get(options *GetBlobOptions) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return nil, err
 	}
-	if err := b.writeProperties(resp.headers, true); err != nil {
-		return resp.body, err
+	if err := b.writeProperties(resp.Header, true); err != nil {
+		return resp.Body, err
 	}
-	return resp.body, nil
+	return resp.Body, nil
 }
 
 // GetRange reads the specified range of a blob to a stream. The bytesRange
@@ -228,18 +228,18 @@ func (b *Blob) GetRange(options *GetBlobRangeOptions) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusPartialContent}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusPartialContent}); err != nil {
 		return nil, err
 	}
 	// Content-Length header should not be updated, as the service returns the range length
 	// (which is not alwys the full blob length)
-	if err := b.writeProperties(resp.headers, false); err != nil {
-		return resp.body, err
+	if err := b.writeProperties(resp.Header, false); err != nil {
+		return resp.Body, err
 	}
-	return resp.body, nil
+	return resp.Body, nil
 }
 
-func (b *Blob) getRange(options *GetBlobRangeOptions) (*storageResponse, error) {
+func (b *Blob) getRange(options *GetBlobRangeOptions) (*http.Response, error) {
 	params := url.Values{}
 	headers := b.Container.bsc.client.getStandardHeaders()
 
@@ -293,13 +293,13 @@ func (b *Blob) CreateSnapshot(options *SnapshotOptions) (snapshotTimestamp *time
 	if err != nil || resp == nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusCreated}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusCreated}); err != nil {
 		return nil, err
 	}
 
-	snapshotResponse := resp.headers.Get(http.CanonicalHeaderKey("x-ms-snapshot"))
+	snapshotResponse := resp.Header.Get(http.CanonicalHeaderKey("x-ms-snapshot"))
 	if snapshotResponse != "" {
 		snapshotTimestamp, err := time.Parse(time.RFC3339, snapshotResponse)
 		if err != nil {
@@ -340,12 +340,12 @@ func (b *Blob) GetProperties(options *GetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
-	return b.writeProperties(resp.headers, true)
+	return b.writeProperties(resp.Header, true)
 }
 
 func (b *Blob) writeProperties(h http.Header, includeContentLen bool) error {
@@ -463,8 +463,8 @@ func (b *Blob) SetProperties(options *SetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // SetBlobMetadataOptions includes the options for a set blob metadata operation
@@ -501,8 +501,8 @@ func (b *Blob) SetMetadata(options *SetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // GetBlobMetadataOptions includes the options for a get blob metadata operation
@@ -538,13 +538,13 @@ func (b *Blob) GetMetadata(options *GetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
 
-	b.writeMetadata(resp.headers)
+	b.writeMetadata(resp.Header)
 	return nil
 }
 
@@ -574,8 +574,8 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusAccepted})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
 // DeleteIfExists deletes the given blob from the specified container If the
@@ -585,15 +585,15 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 func (b *Blob) DeleteIfExists(options *DeleteBlobOptions) (bool, error) {
 	resp, err := b.delete(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
 }
 
-func (b *Blob) delete(options *DeleteBlobOptions) (*storageResponse, error) {
+func (b *Blob) delete(options *DeleteBlobOptions) (*http.Response, error) {
 	params := url.Values{}
 	headers := b.Container.bsc.client.getStandardHeaders()
 
@@ -621,9 +621,9 @@ func pathForResource(container, name string) string {
 	return fmt.Sprintf("/%s", container)
 }
 
-func (b *Blob) respondCreation(resp *storageResponse, bt BlobType) error {
-	readAndCloseBody(resp.body)
-	err := checkRespCode(resp.statusCode, []int{http.StatusCreated})
+func (b *Blob) respondCreation(resp *http.Response, bt BlobType) error {
+	defer drainRespBody(resp)
+	err := checkRespCode(resp, []int{http.StatusCreated})
 	if err != nil {
 		return err
 	}

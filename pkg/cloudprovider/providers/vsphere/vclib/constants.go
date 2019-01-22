@@ -16,7 +16,7 @@ limitations under the License.
 
 package vclib
 
-// Volume Constnts
+// Volume Constants
 const (
 	ThinDiskType             = "thin"
 	PreallocatedDiskType     = "preallocated"
@@ -53,7 +53,8 @@ const (
 
 // Test Constants
 const (
-	testDefaultDatacenter = "DC0"
-	testDefaultDatastore  = "LocalDS_0"
+	TestDefaultDatacenter = "DC0"
+	TestDefaultDatastore  = "LocalDS_0"
+	TestDefaultNetwork    = "VM Network"
 	testNameNotFound      = "enoent"
 )

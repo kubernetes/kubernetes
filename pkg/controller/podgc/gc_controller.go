@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -59,7 +59,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
-			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
+			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
 			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
@@ -73,8 +73,8 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Infof("Starting GC controller")
-	defer glog.Infof("Shutting down GC controller")
+	klog.Infof("Starting GC controller")
+	defer klog.Infof("Shutting down GC controller")
 
 	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
 		return
@@ -88,7 +88,7 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 func (gcc *PodGCController) gc() {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Error while listing all Pods: %v", err)
+		klog.Errorf("Error while listing all Pods: %v", err)
 		return
 	}
 	if gcc.terminatedPodThreshold > 0 {
@@ -122,7 +122,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		deleteCount = terminatedPodCount
 	}
 	if deleteCount > 0 {
-		glog.Infof("garbage collecting %v pods", deleteCount)
+		klog.Infof("garbage collecting %v pods", deleteCount)
 	}
 
 	var wait sync.WaitGroup
@@ -141,7 +141,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
-	glog.V(4).Infof("GC'ing orphaned")
+	klog.V(4).Infof("GC'ing orphaned")
 	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
 	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -159,29 +159,29 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 		if nodeNames.Has(pod.Spec.NodeName) {
 			continue
 		}
-		glog.V(2).Infof("Found orphaned Pod %v assigned to the Node %v. Deleting.", pod.Name, pod.Spec.NodeName)
+		klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(0).Infof("Forced deletion of orphaned Pod %s succeeded", pod.Name)
+			klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
 func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
-	glog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
+	klog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
 		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 {
 			continue
 		}
 
-		glog.V(2).Infof("Found unscheduled terminating Pod %v not assigned to any Node. Deleting.", pod.Name)
+		klog.V(2).Infof("Found unscheduled terminating Pod %v/%v not assigned to any Node. Deleting.", pod.Namespace, pod.Name)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(0).Infof("Forced deletion of unscheduled terminating Pod %s succeeded", pod.Name)
+			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }

@@ -9,6 +9,7 @@ go_library(
         "typeinfo.go",
         "xml.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/vim25/xml",
     importpath = "github.com/vmware/govmomi/vim25/xml",
     visibility = ["//visibility:public"],
 )

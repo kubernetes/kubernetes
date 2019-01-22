@@ -17,23 +17,28 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -45,10 +50,20 @@ type jobStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = jobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
-func (jobStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
-	return rest.OrphanDependents
+// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1 for backwards compatibility,
+// and DeleteDependents for all other versions.
+func (jobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	switch groupVersion {
+	case batchv1.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
@@ -57,25 +72,32 @@ func (jobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a job before creation.
-func (jobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
-	pod.DropDisabledAlphaFields(&job.Spec.Template.Spec)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+		job.Spec.TTLSecondsAfterFinished = nil
+	}
+
+	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (jobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	pod.DropDisabledAlphaFields(&newJob.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldJob.Spec.Template.Spec)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
+		newJob.Spec.TTLSecondsAfterFinished = nil
+	}
+
+	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 }
 
 // Validate validates a new job.
-func (jobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	// TODO: move UID generation earlier and do this in defaulting logic?
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
@@ -148,7 +170,7 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (jobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
 	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
 	return append(validationErrorList, updateErrorList...)
@@ -160,13 +182,13 @@ type jobStatusStrategy struct {
 
 var StatusStrategy = jobStatusStrategy{Strategy}
 
-func (jobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
 }
 
-func (jobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
 }
 

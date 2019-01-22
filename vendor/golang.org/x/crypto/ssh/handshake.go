@@ -78,6 +78,11 @@ type handshakeTransport struct {
 	dialAddress     string
 	remoteAddr      net.Addr
 
+	// bannerCallback is non-empty if we are the client and it has been set in
+	// ClientConfig. In that case it is called during the user authentication
+	// dance to handle a custom server's message.
+	bannerCallback BannerCallback
+
 	// Algorithms agreed in the last key exchange.
 	algorithms *algorithms
 
@@ -120,6 +125,7 @@ func newClientTransport(conn keyingTransport, clientVersion, serverVersion []byt
 	t.dialAddress = dialAddr
 	t.remoteAddr = addr
 	t.hostKeyCallback = config.HostKeyCallback
+	t.bannerCallback = config.BannerCallback
 	if config.HostKeyAlgorithms != nil {
 		t.hostKeyAlgorithms = config.HostKeyAlgorithms
 	} else {

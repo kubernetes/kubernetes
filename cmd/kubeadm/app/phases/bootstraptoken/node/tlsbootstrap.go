@@ -47,7 +47,7 @@ const (
 
 // AllowBootstrapTokensToPostCSRs creates RBAC rules in a way the makes Node Bootstrap Tokens able to post CSRs
 func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
-	fmt.Println("[bootstraptoken] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials")
+	fmt.Println("[bootstraptoken] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials")
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -69,7 +69,7 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 
 // AutoApproveNodeBootstrapTokens creates RBAC rules in a way that makes Node Bootstrap Tokens' CSR auto-approved by the csrapprover controller
 func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
-	fmt.Println("[bootstraptoken] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token")
+	fmt.Println("[bootstraptoken] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token")
 
 	// Always create this kubeadm-specific binding though
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
@@ -92,7 +92,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 
 // AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
 func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
-	fmt.Println("[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
+	fmt.Println("[bootstraptoken] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

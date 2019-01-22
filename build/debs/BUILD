@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
@@ -12,7 +13,7 @@ load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
 release_filegroup(
     name = "debs",
     srcs = [
-        ":cloud-controller-manager.deb",
+        ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -77,6 +78,16 @@ deb_data(
             "mode": "644",
             "dir": "/etc/systemd/system/kubelet.service.d",
         },
+        {
+            "files": ["kubeadm.conf"],
+            "mode": "644",
+            "dir": "/usr/lib/modules-load.d",
+        },
+        {
+            "files": ["50-kubeadm.conf"],
+            "mode": "644",
+            "dir": "/etc/sysctl.d",
+        },
     ],
 )
 
@@ -84,6 +95,12 @@ pkg_tar(
     name = "kubernetes-cni-data",
     package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
+)
+
+pkg_tar(
+    name = "cri-tools-data",
+    package_dir = "/usr/bin",
+    deps = ["@cri_tools//file"],
 )
 
 k8s_deb(
@@ -131,14 +148,15 @@ k8s_deb(
 k8s_deb(
     name = "kubelet",
     depends = [
-        "iptables (>= 1.4.21)",
-        "kubernetes-cni (>= 0.5.1)",
-        "iproute2",
-        "socat",
-        "util-linux",
-        "mount",
+        "conntrack",
         "ebtables",
         "ethtool",
+        "iproute2",
+        "iptables (>= 1.4.21)",
+        "kubernetes-cni (>= %s)" % CNI_VERSION,
+        "mount",
+        "socat",
+        "util-linux",
     ],
     description = """Kubernetes Node Agent
 The node agent of Kubernetes, the container cluster manager
@@ -151,11 +169,13 @@ k8s_deb(
     depends = [
         "kubelet (>= 1.8.0)",
         "kubectl (>= 1.8.0)",
-        "kubernetes-cni (>= 0.5.1)",
+        "kubernetes-cni (>= %s)" % CNI_VERSION,
+        "cri-tools (>= 1.11.0)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    postinst = "postinst",
     version_file = "//build:os_package_version",
 )
 
@@ -164,7 +184,13 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
-    version_file = "//build:cni_package_version",
+    version = CNI_VERSION,
+)
+
+k8s_deb(
+    name = "cri-tools",
+    description = """Container Runtime Interface tools (crictl)""",
+    version = CRI_TOOLS_VERSION,
 )
 
 filegroup(

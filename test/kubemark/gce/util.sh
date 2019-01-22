@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -25,34 +25,51 @@ function run-gcloud-compute-with-retries {
   run-cmd-with-retries gcloud compute "$@"
 }
 
-function create-master-instance-with-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
+function authenticate-docker {
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+}
 
-  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
-  
-  if [ "${EVENT_PD:-}" == "true" ]; then
-    run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} \
-      --type "${MASTER_DISK_TYPE}" \
-      --size "${MASTER_DISK_SIZE}"
-  fi
-  
-  run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
+# This function isn't too robust to race, but that should be ok given its one-off usage during setup.
+function get-or-create-master-ip {
+  MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') 2>/dev/null || true
+
+  if [[ -z "${MASTER_IP:-}" ]]; then
+    run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" -q
-  
-  MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
 
+    MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+  fi
+}
+
+function create-master-instance-with-resources {
+  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
   # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
   DEFAULT_GCI_PROJECT=google-containers
   if [[ "${GCI_VERSION}" == "cos"* ]]; then
       DEFAULT_GCI_PROJECT=cos-cloud
   fi
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+
+  run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
+    ${GCLOUD_COMMON_ARGS} \
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}" &
+  
+  if [ "${EVENT_PD:-}" == "true" ]; then
+    run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
+      ${GCLOUD_COMMON_ARGS} \
+      --type "${MASTER_DISK_TYPE}" \
+      --size "${MASTER_DISK_SIZE}" &
+  fi
+
+  get-or-create-master-ip &
+
+  wait
 
   run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
@@ -68,14 +85,14 @@ function create-master-instance-with-resources {
 
   run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
-    --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh"
+    --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh" &
   
   if [ "${EVENT_PD:-}" == "true" ]; then
     echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
     run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
     --disk "${MASTER_NAME}-event-pd" \
-    --device-name="master-event-pd"
+    --device-name="master-event-pd" &
   fi
   
   run-gcloud-compute-with-retries firewall-rules create "${MASTER_NAME}-https" \
@@ -83,7 +100,9 @@ function create-master-instance-with-resources {
     --network "${NETWORK}" \
     --source-ranges "0.0.0.0/0" \
     --target-tags "${MASTER_TAG}" \
-    --allow "tcp:443"
+    --allow "tcp:443" &
+
+  wait
 }
 
 # Command to be executed is '$1'.

@@ -1,9 +1,12 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cassandra-test-server
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: test-server
   template:
     metadata:
       labels:
@@ -11,7 +14,7 @@ spec:
     spec:
       containers:
       - name: test-server
-        image: gcr.io/google-containers/cassandra-e2e-test:0.1
+        image: k8s.gcr.io/cassandra-e2e-test:0.1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

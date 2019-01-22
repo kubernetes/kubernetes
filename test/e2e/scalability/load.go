@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -28,7 +29,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,11 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -52,8 +56,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -96,10 +98,18 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	testCaseBaseName := "load"
 	var testPhaseDurations *timer.TestPhaseTimer
+	var profileGathererStopCh chan struct{}
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
+		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
+		close(profileGathererStopCh)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		framework.GatherMemoryProfile("kube-apiserver", "load", &wg)
+		wg.Wait()
+
 		// Verify latency metrics
 		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
@@ -114,7 +124,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// We assume a default throughput of 10 pods/second throughput.
 	// We may want to revisit it in the future.
-	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	// However, this can be overridden by LOAD_TEST_THROUGHPUT env var.
 	throughput := 10
 	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
 		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
@@ -147,6 +157,10 @@ var _ = SIGDescribe("Load capacity", func() {
 		framework.ExpectNoError(err)
 
 		framework.ExpectNoError(framework.ResetMetrics(clientset))
+
+		// Start apiserver CPU profile gatherer with frequency based on cluster size.
+		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "load", profileGatheringDelay)
 	})
 
 	type Load struct {
@@ -159,6 +173,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		secretsPerPod    int
 		configMapsPerPod int
 		daemonsPerNode   int
+		quotas           bool
 	}
 
 	loadTests := []Load{
@@ -176,11 +191,18 @@ var _ = SIGDescribe("Load capacity", func() {
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		// Test with quotas
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+	}
+
+	isCanonical := func(test *Load) bool {
+		return test.podsPerNode == 30 && test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && !test.quotas
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
+		if isCanonical(&testArg) {
 			feature = "Performance"
 		}
 		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets, %v configmaps and %v daemons",
@@ -191,6 +213,9 @@ var _ = SIGDescribe("Load capacity", func() {
 			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
+		if testArg.quotas {
+			name += " with quotas"
+		}
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
@@ -203,6 +228,12 @@ var _ = SIGDescribe("Load capacity", func() {
 			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
 			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
 
+			if itArg.quotas {
+				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
+			}
+
+			f.AddonResourceConstraints = loadResourceConstraints()
+
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
@@ -210,10 +241,9 @@ var _ = SIGDescribe("Load capacity", func() {
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
-					_, err := clientset.CoreV1().Services(services[i].Namespace).Create(services[i])
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
-				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
+				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
@@ -221,10 +251,9 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
-						err := clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
-					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
+					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
@@ -260,9 +289,8 @@ var _ = SIGDescribe("Load capacity", func() {
 				}
 				daemonConfig.Run()
 				defer func(config *testutils.DaemonConfig) {
-					framework.ExpectNoError(framework.DeleteResourceAndPods(
+					framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
 						f.ClientSet,
-						f.InternalClientset,
 						extensions.Kind("DaemonSet"),
 						config.Namespace,
 						config.Name,
@@ -295,14 +323,12 @@ var _ = SIGDescribe("Load capacity", func() {
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
 			// Currently we assume that <throughput> pods/second average throughput.
-			// The expected number of created/deleted pods is less than totalPods/3.
-			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
+
+			// The expected number of created/deleted pods is totalPods/4 when scaling,
+			// as each RC changes its size from X to a uniform random value in [X/2, 3X/2].
+			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
 			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
-			By("============================================================================")
-
-			framework.Logf("Starting to scale %v objects second time...", itArg.kind)
-			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(400, "scaling second time"))
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
@@ -346,10 +372,10 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			TLSHandshakeTimeout: 10 * time.Second,
 			TLSClientConfig:     tlsConfig,
 			MaxIdleConnsPerHost: 100,
-			Dial: (&net.Dialer{
+			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
-			}).Dial,
+			}).DialContext,
 		})
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.
@@ -383,7 +409,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			return nil, nil, nil, err
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
@@ -403,6 +429,19 @@ func computePodCounts(total int) (int, int, int) {
 	total -= mediumGroupCount * mediumGroupSize
 	smallGroupCount := total / smallGroupSize
 	return smallGroupCount, mediumGroupCount, bigGroupCount
+}
+
+func loadResourceConstraints() map[string]framework.ResourceConstraint {
+	constraints := make(map[string]framework.ResourceConstraint)
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	return constraints
 }
 
 func generateConfigs(
@@ -502,7 +541,7 @@ func GenerateConfigsForGroup(
 			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
-			Timeout:        10 * time.Minute,
+			Timeout:        UnreadyNodeToleration,
 			Image:          image,
 			Command:        command,
 			Replicas:       size,
@@ -512,6 +551,19 @@ func GenerateConfigsForGroup(
 			ConfigMapNames: configMapNames,
 			// Define a label to group every 2 RCs into one service.
 			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+			Tolerations: []v1.Toleration{
+				{
+					Key:               "node.kubernetes.io/not-ready",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				}, {
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				},
+			},
 		}
 
 		if kind == randomKind {
@@ -622,7 +674,6 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
 		config.GetClient(),
-		config.GetInternalClient(),
 		config.GetScalesGetter(),
 		config.GetNamespace(),
 		config.GetName(),
@@ -644,7 +695,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 			return true, nil
 		}
 		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
-		if framework.IsRetryableAPIError(err) {
+		if testutils.IsRetryableAPIError(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("Failed to list pods from %v %v with non-retriable error: %v", config.GetKind(), config.GetName(), err)
@@ -668,15 +719,9 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
-	if framework.TestContext.GarbageCollectorEnabled && config.GetKind() != extensions.Kind("Deployment") {
-		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
-			config.GetClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
-			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
-	} else {
-		framework.ExpectNoError(framework.DeleteResourceAndPods(
-			config.GetClient(), config.GetInternalClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
-			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
-	}
+	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
+		config.GetClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+		fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 }
 
 func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {
@@ -690,4 +735,20 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 		namespaces = append(namespaces, namespace)
 	}
 	return namespaces, nil
+}
+
+func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
+	defer testPhase.End()
+	quotaTemplate := &v1.ResourceQuota{
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{"pods": *resource.NewQuantity(int64(podCount), resource.DecimalSI)},
+		},
+	}
+	for _, ns := range namespaces {
+		quotaTemplate.Name = ns.Name + "-quota"
+		if err := testutils.CreateResourceQuotaWithRetries(f.ClientSet, ns.Name, quotaTemplate); err != nil {
+			return fmt.Errorf("Error creating quota: %v", err)
+		}
+	}
+	return nil
 }

@@ -3,8 +3,8 @@ reviewers:
   - ixdy
   - jbeda
   - lavalamp
+  - spiffxp
   - zmerlynn
-  - spxtr
 approvers:
   - cblecker
   - ixdy
@@ -12,4 +12,3 @@ approvers:
   - lavalamp
   - zmerlynn
   - mikedanese
-  - spxtr

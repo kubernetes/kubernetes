@@ -19,15 +19,16 @@ a Deployment, but allows for maintaining state on storage volumes.
 
 ### Security
 
-Elasticsearch has capabilities to enable authorization using the
-[X-Pack plugin][xPack]. See configuration parameter `xpack.security.enabled`
-in Elasticsearch and Kibana configurations. It can also be set via the
-`XPACK_SECURITY_ENABLED` env variable. After enabling the feature,
-follow [official documentation][setupCreds] to set up credentials in
-Elasticsearch and Kibana. Don't forget to propagate those credentials also to
-Fluentd in its [configuration][fluentdCreds], using for example
-[environment variables][fluentdEnvVar]. You can utilize [ConfigMaps][configMap]
-and [Secrets][secret] to store credentials in the Kubernetes apiserver.
+Elasticsearch has capabilities to enable authorization using the [X-Pack
+plugin][xPack]. For the sake of simplicity this example uses the fully open
+source prebuild images from elastic that do not contain the X-Pack plugin. If
+you need these features, please consider building the images from either the
+"basic" or "platinum" version. After enabling these features, follow [official
+documentation][setupCreds] to set up credentials in Elasticsearch and Kibana.
+Don't forget to propagate those credentials also to Fluentd in its
+[configuration][fluentdCreds], using for example [environment
+variables][fluentdEnvVar]. You can utilize [ConfigMaps][configMap] and
+[Secrets][secret] to store credentials in the Kubernetes apiserver.
 
 ### Initialization
 

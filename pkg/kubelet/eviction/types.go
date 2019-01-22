@@ -48,18 +48,23 @@ type Config struct {
 	Thresholds []evictionapi.Threshold
 	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
 	KernelMemcgNotification bool
+	// PodCgroupRoot is the cgroup which contains all pods.
+	PodCgroupRoot string
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, capacityProvider CapacityProvider, monitoringInterval time.Duration)
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
 
 	// IsUnderDiskPressure returns true if the node is under disk pressure.
 	IsUnderDiskPressure() bool
+
+	// IsUnderPIDPressure returns true if the node is under PID pressure.
+	IsUnderPIDPressure() bool
 }
 
 // DiskInfoProvider is responsible for informing the manager how disk is configured.
@@ -68,25 +73,15 @@ type DiskInfoProvider interface {
 	HasDedicatedImageFs() (bool, error)
 }
 
-// CapacityProvider is responsible for providing the resource capacity and reservation information
-type CapacityProvider interface {
-	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
-	GetCapacity() v1.ResourceList
-	// GetNodeAllocatableReservation returns the amount of compute resources that have to be reserved from scheduling.
-	GetNodeAllocatableReservation() v1.ResourceList
-}
-
 // ImageGC is responsible for performing garbage collection of unused images.
 type ImageGC interface {
-	// DeleteUnusedImages deletes unused images and returns the number of bytes freed, and an error.
-	// This returns the bytes freed even if an error is returned.
-	DeleteUnusedImages() (int64, error)
+	// DeleteUnusedImages deletes unused images.
+	DeleteUnusedImages() error
 }
 
 // ContainerGC is responsible for performing garbage collection of unused containers.
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
-	// It returns an error if it is unsuccessful.
 	DeleteAllUnusedContainers() error
 }
 
@@ -131,17 +126,35 @@ type thresholdsObservedAt map[evictionapi.Threshold]time.Time
 type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time
 
 // nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
-// Returns the quantity of resources reclaimed and an error, if applicable.
-// nodeReclaimFunc return the resources reclaimed even if an error occurs.
-type nodeReclaimFunc func() (*resource.Quantity, error)
+type nodeReclaimFunc func() error
 
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc
 
-// thresholdNotifierHandlerFunc is a function that takes action in response to a crossed threshold
-type thresholdNotifierHandlerFunc func(thresholdDescription string)
+// CgroupNotifier generates events from cgroup events
+type CgroupNotifier interface {
+	// Start causes the CgroupNotifier to begin notifying on the eventCh
+	Start(eventCh chan<- struct{})
+	// Stop stops all processes and cleans up file descriptors associated with the CgroupNotifier
+	Stop()
+}
 
-// ThresholdNotifier notifies the user when an attribute crosses a threshold value
+// NotifierFactory creates CgroupNotifer
+type NotifierFactory interface {
+	// NewCgroupNotifier creates a CgroupNotifier that creates events when the threshold
+	// on the attribute in the cgroup specified by the path is crossed.
+	NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error)
+}
+
+// ThresholdNotifier manages CgroupNotifiers based on memory eviction thresholds, and performs a function
+// when memory eviction thresholds are crossed
 type ThresholdNotifier interface {
-	Start(stopCh <-chan struct{})
+	// Start calls the notifier function when the CgroupNotifier notifies the ThresholdNotifier that an event occurred
+	Start()
+	// UpdateThreshold updates the memory cgroup threshold based on the metrics provided.
+	// Calling UpdateThreshold with recent metrics allows the ThresholdNotifier to trigger at the
+	// eviction threshold more accurately
+	UpdateThreshold(summary *statsapi.Summary) error
+	// Description produces a relevant string describing the Memory Threshold Notifier
+	Description() string
 }

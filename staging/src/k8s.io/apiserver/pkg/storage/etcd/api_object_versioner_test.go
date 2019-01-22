@@ -56,8 +56,7 @@ func TestEtcdParseResourceVersion(t *testing.T) {
 
 	v := APIObjectVersioner{}
 	testFuncs := []func(string) (uint64, error){
-		v.ParseListResourceVersion,
-		v.ParseWatchResourceVersion,
+		v.ParseResourceVersion,
 	}
 
 	for _, testCase := range testCases {

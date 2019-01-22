@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "entrypoint-tester",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/entrypoint-tester",
 )
 
 go_library(

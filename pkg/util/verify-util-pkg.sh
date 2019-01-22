@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -41,7 +41,7 @@ pushd "${BASH_DIR}" > /dev/null
   done
 popd > /dev/null
 
-if [[ ${ret} > 0 ]]; then
+if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
 

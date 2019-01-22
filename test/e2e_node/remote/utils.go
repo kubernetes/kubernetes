@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // utils.go contains functions used across test suites.
@@ -52,11 +52,11 @@ const cniConfig = `{
 // Install the cni plugin and add basic bridge configuration to the
 // configuration directory.
 func setupCNI(host, workspace string) error {
-	glog.V(2).Infof("Install CNI on %q", host)
+	klog.V(2).Infof("Install CNI on %q", host)
 	cniPath := filepath.Join(workspace, cniDirectory)
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniPath),
-		fmt.Sprintf("wget -O - %s | tar -xz -C %s", cniURL, cniPath),
+		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", cniURL, cniPath),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)
@@ -65,7 +65,7 @@ func setupCNI(host, workspace string) error {
 	// The added CNI network config is not needed for kubenet. It is only
 	// used when testing the CNI network plugin, but is added in both cases
 	// for consistency and simplicity.
-	glog.V(2).Infof("Adding CNI configuration on %q", host)
+	klog.V(2).Infof("Adding CNI configuration on %q", host)
 	cniConfigPath := filepath.Join(workspace, cniConfDirectory)
 	cmd = getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniConfigPath),
@@ -79,7 +79,7 @@ func setupCNI(host, workspace string) error {
 
 // configureFirewall configures iptable firewall rules.
 func configureFirewall(host string) error {
-	glog.V(2).Infof("Configure iptables firewall rules on %q", host)
+	klog.V(2).Infof("Configure iptables firewall rules on %q", host)
 	// TODO: consider calling bootstrap script to configure host based on OS
 	output, err := SSH(host, "iptables", "-L", "INPUT")
 	if err != nil {
@@ -114,7 +114,7 @@ func configureFirewall(host string) error {
 
 // cleanupNodeProcesses kills all running node processes may conflict with the test.
 func cleanupNodeProcesses(host string) {
-	glog.V(2).Infof("Killing any existing node processes on %q", host)
+	klog.V(2).Infof("Killing any existing node processes on %q", host)
 	cmd := getSSHCommand(" ; ",
 		"pkill kubelet",
 		"pkill kube-apiserver",

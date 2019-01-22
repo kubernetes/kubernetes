@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["rpc.pb.gw.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/etcdserverpb/gw",
     importpath = "github.com/coreos/etcd/etcdserver/etcdserverpb/gw",
     visibility = ["//visibility:public"],
     deps = [

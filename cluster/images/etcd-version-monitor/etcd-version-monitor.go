@@ -17,18 +17,20 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	goflag "flag"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 // Initialize the prometheus instrumentation and client related flags.
@@ -96,6 +98,13 @@ var (
 						renameLabels(mf, map[string]string{
 							"grpc_method":  "method",
 							"grpc_service": "service",
+						})
+						filterMetricsByLabels(mf, map[string]string{
+							"grpc_type": "unary",
+						})
+						groupCounterMetricsByLabels(mf, map[string]bool{
+							"grpc_type": true,
+							"grpc_code": true,
 						})
 						return mf, nil
 					},
@@ -236,7 +245,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 	lastSeenBinaryVersion := ""
 	for {
 		if err := getVersion(&lastSeenBinaryVersion); err != nil {
-			glog.Errorf("Failed to fetch etcd version: %v", err)
+			klog.Errorf("Failed to fetch etcd version: %v", err)
 		}
 		select {
 		case <-stopCh:
@@ -277,6 +286,62 @@ func renameLabels(mf *dto.MetricFamily, nameMapping map[string]string) {
 				lbl.Name = &alias
 			}
 		}
+	}
+}
+
+func filterMetricsByLabels(mf *dto.MetricFamily, labelValues map[string]string) {
+	buf := mf.Metric[:0]
+	for _, m := range mf.Metric {
+		shouldRemove := false
+		for _, lbl := range m.Label {
+			if val, ok := labelValues[*lbl.Name]; ok && val != *lbl.Value {
+				shouldRemove = true
+				break
+			}
+		}
+		if !shouldRemove {
+			buf = append(buf, m)
+		}
+	}
+	mf.Metric = buf
+}
+
+func groupCounterMetricsByLabels(mf *dto.MetricFamily, names map[string]bool) {
+	buf := mf.Metric[:0]
+	deleteLabels(mf, names)
+	byLabels := map[string]*dto.Metric{}
+	for _, m := range mf.Metric {
+		if metric, ok := byLabels[labelsKey(m.Label)]; ok {
+			metric.Counter.Value = proto.Float64(*metric.Counter.Value + *m.Counter.Value)
+		} else {
+			byLabels[labelsKey(m.Label)] = m
+			buf = append(buf, m)
+		}
+	}
+	mf.Metric = buf
+}
+
+func labelsKey(lbls []*dto.LabelPair) string {
+	var buf bytes.Buffer
+	for i, lbl := range lbls {
+		buf.WriteString(lbl.String())
+		if i < len(lbls)-1 {
+			buf.WriteString(",")
+		}
+	}
+	return buf.String()
+}
+
+func deleteLabels(mf *dto.MetricFamily, names map[string]bool) {
+	for _, m := range mf.Metric {
+		buf := m.Label[:0]
+		for _, lbl := range m.Label {
+			shouldRemove := names[*lbl.Name]
+			if !shouldRemove {
+				buf = append(buf, lbl)
+			}
+		}
+		m.Label = buf
 	}
 }
 
@@ -334,7 +399,7 @@ func main() {
 	go getVersionPeriodically(stopCh)
 
 	// Serve our metrics on listenAddress/metricsPath.
-	glog.Infof("Listening on: %v", listenAddress)
+	klog.Infof("Listening on: %v", listenAddress)
 	http.Handle(metricsPath, promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
-	glog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
+	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
 }

@@ -21,34 +21,26 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/apis/example"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
 	resource := metav1.ObjectMeta{}
-	FillObjectMetaSystemFields(ctx, &resource)
+	FillObjectMetaSystemFields(&resource)
 	if resource.CreationTimestamp.Time.IsZero() {
 		t.Errorf("resource.CreationTimestamp is zero")
 	} else if len(resource.UID) == 0 {
 		t.Errorf("resource.UID missing")
 	}
-	// verify we can inject a UID
-	uid := uuid.NewUUID()
-	ctx = genericapirequest.WithUID(ctx, uid)
-	resource = metav1.ObjectMeta{}
-	FillObjectMetaSystemFields(ctx, &resource)
-	if resource.UID != uid {
-		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
+	if len(resource.UID) == 0 {
+		t.Errorf("resource.UID missing")
 	}
 }
 
 // TestHasObjectMetaSystemFieldValues validates that true is returned if and only if all fields are populated
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
 	resource := metav1.ObjectMeta{}
 	objMeta, err := meta.Accessor(&resource)
 	if err != nil {
@@ -57,7 +49,7 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	if metav1.HasObjectMetaSystemFieldValues(objMeta) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
 	}
-	FillObjectMetaSystemFields(ctx, &resource)
+	FillObjectMetaSystemFields(&resource)
 	if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
 	}

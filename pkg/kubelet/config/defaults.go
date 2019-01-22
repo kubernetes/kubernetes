@@ -17,10 +17,13 @@ limitations under the License.
 package config
 
 const (
-	DefaultKubeletPodsDirName             = "pods"
-	DefaultKubeletVolumesDirName          = "volumes"
-	DefaultKubeletVolumeDevicesDirName    = "volumeDevices"
-	DefaultKubeletPluginsDirName          = "plugins"
-	DefaultKubeletContainersDirName       = "containers"
-	DefaultKubeletPluginContainersDirName = "plugin-containers"
+	DefaultKubeletPodsDirName                = "pods"
+	DefaultKubeletVolumesDirName             = "volumes"
+	DefaultKubeletVolumeSubpathsDirName      = "volume-subpaths"
+	DefaultKubeletVolumeDevicesDirName       = "volumeDevices"
+	DefaultKubeletPluginsDirName             = "plugins"
+	DefaultKubeletPluginsRegistrationDirName = "plugins_registry"
+	DefaultKubeletContainersDirName          = "containers"
+	DefaultKubeletPluginContainersDirName    = "plugin-containers"
+	DefaultKubeletPodResourcesDirName        = "pod-resources"
 )

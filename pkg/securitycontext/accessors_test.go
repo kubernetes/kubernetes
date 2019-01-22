@@ -27,6 +27,7 @@ import (
 func TestPodSecurityContextAccessor(t *testing.T) {
 	fsGroup := int64(2)
 	runAsUser := int64(1)
+	runAsGroup := int64(1)
 	runAsNonRoot := true
 
 	testcases := []*api.PodSecurityContext{
@@ -38,6 +39,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		{HostPID: true},
 		{RunAsNonRoot: &runAsNonRoot},
 		{RunAsUser: &runAsUser},
+		{RunAsGroup: &runAsGroup},
 		{SELinuxOptions: &api.SELinuxOptions{User: "bob"}},
 		{SupplementalGroups: []int64{1, 2, 3}},
 	}
@@ -68,6 +70,9 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		if v := a.RunAsUser(); !reflect.DeepEqual(expected.RunAsUser, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsUser, v)
 		}
+		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
+		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
 		}
@@ -95,6 +100,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 					HostPID:            true,
 					SELinuxOptions:     &api.SELinuxOptions{},
 					RunAsUser:          nil,
+					RunAsGroup:         nil,
 					RunAsNonRoot:       nil,
 					SupplementalGroups: nil,
 					FSGroup:            nil,
@@ -123,6 +129,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m.SetHostPID(m.HostPID())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
+			m.SetRunAsGroup(m.RunAsGroup())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			m.SetSupplementalGroups(m.SupplementalGroups())
 			if !reflect.DeepEqual(sc, originalSC) {
@@ -202,6 +209,19 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			i := int64(1123)
 			modifiedSC.RunAsUser = &i
 			m.SetRunAsUser(&i)
+			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
+				continue
+			}
+		}
+
+		// RunAsGroup
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewPodSecurityContextMutator(tc.newSC())
+			i := int64(1123)
+			modifiedSC.RunAsGroup = &i
+			m.SetRunAsGroup(&i)
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue
@@ -429,6 +449,8 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 	privileged := true
 	runAsUser := int64(1)
 	runAsUserPod := int64(12)
+	runAsGroup := int64(1)
+	runAsGroupPod := int64(12)
 	runAsNonRoot := true
 	runAsNonRootPod := false
 	readOnlyRootFilesystem := true
@@ -498,6 +520,26 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 				RunAsUser:                &runAsUser,
 				RunAsNonRoot:             &runAsNonRoot,
 				SELinuxOptions:           &api.SELinuxOptions{User: "bob"},
+			},
+		},
+		{
+			PodSC: &api.PodSecurityContext{
+				RunAsGroup: &runAsGroup,
+			},
+			SC: nil,
+			Effective: &api.SecurityContext{
+				RunAsGroup: &runAsGroup,
+			},
+		},
+		{
+			PodSC: &api.PodSecurityContext{
+				RunAsGroup: &runAsGroupPod,
+			},
+			SC: &api.SecurityContext{
+				RunAsGroup: &runAsGroup,
+			},
+			Effective: &api.SecurityContext{
+				RunAsGroup: &runAsGroup,
 			},
 		},
 	}

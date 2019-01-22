@@ -25,16 +25,20 @@ import (
 
 // SetFeatureGateDuringTest sets the specified gate to the specified value, and returns a function that restores the original value.
 // Failures to set or restore cause the test to fail.
-func SetFeatureGateDuringTest(t *testing.T, gate feature.FeatureGate, feature feature.Feature, value bool) func() {
-	originalValue := gate.Enabled(feature)
+//
+// Example use:
+//
+// defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
+func SetFeatureGateDuringTest(tb testing.TB, gate feature.FeatureGate, f feature.Feature, value bool) func() {
+	originalValue := gate.Enabled(f)
 
-	if err := gate.Set(fmt.Sprintf("%s=%v", feature, value)); err != nil {
-		t.Errorf("error setting %s=%v: %v", feature, value, err)
+	if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
+		tb.Errorf("error setting %s=%v: %v", f, value, err)
 	}
 
 	return func() {
-		if err := gate.Set(fmt.Sprintf("%s=%v", feature, originalValue)); err != nil {
-			t.Errorf("error restoring %s=%v: %v", feature, originalValue, err)
+		if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
+			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
 	}
 }

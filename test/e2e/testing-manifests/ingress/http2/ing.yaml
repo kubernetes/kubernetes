@@ -1,0 +1,9 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: echomap
+spec:
+  # kubemci requires a default backend.
+  backend:
+    serviceName: echoheaders
+    servicePort: 443

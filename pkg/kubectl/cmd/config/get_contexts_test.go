@@ -17,11 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -61,7 +61,7 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 		names:          []string{},
 		noHeader:       true,
 		nameOnly:       false,
-		expectedOut:    "*         shaker-context   big-cluster   blue-user   saw-ns\n",
+		expectedOut:    "*     shaker-context   big-cluster   blue-user   saw-ns\n",
 	}
 	test.run(t)
 }
@@ -157,11 +157,11 @@ func (test getContextsTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	options := GetContextsOptions{
 		configAccess: pathOptions,
 	}
-	cmd := NewCmdConfigGetContexts(buf, options.configAccess)
+	cmd := NewCmdConfigGetContexts(streams, options.configAccess)
 	if test.nameOnly {
 		cmd.Flags().Set("output", "name")
 	}
@@ -171,7 +171,7 @@ func (test getContextsTest) run(t *testing.T) {
 	cmd.Run(cmd, test.names)
 	if len(test.expectedOut) != 0 {
 		if buf.String() != test.expectedOut {
-			t.Errorf("Expected %v, but got %v", test.expectedOut, buf.String())
+			t.Errorf("Expected\n%s\ngot\n%s", test.expectedOut, buf.String())
 		}
 		return
 	}

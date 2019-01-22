@@ -56,6 +56,8 @@ import (
 	stpb "github.com/golang/protobuf/ptypes/struct"
 )
 
+const secondInNanos = int64(time.Second / time.Nanosecond)
+
 // Marshaler is a configurable object for converting between
 // protocol buffer objects and a JSON representation for them.
 type Marshaler struct {
@@ -118,6 +120,14 @@ type JSONPBUnmarshaler interface {
 
 // Marshal marshals a protocol buffer into JSON.
 func (m *Marshaler) Marshal(out io.Writer, pb proto.Message) error {
+	v := reflect.ValueOf(pb)
+	if pb == nil || (v.Kind() == reflect.Ptr && v.IsNil()) {
+		return errors.New("Marshal called with nil")
+	}
+	// Check for unset required fields first.
+	if err := checkRequiredFields(pb); err != nil {
+		return err
+	}
 	writer := &errWriter{writer: out}
 	return m.marshalObject(writer, pb, "", "")
 }
@@ -190,13 +200,22 @@ func (m *Marshaler) marshalObject(out *errWriter, v proto.Message, indent, typeU
 			// Any is a bit more involved.
 			return m.marshalAny(out, v, indent)
 		case "Duration":
-			// "Generated output always contains 3, 6, or 9 fractional digits,
+			// "Generated output always contains 0, 3, 6, or 9 fractional digits,
 			//  depending on required precision."
 			s, ns := s.Field(0).Int(), s.Field(1).Int()
-			d := time.Duration(s)*time.Second + time.Duration(ns)*time.Nanosecond
-			x := fmt.Sprintf("%.9f", d.Seconds())
+			if ns <= -secondInNanos || ns >= secondInNanos {
+				return fmt.Errorf("ns out of range (%v, %v)", -secondInNanos, secondInNanos)
+			}
+			if (s > 0 && ns < 0) || (s < 0 && ns > 0) {
+				return errors.New("signs of seconds and nanos do not match")
+			}
+			if s < 0 {
+				ns = -ns
+			}
+			x := fmt.Sprintf("%d.%09d", s, ns)
 			x = strings.TrimSuffix(x, "000")
 			x = strings.TrimSuffix(x, "000")
+			x = strings.TrimSuffix(x, ".000")
 			out.write(`"`)
 			out.write(x)
 			out.write(`s"`)
@@ -207,13 +226,17 @@ func (m *Marshaler) marshalObject(out *errWriter, v proto.Message, indent, typeU
 			return m.marshalValue(out, &proto.Properties{}, s.Field(0), indent)
 		case "Timestamp":
 			// "RFC 3339, where generated output will always be Z-normalized
-			//  and uses 3, 6 or 9 fractional digits."
+			//  and uses 0, 3, 6 or 9 fractional digits."
 			s, ns := s.Field(0).Int(), s.Field(1).Int()
+			if ns < 0 || ns >= secondInNanos {
+				return fmt.Errorf("ns out of range [0, %v)", secondInNanos)
+			}
 			t := time.Unix(s, ns).UTC()
 			// time.RFC3339Nano isn't exactly right (we need to get 3/6/9 fractional digits).
 			x := t.Format("2006-01-02T15:04:05.000000000")
 			x = strings.TrimSuffix(x, "000")
 			x = strings.TrimSuffix(x, "000")
+			x = strings.TrimSuffix(x, ".000")
 			out.write(`"`)
 			out.write(x)
 			out.write(`Z"`)
@@ -632,7 +655,10 @@ func (u *Unmarshaler) UnmarshalNext(dec *json.Decoder, pb proto.Message) error {
 	if err := dec.Decode(&inputValue); err != nil {
 		return err
 	}
-	return u.unmarshalValue(reflect.ValueOf(pb).Elem(), inputValue, nil)
+	if err := u.unmarshalValue(reflect.ValueOf(pb).Elem(), inputValue, nil); err != nil {
+		return err
+	}
+	return checkRequiredFields(pb)
 }
 
 // Unmarshal unmarshals a JSON object stream into a protocol
@@ -803,7 +829,7 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMe
 				return fmt.Errorf("bad ListValue: %v", err)
 			}
 
-			target.Field(0).Set(reflect.ValueOf(make([]*stpb.Value, len(s), len(s))))
+			target.Field(0).Set(reflect.ValueOf(make([]*stpb.Value, len(s))))
 			for i, sv := range s {
 				if err := u.unmarshalValue(target.Field(0).Index(i), sv, prop); err != nil {
 					return err
@@ -973,13 +999,6 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMe
 		}
 		if mp != nil {
 			target.Set(reflect.MakeMap(targetType))
-			var keyprop, valprop *proto.Properties
-			if prop != nil {
-				// These could still be nil if the protobuf metadata is broken somehow.
-				// TODO: This won't work because the fields are unexported.
-				// We should probably just reparse them.
-				//keyprop, valprop = prop.mkeyprop, prop.mvalprop
-			}
 			for ks, raw := range mp {
 				// Unmarshal map key. The core json library already decoded the key into a
 				// string, so we handle that specially. Other types were quoted post-serialization.
@@ -988,14 +1007,16 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMe
 					k = reflect.ValueOf(ks)
 				} else {
 					k = reflect.New(targetType.Key()).Elem()
-					if err := u.unmarshalValue(k, json.RawMessage(ks), keyprop); err != nil {
+					// TODO: pass the correct Properties if needed.
+					if err := u.unmarshalValue(k, json.RawMessage(ks), nil); err != nil {
 						return err
 					}
 				}
 
 				// Unmarshal map value.
 				v := reflect.New(targetType.Elem()).Elem()
-				if err := u.unmarshalValue(v, raw, valprop); err != nil {
+				// TODO: pass the correct Properties if needed.
+				if err := u.unmarshalValue(v, raw, nil); err != nil {
 					return err
 				}
 				target.SetMapIndex(k, v)
@@ -1080,4 +1101,141 @@ func (s mapKeys) Less(i, j int) bool {
 		}
 	}
 	return fmt.Sprint(s[i].Interface()) < fmt.Sprint(s[j].Interface())
+}
+
+// checkRequiredFields returns an error if any required field in the given proto message is not set.
+// This function is used by both Marshal and Unmarshal.  While required fields only exist in a
+// proto2 message, a proto3 message can contain proto2 message(s).
+func checkRequiredFields(pb proto.Message) error {
+	// Most well-known type messages do not contain required fields.  The "Any" type may contain
+	// a message that has required fields.
+	//
+	// When an Any message is being marshaled, the code will invoked proto.Unmarshal on Any.Value
+	// field in order to transform that into JSON, and that should have returned an error if a
+	// required field is not set in the embedded message.
+	//
+	// When an Any message is being unmarshaled, the code will have invoked proto.Marshal on the
+	// embedded message to store the serialized message in Any.Value field, and that should have
+	// returned an error if a required field is not set.
+	if _, ok := pb.(wkt); ok {
+		return nil
+	}
+
+	v := reflect.ValueOf(pb)
+	// Skip message if it is not a struct pointer.
+	if v.Kind() != reflect.Ptr {
+		return nil
+	}
+	v = v.Elem()
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		sfield := v.Type().Field(i)
+
+		if sfield.PkgPath != "" {
+			// blank PkgPath means the field is exported; skip if not exported
+			continue
+		}
+
+		if strings.HasPrefix(sfield.Name, "XXX_") {
+			continue
+		}
+
+		// Oneof field is an interface implemented by wrapper structs containing the actual oneof
+		// field, i.e. an interface containing &T{real_value}.
+		if sfield.Tag.Get("protobuf_oneof") != "" {
+			if field.Kind() != reflect.Interface {
+				continue
+			}
+			v := field.Elem()
+			if v.Kind() != reflect.Ptr || v.IsNil() {
+				continue
+			}
+			v = v.Elem()
+			if v.Kind() != reflect.Struct || v.NumField() < 1 {
+				continue
+			}
+			field = v.Field(0)
+			sfield = v.Type().Field(0)
+		}
+
+		protoTag := sfield.Tag.Get("protobuf")
+		if protoTag == "" {
+			continue
+		}
+		var prop proto.Properties
+		prop.Init(sfield.Type, sfield.Name, protoTag, &sfield)
+
+		switch field.Kind() {
+		case reflect.Map:
+			if field.IsNil() {
+				continue
+			}
+			// Check each map value.
+			keys := field.MapKeys()
+			for _, k := range keys {
+				v := field.MapIndex(k)
+				if err := checkRequiredFieldsInValue(v); err != nil {
+					return err
+				}
+			}
+		case reflect.Slice:
+			// Handle non-repeated type, e.g. bytes.
+			if !prop.Repeated {
+				if prop.Required && field.IsNil() {
+					return fmt.Errorf("required field %q is not set", prop.Name)
+				}
+				continue
+			}
+
+			// Handle repeated type.
+			if field.IsNil() {
+				continue
+			}
+			// Check each slice item.
+			for i := 0; i < field.Len(); i++ {
+				v := field.Index(i)
+				if err := checkRequiredFieldsInValue(v); err != nil {
+					return err
+				}
+			}
+		case reflect.Ptr:
+			if field.IsNil() {
+				if prop.Required {
+					return fmt.Errorf("required field %q is not set", prop.Name)
+				}
+				continue
+			}
+			if err := checkRequiredFieldsInValue(field); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Handle proto2 extensions.
+	for _, ext := range proto.RegisteredExtensions(pb) {
+		if !proto.HasExtension(pb, ext) {
+			continue
+		}
+		ep, err := proto.GetExtension(pb, ext)
+		if err != nil {
+			return err
+		}
+		err = checkRequiredFieldsInValue(reflect.ValueOf(ep))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func checkRequiredFieldsInValue(v reflect.Value) error {
+	if pm, ok := v.Interface().(proto.Message); ok {
+		return checkRequiredFields(pm)
+	}
+	return nil
 }

@@ -2,7 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["uuid.go"],
+    srcs = [
+        "codec.go",
+        "generator.go",
+        "sql.go",
+        "uuid.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/satori/go.uuid",
     importpath = "github.com/satori/go.uuid",
     visibility = ["//visibility:public"],
 )

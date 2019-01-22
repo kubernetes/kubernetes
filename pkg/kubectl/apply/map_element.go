@@ -70,3 +70,17 @@ func mapCast(i interface{}) map[string]interface{} {
 	}
 	return i.(map[string]interface{})
 }
+
+// HasConflict returns ConflictError if some elements in map conflict.
+func (e MapElement) HasConflict() error {
+	for _, item := range e.GetValues() {
+		if item, ok := item.(ConflictDetector); ok {
+			if err := item.HasConflict(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+var _ ConflictDetector = &MapElement{}

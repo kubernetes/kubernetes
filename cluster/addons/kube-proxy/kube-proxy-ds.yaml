@@ -1,7 +1,7 @@
 # Please keep kube-proxy configuration in-sync with:
 # cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
@@ -24,7 +24,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
-      {{pod_priority}}
+      priorityClassName: system-node-critical
       hostNetwork: true
       nodeSelector:
         beta.kubernetes.io/kube-proxy-ds-ready: "true"

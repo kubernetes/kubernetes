@@ -11,13 +11,14 @@ import (
 // sort by a particular network attribute. SortDir sets the direction, and is
 // either `asc' or `desc'. Marker and Limit are used for pagination.
 type ListOpts struct {
-	ID       string `q:"id"`
-	Name     string `q:"name"`
-	TenantID string `q:"tenant_id"`
-	Limit    int    `q:"limit"`
-	Marker   string `q:"marker"`
-	SortKey  string `q:"sort_key"`
-	SortDir  string `q:"sort_dir"`
+	ID        string `q:"id"`
+	Name      string `q:"name"`
+	TenantID  string `q:"tenant_id"`
+	ProjectID string `q:"project_id"`
+	Limit     int    `q:"limit"`
+	Marker    string `q:"marker"`
+	SortKey   string `q:"sort_key"`
+	SortDir   string `q:"sort_dir"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of
@@ -45,9 +46,13 @@ type CreateOpts struct {
 	// Human-readable name for the Security Group. Does not have to be unique.
 	Name string `json:"name" required:"true"`
 
-	// The UUID of the tenant who owns the Group. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Group.
+	// Only administrative users can specify a tenant UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Group.
+	// Only administrative users can specify a tenant UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// Describes the security group.
 	Description string `json:"description,omitempty"`

@@ -1,3 +1,5 @@
+//+build !windows
+
 /*
 Copyright (c) 2017 VMware, Inc. All Rights Reserved.
 
@@ -27,12 +29,10 @@ func (ds *Datastore) stat() error {
 		return err
 	}
 
-	bsize := uint64(stat.Bsize) / 512
-
-	info.FreeSpace = int64(stat.Bfree*bsize) >> 1
+	info.FreeSpace = int64(stat.Bfree * uint64(stat.Bsize))
 
 	ds.Summary.FreeSpace = info.FreeSpace
-	ds.Summary.Capacity = int64(stat.Blocks*bsize) >> 1
+	ds.Summary.Capacity = int64(stat.Blocks * uint64(stat.Bsize))
 
 	return nil
 }

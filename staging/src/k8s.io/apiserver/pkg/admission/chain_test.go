@@ -119,7 +119,7 @@ func TestAdmitAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
@@ -140,7 +140,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
 		accepted = (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)

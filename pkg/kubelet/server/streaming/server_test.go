@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/portforward"
 )
 

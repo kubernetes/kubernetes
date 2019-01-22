@@ -24,7 +24,7 @@ import (
 
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -63,13 +63,13 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 		}
 
 		if stat == nil {
-			glog.Errorf("Got nil stat_t for path %v while setting ownership of volume", path)
+			klog.Errorf("Got nil stat_t for path %v while setting ownership of volume", path)
 			return nil
 		}
 
 		err = os.Chown(path, int(stat.Uid), int(*fsGroup))
 		if err != nil {
-			glog.Errorf("Chown failed on %v: %v", path, err)
+			klog.Errorf("Chown failed on %v: %v", path, err)
 		}
 
 		mask := rwMask
@@ -83,23 +83,9 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 
 		err = os.Chmod(path, info.Mode()|mask)
 		if err != nil {
-			glog.Errorf("Chmod failed on %v: %v", path, err)
+			klog.Errorf("Chmod failed on %v: %v", path, err)
 		}
 
 		return nil
 	})
-}
-
-// IsSameFSGroup is called only for requests to mount an already mounted
-// volume. It checks if fsGroup of new mount request is the same or not.
-// It returns false if it not the same. It also returns current Gid of a path
-// provided for dir variable.
-func IsSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
-	info, err := os.Stat(dir)
-	if err != nil {
-		glog.Errorf("Error getting stats for %s (%v)", dir, err)
-		return false, 0, err
-	}
-	s := info.Sys().(*syscall.Stat_t)
-	return int(s.Gid) == int(fsGroup), int(s.Gid), nil
 }

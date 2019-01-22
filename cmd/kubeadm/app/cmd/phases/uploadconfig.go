@@ -19,60 +19,133 @@ package phases
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	uploadConfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Uploads the kubeadm init configuration of your cluster to a ConfigMap called %s in the %s namespace. 
+	uploadKubeadmConfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Uploads the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace. 
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
+		`), kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
-	uploadConfigExample = normalizer.Examples(`
+	uploadKubeadmConfigExample = normalizer.Examples(`
 		# uploads the configuration of your cluster
-		kubeadm alpha phase upload-config --config=myConfig.yaml
+		kubeadm init phase upload-config --config=myConfig.yaml
+		`)
+
+	uploadKubeletConfigLongDesc = normalizer.LongDesc(`
+		Uploads kubelet configuration extracted from the kubeadm InitConfiguration object to a ConfigMap
+		of the form kubelet-config-1.X in the cluster, where X is the minor version of the current (API Server) Kubernetes version.
+		`)
+
+	uploadKubeletConfigExample = normalizer.Examples(`
+		# Uploads the kubelet configuration from the kubeadm Config file to a ConfigMap in the cluster.
+		kubeadm init phase upload-config kubelet --config kubeadm.yaml
 		`)
 )
 
-// NewCmdUploadConfig returns the Cobra command for running the uploadconfig phase
-func NewCmdUploadConfig() *cobra.Command {
-	var cfgPath, kubeConfigFile string
-	cmd := &cobra.Command{
-		Use:     "upload-config",
-		Short:   "Uploads the currently used configuration for kubeadm to a ConfigMap",
-		Long:    uploadConfigLongDesc,
-		Example: uploadConfigExample,
+type uploadConfigData interface {
+	Cfg() *kubeadmapi.InitConfiguration
+	Client() (clientset.Interface, error)
+}
+
+// NewUploadConfigPhase returns the phase to uploadConfig
+func NewUploadConfigPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:    "upload-config",
 		Aliases: []string{"uploadconfig"},
-		Run: func(_ *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
-			}
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
-
-			defaultcfg := &kubeadmapiext.MasterConfiguration{}
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
-			kubeadmutil.CheckErr(err)
-
-			err = uploadconfig.UploadConfiguration(internalcfg, client)
-			kubeadmutil.CheckErr(err)
+		Short:   "Uploads the kubeadm and kubelet configuration to a ConfigMap",
+		Long:    cmdutil.MacroCommandLongDescription,
+		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Uploads all configuration to a config map",
+				RunAllSiblings: true,
+				InheritFlags:   getUploadConfigPhaseFlags(),
+			},
+			{
+				Name:         "kubeadm",
+				Short:        "Uploads the kubeadm ClusterConfiguration to a ConfigMap",
+				Long:         uploadKubeadmConfigLongDesc,
+				Example:      uploadKubeadmConfigExample,
+				Run:          runUploadKubeadmConfig,
+				InheritFlags: getUploadConfigPhaseFlags(),
+			},
+			{
+				Name:         "kubelet",
+				Short:        "Uploads the kubelet component config to a ConfigMap",
+				Long:         uploadKubeletConfigLongDesc,
+				Example:      uploadKubeletConfigExample,
+				Run:          runUploadKubeletConfig,
+				InheritFlags: getUploadConfigPhaseFlags(),
+			},
 		},
 	}
+}
 
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
-	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
+func getUploadConfigPhaseFlags() []string {
+	return []string{
+		options.CfgPath,
+		options.KubeconfigPath,
+	}
+}
 
-	return cmd
+// runUploadKubeadmConfig uploads the kubeadm configuration to a ConfigMap
+func runUploadKubeadmConfig(c workflow.RunData) error {
+	cfg, client, err := getUploadConfigData(c)
+	if err != nil {
+		return err
+	}
+
+	klog.V(1).Infof("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
+	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
+		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
+	}
+	return nil
+}
+
+// runUploadKubeletConfig uploads the kubelet configuration to a ConfigMap
+func runUploadKubeletConfig(c workflow.RunData) error {
+	cfg, client, err := getUploadConfigData(c)
+	if err != nil {
+		return err
+	}
+
+	klog.V(1).Infof("[upload-config] Uploading the kubelet component config to a ConfigMap")
+	if err = kubeletphase.CreateConfigMap(cfg, client); err != nil {
+		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
+	}
+
+	klog.V(1).Infof("[upload-config] Preserving the CRISocket information for the control-plane node")
+	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
+	}
+	return nil
+}
+
+func getUploadConfigData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, error) {
+	data, ok := c.(uploadConfigData)
+	if !ok {
+		return nil, nil, errors.New("upload-config phase invoked with an invalid data struct")
+	}
+	cfg := data.Cfg()
+	client, err := data.Client()
+	if err != nil {
+		return nil, nil, err
+	}
+	return cfg, client, err
 }

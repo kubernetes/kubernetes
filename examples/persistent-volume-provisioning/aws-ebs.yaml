@@ -1,9 +1,0 @@
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: slow
-provisioner: kubernetes.io/aws-ebs
-parameters:
-  type: io1
-  zone: us-east-1d
-  iopsPerGB: "10"

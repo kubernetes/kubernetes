@@ -103,6 +103,10 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
 	}
 
+	if s.MinRequestTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
 	return errors
 }
 
@@ -150,5 +154,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

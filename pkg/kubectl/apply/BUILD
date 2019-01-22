@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "element.go",
         "empty_element.go",
+        "error.go",
         "list_element.go",
         "map_element.go",
         "primitive_element.go",

@@ -1,0 +1,79 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: gce:cloud-provider
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - patch
+  - update
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: gce:cloud-provider
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: cloud-provider
+  namespace: kube-system
+  annotations:
+    kubernetes.io/deprecation: 'cloud-provider role is DEPRECATED in the
+      concern of potential collisions and will be removed in 1.16. Do not use
+      this role.'
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - patch
+  - update
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: cloud-provider
+  annotations:
+    kubernetes.io/deprecation: 'cloud-provider clusterrole is DEPRECATED in the
+      concern of potential collisions and will be removed in 1.16. Do not use
+      this role.'
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update

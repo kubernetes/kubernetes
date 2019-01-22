@@ -4,6 +4,12 @@ options:
 reviewers:
   - bgrant0607
   - smarterclayton
+  - spiffxp
+  - timothysc
+  - dims
 approvers:
   - bgrant0607
   - smarterclayton
+labels:
+  - area/conformance
+  - sig/architecture

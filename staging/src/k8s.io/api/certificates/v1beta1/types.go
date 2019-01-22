@@ -131,7 +131,7 @@ type KeyUsage string
 const (
 	UsageSigning            KeyUsage = "signing"
 	UsageDigitalSignature   KeyUsage = "digital signature"
-	UsageContentCommittment KeyUsage = "content committment"
+	UsageContentCommittment KeyUsage = "content commitment"
 	UsageKeyEncipherment    KeyUsage = "key encipherment"
 	UsageKeyAgreement       KeyUsage = "key agreement"
 	UsageDataEncipherment   KeyUsage = "data encipherment"

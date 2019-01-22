@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -94,6 +94,7 @@ done
 packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/admission"
+	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"

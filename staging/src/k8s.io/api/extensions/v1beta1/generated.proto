@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.extensions.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/policy/v1beta1/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -33,47 +31,28 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 option go_package = "v1beta1";
 
 // AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
+// Deprecated: use AllowedFlexVolume from policy API Group instead.
 message AllowedFlexVolume {
-  // Driver is the name of the Flexvolume driver.
+  // driver is the name of the Flexvolume driver.
   optional string driver = 1;
 }
 
-// defines the host volume conditions that will be enabled by a policy
+// AllowedHostPath defines the host volume conditions that will be enabled by a policy
 // for pods to use. It requires the path prefix to be defined.
+// Deprecated: use AllowedHostPath from policy API Group instead.
 message AllowedHostPath {
-  // is the path prefix that the host volume must match.
+  // pathPrefix is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
-  // 
+  //
   // Examples:
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
   optional string pathPrefix = 1;
-}
 
-message CustomMetricCurrentStatus {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricCurrentStatusList {
-  repeated CustomMetricCurrentStatus items = 1;
-}
-
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-message CustomMetricTarget {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricTargetList {
-  repeated CustomMetricTarget items = 1;
+  // when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
+  // +optional
+  optional bool readOnly = 2;
 }
 
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
@@ -330,6 +309,8 @@ message DeploymentSpec {
 
   // The number of old ReplicaSets to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
+  // This is set to the max value of int32 (i.e. 2147483647) by default, which
+  // means "retaining all old RelicaSets".
   // +optional
   optional int32 revisionHistoryLimit = 6;
 
@@ -347,8 +328,8 @@ message DeploymentSpec {
   // is considered to be failed. The deployment controller will continue to
   // process failed deployments and a condition with a ProgressDeadlineExceeded
   // reason will be surfaced in the deployment status. Note that progress will
-  // not be estimated during the time a deployment is paused. This is not set
-  // by default.
+  // not be estimated during the time a deployment is paused. This is set to
+  // the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
   // +optional
   optional int32 progressDeadlineSeconds = 9;
 }
@@ -409,13 +390,14 @@ message DeploymentStrategy {
 }
 
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+// Deprecated: use FSGroupStrategyOptions from policy API Group instead.
 message FSGroupStrategyOptions {
-  // Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
+  // rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
   // +optional
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of fs groups.  If you would like to force a single
-  // fs group then supply a single range with the same start and end.
+  // ranges are the allowed ranges of fs groups.  If you would like to force a single
+  // fs group then supply a single range with the same start and end. Required for MustRunAs.
   // +optional
   repeated IDRange ranges = 2;
 }
@@ -448,8 +430,9 @@ message HTTPIngressRuleValue {
   repeated HTTPIngressPath paths = 1;
 }
 
-// Host Port Range defines a range of host ports that will be enabled by a policy
+// HostPortRange defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.
+// Deprecated: use HostPortRange from policy API Group instead.
 message HostPortRange {
   // min is the start of the range, inclusive.
   optional int32 min = 1;
@@ -458,12 +441,13 @@ message HostPortRange {
   optional int32 max = 2;
 }
 
-// ID Range provides a min/max of an allowed range of IDs.
+// IDRange provides a min/max of an allowed range of IDs.
+// Deprecated: use IDRange from policy API Group instead.
 message IDRange {
-  // Min is the start of the range, inclusive.
+  // min is the start of the range, inclusive.
   optional int64 min = 1;
 
-  // Max is the end of the range, inclusive.
+  // max is the end of the range, inclusive.
   optional int64 max = 2;
 }
 
@@ -678,27 +662,33 @@ message NetworkPolicyList {
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.
 message NetworkPolicyPeer {
-  // This is a label selector which selects Pods in this namespace.
-  // This field follows standard label selector semantics.
-  // If present but empty, this selector selects all pods in this namespace.
+  // This is a label selector which selects Pods. This field follows standard label
+  // selector semantics; if present but empty, it selects all pods.
+  //
+  // If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+  // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+  // Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
-  // Selects Namespaces using cluster scoped-labels.  This
-  // matches all pods in all namespaces selected by this label selector.
-  // This field follows standard label selector semantics.
-  // If present but empty, this selector selects all namespaces.
+  // Selects Namespaces using cluster-scoped labels. This field follows standard label
+  // selector semantics; if present but empty, it selects all namespaces.
+  //
+  // If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
+  // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+  // Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 
-  // IPBlock defines policy on a particular IPBlock
+  // IPBlock defines policy on a particular IPBlock. If this field is set then
+  // neither of the other fields can be.
   // +optional
   optional IPBlock ipBlock = 3;
 }
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
 message NetworkPolicyPort {
-  // Optional.  The protocol (TCP or UDP) which traffic must match.
+  // Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match.
   // If not specified, this field defaults to TCP.
   // +optional
   optional string protocol = 1;
@@ -755,8 +745,9 @@ message NetworkPolicySpec {
   repeated string policyTypes = 4;
 }
 
-// Pod Security Policy governs the ability to make requests that affect the Security Context
+// PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// Deprecated: use PodSecurityPolicy from policy API Group instead.
 message PodSecurityPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -768,43 +759,45 @@ message PodSecurityPolicy {
   optional PodSecurityPolicySpec spec = 2;
 }
 
-// Pod Security Policy List is a list of PodSecurityPolicy objects.
+// PodSecurityPolicyList is a list of PodSecurityPolicy objects.
+// Deprecated: use PodSecurityPolicyList from policy API Group instead.
 message PodSecurityPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of schema objects.
+  // items is a list of schema objects.
   repeated PodSecurityPolicy items = 2;
 }
 
-// Pod Security Policy Spec defines the policy enforced.
+// PodSecurityPolicySpec defines the policy enforced.
+// Deprecated: use PodSecurityPolicySpec from policy API Group instead.
 message PodSecurityPolicySpec {
   // privileged determines if a pod can request to be run as privileged.
   // +optional
   optional bool privileged = 1;
 
-  // DefaultAddCapabilities is the default set of capabilities that will be added to the container
+  // defaultAddCapabilities is the default set of capabilities that will be added to the container
   // unless the pod spec specifically drops the capability.  You may not list a capability in both
-  // DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
-  // allowed, and need not be included in the AllowedCapabilities list.
+  // defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly
+  // allowed, and need not be included in the allowedCapabilities list.
   // +optional
   repeated string defaultAddCapabilities = 2;
 
-  // RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+  // requiredDropCapabilities are the capabilities that will be dropped from the container.  These
   // are required to be dropped and cannot be added.
   // +optional
   repeated string requiredDropCapabilities = 3;
 
-  // AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+  // allowedCapabilities is a list of capabilities that can be requested to add to the container.
   // Capabilities in this field may be added at the pod author's discretion.
-  // You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+  // You must not list a capability in both allowedCapabilities and requiredDropCapabilities.
   // +optional
   repeated string allowedCapabilities = 4;
 
-  // volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
-  // may be used.
+  // volumes is a white list of allowed volume plugins. Empty indicates that
+  // no volumes may be used. To allow all volumes you may use '*'.
   // +optional
   repeated string volumes = 5;
 
@@ -830,13 +823,19 @@ message PodSecurityPolicySpec {
   // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
   optional RunAsUserStrategyOptions runAsUser = 11;
 
-  // SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+  // RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  // If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+  // RunAsGroup feature gate to be enabled.
+  // +optional
+  optional RunAsGroupStrategyOptions runAsGroup = 22;
+
+  // supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
   optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
 
-  // FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+  // fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
   optional FSGroupStrategyOptions fsGroup = 13;
 
-  // ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+  // readOnlyRootFilesystem when set to true will force containers to run with a read only root file
   // system.  If the container specifically requests to run with a non-read only root file system
   // the PSP should deny the pod.
   // If set to false the container may run with a read only root file system if it wishes but it
@@ -844,25 +843,53 @@ message PodSecurityPolicySpec {
   // +optional
   optional bool readOnlyRootFilesystem = 14;
 
-  // DefaultAllowPrivilegeEscalation controls the default setting for whether a
+  // defaultAllowPrivilegeEscalation controls the default setting for whether a
   // process can gain more privileges than its parent process.
   // +optional
   optional bool defaultAllowPrivilegeEscalation = 15;
 
-  // AllowPrivilegeEscalation determines if a pod can request to allow
+  // allowPrivilegeEscalation determines if a pod can request to allow
   // privilege escalation. If unspecified, defaults to true.
   // +optional
   optional bool allowPrivilegeEscalation = 16;
 
-  // is a white list of allowed host paths. Empty indicates that all host paths may be used.
+  // allowedHostPaths is a white list of allowed host paths. Empty indicates
+  // that all host paths may be used.
   // +optional
   repeated AllowedHostPath allowedHostPaths = 17;
 
-  // AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+  // allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
   // Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
-  // is allowed in the "Volumes" field.
+  // is allowed in the "volumes" field.
   // +optional
   repeated AllowedFlexVolume allowedFlexVolumes = 18;
+
+  // allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
+  // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+  // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
+  // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+  //
+  // Examples:
+  // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
+  // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
+  // +optional
+  repeated string allowedUnsafeSysctls = 19;
+
+  // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
+  // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+  // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
+  //
+  // Examples:
+  // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
+  // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
+  // +optional
+  repeated string forbiddenSysctls = 20;
+
+  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // Empty or nil indicates that only the DefaultProcMountType may be used.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  repeated string allowedProcMountTypes = 21;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
@@ -1041,19 +1068,34 @@ message RollingUpdateDeployment {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
-// Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
-message RunAsUserStrategyOptions {
-  // Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.
+message RunAsGroupStrategyOptions {
+  // rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of uids that may be used.
+  // ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+  // then supply a single range with the same start and end. Required for MustRunAs.
   // +optional
   repeated IDRange ranges = 2;
 }
 
-// SELinux  Strategy Options defines the strategy type and any options used to create the strategy.
+// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use RunAsUserStrategyOptions from policy API Group instead.
+message RunAsUserStrategyOptions {
+  // rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+  optional string rule = 1;
+
+  // ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
+  // then supply a single range with the same start and end. Required for MustRunAs.
+  // +optional
+  repeated IDRange ranges = 2;
+}
+
+// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use SELinuxStrategyOptions from policy API Group instead.
 message SELinuxStrategyOptions {
-  // type is the strategy that will dictate the allowable labels that may be set.
+  // rule is the strategy that will dictate the allowable labels that may be set.
   optional string rule = 1;
 
   // seLinuxOptions required to run as; required for MustRunAs
@@ -1104,13 +1146,14 @@ message ScaleStatus {
 }
 
 // SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+// Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.
 message SupplementalGroupsStrategyOptions {
-  // Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+  // rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
   // +optional
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-  // supplemental group then supply a single range with the same start and end.
+  // ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+  // supplemental group then supply a single range with the same start and end. Required for MustRunAs.
   // +optional
   repeated IDRange ranges = 2;
 }

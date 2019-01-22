@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -267,6 +267,12 @@ type PbmAlreadyExists struct {
 
 func init() {
 	types.Add("pbm:PbmAlreadyExists", reflect.TypeOf((*PbmAlreadyExists)(nil)).Elem())
+}
+
+type PbmAlreadyExistsFault PbmAlreadyExists
+
+func init() {
+	types.Add("pbm:PbmAlreadyExistsFault", reflect.TypeOf((*PbmAlreadyExistsFault)(nil)).Elem())
 }
 
 type PbmAssignDefaultRequirementProfile PbmAssignDefaultRequirementProfileRequestType
@@ -1709,4 +1715,10 @@ type PbmVaioDataServiceInfo struct {
 
 func init() {
 	types.Add("pbm:PbmVaioDataServiceInfo", reflect.TypeOf((*PbmVaioDataServiceInfo)(nil)).Elem())
+}
+
+type VersionURI string
+
+func init() {
+	types.Add("pbm:versionURI", reflect.TypeOf((*VersionURI)(nil)).Elem())
 }

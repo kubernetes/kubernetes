@@ -26,11 +26,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
@@ -61,7 +62,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam("v1")
 	table := []struct {
 		location      string
 		resource      string
@@ -102,7 +103,7 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		lw.DisableChunking = true
 		// This test merely tests that the correct request is made.
@@ -112,7 +113,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam(legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String())
+	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam("v1")
 	table := []struct {
 		rv            string
 		location      string
@@ -169,7 +170,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})
@@ -201,7 +202,7 @@ func TestListWatchUntil(t *testing.T) {
 		watch: fw,
 	}
 
-	conditions := []watch.ConditionFunc{
+	conditions := []watchtools.ConditionFunc{
 		func(event watch.Event) (bool, error) {
 			t.Logf("got %#v", event)
 			return event.Type == watch.Added, nil
@@ -213,7 +214,7 @@ func TestListWatchUntil(t *testing.T) {
 	}
 
 	timeout := 10 * time.Second
-	lastEvent, err := ListWatchUntil(timeout, listwatch, conditions...)
+	lastEvent, err := watchtools.ListWatchUntil(timeout, listwatch, conditions...)
 	if err != nil {
 		t.Fatalf("expected nil error, got %#v", err)
 	}

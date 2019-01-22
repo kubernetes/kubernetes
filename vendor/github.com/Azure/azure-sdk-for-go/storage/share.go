@@ -75,10 +75,10 @@ func (s *Share) CreateIfNotExists(options *FileRequestOptions) (bool, error) {
 	params := prepareOptions(options)
 	resp, err := s.fsc.createResourceNoClose(s.buildPath(), resourceShare, params, extraheaders)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusCreated || resp.statusCode == http.StatusConflict {
-			if resp.statusCode == http.StatusCreated {
-				s.updateEtagAndLastModified(resp.headers)
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+			if resp.StatusCode == http.StatusCreated {
+				s.updateEtagAndLastModified(resp.Header)
 				return true, nil
 			}
 			return false, s.FetchAttributes(nil)
@@ -103,9 +103,9 @@ func (s *Share) Delete(options *FileRequestOptions) error {
 func (s *Share) DeleteIfExists(options *FileRequestOptions) (bool, error) {
 	resp, err := s.fsc.deleteResourceNoClose(s.buildPath(), resourceShare, options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err

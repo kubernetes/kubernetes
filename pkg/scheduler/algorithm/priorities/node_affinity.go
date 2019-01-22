@@ -23,26 +23,25 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
+// CalculateNodeAffinityPriorityMap prioritizes nodes according to node affinity scheduling preferences
 // indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	var affinity *v1.Affinity
+	// default is the podspec.
+	affinity := pod.Spec.Affinity
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use affinity from there.
 		affinity = priorityMeta.affinity
-	} else {
-		// We couldn't parse metadata - fallback to the podspec.
-		affinity = pod.Spec.Affinity
 	}
 
 	var count int32
@@ -74,4 +73,5 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 	}, nil
 }
 
+// CalculateNodeAffinityPriorityReduce is a reduce function for node affinity priority calculation.
 var CalculateNodeAffinityPriorityReduce = NormalizeReduce(schedulerapi.MaxPriority, false)

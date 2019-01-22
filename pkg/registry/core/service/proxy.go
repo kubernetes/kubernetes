@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -32,7 +32,7 @@ import (
 
 // ProxyREST implements the proxy subresource for a Service
 type ProxyREST struct {
-	ServiceRest    *REST
+	Redirector     rest.Redirector
 	ProxyTransport http.RoundTripper
 }
 
@@ -43,7 +43,7 @@ var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OP
 
 // New returns an empty service resource
 func (r *ProxyREST) New() runtime.Object {
-	return &api.Service{}
+	return &api.ServiceProxyOptions{}
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied
@@ -57,12 +57,12 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 }
 
 // Connect returns a handler for the service proxy
-func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	proxyOpts, ok := opts.(*api.ServiceProxyOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := r.ServiceRest.ResourceLocation(ctx, id)
+	location, transport, err := r.Redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		return nil, err
 	}

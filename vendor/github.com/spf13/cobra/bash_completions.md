@@ -6,15 +6,16 @@ Generating bash completions from a cobra command is incredibly easy. An actual p
 package main
 
 import (
-        "io/ioutil"
-        "os"
+	"io/ioutil"
+	"os"
 
-        "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {
-        kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
-        kubectl.GenBashCompletionFile("out.sh")
+	kubectl := cmd.NewKubectlCommand(util.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+	kubectl.GenBashCompletionFile("out.sh")
 }
 ```
 
@@ -173,9 +174,9 @@ hello.yml                     test.json
 
 So while there are many other files in the CWD it only shows me subdirs and those with valid extensions.
 
-# Specifiy custom flag completion
+# Specify custom flag completion
 
-Similar to the filename completion and filtering using cobra.BashCompFilenameExt, you can specifiy
+Similar to the filename completion and filtering using cobra.BashCompFilenameExt, you can specify
 a custom flag completion function with cobra.BashCompCustom:
 
 ```go
@@ -203,4 +204,18 @@ __kubectl_get_namespaces()
         COMPREPLY=( $( compgen -W "${kubectl_out}[*]" -- "$cur" ) )
     fi
 }
+```
+# Using bash aliases for commands
+
+You can also configure the `bash aliases` for the commands and they will also support completions.
+
+```bash
+alias aliasname=origcommand
+complete -o default -F __start_origcommand aliasname
+
+# and now when you run `aliasname` completion will make
+# suggestions as it did for `origcommand`.
+
+$) aliasname <tab><tab>
+completion     firstcommand   secondcommand
 ```

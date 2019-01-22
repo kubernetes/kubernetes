@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["addr.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/third_party/forked/golang/netutil",
     importpath = "k8s.io/apimachinery/third_party/forked/golang/netutil",
 )
 

@@ -24,7 +24,6 @@ go_test(
         "strings_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/strings",
 )
 
 filegroup(

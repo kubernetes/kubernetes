@@ -12,18 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: build
+all: all-build
 
-REGISTRY ?= gcr.io/google-containers
-IMAGE ?= debian-base
+REGISTRY ?= staging-k8s.gcr.io
+IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.3
+TAG ?= 0.4.0
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
+
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
+
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:stretch
@@ -45,6 +52,23 @@ ifeq ($(ARCH),s390x)
 	QEMUARCH=s390x
 endif
 
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+all-push: all-push-images push-manifest
+
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
+	docker manifest push --purge ${IMAGE}:${TAG}
+
 build: clean
 	cp ./* $(TEMP_DIR)
 	cat Dockerfile.build \
@@ -57,9 +81,11 @@ ifeq ($(ARCH),amd64)
 	sed "/CROSS_BUILD_/d" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
+	# Ensure we don't get surprised by umask settings
+	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
 	sed "s/CROSS_BUILD_//g" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
 endif
 	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build
@@ -67,13 +93,13 @@ endif
 	docker build --pull -t $(BUILD_IMAGE) -f $(TEMP_DIR)/Dockerfile.build $(TEMP_DIR)
 	docker create --name $(BUILD_IMAGE) $(BUILD_IMAGE)
 	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
-	docker build -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(IMAGE)-$(ARCH):$(TAG)
 
 clean:
-	docker rmi -f $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) || true
+	docker rmi -f $(IMAGE)-$(ARCH):$(TAG) || true
 	docker rmi -f $(BUILD_IMAGE)   || true
 	docker rm  -f $(BUILD_IMAGE)   || true

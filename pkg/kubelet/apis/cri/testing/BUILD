@@ -14,7 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing",
     deps = [
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],

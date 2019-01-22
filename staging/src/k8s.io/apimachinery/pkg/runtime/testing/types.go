@@ -263,7 +263,7 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 
 func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	if obj.Object == nil {
-		obj.Object = make(map[string]interface{})
+		return make(map[string]interface{})
 	}
 	return obj.Object
 }
@@ -315,6 +315,9 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (u *Unstructured) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
 	u.Object["apiVersion"] = gvk.GroupVersion().String()
 	u.Object["kind"] = gvk.Kind
 }

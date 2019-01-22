@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,180 +18,140 @@ package phases
 
 import (
 	"fmt"
-	"io"
-	"path/filepath"
 
-	"github.com/spf13/cobra"
-
+	"github.com/pkg/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	allKubeconfigLongDesc = normalizer.LongDesc(`
-		Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
-		` + cmdutil.AlphaDisclaimer)
-
-	allKubeconfigExample = normalizer.Examples(`
-		# Generates all kubeconfig files, functionally equivalent to what generated
-		# by kubeadm init.
-		kubeadm alpha phase kubeconfig all
-
-		# Generates all kubeconfig files using options read from a configuration file.
-		kubeadm alpha phase kubeconfig all --config masterconfiguration.yaml
-		`)
-
-	adminKubeconfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the kubeconfig file for the admin and for kubeadm itself, and saves it to %s file.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.AdminKubeConfigFileName)
-
-	kubeletKubeconfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the kubeconfig file for the kubelet to use and saves it to %s file. 
-
-		Please note that this should *only* be used for bootstrapping purposes. After your control plane is up, 
-		you should request all kubelet credentials from the CSR API.
-		`+cmdutil.AlphaDisclaimer), filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName))
-
-	controllerManagerKubeconfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the kubeconfig file for the controller manager to use and saves it to %s file.
-		`+cmdutil.AlphaDisclaimer), filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName))
-
-	schedulerKubeconfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the kubeconfig file for the scheduler to use and saves it to %s file.
-		`+cmdutil.AlphaDisclaimer), filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName))
-
-	userKubeconfigLongDesc = normalizer.LongDesc(`
-		Outputs a kubeconfig file for an additional user.
-		` + cmdutil.AlphaDisclaimer)
-
-	userKubeconfigExample = normalizer.Examples(`
-		# Outputs a kubeconfig file for an additional user named foo
-		kubeadm alpha phase kubeconfig user --client-name=foo
-		`)
+	kubeconfigFilePhaseProperties = map[string]struct {
+		name  string
+		short string
+		long  string
+	}{
+		kubeadmconstants.AdminKubeConfigFileName: {
+			name:  "admin",
+			short: "Generates a kubeconfig file for the admin to use and for kubeadm itself",
+			long:  "Generates the kubeconfig file for the admin and for kubeadm itself, and saves it to %s file.",
+		},
+		kubeadmconstants.KubeletKubeConfigFileName: {
+			name:  "kubelet",
+			short: "Generates a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
+			long: normalizer.LongDesc(`
+					Generates the kubeconfig file for the kubelet to use and saves it to %s file.
+			
+					Please note that this should *only* be used for cluster bootstrapping purposes. After your control plane is up,
+					you should request all kubelet credentials from the CSR API.`),
+		},
+		kubeadmconstants.ControllerManagerKubeConfigFileName: {
+			name:  "controller-manager",
+			short: "Generates a kubeconfig file for the controller manager to use",
+			long:  "Generates the kubeconfig file for the controller manager to use and saves it to %s file",
+		},
+		kubeadmconstants.SchedulerKubeConfigFileName: {
+			name:  "scheduler",
+			short: "Generates a kubeconfig file for the scheduler to use",
+			long:  "Generates the kubeconfig file for the scheduler to use and saves it to %s file.",
+		},
+	}
 )
 
-// NewCmdKubeConfig return main command for kubeconfig phase
-func NewCmdKubeConfig(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "kubeconfig",
-		Short: "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
-		Long:  cmdutil.MacroCommandLongDescription,
-	}
-
-	cmd.AddCommand(getKubeConfigSubCommands(out, kubeadmconstants.KubernetesDir, "")...)
-	return cmd
+// kubeConfigData defines the behavior that a runtime data struct passed to the kubeconfig phase
+// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
+// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
+type kubeConfigData interface {
+	Cfg() *kubeadmapi.InitConfiguration
+	ExternalCA() bool
+	CertificateDir() string
+	CertificateWriteDir() string
+	KubeConfigDir() string
 }
 
-// getKubeConfigSubCommands returns sub commands for kubeconfig phase
-func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion string) []*cobra.Command {
-
-	cfg := &kubeadmapiext.MasterConfiguration{}
-
-	// This is used for unit testing only...
-	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitely for tests workarounds that
-	if defaultKubernetesVersion != "" {
-		cfg.KubernetesVersion = defaultKubernetesVersion
-	}
-
-	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
-
-	var cfgPath, token, clientName string
-	var subCmds []*cobra.Command
-
-	subCmdProperties := []struct {
-		use      string
-		short    string
-		long     string
-		examples string
-		cmdFunc  func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
-	}{
-		{
-			use:      "all",
-			short:    "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
-			long:     allKubeconfigLongDesc,
-			examples: allKubeconfigExample,
-			cmdFunc:  kubeconfigphase.CreateInitKubeConfigFiles,
-		},
-		{
-			use:     "admin",
-			short:   "Generates a kubeconfig file for the admin to use and for kubeadm itself",
-			long:    adminKubeconfigLongDesc,
-			cmdFunc: kubeconfigphase.CreateAdminKubeConfigFile,
-		},
-		{
-			use:     "kubelet",
-			short:   "Generates a kubeconfig file for the kubelet to use. Please note that this should be used *only* for bootstrapping purposes.",
-			long:    kubeletKubeconfigLongDesc,
-			cmdFunc: kubeconfigphase.CreateKubeletKubeConfigFile,
-		},
-		{
-			use:     "controller-manager",
-			short:   "Generates a kubeconfig file for the controller manager to use",
-			long:    controllerManagerKubeconfigLongDesc,
-			cmdFunc: kubeconfigphase.CreateControllerManagerKubeConfigFile,
-		},
-		{
-			use:     "scheduler",
-			short:   "Generates a kubeconfig file for the scheduler to use",
-			long:    schedulerKubeconfigLongDesc,
-			cmdFunc: kubeconfigphase.CreateSchedulerKubeConfigFile,
-		},
-		{
-			use:      "user",
-			short:    "Outputs a kubeconfig file for an additional user",
-			long:     userKubeconfigLongDesc,
-			examples: userKubeconfigExample,
-			cmdFunc: func(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
-				if clientName == "" {
-					return fmt.Errorf("missing required argument --client-name")
-				}
-
-				// if the kubeconfig file for an additional user has to use a token, use it
-				if token != "" {
-					return kubeconfigphase.WriteKubeConfigWithToken(out, cfg, clientName, token)
-				}
-
-				// Otherwise, write a kubeconfig file with a generate client cert
-				return kubeconfigphase.WriteKubeConfigWithClientCert(out, cfg, clientName)
+// NewKubeConfigPhase creates a kubeadm workflow phase that creates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
+func NewKubeConfigPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:  "kubeconfig",
+		Short: "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
+		Long:  cmdutil.MacroCommandLongDescription,
+		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Generates all kubeconfig files",
+				InheritFlags:   getKubeConfigPhaseFlags("all"),
+				RunAllSiblings: true,
 			},
+			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
+			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),
+			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
+			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),
 		},
+		Run: runKubeConfig,
+	}
+}
+
+// NewKubeConfigFilePhase creates a kubeadm workflow phase that creates a kubeconfig file.
+func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
+	return workflow.Phase{
+		Name:         kubeconfigFilePhaseProperties[kubeConfigFileName].name,
+		Short:        kubeconfigFilePhaseProperties[kubeConfigFileName].short,
+		Long:         fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
+		Run:          runKubeConfigFile(kubeConfigFileName),
+		InheritFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
+	}
+}
+
+func getKubeConfigPhaseFlags(name string) []string {
+	flags := []string{
+		options.APIServerAdvertiseAddress,
+		options.APIServerBindPort,
+		options.CertificatesDir,
+		options.CfgPath,
+		options.KubeconfigDir,
+	}
+	if name == "all" || name == kubeadmconstants.KubeletKubeConfigFileName {
+		flags = append(flags,
+			options.NodeName,
+		)
+	}
+	return flags
+}
+
+func runKubeConfig(c workflow.RunData) error {
+	data, ok := c.(kubeConfigData)
+	if !ok {
+		return errors.New("kubeconfig phase invoked with an invalid data struct")
 	}
 
-	for _, properties := range subCmdProperties {
-		// Creates the UX Command
-		cmd := &cobra.Command{
-			Use:     properties.use,
-			Short:   properties.short,
-			Long:    properties.long,
-			Example: properties.examples,
-			Run:     runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg),
+	fmt.Printf("[kubeconfig] Using kubeconfig folder %q\n", data.KubeConfigDir())
+	return nil
+}
+
+// runKubeConfigFile executes kubeconfig creation logic.
+func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
+	return func(c workflow.RunData) error {
+		data, ok := c.(kubeConfigData)
+		if !ok {
+			return errors.New("kubeconfig phase invoked with an invalid data struct")
 		}
 
-		// Add flags to the command
-		if properties.use != "user" {
-			cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
-		}
-		cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored")
-		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API server is accessible on")
-		cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
-		cmd.Flags().StringVar(&outDir, "kubeconfig-dir", outDir, "The port where to save the kubeconfig file")
-		if properties.use == "all" || properties.use == "kubelet" {
-			cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name that should be used for the kubelet client certificate`)
-		}
-		if properties.use == "user" {
-			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig (instead of client certificates)")
-			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
+		// if external CA mode, skip certificate authority generation
+		if data.ExternalCA() {
+			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
+			return nil
 		}
 
-		subCmds = append(subCmds, cmd)
+		// if dryrunning, reads certificates from a temporary folder (and defer restore to the path originally specified by the user)
+		cfg := data.Cfg()
+		cfg.CertificatesDir = data.CertificateWriteDir()
+		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
+
+		// creates the KubeConfig file (or use existing)
+		return kubeconfigphase.CreateKubeConfigFile(kubeConfigFileName, data.KubeConfigDir(), data.Cfg())
 	}
-
-	return subCmds
 }

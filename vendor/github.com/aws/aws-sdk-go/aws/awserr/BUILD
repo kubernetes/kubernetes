@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/awserr",
     importpath = "github.com/aws/aws-sdk-go/aws/awserr",
     visibility = ["//visibility:public"],
 )

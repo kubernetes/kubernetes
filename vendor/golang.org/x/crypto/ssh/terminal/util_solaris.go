@@ -14,7 +14,7 @@ import (
 
 // State contains the state of a terminal.
 type State struct {
-	state *unix.Termios
+	termios unix.Termios
 }
 
 // IsTerminal returns true if the given file descriptor is a terminal.
@@ -75,47 +75,43 @@ func ReadPassword(fd int) ([]byte, error) {
 // restored.
 // see http://cr.illumos.org/~webrev/andy_js/1060/
 func MakeRaw(fd int) (*State, error) {
-	oldTermiosPtr, err := unix.IoctlGetTermios(fd, unix.TCGETS)
+	termios, err := unix.IoctlGetTermios(fd, unix.TCGETS)
 	if err != nil {
 		return nil, err
 	}
-	oldTermios := *oldTermiosPtr
 
-	newTermios := oldTermios
-	newTermios.Iflag &^= syscall.IGNBRK | syscall.BRKINT | syscall.PARMRK | syscall.ISTRIP | syscall.INLCR | syscall.IGNCR | syscall.ICRNL | syscall.IXON
-	newTermios.Oflag &^= syscall.OPOST
-	newTermios.Lflag &^= syscall.ECHO | syscall.ECHONL | syscall.ICANON | syscall.ISIG | syscall.IEXTEN
-	newTermios.Cflag &^= syscall.CSIZE | syscall.PARENB
-	newTermios.Cflag |= syscall.CS8
-	newTermios.Cc[unix.VMIN] = 1
-	newTermios.Cc[unix.VTIME] = 0
+	oldState := State{termios: *termios}
 
-	if err := unix.IoctlSetTermios(fd, unix.TCSETS, &newTermios); err != nil {
+	termios.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
+	termios.Oflag &^= unix.OPOST
+	termios.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
+	termios.Cflag &^= unix.CSIZE | unix.PARENB
+	termios.Cflag |= unix.CS8
+	termios.Cc[unix.VMIN] = 1
+	termios.Cc[unix.VTIME] = 0
+
+	if err := unix.IoctlSetTermios(fd, unix.TCSETS, termios); err != nil {
 		return nil, err
 	}
 
-	return &State{
-		state: oldTermiosPtr,
-	}, nil
+	return &oldState, nil
 }
 
 // Restore restores the terminal connected to the given file descriptor to a
 // previous state.
 func Restore(fd int, oldState *State) error {
-	return unix.IoctlSetTermios(fd, unix.TCSETS, oldState.state)
+	return unix.IoctlSetTermios(fd, unix.TCSETS, &oldState.termios)
 }
 
 // GetState returns the current state of a terminal which may be useful to
 // restore the terminal after a signal.
 func GetState(fd int) (*State, error) {
-	oldTermiosPtr, err := unix.IoctlGetTermios(fd, unix.TCGETS)
+	termios, err := unix.IoctlGetTermios(fd, unix.TCGETS)
 	if err != nil {
 		return nil, err
 	}
 
-	return &State{
-		state: oldTermiosPtr,
-	}, nil
+	return &State{termios: *termios}, nil
 }
 
 // GetSize returns the dimensions of the given terminal.

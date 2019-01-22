@@ -105,32 +105,6 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-// verifyRemainingObjects verifies if the number of the remaining replication
-// controllers and pods are rcNum and podNum. It returns error if the
-// communication with the API server fails.
-func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
-	podClient := clientSet.CoreV1().Pods(namespace)
-	pods, err := podClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	var ret = true
-	if len(pods.Items) != podNum {
-		ret = false
-		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
-	}
-	rcs, err := rcClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
-	}
-	if len(rcs.Items) != rcNum {
-		ret = false
-		t.Logf("expect %d RCs, got %d RCs", rcNum, len(rcs.Items))
-	}
-	return ret, nil
-}
-
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
@@ -366,9 +340,7 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rc *v
 	if err != nil {
 		t.Fatalf("Failed to obtain rc %s: %v", rc.Name, err)
 	}
-	kind := "ReplicationController"
-	scaleClient := c.ExtensionsV1beta1().Scales(ns)
-	scale, err := scaleClient.Get(kind, rc.Name)
+	scale, err := c.CoreV1().ReplicationControllers(ns).GetScale(rc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for rc %s: %v", rc.Name, err)
 	}
@@ -377,12 +349,12 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rc *v
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := scaleClient.Get(kind, rc.Name)
+		scale, err := c.CoreV1().ReplicationControllers(ns).GetScale(rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = scaleClient.Update(kind, scale)
+		_, err = c.CoreV1().ReplicationControllers(ns).UpdateScale(rc.Name, scale)
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for rc %s: %v", rc.Name, err)

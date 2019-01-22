@@ -63,13 +63,22 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(c *types.AddDVPortgroup_Ta
 				VmVnicNetworkResourcePoolKey: spec.VmVnicNetworkResourcePoolKey,
 			}
 
+			if pg.Config.DefaultPortConfig == nil {
+				pg.Config.DefaultPortConfig = &types.VMwareDVSPortSetting{
+					Vlan: new(types.VmwareDistributedVirtualSwitchVlanIdSpec),
+				}
+			}
+
+			pg.PortKeys = []string{}
+
 			s.Portgroup = append(s.Portgroup, pg.Self)
 			s.Summary.PortgroupName = append(s.Summary.PortgroupName, pg.Name)
 
 			for _, h := range s.Summary.HostMember {
-				pg.Host = AddReference(h, pg.Host)
+				pg.Host = append(pg.Host, h)
+
 				host := Map.Get(h).(*HostSystem)
-				host.Network = append(host.Network, pg.Reference())
+				Map.AppendReference(host, &host.Network, pg.Reference())
 			}
 		}
 
@@ -97,28 +106,29 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 
 			switch types.ConfigSpecOperation(member.Operation) {
 			case types.ConfigSpecOperationAdd:
-				if FindReference(host.Network, s.Self) != nil {
+				if FindReference(s.Summary.HostMember, member.Host) != nil {
 					return nil, &types.AlreadyExists{Name: host.Name}
 				}
 
-				host.Network = append(host.Network, s.Self)
-				host.Network = append(host.Network, s.Portgroup...)
+				Map.AppendReference(host, &host.Network, s.Portgroup...)
 				s.Summary.HostMember = append(s.Summary.HostMember, member.Host)
 
 				for _, ref := range s.Portgroup {
 					pg := Map.Get(ref).(*DistributedVirtualPortgroup)
-					pg.Host = AddReference(member.Host, pg.Host)
+					Map.AddReference(pg, &pg.Host, member.Host)
 				}
 			case types.ConfigSpecOperationRemove:
-				if pg := FindReference(host.Network, s.Portgroup...); pg != nil {
-					return nil, &types.ResourceInUse{
-						Type: pg.Type,
-						Name: pg.Value,
+				for _, ref := range host.Vm {
+					vm := Map.Get(ref).(*VirtualMachine)
+					if pg := FindReference(vm.Network, s.Portgroup...); pg != nil {
+						return nil, &types.ResourceInUse{
+							Type: pg.Type,
+							Name: pg.Value,
+						}
 					}
 				}
 
-				host.Network = RemoveReference(s.Self, host.Network)
-				s.Summary.HostMember = RemoveReference(s.Self, s.Summary.HostMember)
+				RemoveReference(&s.Summary.HostMember, member.Host)
 			case types.ConfigSpecOperationEdit:
 				return nil, &types.NotSupported{}
 			}
@@ -168,10 +178,6 @@ func (s *DistributedVirtualSwitch) dvPortgroups(_ *types.DistributedVirtualSwitc
 				Setting: pg.Config.DefaultPortConfig,
 			},
 		})
-
-		if pg.PortKeys == nil {
-			continue
-		}
 
 		for _, key := range pg.PortKeys {
 			res = append(res, types.DistributedVirtualPort{

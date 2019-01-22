@@ -46,8 +46,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		// Flaky issue #36821.
-		framework.ConformanceIt("should be submitted and removed  [Flaky]", func() {
+		// TODO: Fix Flaky issue #68066 and then re-add this back into Conformance Suite
+		/*
+			Release : v1.9
+			Testname: Pods, delete grace period
+			Description: Create a pod, make sure it is running, create a watch to observe Pod creation. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+		*/
+		It("should be submitted and removed  [Flaky]", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -63,7 +68,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 						},
 					},
 				},
@@ -166,7 +171,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			deleted := false
 			timeout := false
 			var lastPod *v1.Pod
-			timer := time.After(1 * time.Minute)
+			timer := time.After(2 * time.Minute)
 			for !deleted && !timeout {
 				select {
 				case event, _ := <-w.ResultChan():
@@ -199,6 +204,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
+		/*
+			Release : v1.9
+			Testname: Pods, QOS
+			Description:  Create a Pod with CPU and Memory request and limits. Pos status MUST have QOSClass set to PodQOSGuaranteed.
+		*/
 		framework.ConformanceIt("should be submitted and removed ", func() {
 			By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
@@ -213,7 +223,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("100m"),

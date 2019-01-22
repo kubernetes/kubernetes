@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -87,6 +88,11 @@ func TestReadConfig(t *testing.T) {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
 
+	// Since we are setting env vars, we need to reset old
+	// values for other tests to succeed.
+	env := clearEnviron(t)
+	defer resetEnviron(t, env)
+
 	os.Setenv("OS_PASSWORD", "mypass")
 	defer os.Unsetenv("OS_PASSWORD")
 
@@ -98,6 +104,7 @@ func TestReadConfig(t *testing.T) {
  auth-url = http://auth.url
  user-id = user
  tenant-name = demo
+ region = RegionOne
  [LoadBalancer]
  create-monitor = yes
  monitor-delay = 1m
@@ -128,6 +135,10 @@ func TestReadConfig(t *testing.T) {
 	// config file wins over environment variable
 	if cfg.Global.TenantName != "demo" {
 		t.Errorf("incorrect tenant name: %s", cfg.Global.TenantName)
+	}
+
+	if cfg.Global.Region != "RegionOne" {
+		t.Errorf("incorrect region: %s", cfg.Global.Region)
 	}
 
 	if !cfg.LoadBalancer.CreateMonitor {
@@ -433,6 +444,10 @@ func TestNodeAddresses(t *testing.T) {
 				},
 			},
 		},
+		Metadata: map[string]string{
+			"name":       "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy",
+			TypeHostName: "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy.novalocal",
+		},
 	}
 
 	addrs, err := nodeAddresses(&srv)
@@ -451,6 +466,7 @@ func TestNodeAddresses(t *testing.T) {
 		{Type: v1.NodeExternalIP, Address: "50.56.176.35"},
 		{Type: v1.NodeExternalIP, Address: "50.56.176.36"},
 		{Type: v1.NodeExternalIP, Address: "50.56.176.99"},
+		{Type: v1.NodeHostName, Address: "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy.novalocal"},
 	}
 
 	if !reflect.DeepEqual(want, addrs) {
@@ -492,7 +508,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(context.TODO(), testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}
@@ -518,7 +534,7 @@ func TestZones(t *testing.T) {
 		t.Fatalf("Zones() returned false")
 	}
 
-	zone, err := z.GetZone()
+	zone, err := z.GetZone(context.TODO())
 	if err != nil {
 		t.Fatalf("GetZone() returned error: %s", err)
 	}
@@ -548,7 +564,7 @@ func TestVolumes(t *testing.T) {
 	tags := map[string]string{
 		"test": "value",
 	}
-	vol, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
+	vol, _, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
@@ -678,5 +694,26 @@ func TestToAuth3Options(t *testing.T) {
 	}
 	if ao.DomainName != cfg.Global.DomainName {
 		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+}
+
+func clearEnviron(t *testing.T) []string {
+	env := os.Environ()
+	for _, pair := range env {
+		if strings.HasPrefix(pair, "OS_") {
+			i := strings.Index(pair, "=") + 1
+			os.Unsetenv(pair[:i-1])
+		}
+	}
+	return env
+}
+func resetEnviron(t *testing.T, items []string) {
+	for _, pair := range items {
+		if strings.HasPrefix(pair, "OS_") {
+			i := strings.Index(pair, "=") + 1
+			if err := os.Setenv(pair[:i-1], pair[i:]); err != nil {
+				t.Errorf("Setenv(%q, %q) failed during reset: %v", pair[:i-1], pair[i:], err)
+			}
+		}
 	}
 }

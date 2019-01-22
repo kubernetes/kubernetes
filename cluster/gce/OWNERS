@@ -5,6 +5,7 @@ reviewers:
   - vishh
   - mwielgus
   - MaciekPytel
+  - jingax10
 approvers:
   - bowei
   - gmarek
@@ -12,3 +13,4 @@ approvers:
   - vishh
   - mwielgus
   - MaciekPytel
+  - jingax10

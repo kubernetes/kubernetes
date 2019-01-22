@@ -17,12 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"sort"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -40,8 +40,8 @@ type StorageSerializationOptions struct {
 
 func NewStorageSerializationOptions() *StorageSerializationOptions {
 	return &StorageSerializationOptions{
-		DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
-		StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
+		DefaultStorageVersions: ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
+		StorageVersions:        ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
 	}
 }
 
@@ -95,20 +95,30 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion
 func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-
-	deprecatedStorageVersion := ""
-	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
-		"DEPRECATED: the version to store the legacy v1 resources with. Defaults to server preferred.")
-	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API "+
-		"is retired. Setting this has no effect. See --storage-versions instead.")
-
 	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, ""+
 		"The per-group version to store resources in. "+
 		"Specified in the format \"group1/version1,group2/version2,...\". "+
 		"In the case where objects are moved from one group to the other, "+
 		"you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
 		"You only need to pass the groups you wish to change from the defaults. "+
-		"It defaults to a list of preferred versions of all registered groups, "+
-		"which is derived from the KUBE_API_VERSIONS environment variable.")
+		"It defaults to a list of preferred versions of all known groups.")
 
+	fs.MarkDeprecated("storage-versions", ""+
+		"Please omit this flag to ensure the default storage versions are used ."+
+		"Otherwise the cluster is not safe to upgrade to a version newer than 1.12. "+
+		"This flag will be removed in 1.13.")
+
+}
+
+// ToPreferredVersionString returns the preferred versions of all registered
+// groups in the form of "group1/version1,group2/version2,...".  This is compatible
+// with the flag format
+func ToPreferredVersionString(versions []schema.GroupVersion) string {
+	var defaults []string
+	for _, version := range versions {
+		defaults = append(defaults, version.String())
+	}
+	// sorting provides stable output for help.
+	sort.Strings(defaults)
+	return strings.Join(defaults, ",")
 }

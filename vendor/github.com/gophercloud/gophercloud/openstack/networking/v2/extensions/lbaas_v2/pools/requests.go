@@ -20,6 +20,7 @@ type ListOpts struct {
 	LBMethod       string `q:"lb_algorithm"`
 	Protocol       string `q:"protocol"`
 	TenantID       string `q:"tenant_id"`
+	ProjectID      string `q:"project_id"`
 	AdminStateUp   *bool  `q:"admin_state_up"`
 	Name           string `q:"name"`
 	ID             string `q:"id"`
@@ -97,9 +98,13 @@ type CreateOpts struct {
 	// Note: one of LoadbalancerID or ListenerID must be provided.
 	ListenerID string `json:"listener_id,omitempty" xor:"LoadbalancerID"`
 
-	// The UUID of the tenant who owns the Pool. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Pool.
+	// Only administrative users can specify a project UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Pool.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// Name of the pool.
 	Name string `json:"name,omitempty"`
@@ -257,9 +262,13 @@ type CreateMemberOpts struct {
 	// Name of the Member.
 	Name string `json:"name,omitempty"`
 
-	// The UUID of the tenant who owns the Member. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Member.
+	// Only administrative users can specify a project UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Member.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// A positive integer value that indicates the relative portion of traffic
 	// that  this member should receive from the pool. For example, a member with

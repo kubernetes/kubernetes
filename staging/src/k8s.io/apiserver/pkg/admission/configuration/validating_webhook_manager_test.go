@@ -17,24 +17,49 @@ limitations under the License.
 package configuration
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-type disabledValidatingWebhookConfigLister struct{}
+func TestGetValidatingWebhookConfig(t *testing.T) {
+	// Build a test client that the admission plugin can use to look up the ValidatingWebhookConfiguration
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	stop := make(chan struct{})
+	defer close(stop)
+	informerFactory.Start(stop)
+	informerFactory.WaitForCacheSync(stop)
 
-func (l *disabledValidatingWebhookConfigLister) List(options metav1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error) {
-	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "ValidatingWebhookConfigurations"}, "")
-}
-func TestWebhookConfigDisabled(t *testing.T) {
-	manager := NewValidatingWebhookConfigurationManager(&disabledValidatingWebhookConfigLister{})
-	manager.sync()
-	_, err := manager.Webhooks()
-	if err.Error() != ErrDisabled.Error() {
-		t.Errorf("expected %v, got %v", ErrDisabled, err)
+	manager := NewValidatingWebhookConfigurationManager(informerFactory)
+	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
+		validatingConfig.updateConfiguration()
+	}
+	// no configurations
+	if configurations := manager.Webhooks(); len(configurations) != 0 {
+		t.Errorf("expected empty webhooks, but got %v", configurations)
+	}
+
+	webhookConfiguration := &v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
+		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
+	}
+
+	validatingInformer := informerFactory.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	validatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
+	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
+		validatingConfig.updateConfiguration()
+	}
+	// configuration populated
+	configurations := manager.Webhooks()
+	if len(configurations) == 0 {
+		t.Errorf("expected non empty webhooks")
+	}
+	if !reflect.DeepEqual(configurations, webhookConfiguration.Webhooks) {
+		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations)
 	}
 }

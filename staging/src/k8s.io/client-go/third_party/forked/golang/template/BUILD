@@ -11,6 +11,7 @@ go_library(
         "exec.go",
         "funcs.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/third_party/forked/golang/template",
     importpath = "k8s.io/client-go/third_party/forked/golang/template",
 )
 

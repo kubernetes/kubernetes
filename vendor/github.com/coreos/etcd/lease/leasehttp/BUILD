@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "http.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/lease/leasehttp",
     importpath = "github.com/coreos/etcd/lease/leasehttp",
     visibility = ["//visibility:public"],
     deps = [

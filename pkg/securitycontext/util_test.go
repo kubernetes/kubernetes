@@ -17,6 +17,7 @@ limitations under the License.
 package securitycontext
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -84,99 +85,6 @@ func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
 	}
 }
 
-func containerWithUser(ptr *int64) *v1.Container {
-	return &v1.Container{SecurityContext: &v1.SecurityContext{RunAsUser: ptr}}
-}
-
-func TestHaRootUID(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRootUID(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRunAsUser(t *testing.T) {
-	runAsUser := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsUser": {
-			container: containerWithUser(nil),
-		},
-		"valid runAsUser": {
-			container: containerWithUser(&runAsUser),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRunAsUser(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRootRunAsUser(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRootRunAsUser(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
 func TestAddNoNewPrivileges(t *testing.T) {
 	pfalse := false
 	ptrue := true
@@ -213,6 +121,64 @@ func TestAddNoNewPrivileges(t *testing.T) {
 		actual := AddNoNewPrivileges(v.sc)
 		if actual != v.expect {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}
+
+func TestConvertToRuntimeMaskedPaths(t *testing.T) {
+	dPM := v1.DefaultProcMount
+	uPM := v1.UnmaskedProcMount
+	tests := map[string]struct {
+		pm     *v1.ProcMountType
+		expect []string
+	}{
+		"procMount nil": {
+			pm:     nil,
+			expect: defaultMaskedPaths,
+		},
+		"procMount default": {
+			pm:     &dPM,
+			expect: defaultMaskedPaths,
+		},
+		"procMount unmasked": {
+			pm:     &uPM,
+			expect: []string{},
+		},
+	}
+
+	for k, v := range tests {
+		actual := ConvertToRuntimeMaskedPaths(v.pm)
+		if !reflect.DeepEqual(actual, v.expect) {
+			t.Errorf("%s failed, expected %#v but received %#v", k, v.expect, actual)
+		}
+	}
+}
+
+func TestConvertToRuntimeReadonlyPaths(t *testing.T) {
+	dPM := v1.DefaultProcMount
+	uPM := v1.UnmaskedProcMount
+	tests := map[string]struct {
+		pm     *v1.ProcMountType
+		expect []string
+	}{
+		"procMount nil": {
+			pm:     nil,
+			expect: defaultReadonlyPaths,
+		},
+		"procMount default": {
+			pm:     &dPM,
+			expect: defaultReadonlyPaths,
+		},
+		"procMount unmasked": {
+			pm:     &uPM,
+			expect: []string{},
+		},
+	}
+
+	for k, v := range tests {
+		actual := ConvertToRuntimeReadonlyPaths(v.pm)
+		if !reflect.DeepEqual(actual, v.expect) {
+			t.Errorf("%s failed, expected %#v but received %#v", k, v.expect, actual)
 		}
 	}
 }

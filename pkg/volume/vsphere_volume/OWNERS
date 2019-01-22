@@ -3,7 +3,10 @@ approvers:
 - saad-ali
 - thockin
 - matchstick
-- kerneltime
+- SandeepPissay
+- divyenpatel
+- BaluDontu
+- abrarshivani
 reviewers:
 - abithap
 - abrarshivani
@@ -13,4 +16,6 @@ reviewers:
 - rootfs
 - jingxu97
 - msau42
-- kerneltime
+- SandeepPissay
+- divyenpatel
+- BaluDontu

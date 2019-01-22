@@ -17,11 +17,12 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -52,32 +53,32 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	clusterVersionStr, clusterVersion, err := versionGetter.ClusterVersion()
 	if err != nil {
 		// This case can't be forced: kubeadm has to be able to lookup cluster version for upgrades to work
-		skewErrors.Mandatory = append(skewErrors.Mandatory, fmt.Errorf("Unable to fetch cluster version: %v", err))
+		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch cluster version"))
 		return skewErrors
 	}
 
 	kubeadmVersionStr, kubeadmVersion, err := versionGetter.KubeadmVersion()
 	if err != nil {
 		// This case can't be forced: kubeadm has to be able to lookup its version for upgrades to work
-		skewErrors.Mandatory = append(skewErrors.Mandatory, fmt.Errorf("Unable to fetch kubeadm version: %v", err))
+		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch kubeadm version"))
 		return skewErrors
 	}
 
 	kubeletVersions, err := versionGetter.KubeletVersions()
 	if err != nil {
 		// This is a non-critical error; continue although kubeadm couldn't look this up
-		skewErrors.Skippable = append(skewErrors.Skippable, fmt.Errorf("Unable to fetch kubelet version: %v", err))
+		skewErrors.Skippable = append(skewErrors.Skippable, errors.Wrap(err, "Unable to fetch kubelet version"))
 	}
 
 	// Make sure the new version is a supported version (higher than the minimum one supported)
 	if constants.MinimumControlPlaneVersion.AtLeast(newK8sVersion) {
 		// This must not happen, kubeadm always supports a minimum version; and we can't go below that
-		skewErrors.Mandatory = append(skewErrors.Mandatory, fmt.Errorf("Specified version to upgrade to %q is equal to or lower than the minimum supported version %q. Please specify a higher version to upgrade to", newK8sVersionStr, clusterVersionStr))
+		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Errorf("Specified version to upgrade to %q is equal to or lower than the minimum supported version %q. Please specify a higher version to upgrade to", newK8sVersionStr, clusterVersionStr))
 	}
 
 	// kubeadm doesn't support upgrades between two minor versions; e.g. a v1.7 -> v1.9 upgrade is not supported right away
 	if newK8sVersion.Minor() > clusterVersion.Minor()+MaximumAllowedMinorVersionUpgradeSkew {
-		tooLargeUpgradeSkewErr := fmt.Errorf("Specified version to upgrade to %q is too high; kubeadm can upgrade only %d minor version at a time", newK8sVersionStr, MaximumAllowedMinorVersionUpgradeSkew)
+		tooLargeUpgradeSkewErr := errors.Errorf("Specified version to upgrade to %q is too high; kubeadm can upgrade only %d minor version at a time", newK8sVersionStr, MaximumAllowedMinorVersionUpgradeSkew)
 		// If the version that we're about to upgrade to is a released version, we should fully enforce this policy
 		// If the version is a CI/dev/experimental version, it's okay to jump two minor version steps, but then require the -f flag
 		if len(newK8sVersion.PreRelease()) == 0 {
@@ -89,7 +90,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 
 	// kubeadm doesn't support downgrades between two minor versions; e.g. a v1.9 -> v1.7 downgrade is not supported right away
 	if newK8sVersion.Minor() < clusterVersion.Minor()-MaximumAllowedMinorVersionDowngradeSkew {
-		tooLargeDowngradeSkewErr := fmt.Errorf("Specified version to downgrade to %q is too low; kubeadm can downgrade only %d minor version at a time", newK8sVersionStr, MaximumAllowedMinorVersionDowngradeSkew)
+		tooLargeDowngradeSkewErr := errors.Errorf("Specified version to downgrade to %q is too low; kubeadm can downgrade only %d minor version at a time", newK8sVersionStr, MaximumAllowedMinorVersionDowngradeSkew)
 		// If the version that we're about to downgrade to is a released version, we should fully enforce this policy
 		// If the version is a CI/dev/experimental version, it's okay to jump two minor version steps, but then require the -f flag
 		if len(newK8sVersion.PreRelease()) == 0 {
@@ -102,7 +103,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	// If the kubeadm version is lower than what we want to upgrade to; error
 	if kubeadmVersion.LessThan(newK8sVersion) {
 		if newK8sVersion.Minor() > kubeadmVersion.Minor() {
-			tooLargeKubeadmSkew := fmt.Errorf("Specified version to upgrade to %q is at least one minor release higher than the kubeadm minor release (%d > %d). Such an upgrade is not supported", newK8sVersionStr, newK8sVersion.Minor(), kubeadmVersion.Minor())
+			tooLargeKubeadmSkew := errors.Errorf("Specified version to upgrade to %q is at least one minor release higher than the kubeadm minor release (%d > %d). Such an upgrade is not supported", newK8sVersionStr, newK8sVersion.Minor(), kubeadmVersion.Minor())
 			// This is unsupported; kubeadm has no idea how it should handle a newer minor release than itself
 			// If the version is a CI/dev/experimental version though, lower the severity of this check, but then require the -f flag
 			if len(newK8sVersion.PreRelease()) == 0 {
@@ -112,8 +113,13 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 			}
 		} else {
 			// Upgrading to a higher patch version than kubeadm is ok if the user specifies --force. Not recommended, but possible.
-			skewErrors.Skippable = append(skewErrors.Skippable, fmt.Errorf("Specified version to upgrade to %q is higher than the kubeadm version %q. Upgrade kubeadm first using the tool you used to install kubeadm", newK8sVersionStr, kubeadmVersionStr))
+			skewErrors.Skippable = append(skewErrors.Skippable, errors.Errorf("Specified version to upgrade to %q is higher than the kubeadm version %q. Upgrade kubeadm first using the tool you used to install kubeadm", newK8sVersionStr, kubeadmVersionStr))
 		}
+	}
+
+	if kubeadmVersion.Major() > newK8sVersion.Major() ||
+		kubeadmVersion.Minor() > newK8sVersion.Minor() {
+		skewErrors.Skippable = append(skewErrors.Skippable, errors.Errorf("Kubeadm version %s can only be used to upgrade to Kubernetes version %d.%d", kubeadmVersionStr, kubeadmVersion.Major(), kubeadmVersion.Minor()))
 	}
 
 	// Detect if the version is unstable and the user didn't allow that
@@ -154,7 +160,7 @@ func detectUnstableVersionError(newK8sVersion *version.Version, newK8sVersionStr
 		return nil
 	}
 
-	return fmt.Errorf("Specified version to upgrade to %q is an unstable version and such upgrades weren't allowed via setting the --allow-*-upgrades flags", newK8sVersionStr)
+	return errors.Errorf("Specified version to upgrade to %q is an unstable version and such upgrades weren't allowed via setting the --allow-*-upgrades flags", newK8sVersionStr)
 }
 
 // detectTooOldKubelets errors out if the kubelet versions are so old that an unsupported skew would happen if the cluster was upgraded
@@ -164,7 +170,7 @@ func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[st
 
 		kubeletVersion, err := version.ParseSemantic(versionStr)
 		if err != nil {
-			return fmt.Errorf("couldn't parse kubelet version %s", versionStr)
+			return errors.Errorf("couldn't parse kubelet version %s", versionStr)
 		}
 
 		if newK8sVersion.Minor() > kubeletVersion.Minor()+MaximumAllowedMinorVersionKubeletSkew {
@@ -175,5 +181,5 @@ func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[st
 		return nil
 	}
 
-	return fmt.Errorf("There are kubelets in this cluster that are too old that have these versions %v", tooOldKubeletVersions)
+	return errors.Errorf("There are kubelets in this cluster that are too old that have these versions %v", tooOldKubeletVersions)
 }

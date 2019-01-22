@@ -109,15 +109,6 @@ func equalStruct(v1, v2 reflect.Value) bool {
 				// set/unset mismatch
 				return false
 			}
-			b1, ok := f1.Interface().(raw)
-			if ok {
-				b2 := f2.Interface().(raw)
-				// RawMessage
-				if !bytes.Equal(b1.Bytes(), b2.Bytes()) {
-					return false
-				}
-				continue
-			}
 			f1, f2 = f1.Elem(), f2.Elem()
 		}
 		if !equalAny(f1, f2, sprop.Prop[i]) {
@@ -146,11 +137,7 @@ func equalStruct(v1, v2 reflect.Value) bool {
 
 	u1 := uf.Bytes()
 	u2 := v2.FieldByName("XXX_unrecognized").Bytes()
-	if !bytes.Equal(u1, u2) {
-		return false
-	}
-
-	return true
+	return bytes.Equal(u1, u2)
 }
 
 // v1 and v2 are known to have the same type.
@@ -261,6 +248,15 @@ func equalExtMap(base reflect.Type, em1, em2 map[int32]Extension) bool {
 
 		m1, m2 := e1.value, e2.value
 
+		if m1 == nil && m2 == nil {
+			// Both have only encoded form.
+			if bytes.Equal(e1.enc, e2.enc) {
+				continue
+			}
+			// The bytes are different, but the extensions might still be
+			// equal. We need to decode them to compare.
+		}
+
 		if m1 != nil && m2 != nil {
 			// Both are unencoded.
 			if !equalAny(reflect.ValueOf(m1), reflect.ValueOf(m2), nil) {
@@ -276,8 +272,12 @@ func equalExtMap(base reflect.Type, em1, em2 map[int32]Extension) bool {
 			desc = m[extNum]
 		}
 		if desc == nil {
+			// If both have only encoded form and the bytes are the same,
+			// it is handled above. We get here when the bytes are different.
+			// We don't know how to decode it, so just compare them as byte
+			// slices.
 			log.Printf("proto: don't know how to compare extension %d of %v", extNum, base)
-			continue
+			return false
 		}
 		var err error
 		if m1 == nil {

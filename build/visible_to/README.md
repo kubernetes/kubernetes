@@ -115,7 +115,7 @@ visibility = ["//visible_to:client_foo,//visible_to:server_foo"],
 ```
 bazel build --check_visibility --nobuild \
     //cmd/... //pkg/... //plugin/... \
-    //third_party/... //examples/... //test/... //vendor/k8s.io/...
+    //third_party/... //test/... //vendor/k8s.io/...
 ```
 
 #### Who depends on target _q_?

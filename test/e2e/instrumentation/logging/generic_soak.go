@@ -27,8 +27,16 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+var loggingSoak struct {
+	Scale            int           `default:"1" usage:"number of waves of pods"`
+	TimeBetweenWaves time.Duration `default:"5000ms" usage:"time to wait before dumping the next wave of pods"`
+}
+var _ = config.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
@@ -43,42 +51,24 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 	// This can expose problems in your docker configuration (logging), log searching infrastructure, to tune deployments to match high load
 	// scenarios.  TODO jayunit100 add this to the kube CI in a follow on infra patch.
 
-	// Returns scale (how many waves of pods).
-	// Returns wave interval (how many seconds to wait before dumping the next wave of pods).
-	readConfig := func() (int, time.Duration) {
-		// Read in configuration settings, reasonable defaults.
-		scale := framework.TestContext.LoggingSoak.Scale
-		if framework.TestContext.LoggingSoak.Scale == 0 {
-			scale = 1
-			framework.Logf("Overriding default scale value of zero to %d", scale)
-		}
-
-		milliSecondsBetweenWaves := framework.TestContext.LoggingSoak.MilliSecondsBetweenWaves
-		if milliSecondsBetweenWaves == 0 {
-			milliSecondsBetweenWaves = 5000
-			framework.Logf("Overriding default milliseconds value of zero to %d", milliSecondsBetweenWaves)
-		}
-
-		return scale, time.Duration(milliSecondsBetweenWaves) * time.Millisecond
-	}
-
-	scale, millisecondsBetweenWaves := readConfig()
-	It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v, scaling up to %v pods per node", kbRateInSeconds, totalLogTime, scale), func() {
+	It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func() {
+		By(fmt.Sprintf("scaling up to %v pods per node", loggingSoak.Scale))
 		defer GinkgoRecover()
 		var wg sync.WaitGroup
-		wg.Add(scale)
-		for i := 0; i < scale; i++ {
+		wg.Add(loggingSoak.Scale)
+		for i := 0; i < loggingSoak.Scale; i++ {
 			go func() {
+				defer wg.Done()
+				defer GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
-				wg.Done()
 			}()
 			// Niceness.
-			time.Sleep(millisecondsBetweenWaves)
+			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
-		framework.Logf("Waiting on all %v logging soak waves to complete", scale)
+		framework.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
 		wg.Wait()
 	})
 })
@@ -100,7 +90,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			return v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "logging-soak",
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",
 						"-c",
@@ -119,7 +109,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 		framework.PodStateVerification{
 			Selectors:   podlables,
 			ValidPhases: []v1.PodPhase{v1.PodRunning, v1.PodSucceeded},
-			// we don't validate total log data, since there is no gaurantee all logs will be stored forever.
+			// we don't validate total log data, since there is no guarantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
 			Verify: func(p v1.Pod) (bool, error) {
 				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)

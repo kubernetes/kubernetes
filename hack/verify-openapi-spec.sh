@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -22,10 +22,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
-
-apiserver=$(kube::util::find-binary "kube-apiserver")
 
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
 TMP_SPECROOT="${KUBE_ROOT}/_tmp/openapi-spec"
@@ -35,7 +34,7 @@ mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
 trap "cp -a ${TMP_SPECROOT} ${SPECROOT}/..; rm -rf ${_tmp}" EXIT SIGINT
 rm ${SPECROOT}/*
-cp ${TMP_SPECROOT}/BUILD ${SPECROOT}/BUILD 
+cp ${TMP_SPECROOT}/BUILD ${SPECROOT}/BUILD
 cp ${TMP_SPECROOT}/README.md ${SPECROOT}/README.md
 
 "${KUBE_ROOT}/hack/update-openapi-spec.sh"
@@ -46,7 +45,7 @@ if [[ $ret -eq 0 ]]
 then
   echo "${SPECROOT} up to date."
 else
-  echo "${SPECROOT} is out of date. Please run hack/update-openapi-spec.sh"
+  echo "${SPECROOT} is out of date. Please run hack/update-openapi-spec.sh" >&2
   exit 1
 fi
 

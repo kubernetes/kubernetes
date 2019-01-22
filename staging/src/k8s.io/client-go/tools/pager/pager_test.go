@@ -17,22 +17,22 @@ limitations under the License.
 package pager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func list(count int, rv string) *metainternalversion.List {
 	var list metainternalversion.List
 	for i := 0; i < count; i++ {
-		list.Items = append(list.Items, &metav1alpha1.PartialObjectMetadata{
+		list.Items = append(list.Items, &metav1beta1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%d", i),
 			},
@@ -80,7 +80,7 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 		if p.remaining <= 0 {
 			break
 		}
-		list.Items = append(list.Items, &metav1alpha1.PartialObjectMetadata{
+		list.Items = append(list.Items, &metav1beta1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%d", p.index),
 			},

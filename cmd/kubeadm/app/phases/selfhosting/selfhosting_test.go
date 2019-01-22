@@ -18,15 +18,15 @@ package selfhosting
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -66,7 +66,7 @@ spec:
     - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
     - --authorization-mode=Node,RBAC
     - --etcd-servers=http://127.0.0.1:2379
-    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
+    image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -153,7 +153,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
+        image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -223,9 +223,10 @@ spec:
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     - --use-service-account-credentials=true
-    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+    image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -298,9 +299,10 @@ spec:
         - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
         - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         - --use-service-account-credentials=true
-        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
+        - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+        image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -372,8 +374,8 @@ spec:
     - kube-scheduler
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    - --address=127.0.0.1
-    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
+    - --bind-address=127.0.0.1
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -423,8 +425,8 @@ spec:
         - kube-scheduler
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        - --address=127.0.0.1
-        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
+        - --bind-address=127.0.0.1
+        image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -488,37 +490,44 @@ func TestBuildDaemonSet(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent(rt.podBytes)
-		if err != nil {
-			t.Errorf("error creating tempfile with content:%v", err)
-		}
-		defer os.Remove(tempFile)
+		t.Run(rt.component, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent(rt.podBytes)
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		pod, err := volumeutil.LoadPodFromFile(tempFile)
-		if err != nil {
-			t.Fatalf("couldn't load the specified Pod")
-		}
-		podSpec := &pod.Spec
+			podSpec, err := loadPodSpecFromFile(tempFile)
+			if err != nil {
+				t.Fatalf("couldn't load the specified Pod Spec")
+			}
 
-		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
-		dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
-		if err != nil {
-			t.Fatalf("failed to marshal daemonset to YAML: %v", err)
-		}
+			ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
+			dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
+			if err != nil {
+				t.Fatalf("failed to marshal daemonset to YAML: %v", err)
+			}
 
-		if !bytes.Equal(dsBytes, rt.dsBytes) {
-			t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
-		}
+			if !bytes.Equal(dsBytes, rt.dsBytes) {
+				t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
+			}
+		})
 	}
 }
 
 func TestLoadPodSpecFromFile(t *testing.T) {
 	tests := []struct {
+		name        string
 		content     string
 		expectError bool
 	}{
 		{
-			// Good YAML
+			name:        "no content",
+			content:     "",
+			expectError: true,
+		},
+		{
+			name: "valid YAML",
 			content: `
 apiVersion: v1
 kind: Pod
@@ -526,12 +535,12 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: gcr.io/google_containers/busybox
+    - image: k8s.gcr.io/busybox
 `,
 			expectError: false,
 		},
 		{
-			// Good JSON
+			name: "valid JSON",
 			content: `
 {
   "apiVersion": "v1",
@@ -542,7 +551,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "gcr.io/google_containers/busybox"
+        "image": "k8s.gcr.io/busybox"
       }
     ]
   }
@@ -550,43 +559,52 @@ spec:
 			expectError: false,
 		},
 		{
-			// Bad PodSpec
+			name: "incorrect PodSpec",
 			content: `
 apiVersion: v1
 kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: gcr.io/google_containers/busybox
+  - image: k8s.gcr.io/busybox
 `,
 			expectError: true,
 		},
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent([]byte(rt.content))
-		if err != nil {
-			t.Errorf("error creating tempfile with content:%v", err)
-		}
-		defer os.Remove(tempFile)
+		t.Run(rt.name, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent([]byte(rt.content))
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		_, err = volumeutil.LoadPodFromFile(tempFile)
-		if (err != nil) != rt.expectError {
-			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
-		}
+			_, err = loadPodSpecFromFile(tempFile)
+			if (err != nil) != rt.expectError {
+				t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
+			}
+		})
 	}
+
+	t.Run("empty file name", func(t *testing.T) {
+		_, err := loadPodSpecFromFile("")
+		if err == nil {
+			t.Error("unexpected success: loadPodSpecFromFile should return error when no file is given")
+		}
+	})
 }
 
 func createTempFileWithContent(content []byte) (string, error) {
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot create temporary file")
 	}
 	if _, err = tempFile.Write([]byte(content)); err != nil {
-		return "", fmt.Errorf("cannot save temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot save temporary file")
 	}
 	if err = tempFile.Close(); err != nil {
-		return "", fmt.Errorf("cannot close temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot close temporary file")
 	}
 	return tempFile.Name(), nil
 }

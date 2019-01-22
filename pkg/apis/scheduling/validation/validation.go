@@ -17,21 +17,30 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"strings"
+
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
-// ValidatePriorityClassName can be used to check whether the given priority
-// class name is valid.
-var ValidatePriorityClassName = apivalidation.NameIsDNSSubdomain
-
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.
 func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, ValidatePriorityClassName, field.NewPath("metadata"))...)
-	// The "Value" field can be any valid integer. So, no need to validate.
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	// If the priorityClass starts with a system prefix, it must be one of the
+	// predefined system priority classes.
+	if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
+		if is, err := scheduling.IsKnownSystemPriorityClass(pc); !is {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "name"), "priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only. error: "+err.Error()))
+		}
+	} else if pc.Value > scheduling.HighestUserDefinablePriority {
+		// Non-system critical priority classes are not allowed to have a value larger than HighestUserDefinablePriority.
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), fmt.Sprintf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority)))
+	}
 	return allErrs
 }
 

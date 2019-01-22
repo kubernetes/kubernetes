@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -30,7 +30,8 @@ KUBE_CONTROLLER_MANAGER_ROOT_CA_FILE="--root-ca-file=/srv/kubernetes/ca.crt"
 # RSA key used to sign service account tokens.
 KUBE_CONTROLLER_MANAGER_SERVICE_ACCOUNT_PRIVATE_KEY_FILE="--service-account-private-key-file=/srv/kubernetes/server.key"
 
-# --leader-elect
+# --leader-elect: Start a leader election client and gain leadership before 
+# executing the main loop. Enable this when running replicated components for high availability.
 KUBE_LEADER_ELECT="--leader-elect"
 EOF
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM docker.elastic.co/elasticsearch/elasticsearch:5.6.4
+FROM docker.elastic.co/elasticsearch/elasticsearch-oss:6.3.2
 
 VOLUME ["/data"]
 EXPOSE 9200 9300

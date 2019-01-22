@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 	"io/ioutil"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -35,7 +36,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = framework.KubeDescribe("Summary API", func() {
+var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		AfterEach(func() {
@@ -107,9 +108,45 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"UserDefinedMetrics": BeEmpty(),
 				})
 			}
+			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
+			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
+				"Time": recent(maxStatsAge),
+				// Pods are limited by Node Allocatable
+				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
+				"UsageBytes":      bounded(10*framework.Kb, 400*framework.Mb),
+				"WorkingSetBytes": bounded(10*framework.Kb, 400*framework.Mb),
+				"RSSBytes":        bounded(1*framework.Kb, 160*framework.Mb),
+				"PageFaults":      bounded(0, 1000000),
+				"MajorPageFaults": bounded(0, 10),
+			})
+			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
+			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
+				// Some Linux distributions still ship a docker.service that is missing
+				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
+				// that allows us to monitor the container runtime resource usage through
+				// the "cpu" and "memory" cgroups.
+				//
+				// Make an exception here for those distros, only for Docker, so that they
+				// can pass the full node e2e tests even in that case.
+				//
+				// For newer container runtimes (using CRI) and even distros that still
+				// ship Docker, we should encourage them to always set `Delegate=yes` in
+				// order to make monitoring of the runtime possible.
+				stdout, err := exec.Command("systemctl", "show", "-p", "Delegate", "docker.service").CombinedOutput()
+				if err == nil && strings.TrimSpace(string(stdout)) == "Delegate=no" {
+					// Only make these optional if we can successfully confirm that
+					// Delegate is set to "no" (in other words, unset.) If we fail
+					// to check that, default to requiring it, which might cause
+					// false positives, but that should be the safer approach.
+					By("Making runtime container expectations optional, since systemd was not configured to Delegate=yes the cgroups")
+					runtimeContExpectations.Fields["Memory"] = Or(BeNil(), runtimeContExpectations.Fields["Memory"])
+					runtimeContExpectations.Fields["CPU"] = Or(BeNil(), runtimeContExpectations.Fields["CPU"])
+				}
+			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
-				"runtime": sysContExpectations(),
+				"runtime": runtimeContExpectations,
+				"pods":    podsContExpectations,
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
@@ -138,15 +175,15 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(100000, 1E9),
+							"UsageNanoCores":       bounded(10000, 1E9),
 							"UsageCoreNanoSeconds": bounded(10000000, 1E11),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(1*framework.Kb, 10*framework.Mb),
-							"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
-							"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
-							"RSSBytes":        bounded(1*framework.Kb, framework.Mb),
+							"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
+							"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
+							"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
+							"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
@@ -185,15 +222,15 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(100000, 1E9),
+					"UsageNanoCores":       bounded(10000, 1E9),
 					"UsageCoreNanoSeconds": bounded(10000000, 1E11),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
-					"AvailableBytes":  bounded(1*framework.Kb, 10*framework.Mb),
-					"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
-					"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
-					"RSSBytes":        bounded(1*framework.Kb, framework.Mb),
+					"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
+					"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
+					"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
+					"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
 					"PageFaults":      bounded(0, 1000000),
 					"MajorPageFaults": bounded(0, 10),
 				}),
@@ -277,6 +314,11 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"InodesUsed": bounded(0, 1E8),
 						}),
 					}),
+					"Rlimit": ptrMatchAllFields(gstruct.Fields{
+						"Time":                  recent(maxStatsAge),
+						"MaxPID":                bounded(0, 1E8),
+						"NumOfRunningProcesses": bounded(0, 1E8),
+					}),
 				}),
 				// Ignore extra pods since the tests run in parallel.
 				"Pods": gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
@@ -307,11 +349,11 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 					{
 						Name:    "busybox-container",
 						Image:   busyboxImage,
-						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
+						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes
-								v1.ResourceMemory: resource.MustParse("10M"),
+								v1.ResourceMemory: resource.MustParse("80M"),
 							},
 						},
 						VolumeMounts: []v1.VolumeMount{

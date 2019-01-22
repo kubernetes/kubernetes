@@ -8,6 +8,7 @@ go_library(
         "go18.go",
         "naming.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/naming",
     importpath = "google.golang.org/grpc/naming",
     visibility = ["//visibility:public"],
     deps = [

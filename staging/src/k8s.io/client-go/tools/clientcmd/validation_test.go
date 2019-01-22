@@ -365,6 +365,106 @@ func TestValidateMultipleMethodsAuthInfo(t *testing.T) {
 	test.testConfig(t)
 }
 
+func TestValidateAuthInfoExec(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			Command:    "/bin/example",
+			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+			Args:       []string{"hello", "world"},
+			Env: []clientcmdapi.ExecEnvVar{
+				{Name: "foo", Value: "bar"},
+			},
+		},
+	}
+	test := configValidationTest{
+		config: config,
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecNoVersion(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			Command: "/bin/example",
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			"apiVersion must be specified for user to use exec authentication plugin",
+		},
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecNoCommand(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			"command must be specified for user to use exec authentication plugin",
+		},
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecWithAuthProvider(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		AuthProvider: &clientcmdapi.AuthProviderConfig{
+			Name: "oidc",
+		},
+		Exec: &clientcmdapi.ExecConfig{
+			Command:    "/bin/example",
+			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			"authProvider cannot be provided in combination with an exec plugin for user",
+		},
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecInvalidEnv(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			Command:    "/bin/example",
+			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+			Env: []clientcmdapi.ExecEnvVar{
+				{Name: "foo"}, // No value
+			},
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			"env variable foo value must be specified for user to use exec authentication plugin",
+		},
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
 type configValidationTest struct {
 	config                 *clientcmdapi.Config
 	expectedErrorSubstring []string

@@ -13,7 +13,6 @@ go_test(
         "selector_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/fields",
 )
 
 go_library(
@@ -24,8 +23,9 @@ go_library(
         "requirements.go",
         "selector.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/fields",
     importpath = "k8s.io/apimachinery/pkg/fields",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/selection:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library"],
 )
 
 filegroup(

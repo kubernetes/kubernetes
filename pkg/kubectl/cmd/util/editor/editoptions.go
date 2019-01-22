@@ -25,12 +25,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,73 +43,134 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor/crlf"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // EditOptions contains all the options for running edit cli command.
 type EditOptions struct {
 	resource.FilenameOptions
+	RecordFlags *genericclioptions.RecordFlags
 
-	Output             string
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
+
 	OutputPatch        bool
 	WindowsLineEndings bool
 
 	cmdutil.ValidateOptions
 
-	Mapper         meta.RESTMapper
-	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
-	Encoder        runtime.Encoder
 
 	EditMode EditMode
 
 	CmdNamespace    string
 	ApplyAnnotation bool
-	Record          bool
 	ChangeCause     string
-	Include3rdParty bool
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 
+	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
 	editPrinterOptions  *editPrinterOptions
 	updatedResultGetter func(data []byte) *resource.Result
 }
 
+// NewEditOptions returns an initialized EditOptions instance
+func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *EditOptions {
+	return &EditOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		EditMode: editMode,
+
+		PrintFlags: genericclioptions.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme),
+
+		editPrinterOptions: &editPrinterOptions{
+			// create new editor-specific PrintFlags, with all
+			// output flags disabled, except json / yaml
+			printFlags: (&genericclioptions.PrintFlags{
+				JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+			}).WithDefaultOutput("yaml"),
+			ext:       ".yaml",
+			addHeader: true,
+		},
+
+		WindowsLineEndings: goruntime.GOOS == "windows",
+
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: ioStreams,
+	}
+}
+
 type editPrinterOptions struct {
-	printer   printers.ResourcePrinter
-	ext       string
-	addHeader bool
+	printFlags *genericclioptions.PrintFlags
+	ext        string
+	addHeader  bool
+}
+
+func (e *editPrinterOptions) Complete(fromPrintFlags *genericclioptions.PrintFlags) error {
+	if e.printFlags == nil {
+		return fmt.Errorf("missing PrintFlags in editor printer options")
+	}
+
+	// bind output format from existing printflags
+	if fromPrintFlags != nil && len(*fromPrintFlags.OutputFormat) > 0 {
+		e.printFlags.OutputFormat = fromPrintFlags.OutputFormat
+	}
+
+	// prevent a commented header at the top of the user's
+	// default editor if presenting contents as json.
+	if *e.printFlags.OutputFormat == "json" {
+		e.addHeader = false
+		e.ext = ".json"
+		return nil
+	}
+
+	// we default to yaml if check above is false, as only json or yaml are supported
+	e.addHeader = true
+	e.ext = ".yaml"
+	return nil
+}
+
+func (e *editPrinterOptions) PrintObj(obj runtime.Object, out io.Writer) error {
+	p, err := e.printFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	return p.PrintObj(obj, out)
 }
 
 // Complete completes all the required options
-func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
+func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
+	var err error
+
+	o.RecordFlags.Complete(cmd)
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
-	if o.Output != "" {
-		if o.Output != "yaml" && o.Output != "json" {
-			return fmt.Errorf("invalid output format %s, only yaml|json supported", o.Output)
-		}
-	}
-	o.editPrinterOptions = getPrinter(o.Output)
+
+	o.editPrinterOptions.Complete(o.PrintFlags)
 
 	if o.OutputPatch && o.EditMode != NormalEditMode {
 		return fmt.Errorf("the edit mode doesn't support output the patch")
 	}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	mapper, _ := f.Object()
 	b := f.NewBuilder().
 		Unstructured()
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
@@ -138,14 +201,13 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 			Do()
 	}
 
-	o.Mapper = mapper
-	o.CmdNamespace = cmdNamespace
-	o.Encoder = f.JSONEncoder()
-	o.f = f
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		return o.PrintFlags.ToPrinter()
+	}
 
-	// Set up writer
-	o.Out = out
-	o.ErrOut = errOut
+	o.CmdNamespace = cmdNamespace
+	o.f = f
 
 	return nil
 }
@@ -155,8 +217,9 @@ func (o *EditOptions) Validate() error {
 	return nil
 }
 
+// Run performs the execution
 func (o *EditOptions) Run() error {
-	edit := NewDefaultEditor(o.f.EditorEnvs())
+	edit := NewDefaultEditor(editorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
 	editFn := func(infos []*resource.Info) error {
 		var (
@@ -201,7 +264,7 @@ func (o *EditOptions) Run() error {
 			}
 
 			if !containsError {
-				if err := o.editPrinterOptions.printer.PrintObj(originalObj, w); err != nil {
+				if err := o.editPrinterOptions.PrintObj(originalObj, w); err != nil {
 					return preservedFile(err, results.file, o.ErrOut)
 				}
 				original = buf.Bytes()
@@ -226,7 +289,7 @@ func (o *EditOptions) Run() error {
 			if len(results.file) > 0 {
 				os.Remove(results.file)
 			}
-			glog.V(4).Infof("User edited:\n%s", string(edited))
+			klog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
 			schema, err := o.f.Validator(o.EnableValidation)
@@ -239,7 +302,8 @@ func (o *EditOptions) Run() error {
 					file: file,
 				}
 				containsError = true
-				fmt.Fprintln(o.ErrOut, results.addError(apierrors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
+				fmt.Fprintln(o.ErrOut, results.addError(apierrors.NewInvalid(corev1.SchemeGroupVersion.WithKind("").GroupKind(),
+					"", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
 				continue
 			}
 
@@ -337,7 +401,7 @@ func (o *EditOptions) Run() error {
 			return err
 		}
 		if len(infos) == 0 {
-			return errors.New("edit cancelled, no objects found.")
+			return errors.New("edit cancelled, no objects found")
 		}
 		return editFn(infos)
 	case ApplyEditMode:
@@ -347,7 +411,7 @@ func (o *EditOptions) Run() error {
 		}
 		var annotationInfos []*resource.Info
 		for i := range infos {
-			data, err := kubectl.GetOriginalConfiguration(infos[i].Mapping, infos[i].Object)
+			data, err := kubectl.GetOriginalConfiguration(infos[i].Object)
 			if err != nil {
 				return err
 			}
@@ -397,33 +461,39 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(o.Encoder, originalInfo.Object)
+		originalJS, err := encodeToJSON(originalInfo.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(o.Encoder, info.Object)
+		editedJS, err := encodeToJSON(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
-			return nil
-		} else {
-			err := o.annotationPatch(info)
+			printer, err := o.ToPrinter("skipped")
 			if err != nil {
 				return err
 			}
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
-			return nil
+			return printer.PrintObj(info.Object, o.Out)
 		}
+		err = o.annotationPatch(info)
+		if err != nil {
+			return err
+		}
+
+		printer, err := o.ToPrinter("edited")
+		if err != nil {
+			return err
+		}
+		return printer.PrintObj(info.Object, o.Out)
 	})
 	return err
 }
 
 func (o *EditOptions) annotationPatch(update *resource.Info) error {
-	patch, _, patchType, err := GetApplyPatch(update.Object, o.Encoder)
+	patch, _, patchType, err := GetApplyPatch(update.Object.(runtime.Unstructured))
 	if err != nil {
 		return err
 	}
@@ -433,15 +503,16 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 		return err
 	}
 	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch)
+	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, types.PatchType, error) {
-	beforeJSON, err := encodeToJson(codec, obj)
+// GetApplyPatch is used to get and apply patches
+func GetApplyPatch(obj runtime.Unstructured) ([]byte, []byte, types.PatchType, error) {
+	beforeJSON, err := encodeToJSON(obj)
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
@@ -454,9 +525,9 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[api.LastAppliedConfigAnnotation] = string(beforeJSON)
+	annotations[corev1.LastAppliedConfigAnnotation] = string(beforeJSON)
 	accessor.SetAnnotations(objCopy, annotations)
-	afterJSON, err := encodeToJson(codec, objCopy)
+	afterJSON, err := encodeToJSON(objCopy.(runtime.Unstructured))
 	if err != nil {
 		return nil, beforeJSON, types.MergePatchType, err
 	}
@@ -464,8 +535,8 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	return patch, beforeJSON, types.MergePatchType, err
 }
 
-func encodeToJson(codec runtime.Encoder, obj runtime.Object) ([]byte, error) {
-	serialization, err := runtime.Encode(codec, obj)
+func encodeToJSON(obj runtime.Unstructured) ([]byte, error) {
+	serialization, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -474,30 +545,6 @@ func encodeToJson(codec runtime.Encoder, obj runtime.Object) ([]byte, error) {
 		return nil, err
 	}
 	return js, nil
-}
-
-func getPrinter(format string) *editPrinterOptions {
-	switch format {
-	case "json":
-		return &editPrinterOptions{
-			printer:   &printers.JSONPrinter{},
-			ext:       ".json",
-			addHeader: false,
-		}
-	case "yaml":
-		return &editPrinterOptions{
-			printer:   &printers.YAMLPrinter{},
-			ext:       ".yaml",
-			addHeader: true,
-		}
-	default:
-		// if format is not specified, use yaml as default
-		return &editPrinterOptions{
-			printer:   &printers.YAMLPrinter{},
-			ext:       ".yaml",
-			addHeader: true,
-		}
-	}
 }
 
 func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor, results *editResults) error {
@@ -522,20 +569,23 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(o.Encoder, originalInfo.Object)
+		originalJS, err := encodeToJSON(originalInfo.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(o.Encoder, info.Object)
+		editedJS, err := encodeToJSON(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
-			return nil
+			printer, err := o.ToPrinter("skipped")
+			if err != nil {
+				return err
+			}
+			return printer.PrintObj(info.Object, o.Out)
 		}
 
 		preconditions := []mergepatch.PreconditionFunc{
@@ -555,12 +605,12 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.MergePatchType
 			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
 			if err != nil {
-				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				return err
 			}
 			for _, precondition := range preconditions {
 				if !precondition(patch) {
-					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
 			}
@@ -570,7 +620,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.StrategicMergePatchType
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
 			if err != nil {
-				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				if mergepatch.IsPreconditionFailed(err) {
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
@@ -582,14 +632,17 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)
+		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch, nil)
 		if err != nil {
 			fmt.Fprintln(o.ErrOut, results.addError(err, info))
 			return nil
 		}
 		info.Refresh(patched, true)
-		o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
-		return nil
+		printer, err := o.ToPrinter("edited")
+		if err != nil {
+			return err
+		}
+		return printer.PrintObj(info.Object, o.Out)
 	})
 	return err
 }
@@ -599,8 +652,11 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		o.f.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "created")
-		return nil
+		printer, err := o.ToPrinter("created")
+		if err != nil {
+			return err
+		}
+		return printer.PrintObj(info.Object, o.Out)
 	})
 	return err
 }
@@ -610,14 +666,12 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
 		if o.ApplyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info, o.Encoder); err != nil {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 				return err
 			}
 		}
-		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(info.Object, o.ChangeCause); err != nil {
-				return err
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return nil
@@ -626,12 +680,18 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	return err
 }
 
+// EditMode can be either NormalEditMode, EditBeforeCreateMode or ApplyEditMode
 type EditMode string
 
 const (
-	NormalEditMode       EditMode = "normal_mode"
+	// NormalEditMode is an edit mode
+	NormalEditMode EditMode = "normal_mode"
+
+	// EditBeforeCreateMode is an edit mode
 	EditBeforeCreateMode EditMode = "edit_before_create_mode"
-	ApplyEditMode        EditMode = "edit_last_applied_mode"
+
+	// ApplyEditMode is an edit mode
+	ApplyEditMode EditMode = "edit_last_applied_mode"
 )
 
 // editReason preserves a message about the reason this file must be edited again
@@ -662,12 +722,12 @@ func (h *editHeader) writeTo(w io.Writer, editMode EditMode) error {
 
 	for _, r := range h.reasons {
 		if len(r.other) > 0 {
-			fmt.Fprintf(w, "# %s:\n", r.head)
+			fmt.Fprintf(w, "# %s:\n", hashOnLineBreak(r.head))
 		} else {
-			fmt.Fprintf(w, "# %s\n", r.head)
+			fmt.Fprintf(w, "# %s\n", hashOnLineBreak(r.head))
 		}
 		for _, o := range r.other {
-			fmt.Fprintf(w, "# * %s\n", o)
+			fmt.Fprintf(w, "# * %s\n", hashOnLineBreak(o))
 		}
 		fmt.Fprintln(w, "#")
 	}
@@ -690,11 +750,16 @@ type editResults struct {
 }
 
 func (r *editResults) addError(err error, info *resource.Info) string {
+	resourceString := info.Mapping.Resource.Resource
+	if len(info.Mapping.Resource.Group) > 0 {
+		resourceString = resourceString + "." + info.Mapping.Resource.Group
+	}
+
 	switch {
 	case apierrors.IsInvalid(err):
 		r.edit = append(r.edit, info)
 		reason := editReason{
-			head: fmt.Sprintf("%s %q was not valid", info.Mapping.Resource, info.Name),
+			head: fmt.Sprintf("%s %q was not valid", resourceString, info.Name),
 		}
 		if err, ok := err.(apierrors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
@@ -704,13 +769,13 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 			}
 		}
 		r.header.reasons = append(r.header.reasons, reason)
-		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q is invalid", resourceString, info.Name)
 	case apierrors.IsNotFound(err):
 		r.notfound++
-		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q could not be found on the server", resourceString, info.Name)
 	default:
 		r.retryable++
-		return fmt.Sprintf("error: %s %q could not be patched: %v", info.Mapping.Resource, info.Name, err)
+		return fmt.Sprintf("error: %s %q could not be patched: %v", resourceString, info.Name, err)
 	}
 }
 
@@ -742,4 +807,27 @@ func hasLines(r io.Reader) (bool, error) {
 		return false, err
 	}
 	return false, nil
+}
+
+// hashOnLineBreak returns a string built from the provided string by inserting any necessary '#'
+// characters after '\n' characters, indicating a comment.
+func hashOnLineBreak(s string) string {
+	r := ""
+	for i, ch := range s {
+		j := i + 1
+		if j < len(s) && ch == '\n' && s[j] != '#' {
+			r += "\n# "
+		} else {
+			r += string(ch)
+		}
+	}
+	return r
+}
+
+// editorEnvs returns an ordered list of env vars to check for editor preferences.
+func editorEnvs() []string {
+	return []string{
+		"KUBE_EDITOR",
+		"EDITOR",
+	}
 }

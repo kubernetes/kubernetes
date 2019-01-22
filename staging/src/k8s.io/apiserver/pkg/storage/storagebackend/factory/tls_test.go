@@ -17,6 +17,7 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path"
@@ -25,12 +26,12 @@ import (
 
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
-	"golang.org/x/net/context"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
@@ -42,8 +43,8 @@ var codecs = serializer.NewCodecFactory(scheme)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 func TestTLSConnection(t *testing.T) {
@@ -65,12 +66,14 @@ func TestTLSConnection(t *testing.T) {
 	defer cluster.Terminate(t)
 
 	cfg := storagebackend.Config{
-		Type:       storagebackend.StorageTypeETCD3,
-		ServerList: []string{cluster.Members[0].GRPCAddr()},
-		CertFile:   certFile,
-		KeyFile:    keyFile,
-		CAFile:     caFile,
-		Codec:      codec,
+		Type: storagebackend.StorageTypeETCD3,
+		Transport: storagebackend.TransportConfig{
+			ServerList: []string{cluster.Members[0].GRPCAddr()},
+			CertFile:   certFile,
+			KeyFile:    keyFile,
+			CAFile:     caFile,
+		},
+		Codec: codec,
 	}
 	storage, destroyFunc, err := newETCD3Storage(cfg)
 	defer destroyFunc()

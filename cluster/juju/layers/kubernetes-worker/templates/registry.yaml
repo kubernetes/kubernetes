@@ -37,7 +37,7 @@ spec:
     spec:
       containers:
       - name: registry
-        image: registry:2
+        image: cdkbot/registry-{{ arch }}:2.6
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:

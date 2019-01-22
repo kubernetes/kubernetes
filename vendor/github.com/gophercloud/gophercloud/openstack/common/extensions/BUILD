@@ -8,6 +8,7 @@ go_library(
         "results.go",
         "urls.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gophercloud/gophercloud/openstack/common/extensions",
     importpath = "github.com/gophercloud/gophercloud/openstack/common/extensions",
     visibility = ["//visibility:public"],
     deps = [

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/sbin/charm-env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -21,7 +21,7 @@ from charmhelpers.core.hookenv import action_get
 from charmhelpers.core.hookenv import action_set
 from charmhelpers.core.hookenv import unit_public_ip
 from charms.templating.jinja2 import render
-from subprocess import call
+from subprocess import call, check_output
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
@@ -29,6 +29,9 @@ context = {}
 context['replicas'] = action_get('replicas')
 context['delete'] = action_get('delete')
 context['public_address'] = unit_public_ip()
+
+arch = check_output(['dpkg', '--print-architecture']).rstrip()
+context['arch'] = arch.decode('utf-8')
 
 if not context['replicas']:
     context['replicas'] = 3

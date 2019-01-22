@@ -25,25 +25,22 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
-
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
-
-	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
-	SecureServing           *genericoptions.SecureServingOptions
-	InsecureServing         *kubeoptions.InsecureServingOptions
+	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
+	InsecureServing         *genericoptions.DeprecatedInsecureServingOptionsWithLoopback
 	Audit                   *genericoptions.AuditOptions
 	Features                *genericoptions.FeatureOptions
 	Admission               *kubeoptions.AdmissionOptions
@@ -71,28 +68,32 @@ type ServerRunOptions struct {
 
 	MasterCount            int
 	EndpointReconcilerType string
+
+	ServiceAccountSigningKeyFile     string
+	ServiceAccountIssuer             serviceaccount.TokenGenerator
+	ServiceAccountTokenMaxExpiration time.Duration
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
-		SecureServing:        kubeoptions.NewSecureServingOptions(),
-		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
-		Audit:                genericoptions.NewAuditOptions(),
-		Features:             genericoptions.NewFeatureOptions(),
-		Admission:            kubeoptions.NewAdmissionOptions(),
-		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
-		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
-		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
-		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
+		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
+		SecureServing:           kubeoptions.NewSecureServingOptions(),
+		InsecureServing:         kubeoptions.NewInsecureServingOptions(),
+		Audit:                   genericoptions.NewAuditOptions(),
+		Features:                genericoptions.NewFeatureOptions(),
+		Admission:               kubeoptions.NewAdmissionOptions(),
+		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
+		StorageSerialization:    kubeoptions.NewStorageSerializationOptions(),
+		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         ports.KubeletPort,
 			ReadOnlyPort: ports.KubeletReadOnlyPort,
@@ -113,32 +114,34 @@ func NewServerRunOptions() *ServerRunOptions {
 		},
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
+	s.ServiceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
+
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 
 	return &s
 }
 
-// AddFlags adds flags for a specific APIServer to the specified FlagSet
-func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
+// Flags returns flags for a specific APIServer by section name
+func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	// Add the generic flags.
-	s.GenericServerRunOptions.AddUniversalFlags(fs)
-	s.Etcd.AddFlags(fs)
-	s.SecureServing.AddFlags(fs)
-	s.InsecureServing.AddFlags(fs)
-	s.InsecureServing.AddDeprecatedFlags(fs)
-	s.Audit.AddFlags(fs)
-	s.Features.AddFlags(fs)
-	s.Authentication.AddFlags(fs)
-	s.Authorization.AddFlags(fs)
-	s.CloudProvider.AddFlags(fs)
-	s.StorageSerialization.AddFlags(fs)
-	s.APIEnablement.AddFlags(fs)
-	s.Admission.AddFlags(fs)
+	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
+	s.Etcd.AddFlags(fss.FlagSet("etcd"))
+	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
+	s.InsecureServing.AddFlags(fss.FlagSet("insecure serving"))
+	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving")) // TODO: remove it until kops stops using `--address`
+	s.Audit.AddFlags(fss.FlagSet("auditing"))
+	s.Features.AddFlags(fss.FlagSet("features"))
+	s.Authentication.AddFlags(fss.FlagSet("authentication"))
+	s.Authorization.AddFlags(fss.FlagSet("authorization"))
+	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
+	s.StorageSerialization.AddFlags(fss.FlagSet("storage"))
+	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
+	s.Admission.AddFlags(fss.FlagSet("admission"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-
+	fs := fss.FlagSet("misc")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events.")
 
@@ -163,7 +166,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster, must be a positive number.")
+		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 
 	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
@@ -209,11 +212,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
 
-	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
-	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", validation.RepairMalformedUpdates, ""+
-		"If true, server will do its best to fix the update request to pass the validation, "+
-		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
-		"after we fix all the clients that send malformed updates.")
+	// TODO: delete this flag in 1.13
+	repair := false
+	fs.BoolVar(&repair, "repair-malformed-updates", false, "deprecated")
+	fs.MarkDeprecated("repair-malformed-updates", "This flag will be removed in a future version")
 
 	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
 		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
@@ -221,7 +223,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"api-server and calling out to webhook admission plugins. It is expected that this "+
 		"cert includes a signature from the CA in the --requestheader-client-ca-file flag. "+
 		"That CA is published in the 'extension-apiserver-authentication' configmap in "+
-		"the kube-system namespace. Components recieving calls from kube-aggregator should "+
+		"the kube-system namespace. Components receiving calls from kube-aggregator should "+
 		"use that CA to perform their half of the mutual TLS verification.")
 	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile, ""+
 		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+
@@ -229,6 +231,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"api-server and calling out to webhook admission plugins.")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
-		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
+		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
 
+	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
+
+	return fss
 }

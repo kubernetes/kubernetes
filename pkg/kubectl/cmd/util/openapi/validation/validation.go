@@ -18,7 +18,6 @@ package validation
 
 import (
 	"errors"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -54,7 +53,7 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	if strings.HasSuffix(gvk.Kind, "List") {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
 		return utilerrors.NewAggregate(v.validateList(obj))
 	}
 

@@ -5,6 +5,9 @@ metadata:
 spec:
   serviceName: mysql
   replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
   template:
     metadata:
       labels:

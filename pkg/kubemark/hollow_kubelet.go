@@ -24,20 +24,20 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
+	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type HollowKubelet struct {
@@ -63,11 +63,12 @@ func NewHollowKubelet(
 	// -----------------
 	// Injected objects
 	// -----------------
-	volumePlugins := empty_dir.ProbeVolumePlugins()
+	volumePlugins := emptydir.ProbeVolumePlugins()
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
+	volumePlugins = append(volumePlugins, projected.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
-		HeartbeatClient:    client.CoreV1(),
+		HeartbeatClient:    client,
 		DockerClientConfig: dockerClientConfig,
 		CAdvisorInterface:  cadvisorInterface,
 		Cloud:              nil,
@@ -76,7 +77,6 @@ func NewHollowKubelet(
 		VolumePlugins:      volumePlugins,
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Writer:             &kubeio.StdWriter{},
 		Mounter:            mount.New("" /* default mount path */),
 	}
 
@@ -89,8 +89,11 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false); err != nil {
-		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+	if err := kubeletapp.RunKubelet(&options.KubeletServer{
+		KubeletFlags:         *hk.KubeletFlags,
+		KubeletConfiguration: *hk.KubeletConfiguration,
+	}, hk.KubeletDeps, false); err != nil {
+		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
 	select {}
 }
@@ -105,11 +108,12 @@ func GetHollowKubeletConfig(
 	podsPerCore int) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
-	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
-	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
+	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()
+	f.EnableServer = true
 	f.RootDirectory = testRootDir
 	f.HostnameOverride = nodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
@@ -124,11 +128,11 @@ func GetHollowKubeletConfig(
 		panic(err)
 	}
 
-	c.ManifestURL = ""
+	c.StaticPodURL = ""
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)
 	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
-	c.PodManifestPath = manifestFilePath
+	c.StaticPodPath = podFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
@@ -144,7 +148,6 @@ func GetHollowKubeletConfig(
 	c.CPUCFSQuota = true
 	c.EnableControllerAttachDetach = false
 	c.EnableDebuggingHandlers = true
-	c.EnableServer = true
 	c.CgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to

@@ -13,8 +13,7 @@ go_test(
         "throttle_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/util/flowcontrol",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library"],
 )
 
 go_library(
@@ -23,11 +22,12 @@ go_library(
         "backoff.go",
         "throttle.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/flowcontrol",
     importpath = "k8s.io/client-go/util/flowcontrol",
     deps = [
-        "//vendor/github.com/juju/ratelimit:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/client-go/util/integer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/client-go/util/integer:go_default_library",
+        "//vendor/golang.org/x/time/rate:go_default_library",
     ],
 )
 

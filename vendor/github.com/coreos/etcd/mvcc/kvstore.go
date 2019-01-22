@@ -15,10 +15,13 @@
 package mvcc
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/etcd/lease"
@@ -26,7 +29,6 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/coreos/etcd/pkg/schedule"
 	"github.com/coreos/pkg/capnslog"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -66,6 +68,10 @@ type ConsistentIndexGetter interface {
 type store struct {
 	ReadView
 	WriteView
+
+	// consistentIndex caches the "consistent_index" key's value. Accessed
+	// through atomics so must be 64-bit aligned.
+	consistentIndex uint64
 
 	// mu read locks for txns and write locks for non-txn store changes.
 	mu sync.RWMutex
@@ -150,9 +156,66 @@ func (s *store) compactBarrier(ctx context.Context, ch chan struct{}) {
 }
 
 func (s *store) Hash() (hash uint32, revision int64, err error) {
+	start := time.Now()
+
 	s.b.ForceCommit()
 	h, err := s.b.Hash(DefaultIgnores)
+
+	hashDurations.Observe(time.Since(start).Seconds())
 	return h, s.currentRev, err
+}
+
+func (s *store) HashByRev(rev int64) (hash uint32, currentRev int64, compactRev int64, err error) {
+	start := time.Now()
+
+	s.mu.RLock()
+	s.revMu.RLock()
+	compactRev, currentRev = s.compactMainRev, s.currentRev
+	s.revMu.RUnlock()
+
+	if rev > 0 && rev <= compactRev {
+		s.mu.RUnlock()
+		return 0, 0, compactRev, ErrCompacted
+	} else if rev > 0 && rev > currentRev {
+		s.mu.RUnlock()
+		return 0, currentRev, 0, ErrFutureRev
+	}
+
+	if rev == 0 {
+		rev = currentRev
+	}
+	keep := s.kvindex.Keep(rev)
+
+	tx := s.b.ReadTx()
+	tx.Lock()
+	defer tx.Unlock()
+	s.mu.RUnlock()
+
+	upper := revision{main: rev + 1}
+	lower := revision{main: compactRev + 1}
+	h := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+
+	h.Write(keyBucketName)
+	err = tx.UnsafeForEach(keyBucketName, func(k, v []byte) error {
+		kr := bytesToRev(k)
+		if !upper.GreaterThan(kr) {
+			return nil
+		}
+		// skip revisions that are scheduled for deletion
+		// due to compacting; don't skip if there isn't one.
+		if lower.GreaterThan(kr) && len(keep) > 0 {
+			if _, ok := keep[kr]; !ok {
+				return nil
+			}
+		}
+		h.Write(k)
+		h.Write(v)
+		return nil
+	})
+	hash = h.Sum32()
+
+	hashRevDurations.Observe(time.Since(start).Seconds())
+	return hash, currentRev, compactRev, err
 }
 
 func (s *store) Compact(rev int64) (<-chan struct{}, error) {
@@ -234,6 +297,7 @@ func (s *store) Restore(b backend.Backend) error {
 	close(s.stopc)
 	s.fifoSched.Stop()
 
+	atomic.StoreUint64(&s.consistentIndex, 0)
 	s.b = b
 	s.kvindex = newTreeIndex()
 	s.currentRev = 1
@@ -245,10 +309,14 @@ func (s *store) Restore(b backend.Backend) error {
 }
 
 func (s *store) restore() error {
-	reportDbTotalSizeInBytesMu.Lock()
 	b := s.b
+
+	reportDbTotalSizeInBytesMu.Lock()
 	reportDbTotalSizeInBytes = func() float64 { return float64(b.Size()) }
 	reportDbTotalSizeInBytesMu.Unlock()
+	reportDbTotalSizeInUseInBytesMu.Lock()
+	reportDbTotalSizeInUseInBytes = func() float64 { return float64(b.SizeInUse()) }
+	reportDbTotalSizeInUseInBytesMu.Unlock()
 
 	min, max := newRevBytes(), newRevBytes()
 	revToBytes(revision{main: 1}, min)
@@ -399,29 +467,23 @@ func (s *store) Close() error {
 	return nil
 }
 
-func (a *store) Equal(b *store) bool {
-	if a.currentRev != b.currentRev {
-		return false
-	}
-	if a.compactMainRev != b.compactMainRev {
-		return false
-	}
-	return a.kvindex.Equal(b.kvindex)
-}
-
 func (s *store) saveIndex(tx backend.BatchTx) {
 	if s.ig == nil {
 		return
 	}
 	bs := s.bytesBuf8
-	binary.BigEndian.PutUint64(bs, s.ig.ConsistentIndex())
+	ci := s.ig.ConsistentIndex()
+	binary.BigEndian.PutUint64(bs, ci)
 	// put the index into the underlying backend
 	// tx has been locked in TxnBegin, so there is no need to lock it again
 	tx.UnsafePut(metaBucketName, consistentIndexKeyName, bs)
+	atomic.StoreUint64(&s.consistentIndex, ci)
 }
 
 func (s *store) ConsistentIndex() uint64 {
-	// TODO: cache index in a uint64 field?
+	if ci := atomic.LoadUint64(&s.consistentIndex); ci > 0 {
+		return ci
+	}
 	tx := s.b.BatchTx()
 	tx.Lock()
 	defer tx.Unlock()
@@ -429,7 +491,9 @@ func (s *store) ConsistentIndex() uint64 {
 	if len(vs) == 0 {
 		return 0
 	}
-	return binary.BigEndian.Uint64(vs[0])
+	v := binary.BigEndian.Uint64(vs[0])
+	atomic.StoreUint64(&s.consistentIndex, v)
+	return v
 }
 
 // appendMarkTombstone appends tombstone mark to normal revision bytes.
@@ -443,17 +507,4 @@ func appendMarkTombstone(b []byte) []byte {
 // isTombstone checks whether the revision bytes is a tombstone.
 func isTombstone(b []byte) bool {
 	return len(b) == markedRevBytesLen && b[markBytePosition] == markTombstone
-}
-
-// revBytesRange returns the range of revision bytes at
-// the given revision.
-func revBytesRange(rev revision) (start, end []byte) {
-	start = newRevBytes()
-	revToBytes(rev, start)
-
-	end = newRevBytes()
-	endRev := revision{main: rev.main, sub: rev.sub + 1}
-	revToBytes(endRev, end)
-
-	return start, end
 }

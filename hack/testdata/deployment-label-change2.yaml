@@ -2,9 +2,13 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: nginx
+  resourceVersion: "99"
   labels:
     name: nginx
 spec:
+  selector:
+    matchLabels:
+      name: nginx2
   replicas: 3
   template:
     metadata:
@@ -13,6 +17,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google-containers/nginx:test-cmd
+        image: k8s.gcr.io/nginx:test-cmd
         ports:
         - containerPort: 80

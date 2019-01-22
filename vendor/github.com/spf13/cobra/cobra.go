@@ -70,7 +70,8 @@ func AddTemplateFuncs(tmplFuncs template.FuncMap) {
 	}
 }
 
-// OnInitialize takes a series of func() arguments and appends them to a slice of func().
+// OnInitialize sets the passed functions to be run when each command's
+// Execute method is called.
 func OnInitialize(y ...func()) {
 	initializers = append(initializers, y...)
 }

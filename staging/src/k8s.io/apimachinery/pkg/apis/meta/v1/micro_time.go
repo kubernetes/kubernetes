@@ -104,7 +104,10 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 	}
 
 	var str string
-	json.Unmarshal(b, &str)
+	err := json.Unmarshal(b, &str)
+	if err != nil {
+		return err
+	}
 
 	pt, err := time.Parse(RFC3339Micro, str)
 	if err != nil {

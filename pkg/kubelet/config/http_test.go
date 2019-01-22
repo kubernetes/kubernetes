@@ -72,7 +72,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "_INVALID_"}},
 				},
@@ -81,7 +81,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -90,7 +90,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: ""}},
 				},
@@ -99,7 +99,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "_INVALID_"}},
 				},
@@ -129,6 +129,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	nodeName := "different-value"
 
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
@@ -173,10 +174,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -244,10 +246,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -272,10 +275,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "2",
-							Image: "bar:bartag",
+							Name:                     "2",
+							Image:                    "bar:bartag",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "IfNotPresent",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -290,7 +294,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	for _, testCase := range testCases {
 		var versionedPods runtime.Object
-		err := testapi.Default.Converter().Convert(&testCase.pods, &versionedPods, nil)
+		err := legacyscheme.Scheme.Convert(&testCase.pods, &versionedPods, nil)
 		if err != nil {
 			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
@@ -331,7 +335,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: "v1",
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{

@@ -9,12 +9,3 @@ spec:
     kind: Foo
     plural: foos
   scope: Namespaced
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
-          properties:
-            replicas:
-              type: integer
-              minimum: 1
-              maximum: 10

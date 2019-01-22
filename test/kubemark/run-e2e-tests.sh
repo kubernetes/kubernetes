@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -44,7 +44,7 @@ fi
 
 if [[ -f /.dockerenv ]]; then
 	# Running inside a dockerized runner.
-	go run ./hack/e2e.go -- -v --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
+	go run ./hack/e2e.go -- --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
 else
 	# Running locally.
  	ARGS=$(echo $ARGS | sed 's/\[/\\\[/g' | sed 's/\]/\\\]/g')

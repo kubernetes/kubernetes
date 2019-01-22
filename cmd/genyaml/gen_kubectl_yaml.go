@@ -27,7 +27,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"k8s.io/kubernetes/cmd/genutils"
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type cmdOption struct {
@@ -66,7 +65,7 @@ func main() {
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
 	// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+	kubectl := cmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 	genYaml(kubectl, "", outDir)
 	for _, c := range kubectl.Commands() {
 		genYaml(c, "kubectl", outDir)

@@ -75,7 +75,7 @@ func TestBackoffReset(t *testing.T) {
 	}
 }
 
-func TestBackoffHightWaterMark(t *testing.T) {
+func TestBackoffHighWaterMark(t *testing.T) {
 	id := "_idHiWaterMark"
 	tc := clock.NewFakeClock(time.Now())
 	step := time.Second

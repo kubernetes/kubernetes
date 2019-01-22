@@ -8,14 +8,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
+	"net/http"
 	"net/mail"
 	"os"
 
@@ -26,8 +25,10 @@ import (
 	"github.com/cloudflare/cfssl/info"
 	"github.com/cloudflare/cfssl/log"
 	"github.com/cloudflare/cfssl/signer"
-	"github.com/google/certificate-transparency/go"
-	"github.com/google/certificate-transparency/go/client"
+	"github.com/google/certificate-transparency-go"
+	"github.com/google/certificate-transparency-go/client"
+	"github.com/google/certificate-transparency-go/jsonclient"
+	"golang.org/x/net/context"
 )
 
 // Signer contains a signer that uses the standard library to
@@ -65,12 +66,12 @@ func NewSigner(priv crypto.Signer, cert *x509.Certificate, sigAlgo x509.Signatur
 // and a caKey file, both PEM encoded.
 func NewSignerFromFile(caFile, caKeyFile string, policy *config.Signing) (*Signer, error) {
 	log.Debug("Loading CA: ", caFile)
-	ca, err := ioutil.ReadFile(caFile)
+	ca, err := helpers.ReadBytes(caFile)
 	if err != nil {
 		return nil, err
 	}
 	log.Debug("Loading CA key: ", caKeyFile)
-	cakey, err := ioutil.ReadFile(caKeyFile)
+	cakey, err := helpers.ReadBytes(caKeyFile)
 	if err != nil {
 		return nil, cferr.Wrap(cferr.CertificateError, cferr.ReadFailed, err)
 	}
@@ -95,12 +96,7 @@ func NewSignerFromFile(caFile, caKeyFile string, policy *config.Signing) (*Signe
 	return NewSigner(priv, parsedCa, signer.DefaultSigAlgo(priv), policy)
 }
 
-func (s *Signer) sign(template *x509.Certificate, profile *config.SigningProfile) (cert []byte, err error) {
-	err = signer.FillTemplate(template, s.policy.Default, profile)
-	if err != nil {
-		return
-	}
-
+func (s *Signer) sign(template *x509.Certificate) (cert []byte, err error) {
 	var initRoot bool
 	if s.ca == nil {
 		if !template.IsCA {
@@ -111,11 +107,6 @@ func (s *Signer) sign(template *x509.Certificate, profile *config.SigningProfile
 		template.EmailAddresses = nil
 		s.ca = template
 		initRoot = true
-		template.MaxPathLen = signer.MaxPathLen
-	} else if template.IsCA {
-		template.MaxPathLen = 1
-		template.DNSNames = nil
-		template.EmailAddresses = nil
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, template, s.ca, template.PublicKey, s.priv)
@@ -203,9 +194,9 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		return nil, cferr.New(cferr.CSRError, cferr.DecodeFailed)
 	}
 
-	if block.Type != "CERTIFICATE REQUEST" {
+	if block.Type != "NEW CERTIFICATE REQUEST" && block.Type != "CERTIFICATE REQUEST" {
 		return nil, cferr.Wrap(cferr.CSRError,
-			cferr.BadRequest, errors.New("not a certificate or csr"))
+			cferr.BadRequest, errors.New("not a csr"))
 	}
 
 	csrTemplate, err := signer.ParseCertificateRequest(s, block.Bytes)
@@ -243,6 +234,29 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		}
 	}
 
+	if req.CRLOverride != "" {
+		safeTemplate.CRLDistributionPoints = []string{req.CRLOverride}
+	}
+
+	if safeTemplate.IsCA {
+		if !profile.CAConstraint.IsCA {
+			log.Error("local signer policy disallows issuing CA certificate")
+			return nil, cferr.New(cferr.PolicyError, cferr.InvalidRequest)
+		}
+
+		if s.ca != nil && s.ca.MaxPathLen > 0 {
+			if safeTemplate.MaxPathLen >= s.ca.MaxPathLen {
+				log.Error("local signer certificate disallows CA MaxPathLen extending")
+				// do not sign a cert with pathlen > current
+				return nil, cferr.New(cferr.PolicyError, cferr.InvalidRequest)
+			}
+		} else if s.ca != nil && s.ca.MaxPathLen == 0 && s.ca.MaxPathLenZero {
+			log.Error("local signer certificate disallows issuing CA certificate")
+			// signer has pathlen of 0, do not sign more intermediate CAs
+			return nil, cferr.New(cferr.PolicyError, cferr.InvalidRequest)
+		}
+	}
+
 	OverrideHosts(&safeTemplate, req.Hosts)
 	safeTemplate.Subject = PopulateSubjectFromCSR(req.Subject, safeTemplate.Subject)
 
@@ -250,17 +264,17 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 	if profile.NameWhitelist != nil {
 		if safeTemplate.Subject.CommonName != "" {
 			if profile.NameWhitelist.Find([]byte(safeTemplate.Subject.CommonName)) == nil {
-				return nil, cferr.New(cferr.PolicyError, cferr.InvalidPolicy)
+				return nil, cferr.New(cferr.PolicyError, cferr.UnmatchedWhitelist)
 			}
 		}
 		for _, name := range safeTemplate.DNSNames {
 			if profile.NameWhitelist.Find([]byte(name)) == nil {
-				return nil, cferr.New(cferr.PolicyError, cferr.InvalidPolicy)
+				return nil, cferr.New(cferr.PolicyError, cferr.UnmatchedWhitelist)
 			}
 		}
 		for _, name := range safeTemplate.EmailAddresses {
 			if profile.NameWhitelist.Find([]byte(name)) == nil {
-				return nil, cferr.New(cferr.PolicyError, cferr.InvalidPolicy)
+				return nil, cferr.New(cferr.PolicyError, cferr.UnmatchedWhitelist)
 			}
 		}
 	}
@@ -312,27 +326,44 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		}
 	}
 
+	var distPoints = safeTemplate.CRLDistributionPoints
+	err = signer.FillTemplate(&safeTemplate, s.policy.Default, profile, req.NotBefore, req.NotAfter)
+	if err != nil {
+		return nil, err
+	}
+	if distPoints != nil && len(distPoints) > 0 {
+		safeTemplate.CRLDistributionPoints = distPoints
+	}
+
 	var certTBS = safeTemplate
 
-	if len(profile.CTLogServers) > 0 {
+	if len(profile.CTLogServers) > 0 || req.ReturnPrecert {
 		// Add a poison extension which prevents validation
 		var poisonExtension = pkix.Extension{Id: signer.CTPoisonOID, Critical: true, Value: []byte{0x05, 0x00}}
 		var poisonedPreCert = certTBS
 		poisonedPreCert.ExtraExtensions = append(safeTemplate.ExtraExtensions, poisonExtension)
-		cert, err = s.sign(&poisonedPreCert, profile)
+		cert, err = s.sign(&poisonedPreCert)
 		if err != nil {
 			return
 		}
 
+		if req.ReturnPrecert {
+			return cert, nil
+		}
+
 		derCert, _ := pem.Decode(cert)
-		prechain := []ct.ASN1Cert{derCert.Bytes, s.ca.Raw}
+		prechain := []ct.ASN1Cert{{Data: derCert.Bytes}, {Data: s.ca.Raw}}
 		var sctList []ct.SignedCertificateTimestamp
 
 		for _, server := range profile.CTLogServers {
 			log.Infof("submitting poisoned precertificate to %s", server)
-			var ctclient = client.New(server)
+			ctclient, err := client.New(server, nil, jsonclient.Options{})
+			if err != nil {
+				return nil, cferr.Wrap(cferr.CTError, cferr.PrecertSubmissionFailed, err)
+			}
 			var resp *ct.SignedCertificateTimestamp
-			resp, err = ctclient.AddPreChain(prechain)
+			ctx := context.Background()
+			resp, err = ctclient.AddPreChain(ctx, prechain)
 			if err != nil {
 				return nil, cferr.Wrap(cferr.CTError, cferr.PrecertSubmissionFailed, err)
 			}
@@ -340,7 +371,7 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		}
 
 		var serializedSCTList []byte
-		serializedSCTList, err = serializeSCTList(sctList)
+		serializedSCTList, err = helpers.SerializeSCTList(sctList)
 		if err != nil {
 			return nil, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
 		}
@@ -355,17 +386,22 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		certTBS.ExtraExtensions = append(certTBS.ExtraExtensions, SCTListExtension)
 	}
 	var signedCert []byte
-	signedCert, err = s.sign(&certTBS, profile)
+	signedCert, err = s.sign(&certTBS)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get the AKI from signedCert.  This is required to support Go 1.9+.
+	// In prior versions of Go, x509.CreateCertificate updated the
+	// AuthorityKeyId of certTBS.
+	parsedCert, _ := helpers.ParseCertificatePEM(signedCert)
 
 	if s.dbAccessor != nil {
 		var certRecord = certdb.CertificateRecord{
 			Serial: certTBS.SerialNumber.String(),
 			// this relies on the specific behavior of x509.CreateCertificate
-			// which updates certTBS AuthorityKeyId from the signer's SubjectKeyId
-			AKI:     hex.EncodeToString(certTBS.AuthorityKeyId),
+			// which sets the AuthorityKeyId from the signer's SubjectKeyId
+			AKI:     hex.EncodeToString(parsedCert.AuthorityKeyId),
 			CALabel: req.Label,
 			Status:  "good",
 			Expiry:  certTBS.NotAfter,
@@ -382,20 +418,83 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 	return signedCert, nil
 }
 
-func serializeSCTList(sctList []ct.SignedCertificateTimestamp) ([]byte, error) {
-	var buf bytes.Buffer
-	for _, sct := range sctList {
-		sct, err := ct.SerializeSCT(sct)
-		if err != nil {
-			return nil, err
-		}
-		binary.Write(&buf, binary.BigEndian, uint16(len(sct)))
-		buf.Write(sct)
+// SignFromPrecert creates and signs a certificate from an existing precertificate
+// that was previously signed by Signer.ca and inserts the provided SCTs into the
+// new certificate. The resulting certificate will be a exact copy of the precert
+// except for the removal of the poison extension and the addition of the SCT list
+// extension. SignFromPrecert does not verify that the contents of the certificate
+// still match the signing profile of the signer, it only requires that the precert
+// was previously signed by the Signers CA.
+func (s *Signer) SignFromPrecert(precert *x509.Certificate, scts []ct.SignedCertificateTimestamp) ([]byte, error) {
+	// Verify certificate was signed by s.ca
+	if err := precert.CheckSignatureFrom(s.ca); err != nil {
+		return nil, err
 	}
 
-	var sctListLengthField = make([]byte, 2)
-	binary.BigEndian.PutUint16(sctListLengthField, uint16(buf.Len()))
-	return bytes.Join([][]byte{sctListLengthField, buf.Bytes()}, nil), nil
+	// Verify certificate is a precert
+	isPrecert := false
+	poisonIndex := 0
+	for i, ext := range precert.Extensions {
+		if ext.Id.Equal(signer.CTPoisonOID) {
+			if !ext.Critical {
+				return nil, cferr.New(cferr.CTError, cferr.PrecertInvalidPoison)
+			}
+			// Check extension contains ASN.1 NULL
+			if bytes.Compare(ext.Value, []byte{0x05, 0x00}) != 0 {
+				return nil, cferr.New(cferr.CTError, cferr.PrecertInvalidPoison)
+			}
+			isPrecert = true
+			poisonIndex = i
+			break
+		}
+	}
+	if !isPrecert {
+		return nil, cferr.New(cferr.CTError, cferr.PrecertMissingPoison)
+	}
+
+	// Serialize SCTs into list format and create extension
+	serializedList, err := helpers.SerializeSCTList(scts)
+	if err != nil {
+		return nil, err
+	}
+	// Serialize again as an octet string before embedding
+	serializedList, err = asn1.Marshal(serializedList)
+	if err != nil {
+		return nil, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+	}
+	sctExt := pkix.Extension{Id: signer.SCTListOID, Critical: false, Value: serializedList}
+
+	// Create the new tbsCert from precert. Do explicit copies of any slices so that we don't
+	// use memory that may be altered by us or the caller at a later stage.
+	tbsCert := x509.Certificate{
+		SignatureAlgorithm:    precert.SignatureAlgorithm,
+		PublicKeyAlgorithm:    precert.PublicKeyAlgorithm,
+		PublicKey:             precert.PublicKey,
+		Version:               precert.Version,
+		SerialNumber:          precert.SerialNumber,
+		Issuer:                precert.Issuer,
+		Subject:               precert.Subject,
+		NotBefore:             precert.NotBefore,
+		NotAfter:              precert.NotAfter,
+		KeyUsage:              precert.KeyUsage,
+		BasicConstraintsValid: precert.BasicConstraintsValid,
+		IsCA:                        precert.IsCA,
+		MaxPathLen:                  precert.MaxPathLen,
+		MaxPathLenZero:              precert.MaxPathLenZero,
+		PermittedDNSDomainsCritical: precert.PermittedDNSDomainsCritical,
+	}
+	if len(precert.Extensions) > 0 {
+		tbsCert.ExtraExtensions = make([]pkix.Extension, len(precert.Extensions))
+		copy(tbsCert.ExtraExtensions, precert.Extensions)
+	}
+
+	// Remove the poison extension from ExtraExtensions
+	tbsCert.ExtraExtensions = append(tbsCert.ExtraExtensions[:poisonIndex], tbsCert.ExtraExtensions[poisonIndex+1:]...)
+	// Insert the SCT list extension
+	tbsCert.ExtraExtensions = append(tbsCert.ExtraExtensions, sctExt)
+
+	// Sign the tbsCert
+	return s.sign(&tbsCert)
 }
 
 // Info return a populated info.Resp struct or an error.
@@ -439,6 +538,16 @@ func (s *Signer) SetPolicy(policy *config.Signing) {
 // SetDBAccessor sets the signers' cert db accessor
 func (s *Signer) SetDBAccessor(dba certdb.Accessor) {
 	s.dbAccessor = dba
+}
+
+// GetDBAccessor returns the signers' cert db accessor
+func (s *Signer) GetDBAccessor() certdb.Accessor {
+	return s.dbAccessor
+}
+
+// SetReqModifier does nothing for local
+func (s *Signer) SetReqModifier(func(*http.Request, []byte)) {
+	// noop
 }
 
 // Policy returns the signer's policy.

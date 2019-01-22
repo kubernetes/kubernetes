@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -35,6 +35,11 @@ const (
 // with a random string (e.g. UUID) with only slight modification of this code.
 // TODO(mikedanese): this should potentially be versioned
 type LeaderElectionRecord struct {
+	// HolderIdentity is the ID that owns the lease. If empty, no one owns this lease and
+	// all callers may acquire. Versions of this library prior to Kubernetes 1.14 will not
+	// attempt to acquire leases with empty identities and will wait for the full lease
+	// interval to expire before attempting to reacquire. This value is set to empty when
+	// a client voluntarily steps down.
 	HolderIdentity       string      `json:"holderIdentity"`
 	LeaseDurationSeconds int         `json:"leaseDurationSeconds"`
 	AcquireTime          metav1.Time `json:"acquireTime"`
@@ -42,11 +47,19 @@ type LeaderElectionRecord struct {
 	LeaderTransitions    int         `json:"leaderTransitions"`
 }
 
+// EventRecorder records a change in the ResourceLock.
+type EventRecorder interface {
+	Eventf(obj runtime.Object, eventType, reason, message string, args ...interface{})
+}
+
 // ResourceLockConfig common data that exists across different
 // resource locks
 type ResourceLockConfig struct {
-	Identity      string
-	EventRecorder record.EventRecorder
+	// Identity is the unique string identifying a lease holder across
+	// all participants in an election.
+	Identity string
+	// EventRecorder is optional.
+	EventRecorder EventRecorder
 }
 
 // Interface offers a common interface for locking on arbitrary

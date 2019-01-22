@@ -64,8 +64,11 @@ type Network struct {
 	// Subnets associated with this network.
 	Subnets []string `json:"subnets"`
 
-	// Owner of network.
+	// TenantID is the project owner of the network.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the network.
+	ProjectID string `json:"project_id"`
 
 	// Specifies whether the network resource can be accessed by any tenant.
 	Shared bool `json:"shared"`

@@ -36,45 +36,53 @@ func TestReferenceTypename(t *testing.T) {
 	}
 
 	tests := []struct {
+		name     string
 		path     []string
 		expected string
 	}{
 		{
 			// Kind is "Object"
+			name:     "test1",
 			path:     []string{},
 			expected: "Object",
 		},
 		{
 			// Reference is equal to pointed type "Object"
+			name:     "test2",
 			path:     []string{"field1"},
 			expected: "Object",
 		},
 		{
 			// Reference is equal to pointed type "string"
+			name:     "test3",
 			path:     []string{"field1", "primitive"},
 			expected: "string",
 		},
 		{
 			// Array of object of reference to string
+			name:     "test4",
 			path:     []string{"field2"},
 			expected: "[]map[string]string",
 		},
 		{
 			// Array of integer
+			name:     "test5",
 			path:     []string{"field1", "array"},
 			expected: "[]integer",
 		},
 	}
 
-	for _, test := range tests {
-		s, err := LookupSchemaForField(schema, test.path)
-		if err != nil {
-			t.Fatalf("Invalid test.path %v: %v", test.path, err)
-		}
-		got := GetTypeName(s)
-		if got != test.expected {
-			t.Errorf("Got %q, expected %q", got, test.expected)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := LookupSchemaForField(schema, tt.path)
+			if err != nil {
+				t.Fatalf("Invalid tt.path %v: %v", tt.path, err)
+			}
+			got := GetTypeName(s)
+			if got != tt.expected {
+				t.Errorf("Got %q, expected %q", got, tt.expected)
+			}
+		})
 	}
 
 }

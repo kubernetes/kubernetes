@@ -7,6 +7,7 @@ go_library(
         "path.go",
         "pathaction.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/exponent-io/jsonpath",
     importpath = "github.com/exponent-io/jsonpath",
     visibility = ["//visibility:public"],
 )

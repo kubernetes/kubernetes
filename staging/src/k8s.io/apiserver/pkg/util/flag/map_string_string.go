@@ -23,11 +23,14 @@ import (
 )
 
 // MapStringString can be set from the command line with the format `--flag "string=string"`.
-// Multiple comma-separated key-value pairs in a single invocation are supported. For example: `--flag "a=foo,b=bar"`.
-// Multiple flag invocations are supported. For example: `--flag "a=foo" --flag "b=bar"`.
+// Multiple flag invocations are supported. For example: `--flag "a=foo" --flag "b=bar"`. If this is desired
+// to be the only type invocation `NoSplit` should be set to true.
+// Multiple comma-separated key-value pairs in a single invocation are supported if `NoSplit`
+// is set to false. For example: `--flag "a=foo,b=bar"`.
 type MapStringString struct {
 	Map         *map[string]string
 	initialized bool
+	NoSplit     bool
 }
 
 // NewMapStringString takes a pointer to a map[string]string and returns the
@@ -36,8 +39,20 @@ func NewMapStringString(m *map[string]string) *MapStringString {
 	return &MapStringString{Map: m}
 }
 
+// NewMapStringString takes a pointer to a map[string]string and sets `NoSplit`
+// value to `true` and returns the MapStringString flag parsing shim for that map
+func NewMapStringStringNoSplit(m *map[string]string) *MapStringString {
+	return &MapStringString{
+		Map:     m,
+		NoSplit: true,
+	}
+}
+
 // String implements github.com/spf13/pflag.Value
 func (m *MapStringString) String() string {
+	if m == nil || m.Map == nil {
+		return ""
+	}
 	pairs := []string{}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
@@ -56,19 +71,34 @@ func (m *MapStringString) Set(value string) error {
 		*m.Map = make(map[string]string)
 		m.initialized = true
 	}
-	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			continue
+
+	// account for comma-separated key-value pairs in a single invocation
+	if !m.NoSplit {
+		for _, s := range strings.Split(value, ",") {
+			if len(s) == 0 {
+				continue
+			}
+			arr := strings.SplitN(s, "=", 2)
+			if len(arr) != 2 {
+				return fmt.Errorf("malformed pair, expect string=string")
+			}
+			k := strings.TrimSpace(arr[0])
+			v := strings.TrimSpace(arr[1])
+			(*m.Map)[k] = v
 		}
-		arr := strings.SplitN(s, "=", 2)
-		if len(arr) != 2 {
-			return fmt.Errorf("malformed pair, expect string=string")
-		}
-		k := strings.TrimSpace(arr[0])
-		v := strings.TrimSpace(arr[1])
-		(*m.Map)[k] = v
+		return nil
 	}
+
+	// account for only one key-value pair in a single invocation
+	arr := strings.SplitN(value, "=", 2)
+	if len(arr) != 2 {
+		return fmt.Errorf("malformed pair, expect string=string")
+	}
+	k := strings.TrimSpace(arr[0])
+	v := strings.TrimSpace(arr[1])
+	(*m.Map)[k] = v
 	return nil
+
 }
 
 // Type implements github.com/spf13/pflag.Value

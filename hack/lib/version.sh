@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -45,7 +45,7 @@ kube::version::get_version_vars() {
     # When a 'git archive' is exported, the '$Format:%D$' below will look
     # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
     # can be extracted from it.
-    if [[ '$Format:%D$' =~ tag:\ (v[^ ]+) ]]; then
+    if [[ '$Format:%D$' =~ tag:\ (v[^ ,]+) ]]; then
      KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
     fi
   fi
@@ -95,6 +95,13 @@ kube::version::get_version_vars() {
         if [[ -n "${BASH_REMATCH[4]}" ]]; then
           KUBE_GIT_MINOR+="+"
         fi
+      fi
+
+      # If KUBE_GIT_VERSION is not a valid Semantic Version, then refuse to build.
+      if ! [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+          echo "KUBE_GIT_VERSION should be a valid Semantic Version. Current value: ${KUBE_GIT_VERSION}"
+          echo "Please see more details here: https://semver.org"
+          exit 1
       fi
     fi
   fi

@@ -76,9 +76,10 @@ type ListMeta struct {
 	// continue may be set if the user set a limit on the number of items returned, and indicates that
 	// the server has more data available. The value is opaque and may be used to issue another request
 	// to the endpoint that served this list to retrieve the next set of available objects. Continuing a
-	// list may not be possible if the server configuration has changed or more than a few minutes have
-	// passed. The resourceVersion field returned when using this continue value will be identical to
-	// the value in the first response.
+	// consistent list may not be possible if the server configuration has changed or more than a few
+	// minutes have passed. The resourceVersion field returned when using this continue value will be
+	// identical to the value in the first response, unless you have received this token from an error
+	// message.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
 }
 
@@ -285,8 +286,8 @@ const (
 )
 
 // OwnerReference contains enough information to let you identify an owning
-// object. Currently, an owning object must be in the same namespace, so there
-// is no namespace field.
+// object. An owning object must be in the same namespace as the dependent, or
+// be cluster-scoped, so there is no namespace field.
 type OwnerReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
@@ -342,6 +343,7 @@ type ListOptions struct {
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
 	// Timeout for the list/watch call.
+	// This limits the duration of the call, regardless of any activity or inactivity.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 
@@ -362,14 +364,20 @@ type ListOptions struct {
 	// updated during a chunked list the version of the object that was present at the time the first list
 	// result was calculated is returned.
 	Limit int64 `json:"limit,omitempty" protobuf:"varint,7,opt,name=limit"`
-	// The continue option should be set when retrieving more results from the server. Since this value
-	// is server defined, clients may only use the continue value from a previous query result with
-	// identical query parameters (except for the value of continue) and the server may reject a continue
-	// value it does not recognize. If the specified continue value is no longer valid whether due to
-	// expiration (generally five to fifteen minutes) or a configuration change on the server the server
-	// will respond with a 410 ResourceExpired error indicating the client must restart their list without
-	// the continue field. This field is not supported when watch is true. Clients may start a watch from
-	// the last resourceVersion value returned by the server and not miss any modifications.
+	// The continue option should be set when retrieving more results from the server. Since this value is
+	// server defined, clients may only use the continue value from a previous query result with identical
+	// query parameters (except for the value of continue) and the server may reject a continue value it
+	// does not recognize. If the specified continue value is no longer valid whether due to expiration
+	// (generally five to fifteen minutes) or a configuration change on the server, the server will
+	// respond with a 410 ResourceExpired error together with a continue token. If the client needs a
+	// consistent list, it must restart their list without the continue field. Otherwise, the client may
+	// send another list request with the token received with the 410 error, the server will respond with
+	// a list starting from the next key, but from the latest snapshot, which is inconsistent from the
+	// previous list results - objects that are created, modified, or deleted after the first list request
+	// will be included in the response, as long as their keys are after the "next key".
+	//
+	// This field is not supported when watch is true. Clients may start a watch from the last
+	// resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
@@ -417,6 +425,12 @@ const (
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
+const (
+	// DryRunAll means to complete all processing stages, but don't
+	// persist changes to storage.
+	DryRunAll = "All"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteOptions may be provided when deleting an API object.
@@ -452,6 +466,48 @@ type DeleteOptions struct {
 	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CreateOptions may be provided when creating an API object.
+type CreateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// If IncludeUninitialized is specified, the object may be
+	// returned without completing initialization.
+	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,2,opt,name=includeUninitialized"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpdateOptions may be provided when updating an API object.
+type UpdateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -798,7 +854,8 @@ type APIGroup struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
+	// +optional
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs,omitempty" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.

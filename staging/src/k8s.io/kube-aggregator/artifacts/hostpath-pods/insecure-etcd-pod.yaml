@@ -19,7 +19,6 @@ spec:
     - "--proxy-client-key-file=/var/run/auth-proxy-client/client-auth-proxy.key"
     - "--tls-cert-file=/var/run/serving-cert/serving-kube-aggregator.crt"
     - "--tls-private-key-file=/var/run/serving-cert/serving-kube-aggregator.key"
-    - "--tls-ca-file=/var/run/serving-ca/server-ca.crt"
     - "--client-ca-file=/var/run/client-ca/client-ca.crt"
     - "--requestheader-username-headers=X-Remote-User"
     - "--requestheader-group-headers=X-Remote-Group"

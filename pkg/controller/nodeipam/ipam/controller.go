@@ -22,13 +22,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
@@ -71,7 +71,7 @@ func NewController(
 		return nil, fmt.Errorf("invalid IPAM controller mode %q", config.Mode)
 	}
 
-	gceCloud, ok := cloud.(*gce.GCECloud)
+	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
 		return nil, fmt.Errorf("cloud IPAM controller does not support %q provider", cloud.ProviderName())
 	}
@@ -96,10 +96,10 @@ func NewController(
 }
 
 // Start initializes the Controller with the existing list of nodes and
-// registers the informers for node chnages. This will start synchronization
+// registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
-	glog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
+	klog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
 
 	nodes, err := listNodes(c.adapter.k8s)
 	if err != nil {
@@ -110,9 +110,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			_, cidrRange, err := net.ParseCIDR(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
-				glog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
+				klog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
 			} else {
-				glog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
+				klog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
 			}
 		}
 
@@ -174,14 +174,15 @@ func (c *Controller) onAdd(node *v1.Node) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if syncer, ok := c.syncers[node.Name]; !ok {
+	syncer, ok := c.syncers[node.Name]
+	if !ok {
 		syncer = c.newSyncer(node.Name)
 		c.syncers[node.Name] = syncer
 		go syncer.Loop(nil)
 	} else {
-		glog.Warningf("Add for node %q that already exists", node.Name)
-		syncer.Update(node)
+		klog.Warningf("Add for node %q that already exists", node.Name)
 	}
+	syncer.Update(node)
 
 	return nil
 }
@@ -193,7 +194,7 @@ func (c *Controller) onUpdate(_, node *v1.Node) error {
 	if sync, ok := c.syncers[node.Name]; ok {
 		sync.Update(node)
 	} else {
-		glog.Errorf("Received update for non-existant node %q", node.Name)
+		klog.Errorf("Received update for non-existent node %q", node.Name)
 		return fmt.Errorf("unknown node %q", node.Name)
 	}
 
@@ -208,7 +209,7 @@ func (c *Controller) onDelete(node *v1.Node) error {
 		syncer.Delete(node)
 		delete(c.syncers, node.Name)
 	} else {
-		glog.Warning("Node %q was already deleted", node.Name)
+		klog.Warningf("Node %q was already deleted", node.Name)
 	}
 
 	return nil

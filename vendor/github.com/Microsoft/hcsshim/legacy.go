@@ -121,6 +121,16 @@ func (r *legacyLayerReader) walkUntilCancelled() error {
 		if err != nil {
 			return err
 		}
+
+		// Indirect fix for https://github.com/moby/moby/issues/32838#issuecomment-343610048.
+		// Handle failure from what may be a golang bug in the conversion of
+		// UTF16 to UTF8 in files which are left in the recycle bin. Os.Lstat
+		// which is called by filepath.Walk will fail when a filename contains
+		// unicode characters. Skip the recycle bin regardless which is goodness.
+		if strings.EqualFold(path, filepath.Join(r.root, `Files\$Recycle.Bin`)) && info.IsDir() {
+			return filepath.SkipDir
+		}
+
 		if path == r.root || path == filepath.Join(r.root, "tombstones.txt") || strings.HasSuffix(path, ".$wcidirs$") {
 			return nil
 		}
@@ -326,59 +336,79 @@ func (r *legacyLayerReader) Close() error {
 
 type pendingLink struct {
 	Path, Target string
+	TargetRoot   *os.File
+}
+
+type pendingDir struct {
+	Path string
+	Root *os.File
 }
 
 type legacyLayerWriter struct {
-	root         string
-	parentRoots  []string
-	destRoot     string
-	currentFile  *os.File
-	backupWriter *winio.BackupFileWriter
-	tombstones   []string
-	pathFixed    bool
-	HasUtilityVM bool
-	uvmDi        []dirInfo
-	addedFiles   map[string]bool
-	PendingLinks []pendingLink
+	root            *os.File
+	destRoot        *os.File
+	parentRoots     []*os.File
+	currentFile     *os.File
+	currentFileName string
+	currentFileRoot *os.File
+	backupWriter    *winio.BackupFileWriter
+	Tombstones      []string
+	HasUtilityVM    bool
+	uvmDi           []dirInfo
+	addedFiles      map[string]bool
+	PendingLinks    []pendingLink
+	pendingDirs     []pendingDir
+	currentIsDir    bool
 }
 
 // newLegacyLayerWriter returns a LayerWriter that can write the contaler layer
 // transport format to disk.
-func newLegacyLayerWriter(root string, parentRoots []string, destRoot string) *legacyLayerWriter {
-	return &legacyLayerWriter{
-		root:        root,
-		parentRoots: parentRoots,
-		destRoot:    destRoot,
-		addedFiles:  make(map[string]bool),
+func newLegacyLayerWriter(root string, parentRoots []string, destRoot string) (w *legacyLayerWriter, err error) {
+	w = &legacyLayerWriter{
+		addedFiles: make(map[string]bool),
 	}
+	defer func() {
+		if err != nil {
+			w.CloseRoots()
+			w = nil
+		}
+	}()
+	w.root, err = openRoot(root)
+	if err != nil {
+		return
+	}
+	w.destRoot, err = openRoot(destRoot)
+	if err != nil {
+		return
+	}
+	for _, r := range parentRoots {
+		f, err := openRoot(r)
+		if err != nil {
+			return w, err
+		}
+		w.parentRoots = append(w.parentRoots, f)
+	}
+	return
 }
 
-func (w *legacyLayerWriter) init() error {
-	if !w.pathFixed {
-		path, err := makeLongAbsPath(w.root)
-		if err != nil {
-			return err
-		}
-		for i, p := range w.parentRoots {
-			w.parentRoots[i], err = makeLongAbsPath(p)
-			if err != nil {
-				return err
-			}
-		}
-		destPath, err := makeLongAbsPath(w.destRoot)
-		if err != nil {
-			return err
-		}
-		w.root = path
-		w.destRoot = destPath
-		w.pathFixed = true
+func (w *legacyLayerWriter) CloseRoots() {
+	if w.root != nil {
+		w.root.Close()
+		w.root = nil
 	}
-	return nil
+	if w.destRoot != nil {
+		w.destRoot.Close()
+		w.destRoot = nil
+	}
+	for i := range w.parentRoots {
+		w.parentRoots[i].Close()
+	}
+	w.parentRoots = nil
 }
 
 func (w *legacyLayerWriter) initUtilityVM() error {
 	if !w.HasUtilityVM {
-		err := os.Mkdir(filepath.Join(w.destRoot, utilityVMPath), 0)
+		err := mkdirRelative(utilityVMPath, w.destRoot)
 		if err != nil {
 			return err
 		}
@@ -386,7 +416,7 @@ func (w *legacyLayerWriter) initUtilityVM() error {
 		// clone the utility VM from the parent layer into this layer. Use hard
 		// links to avoid unnecessary copying, since most of the files are
 		// immutable.
-		err = cloneTree(filepath.Join(w.parentRoots[0], utilityVMFilesPath), filepath.Join(w.destRoot, utilityVMFilesPath), mutatedUtilityVMFiles)
+		err = cloneTree(w.parentRoots[0], w.destRoot, utilityVMFilesPath, mutatedUtilityVMFiles)
 		if err != nil {
 			return fmt.Errorf("cloning the parent utility VM image failed: %s", err)
 		}
@@ -395,7 +425,40 @@ func (w *legacyLayerWriter) initUtilityVM() error {
 	return nil
 }
 
-func (w *legacyLayerWriter) reset() {
+func (w *legacyLayerWriter) reset() error {
+	if w.currentIsDir {
+		r := w.currentFile
+		br := winio.NewBackupStreamReader(r)
+		// Seek to the beginning of the backup stream, skipping the fileattrs
+		if _, err := r.Seek(4, io.SeekStart); err != nil {
+			return err
+		}
+
+		for {
+			bhdr, err := br.Next()
+			if err == io.EOF {
+				// end of backupstream data
+				break
+			}
+			if err != nil {
+				return err
+			}
+			switch bhdr.Id {
+			case winio.BackupReparseData:
+				// The current file is a `.$wcidirs$` metadata file that
+				// describes a directory reparse point. Delete the placeholder
+				// directory to prevent future files being added into the
+				// destination of the reparse point during the ImportLayer call
+				if err := removeRelative(w.currentFileName, w.currentFileRoot); err != nil {
+					return err
+				}
+				w.pendingDirs = append(w.pendingDirs, pendingDir{Path: w.currentFileName, Root: w.currentFileRoot})
+			default:
+				// ignore all other stream types, as we only care about directory reparse points
+			}
+		}
+		w.currentIsDir = false
+	}
 	if w.backupWriter != nil {
 		w.backupWriter.Close()
 		w.backupWriter = nil
@@ -403,21 +466,21 @@ func (w *legacyLayerWriter) reset() {
 	if w.currentFile != nil {
 		w.currentFile.Close()
 		w.currentFile = nil
+		w.currentFileName = ""
+		w.currentFileRoot = nil
 	}
+	return nil
 }
 
 // copyFileWithMetadata copies a file using the backup/restore APIs in order to preserve metadata
-func copyFileWithMetadata(srcPath, destPath string, isDir bool) (fileInfo *winio.FileBasicInfo, err error) {
-	createDisposition := uint32(syscall.CREATE_NEW)
-	if isDir {
-		err = os.Mkdir(destPath, 0)
-		if err != nil {
-			return nil, err
-		}
-		createDisposition = syscall.OPEN_EXISTING
-	}
-
-	src, err := openFileOrDir(srcPath, syscall.GENERIC_READ|winio.ACCESS_SYSTEM_SECURITY, syscall.OPEN_EXISTING)
+func copyFileWithMetadata(srcRoot, destRoot *os.File, subPath string, isDir bool) (fileInfo *winio.FileBasicInfo, err error) {
+	src, err := openRelative(
+		subPath,
+		srcRoot,
+		syscall.GENERIC_READ|winio.ACCESS_SYSTEM_SECURITY,
+		syscall.FILE_SHARE_READ,
+		_FILE_OPEN,
+		_FILE_OPEN_REPARSE_POINT)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +493,17 @@ func copyFileWithMetadata(srcPath, destPath string, isDir bool) (fileInfo *winio
 		return nil, err
 	}
 
-	dest, err := openFileOrDir(destPath, syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY, createDisposition)
+	extraFlags := uint32(0)
+	if isDir {
+		extraFlags |= _FILE_DIRECTORY_FILE
+	}
+	dest, err := openRelative(
+		subPath,
+		destRoot,
+		syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
+		syscall.FILE_SHARE_READ,
+		_FILE_CREATE,
+		extraFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -459,39 +532,49 @@ func copyFileWithMetadata(srcPath, destPath string, isDir bool) (fileInfo *winio
 
 // cloneTree clones a directory tree using hard links. It skips hard links for
 // the file names in the provided map and just copies those files.
-func cloneTree(srcPath, destPath string, mutatedFiles map[string]bool) error {
+func cloneTree(srcRoot *os.File, destRoot *os.File, subPath string, mutatedFiles map[string]bool) error {
 	var di []dirInfo
-	err := filepath.Walk(srcPath, func(srcFilePath string, info os.FileInfo, err error) error {
+	err := ensureNotReparsePointRelative(subPath, srcRoot)
+	if err != nil {
+		return err
+	}
+	err = filepath.Walk(filepath.Join(srcRoot.Name(), subPath), func(srcFilePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		relPath, err := filepath.Rel(srcPath, srcFilePath)
+		relPath, err := filepath.Rel(srcRoot.Name(), srcFilePath)
 		if err != nil {
 			return err
 		}
-		destFilePath := filepath.Join(destPath, relPath)
 
+		fileAttributes := info.Sys().(*syscall.Win32FileAttributeData).FileAttributes
 		// Directories, reparse points, and files that will be mutated during
 		// utility VM import must be copied. All other files can be hard linked.
-		isReparsePoint := info.Sys().(*syscall.Win32FileAttributeData).FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0
-		if info.IsDir() || isReparsePoint || mutatedFiles[relPath] {
-			fi, err := copyFileWithMetadata(srcFilePath, destFilePath, info.IsDir())
+		isReparsePoint := fileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0
+		// In go1.9, FileInfo.IsDir() returns false if the directory is also a symlink.
+		// See: https://github.com/golang/go/commit/1989921aef60c83e6f9127a8448fb5ede10e9acc
+		// Fixes the problem by checking syscall.FILE_ATTRIBUTE_DIRECTORY directly
+		isDir := fileAttributes&syscall.FILE_ATTRIBUTE_DIRECTORY != 0
+
+		if isDir || isReparsePoint || mutatedFiles[relPath] {
+			fi, err := copyFileWithMetadata(srcRoot, destRoot, relPath, isDir)
 			if err != nil {
 				return err
 			}
-			if info.IsDir() && !isReparsePoint {
-				di = append(di, dirInfo{path: destFilePath, fileInfo: *fi})
+			if isDir && !isReparsePoint {
+				di = append(di, dirInfo{path: relPath, fileInfo: *fi})
 			}
 		} else {
-			err = os.Link(srcFilePath, destFilePath)
+			err = linkRelative(relPath, srcRoot, relPath, destRoot)
 			if err != nil {
 				return err
 			}
 		}
 
-		// Don't recurse on reparse points.
-		if info.IsDir() && isReparsePoint {
+		// Don't recurse on reparse points in go1.8 and older. Filepath.Walk
+		// handles this in go1.9 and newer.
+		if isDir && isReparsePoint && shouldSkipDirectoryReparse {
 			return filepath.SkipDir
 		}
 
@@ -501,13 +584,11 @@ func cloneTree(srcPath, destPath string, mutatedFiles map[string]bool) error {
 		return err
 	}
 
-	return reapplyDirectoryTimes(di)
+	return reapplyDirectoryTimes(destRoot, di)
 }
 
 func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) error {
-	w.reset()
-	err := w.init()
-	if err != nil {
+	if err := w.reset(); err != nil {
 		return err
 	}
 
@@ -515,6 +596,7 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		return w.initUtilityVM()
 	}
 
+	name = filepath.Clean(name)
 	if hasPathPrefix(name, utilityVMPath) {
 		if !w.HasUtilityVM {
 			return errors.New("missing UtilityVM directory")
@@ -522,10 +604,9 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		if !hasPathPrefix(name, utilityVMFilesPath) && name != utilityVMFilesPath {
 			return errors.New("invalid UtilityVM layer")
 		}
-		path := filepath.Join(w.destRoot, name)
-		createDisposition := uint32(syscall.OPEN_EXISTING)
+		createDisposition := uint32(_FILE_OPEN)
 		if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
-			st, err := os.Lstat(path)
+			st, err := lstatRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
@@ -533,37 +614,44 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 				// Delete the existing file/directory if it is not the same type as this directory.
 				existingAttr := st.Sys().(*syscall.Win32FileAttributeData).FileAttributes
 				if (uint32(fileInfo.FileAttributes)^existingAttr)&(syscall.FILE_ATTRIBUTE_DIRECTORY|syscall.FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
-					if err = os.RemoveAll(path); err != nil {
+					if err = removeAllRelative(name, w.destRoot); err != nil {
 						return err
 					}
 					st = nil
 				}
 			}
 			if st == nil {
-				if err = os.Mkdir(path, 0); err != nil {
+				if err = mkdirRelative(name, w.destRoot); err != nil {
 					return err
 				}
 			}
 			if fileInfo.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
-				w.uvmDi = append(w.uvmDi, dirInfo{path: path, fileInfo: *fileInfo})
+				w.uvmDi = append(w.uvmDi, dirInfo{path: name, fileInfo: *fileInfo})
 			}
 		} else {
 			// Overwrite any existing hard link.
-			err = os.Remove(path)
+			err := removeRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
-			createDisposition = syscall.CREATE_NEW
+			createDisposition = _FILE_CREATE
 		}
 
-		f, err := openFileOrDir(path, syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY, createDisposition)
+		f, err := openRelative(
+			name,
+			w.destRoot,
+			syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
+			syscall.FILE_SHARE_READ,
+			createDisposition,
+			_FILE_OPEN_REPARSE_POINT,
+		)
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if f != nil {
 				f.Close()
-				os.Remove(path)
+				removeRelative(name, w.destRoot)
 			}
 		}()
 
@@ -574,28 +662,31 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 
 		w.backupWriter = winio.NewBackupFileWriter(f, true)
 		w.currentFile = f
+		w.currentFileName = name
+		w.currentFileRoot = w.destRoot
 		w.addedFiles[name] = true
 		f = nil
 		return nil
 	}
 
-	path := filepath.Join(w.root, name)
+	fname := name
 	if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
-		err := os.Mkdir(path, 0)
+		err := mkdirRelative(name, w.root)
 		if err != nil {
 			return err
 		}
-		path += ".$wcidirs$"
+		fname += ".$wcidirs$"
+		w.currentIsDir = true
 	}
 
-	f, err := openFileOrDir(path, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.CREATE_NEW)
+	f, err := openRelative(fname, w.root, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, _FILE_CREATE, 0)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if f != nil {
 			f.Close()
-			os.Remove(path)
+			removeRelative(fname, w.root)
 		}
 	}()
 
@@ -617,19 +708,20 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 	}
 
 	w.currentFile = f
+	w.currentFileName = name
+	w.currentFileRoot = w.root
 	w.addedFiles[name] = true
 	f = nil
 	return nil
 }
 
 func (w *legacyLayerWriter) AddLink(name string, target string) error {
-	w.reset()
-	err := w.init()
-	if err != nil {
+	if err := w.reset(); err != nil {
 		return err
 	}
 
-	var roots []string
+	target = filepath.Clean(target)
+	var roots []*os.File
 	if hasPathPrefix(target, filesPath) {
 		// Look for cross-layer hard link targets in the parent layers, since
 		// nothing is in the destination path yet.
@@ -638,7 +730,7 @@ func (w *legacyLayerWriter) AddLink(name string, target string) error {
 		// Since the utility VM is fully cloned into the destination path
 		// already, look for cross-layer hard link targets directly in the
 		// destination path.
-		roots = []string{w.destRoot}
+		roots = []*os.File{w.destRoot}
 	}
 
 	if roots == nil || (!hasPathPrefix(name, filesPath) && !hasPathPrefix(name, utilityVMFilesPath)) {
@@ -647,12 +739,12 @@ func (w *legacyLayerWriter) AddLink(name string, target string) error {
 
 	// Find to try the target of the link in a previously added file. If that
 	// fails, search in parent layers.
-	var selectedRoot string
+	var selectedRoot *os.File
 	if _, ok := w.addedFiles[target]; ok {
 		selectedRoot = w.destRoot
 	} else {
 		for _, r := range roots {
-			if _, err = os.Lstat(filepath.Join(r, target)); err != nil {
+			if _, err := lstatRelative(target, r); err != nil {
 				if !os.IsNotExist(err) {
 					return err
 				}
@@ -661,22 +753,25 @@ func (w *legacyLayerWriter) AddLink(name string, target string) error {
 				break
 			}
 		}
-		if selectedRoot == "" {
+		if selectedRoot == nil {
 			return fmt.Errorf("failed to find link target for '%s' -> '%s'", name, target)
 		}
 	}
+
 	// The link can't be written until after the ImportLayer call.
 	w.PendingLinks = append(w.PendingLinks, pendingLink{
-		Path:   filepath.Join(w.destRoot, name),
-		Target: filepath.Join(selectedRoot, target),
+		Path:       name,
+		Target:     target,
+		TargetRoot: selectedRoot,
 	})
 	w.addedFiles[name] = true
 	return nil
 }
 
 func (w *legacyLayerWriter) Remove(name string) error {
+	name = filepath.Clean(name)
 	if hasPathPrefix(name, filesPath) {
-		w.tombstones = append(w.tombstones, name[len(filesPath)+1:])
+		w.Tombstones = append(w.Tombstones, name)
 	} else if hasPathPrefix(name, utilityVMFilesPath) {
 		err := w.initUtilityVM()
 		if err != nil {
@@ -685,11 +780,10 @@ func (w *legacyLayerWriter) Remove(name string) error {
 		// Make sure the path exists; os.RemoveAll will not fail if the file is
 		// already gone, and this needs to be a fatal error for diagnostics
 		// purposes.
-		path := filepath.Join(w.destRoot, name)
-		if _, err := os.Lstat(path); err != nil {
+		if _, err := lstatRelative(name, w.destRoot); err != nil {
 			return err
 		}
-		err = os.RemoveAll(path)
+		err = removeAllRelative(name, w.destRoot)
 		if err != nil {
 			return err
 		}
@@ -711,28 +805,20 @@ func (w *legacyLayerWriter) Write(b []byte) (int, error) {
 }
 
 func (w *legacyLayerWriter) Close() error {
-	w.reset()
-	err := w.init()
-	if err != nil {
+	if err := w.reset(); err != nil {
 		return err
 	}
-	tf, err := os.Create(filepath.Join(w.root, "tombstones.txt"))
-	if err != nil {
+	if err := removeRelative("tombstones.txt", w.root); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	defer tf.Close()
-	_, err = tf.Write([]byte("\xef\xbb\xbfVersion 1.0\n"))
-	if err != nil {
-		return err
-	}
-	for _, t := range w.tombstones {
-		_, err = tf.Write([]byte(filepath.Join(`\`, t) + "\n"))
+	for _, pd := range w.pendingDirs {
+		err := mkdirRelative(pd.Path, pd.Root)
 		if err != nil {
 			return err
 		}
 	}
 	if w.HasUtilityVM {
-		err = reapplyDirectoryTimes(w.uvmDi)
+		err := reapplyDirectoryTimes(w.destRoot, w.uvmDi)
 		if err != nil {
 			return err
 		}

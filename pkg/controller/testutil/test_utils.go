@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
+	"testing"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,17 +40,22 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+)
+
+var (
+	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
 // allows test cases to have fine-grained control over mock behaviors. We also need
-// PodsInterface and PodInterface to test list & delet pods, which is implemented in
+// PodsInterface and PodInterface to test list & delete pods, which is implemented in
 // the embedded client.Fake field.
 type FakeNodeHandler struct {
 	*fake.Clientset
@@ -67,9 +74,10 @@ type FakeNodeHandler struct {
 	// Synchronization
 	lock           sync.Mutex
 	DeleteWaitChan chan struct{}
+	PatchWaitChan  chan struct{}
 }
 
-// FakeLegacyHandler is a fake implemtation of CoreV1Interface.
+// FakeLegacyHandler is a fake implementation of CoreV1Interface.
 type FakeLegacyHandler struct {
 	v1core.CoreV1Interface
 	n *FakeNodeHandler
@@ -173,7 +181,7 @@ func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 	return nodeList, nil
 }
 
-// Delete delets a Node from the fake store.
+// Delete deletes a Node from the fake store.
 func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
@@ -257,7 +265,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 // PatchStatus patches a status of a Node in the fake store.
 func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return &v1.Node{}, nil
+	return m.Patch(nodeName, types.StrategicMergePatchType, data, "status")
 }
 
 // Watch watches Nodes in a fake store.
@@ -270,6 +278,9 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
+		if m.PatchWaitChan != nil {
+			m.PatchWaitChan <- struct{}{}
+		}
 		m.lock.Unlock()
 	}()
 	var nodeCopy v1.Node
@@ -288,12 +299,12 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 
 	originalObjJS, err := json.Marshal(nodeCopy)
 	if err != nil {
-		glog.Errorf("Failed to marshal %v", nodeCopy)
+		klog.Errorf("Failed to marshal %v", nodeCopy)
 		return nil, nil
 	}
 	var originalNode v1.Node
 	if err = json.Unmarshal(originalObjJS, &originalNode); err != nil {
-		glog.Errorf("Failed to unmarshall original object: %v", err)
+		klog.Errorf("Failed to unmarshal original object: %v", err)
 		return nil, nil
 	}
 
@@ -302,31 +313,31 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(data)
 		if err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.MergePatchType:
 		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.StrategicMergePatchType:
 		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	default:
-		glog.Errorf("unknown Content-Type header for patch: %v", pt)
+		klog.Errorf("unknown Content-Type header for patch: %v", pt)
 		return nil, nil
 	}
 
 	var updatedNode v1.Node
 	if err = json.Unmarshal(patchedObjJS, &updatedNode); err != nil {
-		glog.Errorf("Failed to unmarshall patched object: %v", err)
+		klog.Errorf("Failed to unmarshal patched object: %v", err)
 		return nil, nil
 	}
 
@@ -361,12 +372,17 @@ func (f *FakeRecorder) Eventf(obj runtime.Object, eventtype, reason, messageFmt 
 func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
+// AnnotatedEventf emits a fake formatted event to the fake recorder
+func (f *FakeRecorder) AnnotatedEventf(obj runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.Eventf(obj, eventtype, reason, messageFmt, args)
+}
+
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	f.Lock()
 	defer f.Unlock()
 	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
 	if err != nil {
-		glog.Errorf("Encoutered error while getting reference: %v", err)
+		klog.Errorf("Encountered error while getting reference: %v", err)
 		return
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)
@@ -421,9 +437,6 @@ func NewFakeRecorder() *FakeRecorder {
 func NewNode(name string) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: v1.NodeSpec{
-			ExternalID: name,
-		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -478,4 +491,28 @@ func GetZones(nodeHandler *FakeNodeHandler) []string {
 // CreateZoneID returns a single zoneID for a given region and zone.
 func CreateZoneID(region, zone string) string {
 	return region + ":\x00:" + zone
+}
+
+// GetKey is a helper function used by controllers unit tests to get the
+// key for a given kubernetes resource.
+func GetKey(obj interface{}, t *testing.T) string {
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if ok {
+		// if tombstone , try getting the value from tombstone.Obj
+		obj = tombstone.Obj
+	}
+	val := reflect.ValueOf(obj).Elem()
+	name := val.FieldByName("Name").String()
+	kind := val.FieldByName("Kind").String()
+	// Note kind is not always set in the tests, so ignoring that for now
+	if len(name) == 0 || len(kind) == 0 {
+		t.Errorf("Unexpected object %v", obj)
+	}
+
+	key, err := keyFunc(obj)
+	if err != nil {
+		t.Errorf("Unexpected error getting key for %v %v: %v", kind, name, err)
+		return ""
+	}
+	return key
 }

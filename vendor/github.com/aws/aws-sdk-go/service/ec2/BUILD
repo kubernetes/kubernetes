@@ -10,6 +10,7 @@ go_library(
         "service.go",
         "waiters.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/service/ec2",
     importpath = "github.com/aws/aws-sdk-go/service/ec2",
     visibility = ["//visibility:public"],
     deps = [
@@ -20,6 +21,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/signer/v4:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkrand:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/ec2query:go_default_library",
     ],

@@ -22,7 +22,7 @@ import (
 
 // TestRegions does basic checking of region verification / addition
 func TestRegions(t *testing.T) {
-	RecognizeWellKnownRegions()
+	recognizeWellKnownRegions()
 
 	tests := []struct {
 		Add            string
@@ -55,7 +55,7 @@ func TestRegions(t *testing.T) {
 
 	for _, test := range tests {
 		if test.Add != "" {
-			RecognizeRegion(test.Add)
+			recognizeRegion(test.Add)
 		}
 
 		if test.Lookup != "" {
@@ -73,8 +73,8 @@ func TestRecognizesNewRegion(t *testing.T) {
 		t.Fatalf("region already valid: %q", region)
 	}
 
-	awsServices := NewFakeAWSServices(TestClusterId).WithAz(region + "a")
-	_, err := newAWSCloud(nil, awsServices)
+	awsServices := NewFakeAWSServices(TestClusterID).WithAz(region + "a")
+	_, err := newAWSCloud(CloudConfig{}, awsServices)
 	if err != nil {
 		t.Errorf("error building AWS cloud: %v", err)
 	}

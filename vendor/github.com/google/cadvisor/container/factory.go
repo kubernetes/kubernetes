@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/cadvisor/manager/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type ContainerHandlerFactory interface {
@@ -41,15 +41,19 @@ type ContainerHandlerFactory interface {
 type MetricKind string
 
 const (
-	CpuUsageMetrics        MetricKind = "cpu"
-	MemoryUsageMetrics     MetricKind = "memory"
-	CpuLoadMetrics         MetricKind = "cpuLoad"
-	DiskIOMetrics          MetricKind = "diskIO"
-	DiskUsageMetrics       MetricKind = "disk"
-	NetworkUsageMetrics    MetricKind = "network"
-	NetworkTcpUsageMetrics MetricKind = "tcp"
-	NetworkUdpUsageMetrics MetricKind = "udp"
-	AppMetrics             MetricKind = "app"
+	CpuUsageMetrics         MetricKind = "cpu"
+	ProcessSchedulerMetrics MetricKind = "sched"
+	PerCpuUsageMetrics      MetricKind = "percpu"
+	MemoryUsageMetrics      MetricKind = "memory"
+	CpuLoadMetrics          MetricKind = "cpuLoad"
+	DiskIOMetrics           MetricKind = "diskIO"
+	DiskUsageMetrics        MetricKind = "disk"
+	NetworkUsageMetrics     MetricKind = "network"
+	NetworkTcpUsageMetrics  MetricKind = "tcp"
+	NetworkUdpUsageMetrics  MetricKind = "udp"
+	AcceleratorUsageMetrics MetricKind = "accelerator"
+	AppMetrics              MetricKind = "app"
+	ProcessMetrics          MetricKind = "process"
 )
 
 func (mk MetricKind) String() string {
@@ -102,18 +106,18 @@ func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, in
 	for _, factory := range factories[watchType] {
 		canHandle, canAccept, err := factory.CanHandleAndAccept(name)
 		if err != nil {
-			glog.V(4).Infof("Error trying to work out if we can handle %s: %v", name, err)
+			klog.V(4).Infof("Error trying to work out if we can handle %s: %v", name, err)
 		}
 		if canHandle {
 			if !canAccept {
-				glog.V(3).Infof("Factory %q can handle container %q, but ignoring.", factory, name)
+				klog.V(3).Infof("Factory %q can handle container %q, but ignoring.", factory, name)
 				return nil, false, nil
 			}
-			glog.V(3).Infof("Using factory %q for container %q", factory, name)
+			klog.V(3).Infof("Using factory %q for container %q", factory, name)
 			handle, err := factory.NewContainerHandler(name, inHostNamespace)
 			return handle, canAccept, err
 		} else {
-			glog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
+			klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 		}
 	}
 

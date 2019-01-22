@@ -46,9 +46,9 @@ const (
 )
 
 // WithCompression wraps an http.Handler with the Compression Handler
-func WithCompression(handler http.Handler, ctxMapper request.RequestContextMapper) http.Handler {
+func WithCompression(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		wantsCompression, encoding := wantsCompressedResponse(req, ctxMapper)
+		wantsCompression, encoding := wantsCompressedResponse(req)
 		w.Header().Set("Vary", "Accept-Encoding")
 		if wantsCompression {
 			compressionWriter, err := NewCompressionResponseWriter(w, encoding)
@@ -67,12 +67,9 @@ func WithCompression(handler http.Handler, ctxMapper request.RequestContextMappe
 }
 
 // wantsCompressedResponse reads the Accept-Encoding header to see if and which encoding is requested.
-func wantsCompressedResponse(req *http.Request, ctxMapper request.RequestContextMapper) (bool, string) {
+func wantsCompressedResponse(req *http.Request) (bool, string) {
 	// don't compress watches
-	ctx, ok := ctxMapper.Get(req)
-	if !ok {
-		return false, ""
-	}
+	ctx := req.Context()
 	info, ok := request.RequestInfoFrom(ctx)
 	if !ok {
 		return false, ""
@@ -172,13 +169,13 @@ func (c *compressionResponseWriter) compressorClosed() bool {
 }
 
 // RestfulWithCompression wraps WithCompression to be compatible with go-restful
-func RestfulWithCompression(function restful.RouteFunction, ctxMapper request.RequestContextMapper) restful.RouteFunction {
+func RestfulWithCompression(function restful.RouteFunction) restful.RouteFunction {
 	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
 		handler := WithCompression(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			response.ResponseWriter = w
 			request.Request = req
 			function(request, response)
-		}), ctxMapper)
+		}))
 		handler.ServeHTTP(response.ResponseWriter, request.Request)
 	})
 }

@@ -14,5 +14,9 @@ reviewers:
 - sttts
 - ncdc
 - tallclair
-- timothysc
 - enj
+- hzxuzhonghu
+- CaoShuFeng
+labels:
+- sig/api-machinery
+- area/apiserver

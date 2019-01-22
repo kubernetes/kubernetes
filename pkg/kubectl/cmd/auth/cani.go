@@ -19,19 +19,19 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -40,7 +40,7 @@ type CanIOptions struct {
 	AllNamespaces bool
 	Quiet         bool
 	Namespace     string
-	SelfSARClient internalauthorizationclient.SelfSubjectAccessReviewsGetter
+	SelfSARClient authorizationv1client.SelfSubjectAccessReviewsGetter
 
 	Verb           string
 	Resource       schema.GroupVersionResource
@@ -48,8 +48,7 @@ type CanIOptions struct {
 	Subresource    string
 	ResourceName   string
 
-	Out io.Writer
-	Err io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -81,25 +80,25 @@ var (
 		kubectl auth can-i get /logs/`)
 )
 
-func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
+// NewCmdCanI returns an initialized Command for 'auth can-i' sub command
+func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
-		Out: out,
-		Err: err,
+		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
-		Use: "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
+		Use:                   "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		DisableFlagsInUseLine: true,
-		Short:   "Check whether an action is allowed",
-		Long:    canILong,
-		Example: canIExample,
+		Short:                 "Check whether an action is allowed",
+		Long:                  canILong,
+		Example:               canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())
 
 			allowed, err := o.RunAccessCheck()
 			if err == nil {
-				if o.Quiet && !allowed {
+				if !allowed {
 					os.Exit(1)
 				}
 			}
@@ -108,12 +107,13 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, check the specified action in all namespaces.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
-	cmd.Flags().StringVar(&o.Subresource, "subresource", "", "SubResource such as pod/log or deployment/scale")
+	cmd.Flags().StringVar(&o.Subresource, "subresource", o.Subresource, "SubResource such as pod/log or deployment/scale")
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	if o.Quiet {
 		o.Out = ioutil.Discard
@@ -127,7 +127,10 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 			break
 		}
 		resourceTokens := strings.SplitN(args[1], "/", 2)
-		restMapper, _ := f.Object()
+		restMapper, err := f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
 		o.Resource = o.resourceFor(restMapper, resourceTokens[0])
 		if len(resourceTokens) > 1 {
 			o.ResourceName = resourceTokens[1]
@@ -137,15 +140,15 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	}
 
 	var err error
-	client, err := f.ClientSet()
+	client, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.SelfSARClient = client.Authorization()
+	o.SelfSARClient = client.AuthorizationV1()
 
 	o.Namespace = ""
 	if !o.AllNamespaces {
-		o.Namespace, _, err = f.DefaultNamespace()
+		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 		if err != nil {
 			return err
 		}
@@ -154,6 +157,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	return nil
 }
 
+// Validate makes sure provided values for CanIOptions are valid
 func (o *CanIOptions) Validate() error {
 	if o.NonResourceURL != "" {
 		if o.Subresource != "" {
@@ -166,12 +170,13 @@ func (o *CanIOptions) Validate() error {
 	return nil
 }
 
+// RunAccessCheck checks if user has access to a certain resource or non resource URL
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
-	var sar *authorizationapi.SelfSubjectAccessReview
+	var sar *authorizationv1.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {
-		sar = &authorizationapi.SelfSubjectAccessReview{
-			Spec: authorizationapi.SelfSubjectAccessReviewSpec{
-				ResourceAttributes: &authorizationapi.ResourceAttributes{
+		sar = &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
 					Namespace:   o.Namespace,
 					Verb:        o.Verb,
 					Group:       o.Resource.Group,
@@ -182,9 +187,9 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 			},
 		}
 	} else {
-		sar = &authorizationapi.SelfSubjectAccessReview{
-			Spec: authorizationapi.SelfSubjectAccessReviewSpec{
-				NonResourceAttributes: &authorizationapi.NonResourceAttributes{
+		sar = &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				NonResourceAttributes: &authorizationv1.NonResourceAttributes{
 					Verb: o.Verb,
 					Path: o.NonResourceURL,
 				},
@@ -229,9 +234,9 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
 			if len(groupResource.Group) == 0 {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
 			} else {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}

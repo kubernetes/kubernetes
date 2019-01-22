@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: "spark-cluster"
-  labels:
-    name: "spark-cluster"

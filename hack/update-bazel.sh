@@ -20,32 +20,26 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::util::ensure-gnu-sed
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
 
-# Remove generated files prior to running kazel.
-# TODO(spxtr): Remove this line once Bazel is the only way to build.
-rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
-
-# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit \
-    github.com/kubernetes/repo-infra/kazel \
-    ae4e9a3906ace4ba657b7a09242610c6266e832c
-kube::util::go_install_from_commit \
-    github.com/bazelbuild/bazel-gazelle/cmd/gazelle \
-    31ce76e3acc34a22434d1a783bb9b3cae790d108  # 0.8.0
+# Install tools we need, but only from vendor/...
+go install k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+go install k8s.io/kubernetes/vendor/k8s.io/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
+# Ensure that we use the correct importmap for all vendored dependencies.
+# Probably not necessary in gazelle 0.13+
+# (https://github.com/bazelbuild/bazel-gazelle/pull/207).
+if ! grep -q "# gazelle:importmap_prefix" "${KUBE_ROOT}/vendor/BUILD"; then
+  echo "# gazelle:importmap_prefix k8s.io/kubernetes/vendor" >> "${KUBE_ROOT}/vendor/BUILD"
+fi
 
 gazelle fix \
-    -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
-    -proto=legacy \
-    -mode=fix
-# gazelle gets confused by our staging/ directory, prepending an extra
-# "k8s.io/kubernetes/staging/src" to the import path.
-# gazelle won't follow the symlinks in vendor/, so we can't just exclude
-# staging/. Instead we just fix the bad paths with sed.
-find staging -name BUILD -o -name BUILD.bazel | \
-  xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
+    -mode=fix \
+    -repo_root "${KUBE_ROOT}" \
+    "${KUBE_ROOT}"
 
 kazel

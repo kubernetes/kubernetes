@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["types.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(

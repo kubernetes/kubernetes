@@ -98,4 +98,8 @@ func (f *FlagSet) AddGoFlagSet(newSet *goflag.FlagSet) {
 	newSet.VisitAll(func(goflag *goflag.Flag) {
 		f.AddGoFlag(goflag)
 	})
+	if f.addedGoFlagSets == nil {
+		f.addedGoFlagSets = make([]*goflag.FlagSet, 0)
+	}
+	f.addedGoFlagSets = append(f.addedGoFlagSets, newSet)
 }

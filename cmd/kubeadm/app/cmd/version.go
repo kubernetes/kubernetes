@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -40,7 +40,7 @@ type Version struct {
 func NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: i18n.T("Print the version of kubeadm"),
+		Short: "Print the version of kubeadm",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(out, cmd)
 			kubeadmutil.CheckErr(err)
@@ -53,12 +53,19 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 // RunVersion provides the version information of kubeadm in format depending on arguments
 // specified in cobra.Command.
 func RunVersion(out io.Writer, cmd *cobra.Command) error {
+	klog.V(1).Infoln("[version] retrieving version info")
 	clientVersion := version.Get()
 	v := Version{
 		ClientVersion: &clientVersion,
 	}
 
-	switch of := cmdutil.GetFlagString(cmd, "output"); of {
+	const flag = "output"
+	of, err := cmd.Flags().GetString(flag)
+	if err != nil {
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+
+	switch of {
 	case "":
 		fmt.Fprintf(out, "kubeadm version: %#v\n", v.ClientVersion)
 	case "short":
@@ -76,7 +83,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, string(y))
 	default:
-		return fmt.Errorf("invalid output format: %s", of)
+		return errors.Errorf("invalid output format: %s", of)
 	}
 
 	return nil

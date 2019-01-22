@@ -23,12 +23,10 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-RKT_VERSION="v1.18.0"
 DOCKER2ACI_VERSION="v0.13.0"
 MOUNTER_VERSION=$1
 DOCKER_IMAGE=docker://$2
 MOUNTER_ACI_IMAGE=gci-mounter-${MOUNTER_VERSION}.aci
-RKT_GCS_DIR=gs://kubernetes-release/rkt/
 MOUNTER_GCS_DIR=gs://kubernetes-release/gci-mounter/
 
 TMPDIR=/tmp
@@ -37,7 +35,6 @@ DOWNLOAD_DIR=$(mktemp --tmpdir=${TMPDIR} -d gci-mounter-build.XXXXXXXXXX)
 
 # Setup a staging directory
 STAGING_DIR=$(mktemp --tmpdir=${TMPDIR} -d gci-mounter-staging.XXXXXXXXXX)
-RKT_DIR=${STAGING_DIR}/${RKT_VERSION}
 ACI_DIR=${STAGING_DIR}/gci-mounter
 CWD=${PWD}
 
@@ -51,19 +48,7 @@ function cleanup {
 # Delete temporary directories on exit
 trap cleanup EXIT
 
-mkdir ${RKT_DIR}
 mkdir ${ACI_DIR}
-
-# Download rkt
-cd ${DOWNLOAD_DIR}
-echo "Downloading rkt ${RKT_VERSION}"
-wget "https://github.com/coreos/rkt/releases/download/${RKT_VERSION}/rkt-${RKT_VERSION}.tar.gz" &> /dev/null
-echo "Extracting rkt ${RKT_VERSION}"
-tar xzf rkt-${RKT_VERSION}.tar.gz
-
-# Stage rkt into working directory
-cp rkt-${RKT_VERSION}/rkt ${RKT_DIR}/rkt
-cp rkt-${RKT_VERSION}/stage1-fly.aci ${RKT_DIR}/
 
 # Convert docker image to aci and stage it
 echo "Downloading docker2aci ${DOCKER2ACI_VERSION}"
@@ -74,13 +59,9 @@ ACI_IMAGE=$(${DOWNLOAD_DIR}/docker2aci-${DOCKER2ACI_VERSION}/docker2aci ${DOCKER
 cp ${ACI_IMAGE} ${ACI_DIR}/${MOUNTER_ACI_IMAGE}
 
 # Upload the contents to gcs
-echo "Uploading rkt artifacts in ${RKT_DIR} to ${RKT_GCS_DIR}"
-gsutil cp -R ${RKT_DIR} ${RKT_GCS_DIR}
 echo "Uploading gci mounter ACI in ${ACI_DIR} to ${MOUNTER_GCS_DIR}"
 gsutil cp ${ACI_DIR}/${MOUNTER_ACI_IMAGE} ${MOUNTER_GCS_DIR}
 
 echo "Upload completed"
-echo "Update rkt, stag1-fly.aci & gci-mounter ACI versions and SHA1 in cluster/gce/gci/configure.sh"
-echo "${RKT_VERSION}/rkt sha1: $(sha1sum ${RKT_DIR}/rkt)"
-echo "${RKT_VERSION}/stage1-fly.aci sha1: $(sha1sum ${RKT_DIR}/stage1-fly.aci)"
+echo "Updated gci-mounter ACI version and SHA1 in cluster/gce/gci/configure.sh"
 echo "${MOUNTER_ACI_IMAGE} hash: $(sha1sum ${ACI_DIR}/${MOUNTER_ACI_IMAGE})"

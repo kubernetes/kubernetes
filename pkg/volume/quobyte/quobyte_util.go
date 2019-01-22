@@ -18,14 +18,15 @@ package quobyte
 
 import (
 	"net"
-	"path"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/golang/glog"
 	quobyteapi "github.com/quobyte/api"
+	"k8s.io/klog"
 )
 
 type quobyteVolumeManager struct {
@@ -34,7 +35,10 @@ type quobyteVolumeManager struct {
 
 func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProvisioner, createQuota bool) (quobyte *v1.QuobyteVolumeSource, size int, err error) {
 	capacity := provisioner.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	volumeSize, err := util.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return nil, 0, err
+	}
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
 	// to simulate a size constraint we set here a Quota for logical space
 	volumeRequest := &quobyteapi.CreateVolumeRequest{
@@ -59,7 +63,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		}
 	}
 
-	glog.V(4).Infof("Created Quobyte volume %s", provisioner.volume)
+	klog.V(4).Infof("Created Quobyte volume %s", provisioner.volume)
 	return &v1.QuobyteVolumeSource{
 		Registry: provisioner.registry,
 		Volume:   provisioner.volume,
@@ -92,7 +96,7 @@ func (mounter *quobyteMounter) pluginDirIsMounted(pluginDir string) (bool, error
 		}
 
 		if mountPoint.Path == pluginDir {
-			glog.V(4).Infof("quobyte: found mountpoint %s in /proc/mounts", mountPoint.Path)
+			klog.V(4).Infof("quobyte: found mountpoint %s in /proc/mounts", mountPoint.Path)
 			return true, nil
 		}
 	}
@@ -101,7 +105,7 @@ func (mounter *quobyteMounter) pluginDirIsMounted(pluginDir string) (bool, error
 }
 
 func (mounter *quobyteMounter) correctTraillingSlash(regStr string) string {
-	return path.Clean(regStr) + "/"
+	return filepath.Clean(regStr) + string(os.PathSeparator)
 }
 
 func validateRegistry(registry string) bool {

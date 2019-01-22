@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestInstallHandler(t *testing.T) {
@@ -37,25 +40,73 @@ func TestInstallHandler(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
 	}
+	c := w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
+	}
 	if w.Body.String() != "ok" {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
 }
 
-func TestMulitipleChecks(t *testing.T) {
+func TestInstallPathHandler(t *testing.T) {
+	mux := http.NewServeMux()
+	InstallPathHandler(mux, "/healthz/test")
+	InstallPathHandler(mux, "/healthz/ready")
+	req, err := http.NewRequest("GET", "http://example.com/healthz/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	c := w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com/healthz/ready", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	c = w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+}
+
+func testMultipleChecks(path string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"/healthz?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
-		{"/healthz/ping", "ok", http.StatusOK, false},
-		{"/healthz", "ok", http.StatusOK, false},
-		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
-		{"/healthz/ping", "ok", http.StatusOK, true},
-		{"/healthz/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"/healthz", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"?exclude=dontexist", "ok", http.StatusOK, false},
+		{"?exclude=bad", "ok", http.StatusOK, true},
+		{"?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
+		{"?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
+		{"/ping", "ok", http.StatusOK, false},
+		{"", "ok", http.StatusOK, false},
+		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"/ping", "ok", http.StatusOK, true},
+		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
+		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
@@ -66,8 +117,13 @@ func TestMulitipleChecks(t *testing.T) {
 				return errors.New("this will fail")
 			}))
 		}
-		InstallHandler(mux, checks...)
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%v", test.path), nil)
+		if path == "" {
+			InstallHandler(mux, checks...)
+			path = "/healthz"
+		} else {
+			InstallPathHandler(mux, path, checks...)
+		}
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s%v", path, test.path), nil)
 		if err != nil {
 			t.Fatalf("case[%d] Unexpected error: %v", i, err)
 		}
@@ -76,10 +132,22 @@ func TestMulitipleChecks(t *testing.T) {
 		if w.Code != test.expectedStatus {
 			t.Errorf("case[%d] Expected: %v, got: %v", i, test.expectedStatus, w.Code)
 		}
+		c := w.Header().Get("Content-Type")
+		if c != "text/plain; charset=utf-8" {
+			t.Errorf("case[%d] Expected: %v, got: %v", i, "text/plain", c)
+		}
 		if w.Body.String() != test.expectedResponse {
 			t.Errorf("case[%d] Expected:\n%v\ngot:\n%v\n", i, test.expectedResponse, w.Body.String())
 		}
 	}
+}
+
+func TestMultipleChecks(t *testing.T) {
+	testMultipleChecks("", t)
+}
+
+func TestMultiplePathChecks(t *testing.T) {
+	testMultipleChecks("/ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {
@@ -103,10 +171,72 @@ func TestCheckerNames(t *testing.T) {
 	for _, tc := range testCases {
 		result := checkerNames(tc.have...)
 		t.Run(tc.desc, func(t *testing.T) {
-			if reflect.DeepEqual(tc.want, result) {
+			if !reflect.DeepEqual(tc.want, result) {
 				t.Errorf("want %#v, got %#v", tc.want, result)
 			}
 		})
 	}
+}
 
+func TestFormatQuoted(t *testing.T) {
+	n1 := "n1"
+	n2 := "n2"
+	testCases := []struct {
+		desc     string
+		names    []string
+		expected string
+	}{
+		{"empty", []string{}, ""},
+		{"single name", []string{n1}, "\"n1\""},
+		{"two names", []string{n1, n2}, "\"n1\",\"n2\""},
+		{"two names, reverse order", []string{n2, n1}, "\"n2\",\"n1\""},
+	}
+	for _, tc := range testCases {
+		result := formatQuoted(tc.names...)
+		t.Run(tc.desc, func(t *testing.T) {
+			if result != tc.expected {
+				t.Errorf("expected %#v, got %#v", tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetExcludedChecks(t *testing.T) {
+	type args struct {
+		r *http.Request
+	}
+	tests := []struct {
+		name string
+		r    *http.Request
+		want sets.String
+	}{
+		{"Should have no excluded health checks",
+			createGetRequestWithUrl("/healthz?verbose=true"),
+			sets.NewString(),
+		},
+		{"Should extract out the ping health check",
+			createGetRequestWithUrl("/healthz?exclude=ping"),
+			sets.NewString("ping"),
+		},
+		{"Should extract out ping and log health check",
+			createGetRequestWithUrl("/healthz?exclude=ping&exclude=log"),
+			sets.NewString("ping", "log"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getExcludedChecks(tt.r); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getExcludedChecks() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func createGetRequestWithUrl(rawUrlString string) *http.Request {
+	url, _ := url.Parse(rawUrlString)
+	return &http.Request{
+		Method: http.MethodGet,
+		Proto:  "HTTP/1.1",
+		URL:    url,
+	}
 }

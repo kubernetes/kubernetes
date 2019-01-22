@@ -32,6 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
+	"context"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
@@ -41,8 +43,7 @@ import (
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
@@ -155,7 +156,6 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		if err != nil {
 			t.Fatal(err)
 		}
-		m.AuthToken = "simple"
 	} else {
 		cln := newLocalListener(t)
 		m.ClientListeners = []net.Listener{cln}
@@ -165,6 +165,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		}
 	}
 
+	m.AuthToken = "simple"
 	m.Name = name
 	m.DataDir, err = ioutil.TempDir(baseDir, "etcd")
 	if err != nil {
@@ -188,7 +189,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 // launch will attempt to start the etcd server
 func (m *EtcdTestServer) launch(t *testing.T) error {
 	var err error
-	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
+	if m.s, err = etcdserver.NewServer(m.ServerConfig); err != nil {
 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
 	}
 	m.s.SyncTicker = time.NewTicker(500 * time.Millisecond)
@@ -219,7 +220,7 @@ func (m *EtcdTestServer) waitUntilUp() error {
 	for start := time.Now(); time.Since(start) < wait.ForeverTestTimeout; time.Sleep(10 * time.Millisecond) {
 		members, err := membersAPI.List(context.TODO())
 		if err != nil {
-			glog.Errorf("Error when getting etcd cluster members")
+			klog.Errorf("Error when getting etcd cluster members")
 			continue
 		}
 		if len(members) == 1 && len(members[0].ClientURLs) > 0 {
@@ -292,10 +293,11 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 	}
 	server.V3Client = server.v3Cluster.RandClient()
 	config := &storagebackend.Config{
-		Type:                     "etcd3",
-		Prefix:                   etcdtest.PathPrefix(),
-		ServerList:               server.V3Client.Endpoints(),
-		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
+		Type:   "etcd3",
+		Prefix: etcdtest.PathPrefix(),
+		Transport: storagebackend.TransportConfig{
+			ServerList: server.V3Client.Endpoints(),
+		},
 		Paging: true,
 	}
 	return server, config

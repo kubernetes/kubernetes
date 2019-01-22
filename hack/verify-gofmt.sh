@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -36,6 +36,7 @@ find_files() {
   find . -not \( \
       \( \
         -wholename './output' \
+        -o -wholename './.git' \
         -o -wholename './_output' \
         -o -wholename './_gopath' \
         -o -wholename './release' \
@@ -54,6 +55,8 @@ find_files() {
 # have failed before getting to the "echo" in the block below.
 diff=$(find_files | xargs ${gofmt} -d -s 2>&1) || true
 if [[ -n "${diff}" ]]; then
-  echo "${diff}"
+  echo "${diff}" >&2
+  echo >&2
+  echo "Run ./hack/update-gofmt.sh" >&2
   exit 1
 fi

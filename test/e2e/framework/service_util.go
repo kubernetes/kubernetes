@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +40,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -94,6 +92,10 @@ const (
 	// GCPMaxInstancesInInstanceGroup is the maximum number of instances supported in
 	// one instance group on GCP.
 	GCPMaxInstancesInInstanceGroup = 2000
+
+	// AffinityConfirmCount is the number of needed continuous requests to confirm that
+	// affinity is enabled.
+	AffinityConfirmCount = 15
 )
 
 // This should match whatever the default/configured range is
@@ -105,6 +107,14 @@ type ServiceTestJig struct {
 	Name   string
 	Client clientset.Interface
 	Labels map[string]string
+}
+
+// PodNode is a pod-node pair indicating which node a given pod is running on
+type PodNode struct {
+	// Pod represents pod name
+	Pod string
+	// Node represents node name
+	Node string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
@@ -211,6 +221,20 @@ func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak
 	return result
 }
 
+// CreateServiceWithServicePort creates a new Service with ServicePort.
+func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, namespace string, ports []v1.ServicePort) (*v1.Service, error) {
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: j.Name,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: labels,
+			Ports:    ports,
+		},
+	}
+	return j.Client.CoreV1().Services(namespace).Create(service)
+}
+
 func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
 	ingressIP := ""
 	svc := j.UpdateServiceOrFail(namespace, name, func(s *v1.Service) {
@@ -236,7 +260,7 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: 80}}
+		svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80}}
 	})
 
 	if createPod {
@@ -330,6 +354,25 @@ func PickNodeIP(c clientset.Interface) string {
 	}
 	ip := publicIps[0]
 	return ip
+}
+
+// PodNodePairs return PodNode pairs for all pods in a namespace
+func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
+	var result []PodNode
+
+	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return result, err
+	}
+
+	for _, pod := range podList.Items {
+		result = append(result, PodNode{
+			Pod:  pod.Name,
+			Node: pod.Spec.NodeName,
+		})
+	}
+
+	return result, nil
 }
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
@@ -1192,26 +1235,13 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }
 
-// StartServeHostnameService creates a replication controller that serves its hostname and a service on top of it.
-func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
+// StartServeHostnameService creates a replication controller that serves its
+// hostname and a service on top of it.
+func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
-
+	name := svc.ObjectMeta.Name
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.CoreV1().Services(ns).Create(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
-				Port:       int32(port),
-				TargetPort: intstr.FromInt(9376),
-				Protocol:   "TCP",
-			}},
-			Selector: map[string]string{
-				"name": name,
-			},
-		},
-	})
+	_, err := c.CoreV1().Services(ns).Create(svc)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1255,8 +1285,8 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	return podNames, serviceIP, nil
 }
 
-func StopServeHostnameService(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	if err := DeleteRCAndPods(clientset, internalClientset, ns, name); err != nil {
+func StopServeHostnameService(clientset clientset.Interface, ns, name string) error {
+	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
 	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {
@@ -1368,24 +1398,8 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 	return fmt.Errorf("waiting for service to be down timed out")
 }
 
-func CleanupServiceResources(c clientset.Interface, loadBalancerName, zone string) {
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		CleanupServiceGCEResources(c, loadBalancerName, zone)
-	}
-
-	// TODO: we need to add this function with other cloud providers, if there is a need.
-}
-
-func CleanupServiceGCEResources(c clientset.Interface, loadBalancerName, zone string) {
-	if pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
-		if err := CleanupGCEResources(c, loadBalancerName, zone); err != nil {
-			Logf("Still waiting for glbc to cleanup: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}); pollErr != nil {
-		Failf("Failed to cleanup service GCE resources.")
-	}
+func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
+	TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
 func DescribeSvc(ns string) {
@@ -1409,7 +1423,7 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 		headlessService.Spec.ExternalName = externalName
 	} else {
 		headlessService.Spec.Ports = []v1.ServicePort{
-			{Port: 80, Name: "http", Protocol: "TCP"},
+			{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 		}
 	}
 	if isHeadless {
@@ -1419,29 +1433,9 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 }
 
 // EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers: GCE/GKE and Azure
+// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
 func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	enable = func(svc *v1.Service) {}
-	disable = func(svc *v1.Service) {}
-
-	switch TestContext.Provider {
-	case "gce", "gke":
-		enable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{gcecloud.ServiceAnnotationLoadBalancerType: string(gcecloud.LBTypeInternal)}
-		}
-		disable = func(svc *v1.Service) {
-			delete(svc.ObjectMeta.Annotations, gcecloud.ServiceAnnotationLoadBalancerType)
-		}
-	case "azure":
-		enable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "true"}
-		}
-		disable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "false"}
-		}
-	}
-
-	return
+	return TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
@@ -1449,4 +1443,98 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 		return LoadBalancerCreateTimeoutLarge
 	}
 	return LoadBalancerCreateTimeoutDefault
+}
+
+// affinityTracker tracks the destination of a request for the affinity tests.
+type affinityTracker struct {
+	hostTrace []string
+}
+
+// Record the response going to a given host.
+func (at *affinityTracker) recordHost(host string) {
+	at.hostTrace = append(at.hostTrace, host)
+}
+
+// Check that we got a constant count requests going to the same host.
+func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds bool) {
+	fulfilled = (len(at.hostTrace) >= count)
+	if len(at.hostTrace) == 0 {
+		return fulfilled, true
+	}
+	last := at.hostTrace[0:]
+	if len(at.hostTrace)-count >= 0 {
+		last = at.hostTrace[len(at.hostTrace)-count:]
+	}
+	host := at.hostTrace[len(at.hostTrace)-1]
+	for _, h := range last {
+		if h != host {
+			return fulfilled, false
+		}
+	}
+	return fulfilled, true
+}
+
+func checkAffinityFailed(tracker affinityTracker, err string) {
+	Logf("%v", tracker.hostTrace)
+	Failf(err)
+}
+
+// CheckAffinity function tests whether the service affinity works as expected.
+// If affinity is expected and transitionState is true, the test will
+// return true once affinityConfirmCount number of same response observed in a
+// row. If affinity is not expected, the test will keep observe until different
+// responses observed. The function will return false only when no expected
+// responses observed before timeout. If transitionState is false, the test will
+// fail once different host is given if shouldHold is true.
+func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, targetPort int, shouldHold, transitionState bool) bool {
+	targetIpPort := net.JoinHostPort(targetIp, strconv.Itoa(targetPort))
+	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIpPort)
+	timeout := ServiceTestTimeout
+	if execPod == nil {
+		timeout = LoadBalancerPollTimeout
+	}
+	var tracker affinityTracker
+	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		if execPod != nil {
+			if stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+				Logf("Failed to get response from %s. Retry until timeout", targetIpPort)
+				return false, nil
+			} else {
+				tracker.recordHost(stdout)
+			}
+		} else {
+			rawResponse := jig.GetHTTPContent(targetIp, targetPort, timeout, "")
+			tracker.recordHost(rawResponse.String())
+		}
+		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
+		if !shouldHold && !affinityHolds {
+			return true, nil
+		}
+		if shouldHold {
+			if !transitionState && !affinityHolds {
+				return true, fmt.Errorf("Affinity should hold but didn't.")
+			}
+			if trackerFulfilled && affinityHolds {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); pollErr != nil {
+		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
+		if pollErr != wait.ErrWaitTimeout {
+			checkAffinityFailed(tracker, pollErr.Error())
+			return false
+		} else {
+			if !trackerFulfilled {
+				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
+			}
+			if shouldHold {
+				checkAffinityFailed(tracker, "Affinity should hold but didn't.")
+			} else {
+				checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
+			}
+			return true
+		}
+	}
+	return true
 }

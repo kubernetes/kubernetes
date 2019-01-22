@@ -19,14 +19,17 @@ limitations under the License.
 package replicationcontroller
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -49,10 +52,20 @@ type rcStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = rcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that was the default
-// behavior before the server-side garbage collection was implemented.
-func (rcStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
-	return rest.OrphanDependents
+// DefaultGarbageCollectionPolicy returns OrphanDependents for v1 for backwards compatibility,
+// and DeleteDependents for all other versions.
+func (rcStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	switch groupVersion {
+	case corev1.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all Replication Controllers need to be within a namespace.
@@ -61,30 +74,23 @@ func (rcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
-func (rcStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 
 	controller.Generation = 1
 
-	if controller.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&controller.Spec.Template.Spec)
-	}
+	pod.DropDisabledTemplateFields(controller.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newController := obj.(*api.ReplicationController)
 	oldController := old.(*api.ReplicationController)
 	// update is not allowed to set status
 	newController.Status = oldController.Status
 
-	if oldController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&oldController.Spec.Template.Spec)
-	}
-	if newController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&newController.Spec.Template.Spec)
-	}
+	pod.DropDisabledTemplateFields(newController.Spec.Template, oldController.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -100,7 +106,7 @@ func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 }
 
 // Validate validates a new replication controller.
-func (rcStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
 }
@@ -116,7 +122,7 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 
@@ -183,13 +189,13 @@ type rcStatusStrategy struct {
 
 var StatusStrategy = rcStatusStrategy{Strategy}
 
-func (rcStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)
 	oldRc := old.(*api.ReplicationController)
 	// update is not allowed to set spec
 	newRc.Spec = oldRc.Spec
 }
 
-func (rcStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (rcStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 }

@@ -61,8 +61,6 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 			} else if quantity.Cmp(limitQuantity) > 0 {
 				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
 			}
-		} else if resourceName == v1.ResourceNvidiaGPU {
-			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", v1.ResourceNvidiaGPU)))
 		}
 	}
 
@@ -74,6 +72,10 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
+		}
+	} else if !v1helper.IsNativeResource(v1.ResourceName(value)) {
+		if !v1helper.IsExtendedResourceName(v1.ResourceName(value)) {
+			return append(allErrs, field.Invalid(fldPath, value, "doesn't follow extended resource name standard"))
 		}
 	}
 	return allErrs

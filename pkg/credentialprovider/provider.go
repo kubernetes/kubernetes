@@ -22,8 +22,7 @@ import (
 	"sync"
 	"time"
 
-	dockertypes "github.com/docker/docker/api/types"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // DockerConfigProvider is the interface that registered extensions implement
@@ -40,14 +39,12 @@ type DockerConfigProvider interface {
 	LazyProvide() *DockerConfigEntry
 }
 
-func LazyProvide(creds LazyAuthConfiguration) dockertypes.AuthConfig {
+func LazyProvide(creds LazyAuthConfiguration) AuthConfig {
 	if creds.Provider != nil {
 		entry := *creds.Provider.LazyProvide()
 		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
-	} else {
-		return creds.AuthConfig
 	}
-
+	return creds.AuthConfig
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
@@ -86,7 +83,7 @@ func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
-		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
+		klog.V(4).Infof("Unable to parse Docker config file: %v", err)
 	}
 	return DockerConfig{}
 }
@@ -116,7 +113,7 @@ func (d *CachingDockerConfigProvider) Provide() DockerConfig {
 		return d.cacheDockerConfig
 	}
 
-	glog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
+	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
 	d.cacheDockerConfig = d.Provider.Provide()
 	d.expiration = time.Now().Add(d.Lifetime)
 	return d.cacheDockerConfig

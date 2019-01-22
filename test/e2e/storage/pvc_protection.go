@@ -26,10 +26,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
+var _ = utils.SIGDescribe("PVC Protection", func() {
 	var (
 		client                  clientset.Interface
 		nameSpace               string
@@ -47,8 +48,8 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		By("Creating a PVC")
 		suffix := "pvc-protection"
 		defaultSC := getDefaultStorageClassName(client)
-		testStorageClass := storageClassTest{
-			claimSize: "1Gi",
+		testStorageClass := testsuites.StorageClassTest{
+			ClaimSize: "1Gi",
 		}
 		pvc = newClaim(testStorageClass, nameSpace, suffix)
 		pvc.Spec.StorageClassName = &defaultSC
@@ -57,13 +58,13 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		pvcCreatedAndNotDeleted = true
 
 		By("Waiting for PVC to become Bound")
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
 
 		By("Checking that PVC Protection finalizer is set")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PVC status")
-		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue())
+		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue(), "PVC Protection finalizer(%v) is not set in %v", volumeutil.PVCProtectionFinalizer, pvc.ObjectMeta.Finalizers)
 	})
 
 	AfterEach(func() {
@@ -76,11 +77,11 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		By("Deleting the PVC")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
-	It("Verify that PVC in active use by a pod is not removed immediatelly", func() {
+	It("Verify that PVC in active use by a pod is not removed immediately", func() {
 		By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pod, err := framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
@@ -100,7 +101,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -137,7 +138,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 })

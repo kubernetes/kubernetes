@@ -18,6 +18,7 @@ go_library(
         "proto_errors.go",
         "query.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/grpc-ecosystem/grpc-gateway/runtime",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/runtime",
     visibility = ["//visibility:public"],
     deps = [

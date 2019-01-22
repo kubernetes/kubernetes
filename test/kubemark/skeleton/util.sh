@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -18,6 +18,21 @@
 # Kubermark must implement to use test/kubemark/start-kubemark.sh and
 # test/kubemark/stop-kubemark.sh scripts.
 
+# This function should authenticate docker to be able to read/write to
+# the right container registry (needed for pushing kubemark image).
+function authenticate-docker {
+	echo "Configuring registry authentication" 1>&2
+}
+
+# This function should get master IP address (creating one if needed).
+# ENV vars that should be defined by the end of this function:
+# - MASTER_IP
+#
+# Recommended for this function to include retrying logic in case of failures.
+function get-or-create-master-ip {
+	echo "MASTER_IP: $MASTER_IP" 1>&2
+}
+
 # This function should create a machine instance for the master along
 # with any/all of the following resources:
 # - Attach a PD to the master (optionally 1 more for storing events)
@@ -26,8 +41,7 @@
 #   Note: This step is compulsory in order for kubemark to work
 #
 # ENV vars that should be defined by the end of this function:
-# 1. MASTER_IP
-# 2. MASTER_NAME
+# - MASTER_NAME
 #
 # Recommended for this function to include retrying logic for the above
 # operations in case of failures.

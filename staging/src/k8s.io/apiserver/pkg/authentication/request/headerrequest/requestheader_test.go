@@ -152,22 +152,57 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedOk: true,
 		},
+
+		"escaped extra keys": {
+			nameHeaders:        []string{"X-Remote-User"},
+			groupHeaders:       []string{"X-Remote-Group"},
+			extraPrefixHeaders: []string{"X-Remote-Extra-"},
+			requestHeaders: http.Header{
+				"X-Remote-User":                                            {"Bob"},
+				"X-Remote-Group":                                           {"one-a", "one-b"},
+				"X-Remote-Extra-Alpha":                                     {"alphabetical"},
+				"X-Remote-Extra-Alph4num3r1c":                              {"alphanumeric"},
+				"X-Remote-Extra-Percent%20encoded":                         {"percent encoded"},
+				"X-Remote-Extra-Almost%zzpercent%xxencoded":                {"not quite percent encoded"},
+				"X-Remote-Extra-Example.com%2fpercent%2520encoded":         {"url with double percent encoding"},
+				"X-Remote-Extra-Example.com%2F%E4%BB%8A%E6%97%A5%E3%81%AF": {"url with unicode"},
+				"X-Remote-Extra-Abc123!#$+.-_*\\^`~|'":                     {"header key legal characters"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{"one-a", "one-b"},
+				Extra: map[string][]string{
+					"alpha":                         {"alphabetical"},
+					"alph4num3r1c":                  {"alphanumeric"},
+					"percent encoded":               {"percent encoded"},
+					"almost%zzpercent%xxencoded":    {"not quite percent encoded"},
+					"example.com/percent%20encoded": {"url with double percent encoding"},
+					"example.com/今日は":               {"url with unicode"},
+					"abc123!#$+.-_*\\^`~|'":         {"header key legal characters"},
+				},
+			},
+			expectedOk: true,
+		},
 	}
 
 	for k, testcase := range testcases {
-		auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req := &http.Request{Header: testcase.requestHeaders}
+		t.Run(k, func(t *testing.T) {
+			auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := &http.Request{Header: testcase.requestHeaders}
 
-		user, ok, _ := auth.AuthenticateRequest(req)
-		if testcase.expectedOk != ok {
-			t.Errorf("%v: expected %v, got %v", k, testcase.expectedOk, ok)
-		}
-		if e, a := testcase.expectedUser, user; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected %#v, got %#v", k, e, a)
-
-		}
+			resp, ok, _ := auth.AuthenticateRequest(req)
+			if testcase.expectedOk != ok {
+				t.Errorf("%v: expected %v, got %v", k, testcase.expectedOk, ok)
+			}
+			if !ok {
+				return
+			}
+			if e, a := testcase.expectedUser, resp.User; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: expected %#v, got %#v", k, e, a)
+			}
+		})
 	}
 }

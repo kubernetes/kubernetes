@@ -33,17 +33,52 @@ func TestMapToLabelSelectorRoundTrip(t *testing.T) {
 	}
 	for _, in := range inputs {
 		ls := &v1.LabelSelector{}
-		if err := v1.Convert_map_to_unversioned_LabelSelector(&in, ls, nil); err != nil {
-			t.Errorf("Convert_map_to_unversioned_LabelSelector(%#v): %v", in, err)
+		if err := v1.Convert_Map_string_To_string_To_v1_LabelSelector(&in, ls, nil); err != nil {
+			t.Errorf("Convert_Map_string_To_string_To_v1_LabelSelector(%#v): %v", in, err)
 			continue
 		}
 		out := map[string]string{}
-		if err := v1.Convert_unversioned_LabelSelector_to_map(ls, &out, nil); err != nil {
-			t.Errorf("Convert_unversioned_LabelSelector_to_map(%#v): %v", ls, err)
+		if err := v1.Convert_v1_LabelSelector_To_Map_string_To_string(ls, &out, nil); err != nil {
+			t.Errorf("Convert_v1_LabelSelector_To_Map_string_To_string(%#v): %v", ls, err)
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(in, out) {
 			t.Errorf("map-selector conversion round-trip failed: got %v; want %v", out, in)
+		}
+	}
+}
+
+func TestConvertSliceStringToDeletionPropagation(t *testing.T) {
+	tcs := []struct {
+		Input  []string
+		Output v1.DeletionPropagation
+	}{
+		{
+			Input:  nil,
+			Output: "",
+		},
+		{
+			Input:  []string{},
+			Output: "",
+		},
+		{
+			Input:  []string{"foo"},
+			Output: "foo",
+		},
+		{
+			Input:  []string{"bar", "foo"},
+			Output: "bar",
+		},
+	}
+
+	for _, tc := range tcs {
+		var dp v1.DeletionPropagation
+		if err := v1.Convert_Slice_string_To_v1_DeletionPropagation(&tc.Input, &dp, nil); err != nil {
+			t.Errorf("Convert_Slice_string_To_v1_DeletionPropagation(%#v): %v", tc.Input, err)
+			continue
+		}
+		if !apiequality.Semantic.DeepEqual(dp, tc.Output) {
+			t.Errorf("slice string to DeletionPropagation conversion failed: got %v; want %v", dp, tc.Output)
 		}
 	}
 }

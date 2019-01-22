@@ -17,19 +17,21 @@ limitations under the License.
 package staticpod
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -63,9 +65,10 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Labels: map[string]string{"component": container.Name, "tier": "control-plane"},
 		},
 		Spec: v1.PodSpec{
-			Containers:  []v1.Container{container},
-			HostNetwork: true,
-			Volumes:     VolumeMapToSlice(volumes),
+			Containers:        []v1.Container{container},
+			PriorityClassName: "system-cluster-critical",
+			HostNetwork:       true,
+			Volumes:           VolumeMapToSlice(volumes),
 		},
 	}
 }
@@ -80,7 +83,7 @@ func ComponentResources(cpu string) v1.ResourceRequirements {
 }
 
 // ComponentProbe is a helper function building a ready v1.Probe object from some simple parameters
-func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, path string, scheme v1.URIScheme) *v1.Probe {
+func ComponentProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, path string, scheme v1.URIScheme) *v1.Probe {
 	return &v1.Probe{
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -88,6 +91,24 @@ func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, p
 				Path:   path,
 				Port:   intstr.FromInt(port),
 				Scheme: scheme,
+			},
+		},
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      15,
+		FailureThreshold:    8,
+	}
+}
+
+// EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
+func EtcdProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
+	// etcd pod is alive if a linearizable get succeeds.
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=https://[%s]:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
+
+	return &v1.Probe{
+		Handler: v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: []string{"/bin/sh", "-ec", cmd},
 			},
 		},
 		InitialDelaySeconds: 15,
@@ -126,6 +147,10 @@ func VolumeMapToSlice(volumes map[string]v1.Volume) []v1.Volume {
 		v = append(v, vol)
 	}
 
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
+
 	return v
 }
 
@@ -136,6 +161,10 @@ func VolumeMountMapToSlice(volumeMounts map[string]v1.VolumeMount) []v1.VolumeMo
 	for _, volMount := range volumeMounts {
 		v = append(v, volMount)
 	}
+
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
 
 	return v
 }
@@ -161,43 +190,67 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(manifestDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", manifestDir, err)
+		return errors.Wrapf(err, "failed to create directory %q", manifestDir)
 	}
 
 	// writes the pod to disk
 	serialized, err := util.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return fmt.Errorf("failed to marshal manifest for %q to YAML: %v", componentName, err)
+		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
 	}
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
 	if err := ioutil.WriteFile(filename, serialized, 0600); err != nil {
-		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %v", componentName, filename, err)
+		return errors.Wrapf(err, "failed to write static pod manifest file for %q (%q)", componentName, filename)
 	}
 
 	return nil
 }
 
+// ReadStaticPodFromDisk reads a static pod file from disk
+func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
+	buf, err := ioutil.ReadFile(manifestPath)
+	if err != nil {
+		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
+	}
+
+	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	if err != nil {
+		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
+	}
+
+	pod := obj.(*v1.Pod)
+
+	return pod, nil
+}
+
 // GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
 // in static pod manifests.
-func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
+func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) string {
 	switch {
 	case componentName == kubeadmconstants.KubeAPIServer:
-		if cfg.API.AdvertiseAddress != "" {
-			return cfg.API.AdvertiseAddress
+		// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
+		// will generate a DaemonSet with a nodeSelector such that all nodes with the label
+		// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
+		// is run only once on an initial host, the API advertise address will be invalid for any
+		// future hosts that do not have the same address. Furthermore, since liveness and readiness
+		// probes do not support the Downward API we cannot dynamically set the advertise address to
+		// the node's IP. The only option then is to use localhost.
+		if cfg.LocalAPIEndpoint.AdvertiseAddress != "" {
+			return cfg.LocalAPIEndpoint.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:
-		if addr, exists := cfg.ControllerManagerExtraArgs[kubeControllerManagerAddressArg]; exists {
+		if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.KubeScheduler:
-		if addr, exists := cfg.SchedulerExtraArgs[kubeSchedulerAddressArg]; exists {
+		if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.Etcd:
-		if cfg.Etcd.ExtraArgs != nil {
-			if arg, exists := cfg.Etcd.ExtraArgs[etcdListenClientURLsArg]; exists {
+		if cfg.Etcd.Local != nil && cfg.Etcd.Local.ExtraArgs != nil {
+			if arg, exists := cfg.Etcd.Local.ExtraArgs[etcdListenClientURLsArg]; exists {
 				// Use the first url in the listen-client-urls if multiple url's are specified.
 				if strings.ContainsAny(arg, ",") {
 					arg = strings.Split(arg, ",")[0]
@@ -208,6 +261,13 @@ func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) 
 				}
 				// Return the IP if the URL contains an address instead of a name.
 				if ip := net.ParseIP(parsedURL.Hostname()); ip != nil {
+					// etcdctl doesn't support auto-converting zero addresses into loopback addresses
+					if ip.Equal(net.IPv4zero) {
+						return "127.0.0.1"
+					}
+					if ip.Equal(net.IPv6zero) {
+						return net.IPv6loopback.String()
+					}
 					return ip.String()
 				}
 				// Use the local resolver to try resolving the name within the URL.
@@ -233,4 +293,18 @@ func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) 
 		}
 	}
 	return "127.0.0.1"
+}
+
+// ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
+func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
+	content1, err := ioutil.ReadFile(path1)
+	if err != nil {
+		return false, err
+	}
+	content2, err := ioutil.ReadFile(path2)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(content1, content2), nil
 }

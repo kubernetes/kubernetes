@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 )
 
 func TestGetStorageAccessKeys(t *testing.T) {
@@ -64,7 +64,7 @@ func TestGetStorageAccessKeys(t *testing.T) {
 		expectedKey := test.expectedKey
 		fake.Keys = test.results
 		fake.Err = test.err
-		key, err := cloud.getStorageAccesskey("acct")
+		key, err := cloud.GetStorageAccesskey("acct", "rg")
 		if test.expectErr && err == nil {
 			t.Errorf("Unexpected non-error")
 			continue

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -25,10 +25,17 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-ge
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
-${CODEGEN_PKG}/generate-internal-groups.sh all \
-  k8s.io/sample-apiserver/pkg/client k8s.io/sample-apiserver/pkg/apis k8s.io/sample-apiserver/pkg/apis \
-  wardle:v1alpha1 \
-  --output-base "$(dirname ${BASH_SOURCE})/../../.."
+${CODEGEN_PKG}/generate-groups.sh all \
+  k8s.io/sample-apiserver/pkg/client k8s.io/sample-apiserver/pkg/apis \
+  "wardle:v1alpha1,v1beta1" \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
+  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
 
-# To use your own boilerplate text append:
+${CODEGEN_PKG}/generate-internal-groups.sh "deepcopy,defaulter,conversion" \
+  k8s.io/sample-apiserver/pkg/client k8s.io/sample-apiserver/pkg/apis k8s.io/sample-apiserver/pkg/apis \
+  "wardle:v1alpha1,v1beta1" \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
+  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
+
+# To use your own boilerplate text use:
 #   --go-header-file ${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt

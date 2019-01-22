@@ -26,6 +26,3 @@ func scsiHostRescan(io ioHandler, exec mount.Exec) {
 func findDiskByLun(lun int, io ioHandler, exec mount.Exec) (string, error) {
 	return "", nil
 }
-
-func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
-}

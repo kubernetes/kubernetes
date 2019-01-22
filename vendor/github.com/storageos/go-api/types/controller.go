@@ -41,6 +41,7 @@ type Controller struct {
 	Scheduler        bool                   `json:"scheduler"`
 	Name             string                 `json:"name"`
 	Address          string                 `json:"address"`
+	DeviceDir        string                 `json:"deviceDir"`
 	APIPort          int                    `json:"apiPort"`
 	NatsPort         int                    `json:"natsPort"`
 	NatsClusterPort  int                    `json:"natsClusterPort"`
@@ -58,6 +59,9 @@ type Controller struct {
 	HealthUpdatedAt time.Time              `json:"healthUpdatedAt"`
 	VersionInfo     map[string]VersionInfo `json:"versionInfo"`
 	Version         string                 `json:"version"`
+
+	// Cordon true if in an unschedulable state
+	Cordon bool `json:"unschedulable"`
 
 	// high level stats that combine info from all driver instances
 	CapacityStats CapacityStats `json:"capacityStats"`

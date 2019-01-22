@@ -84,8 +84,11 @@ type Port struct {
 	// the subnets where the IP addresses are picked from
 	FixedIPs []IP `json:"fixed_ips"`
 
-	// Owner of network.
+	// TenantID is the project owner of the port.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the port.
+	ProjectID string `json:"project_id"`
 
 	// Identifies the entity (e.g.: dhcp agent) using this port.
 	DeviceOwner string `json:"device_owner"`

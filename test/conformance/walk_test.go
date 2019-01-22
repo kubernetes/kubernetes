@@ -93,3 +93,25 @@ func TestConformance(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeTestNames(t *testing.T) {
+	testCases := []struct {
+		rawName        string
+		normalizedName string
+	}{
+		{
+			"should have monotonically increasing restart count  [Slow]",
+			"should have monotonically increasing restart count",
+		},
+		{
+			" should check is all data is printed  ",
+			"should check is all data is printed",
+		},
+	}
+	for i, tc := range testCases {
+		actualName := normalizeTestName(tc.rawName)
+		if actualName != tc.normalizedName {
+			t.Errorf("test case[%d]: expected normalized name %q, got %q", i, tc.normalizedName, actualName)
+		}
+	}
+}

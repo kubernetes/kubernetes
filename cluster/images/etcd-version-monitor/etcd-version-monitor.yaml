@@ -7,7 +7,7 @@ spec:
   hostNetwork: true
   containers:
   - name: etcd-version-monitor
-    image: gcr.io/google-containers/etcd-version-monitor:0.1.0
+    image: k8s.gcr.io/etcd-version-monitor:0.1.2
     command:
     - /etcd-version-monitor
     - --logtostderr

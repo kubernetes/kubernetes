@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -21,6 +21,11 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+    export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
+
 # include shell2junit library
 source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 
@@ -32,6 +37,30 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+# Exclude typecheck in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-typecheck.sh"          # runs in separate typecheck job
+    )
+fi
+
+
+# Exclude godep checks in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-godeps.sh"             # runs in separate godeps job
+    "verify-staging-godeps.sh"     # runs in separate godeps job
+    "verify-godep-licenses.sh"     # runs in separate godeps job
+    )
+fi
+
+# Exclude readonly package check in certain cases, aka, in periodic jobs we don't care and a readonly package won't be touched
+if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-readonly-packages.sh"  # skip in CI, if env is set
+    )
+fi
+
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
 # `make` and `hack/godep-restore.sh` had already been run.
@@ -39,13 +68,15 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
+  "verify-staging-meta-files.sh"
+  "verify-test-featuregates.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
 )
@@ -71,6 +102,17 @@ function is-quick {
   return 1
 }
 
+function is-explicitly-chosen {
+  local name="${1#verify-}"
+  name="${name%.*}"
+  for e in ${WHAT}; do
+    if [[ $e == "$name" ]]; then
+      return
+    fi
+  done
+  return 1
+}
+
 function run-cmd {
   local filename="${2##*/verify-}"
   local testname="${filename%%.*}"
@@ -87,7 +129,7 @@ function run-cmd {
   return ${tr}
 }
 
-# Collect Failed tests in this Array , initalize it to nil
+# Collect Failed tests in this Array , initialize it to nil
 FAILED_TESTS=()
 
 function print-failed-tests {
@@ -107,13 +149,19 @@ function run-checks {
   for t in $(ls ${pattern})
   do
     local check_name="$(basename "${t}")"
-    if is-excluded "${t}" ; then
-      echo "Skipping ${check_name}"
-      continue
-    fi
-    if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${check_name} in quick mode"
-      continue
+    if [[ ! -z ${WHAT:-} ]]; then
+      if ! is-explicitly-chosen "${check_name}"; then
+        continue
+      fi
+    else
+      if is-excluded "${t}" ; then
+        echo "Skipping ${check_name}"
+        continue
+      fi
+      if ${QUICK} && ! is-quick "${t}" ; then
+        echo "Skipping ${check_name} in quick mode"
+        continue
+      fi
     fi
     echo -e "Verifying ${check_name}"
     local start=$(date +%s)

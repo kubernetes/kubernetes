@@ -33,7 +33,7 @@ type PersistentVolumeUpgradeTest struct {
 	pvc      *v1.PersistentVolumeClaim
 }
 
-func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade [sig-storage]" }
+func (PersistentVolumeUpgradeTest) Name() string { return "[sig-storage] persistent-volume-upgrade" }
 
 const (
 	pvTestFile string = "/mnt/volume1/pv_upgrade_test"
@@ -62,11 +62,8 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 		PVSource:   *t.pvSource,
 		Prebind:    nil,
 	}
-	pvcConfig := framework.PersistentVolumeClaimConfig{
-		Annotations: map[string]string{
-			v1.BetaStorageClassAnnotation: "",
-		},
-	}
+	emptyStorageClass := ""
+	pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &emptyStorageClass}
 
 	By("Creating the PV and PVC")
 	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)

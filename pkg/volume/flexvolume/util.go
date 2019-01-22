@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -49,13 +49,13 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 	}
 	for name, data := range secrets {
 		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString([]byte(data))
-		glog.V(1).Infof("found flex volume secret info: %s", name)
+		klog.V(1).Infof("found flex volume secret info: %s", name)
 	}
 
 	return nil
 }
 
-var notFlexVolume = fmt.Errorf("not a flex volume")
+var errNotFlexVolume = fmt.Errorf("not a flex volume")
 
 func getDriver(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
@@ -64,7 +64,7 @@ func getDriver(spec *volume.Spec) (string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.Driver, nil
 	}
-	return "", notFlexVolume
+	return "", errNotFlexVolume
 }
 
 func getFSType(spec *volume.Spec) (string, error) {
@@ -74,7 +74,7 @@ func getFSType(spec *volume.Spec) (string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.FSType, nil
 	}
-	return "", notFlexVolume
+	return "", errNotFlexVolume
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, podNamespace string) (string, string, error) {
@@ -95,7 +95,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, podNamespace string) (string, 
 		}
 		return secretName, secretNamespace, nil
 	}
-	return "", "", notFlexVolume
+	return "", "", errNotFlexVolume
 }
 
 func getReadOnly(spec *volume.Spec) (bool, error) {
@@ -106,7 +106,7 @@ func getReadOnly(spec *volume.Spec) (bool, error) {
 		// ReadOnly is specified at the PV level
 		return spec.ReadOnly, nil
 	}
-	return false, notFlexVolume
+	return false, errNotFlexVolume
 }
 
 func getOptions(spec *volume.Spec) (map[string]string, error) {
@@ -116,7 +116,7 @@ func getOptions(spec *volume.Spec) (map[string]string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.Options, nil
 	}
-	return nil, notFlexVolume
+	return nil, errNotFlexVolume
 }
 
 func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {
@@ -141,7 +141,7 @@ func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, err
 func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string, options []string) error {
 	err := mounter.Mount(devicePath, deviceMountPath, fsType, options)
 	if err != nil {
-		glog.Errorf("Failed to mount the volume at %s, device: %s, error: %s", deviceMountPath, devicePath, err.Error())
+		klog.Errorf("Failed to mount the volume at %s, device: %s, error: %s", deviceMountPath, devicePath, err.Error())
 		return err
 	}
 	return nil
@@ -150,7 +150,7 @@ func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string
 func isNotMounted(mounter mount.Interface, deviceMountPath string) (bool, error) {
 	notmnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
-		glog.Errorf("Error checking mount point %s, error: %v", deviceMountPath, err)
+		klog.Errorf("Error checking mount point %s, error: %v", deviceMountPath, err)
 		return false, err
 	}
 	return notmnt, nil

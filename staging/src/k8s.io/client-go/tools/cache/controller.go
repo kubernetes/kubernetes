@@ -288,7 +288,7 @@ func NewInformer(
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, clientState)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -355,7 +355,7 @@ func NewIndexerInformer(
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, clientState)
 
 	cfg := &Config{
 		Queue:            fifo,

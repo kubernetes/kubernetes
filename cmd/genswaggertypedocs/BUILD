@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "genswaggertypedocs",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genswaggertypedocs",
 )
 
 go_library(
@@ -17,9 +16,9 @@ go_library(
     srcs = ["swagger_type_docs.go"],
     importpath = "k8s.io/kubernetes/cmd/genswaggertypedocs",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

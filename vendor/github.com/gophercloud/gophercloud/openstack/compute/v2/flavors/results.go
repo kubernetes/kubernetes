@@ -66,6 +66,9 @@ type Flavor struct {
 
 	// IsPublic indicates whether the flavor is public.
 	IsPublic bool `json:"os-flavor-access:is_public"`
+
+	// Ephemeral is the amount of ephemeral disk space, measured in GB.
+	Ephemeral int `json:"OS-FLV-EXT-DATA:ephemeral"`
 }
 
 func (r *Flavor) UnmarshalJSON(b []byte) error {
@@ -158,9 +161,15 @@ type accessResult struct {
 	gophercloud.Result
 }
 
-// AddAccessResult is the response of an AddAccess operations. Call its
+// AddAccessResult is the response of an AddAccess operation. Call its
 // Extract method to interpret it as a slice of FlavorAccess.
 type AddAccessResult struct {
+	accessResult
+}
+
+// RemoveAccessResult is the response of a RemoveAccess operation. Call its
+// Extract method to interpret it as a slice of FlavorAccess.
+type RemoveAccessResult struct {
 	accessResult
 }
 
@@ -221,6 +230,18 @@ type extraSpecResult struct {
 // method to interpret it as a map[string]interface.
 type GetExtraSpecResult struct {
 	extraSpecResult
+}
+
+// UpdateExtraSpecResult contains the result of an Update operation. Call its
+// Extract method to interpret it as a map[string]interface.
+type UpdateExtraSpecResult struct {
+	extraSpecResult
+}
+
+// DeleteExtraSpecResult contains the result of a Delete operation. Call its
+// ExtractErr method to determine if the call succeeded or failed.
+type DeleteExtraSpecResult struct {
+	gophercloud.ErrResult
 }
 
 // Extract interprets any extraSpecResult as an ExtraSpec, if possible.

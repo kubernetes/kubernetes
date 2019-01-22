@@ -8,12 +8,11 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["recognizer_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/runtime/serializer/recognizer/testing",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/recognizer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer:go_default_library",
     ],
 )
 

@@ -16,9 +16,7 @@ limitations under the License.
 
 package generated
 
-//go:generate ../../../hack/generate-bindata.sh
-
-import "github.com/golang/glog"
+import "k8s.io/klog"
 
 /*
 ReadOrDie reads a file from gobindata.
@@ -28,9 +26,9 @@ func ReadOrDie(filePath string) []byte {
 
 	fileBytes, err := Asset(filePath)
 	if err != nil {
-		gobindataMsg := "An error occured, possibly gobindata doesn't know about the file you're opening. For questions on maintaining gobindata, contact the sig-testing group."
-		glog.Infof("Available gobindata files: %v ", AssetNames())
-		glog.Fatalf("Failed opening %v , with error %v.  %v.", filePath, err, gobindataMsg)
+		gobindataMsg := "An error occurred, possibly gobindata doesn't know about the file you're opening. For questions on maintaining gobindata, contact the sig-testing group."
+		klog.Infof("Available gobindata files: %v ", AssetNames())
+		klog.Fatalf("Failed opening %v , with error %v.  %v.", filePath, err, gobindataMsg)
 	}
 	return fileBytes
 }

@@ -6,6 +6,7 @@ go_library(
         "defaults.go",
         "shared_config.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/defaults",
     importpath = "github.com/aws/aws-sdk-go/aws/defaults",
     visibility = ["//visibility:public"],
     deps = [

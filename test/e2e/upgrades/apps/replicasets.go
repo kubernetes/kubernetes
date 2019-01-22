@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	extensions "k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,11 +50,11 @@ func (ReplicaSetUpgradeTest) Name() string { return "[sig-apps] replicaset-upgra
 func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
-	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
+	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := framework.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
-	rs, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(replicaSet)
+	rs, err := c.AppsV1().ReplicaSets(ns).Create(replicaSet)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
@@ -67,7 +67,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
+	rsClient := c.AppsV1().ReplicaSets(ns)
 
 	// Block until upgrade is done
 	By(fmt.Sprintf("Waiting for upgrade to finish before checking replicaset %s", rsName))
@@ -86,7 +86,7 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
-	_, err = framework.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *extensions.ReplicaSet) {
+	_, err = framework.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *apps.ReplicaSet) {
 		*rs.Spec.Replicas = scaleNum
 	})
 	framework.ExpectNoError(err)

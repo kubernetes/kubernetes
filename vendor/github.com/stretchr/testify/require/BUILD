@@ -9,6 +9,7 @@ go_library(
         "require_forward.go",
         "requirements.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/stretchr/testify/require",
     importpath = "github.com/stretchr/testify/require",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],

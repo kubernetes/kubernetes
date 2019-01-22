@@ -21,13 +21,13 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -74,7 +74,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 		InternalClient: f.InternalClientset,
 		Name:           rcName,
 		Namespace:      f.Namespace.Name,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       totalPods,
 	})).NotTo(HaveOccurred())
 
@@ -117,7 +117,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
-	framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
+	framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 }
 
 func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
@@ -198,12 +198,6 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *framework.ResourceMonitor
 
 	BeforeEach(func() {
-		// Wait until image prepull pod has completed so that they wouldn't
-		// affect the runtime cpu usage. Fail the test if prepulling cannot
-		// finish in time.
-		if err := framework.WaitForPodsSuccess(f.ClientSet, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
-			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
-		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
@@ -257,7 +251,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 				podsPerNode: 100,
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 350 * 1024 * 1024},
 				},
 			},
 		}

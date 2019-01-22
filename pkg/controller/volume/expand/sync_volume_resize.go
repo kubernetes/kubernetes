@@ -19,14 +19,14 @@ package expand
 import (
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
-	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -66,7 +66,7 @@ func (rc *syncResize) Sync() {
 		uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
 		updatedClaim, err := markPVCResizeInProgress(pvcWithResizeRequest, rc.kubeClient)
 		if err != nil {
-			glog.V(5).Infof("Error setting PVC %s in progress with error : %v", pvcWithResizeRequest.QualifiedName(), err)
+			klog.V(5).Infof("Error setting PVC %s in progress with error : %v", pvcWithResizeRequest.QualifiedName(), err)
 			continue
 		}
 		if updatedClaim != nil {
@@ -74,16 +74,15 @@ func (rc *syncResize) Sync() {
 		}
 
 		if rc.opsExecutor.IsOperationPending(uniqueVolumeKey, "") {
-			glog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.QualifiedName())
+			klog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.QualifiedName())
 			continue
 		}
-		glog.V(5).Infof("Starting opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
 		growFuncError := rc.opsExecutor.ExpandVolume(pvcWithResizeRequest, rc.resizeMap)
 		if growFuncError != nil && !exponentialbackoff.IsExponentialBackoff(growFuncError) {
-			glog.Errorf("Error growing pvc %s with %v", pvcWithResizeRequest.QualifiedName(), growFuncError)
+			klog.Errorf("Error growing pvc %s with %v", pvcWithResizeRequest.QualifiedName(), growFuncError)
 		}
 		if growFuncError == nil {
-			glog.V(5).Infof("Started opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
+			klog.V(5).Infof("Started opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
 		}
 	}
 }
@@ -96,6 +95,8 @@ func markPVCResizeInProgress(pvcWithResizeRequest *cache.PVCWithResizeRequest, k
 		LastTransitionTime: metav1.Now(),
 	}
 	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
+	newPVC := pvcWithResizeRequest.PVC.DeepCopy()
+	newPVC = util.MergeResizeConditionOnPVC(newPVC, conditions)
 
-	return util.UpdatePVCCondition(pvcWithResizeRequest.PVC, conditions, kubeClient)
+	return util.PatchPVCStatus(pvcWithResizeRequest.PVC /*oldPVC*/, newPVC, kubeClient)
 }

@@ -34,7 +34,7 @@ func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewFakeManager()
 	configMapManager := configmap.NewFakeManager()
-	manager := NewBasicPodManager(fakeMirrorClient, secretManager, configMapManager).(*basicManager)
+	manager := NewBasicPodManager(fakeMirrorClient, secretManager, configMapManager, podtest.NewMockCheckpointManager()).(*basicManager)
 	return manager, fakeMirrorClient
 }
 

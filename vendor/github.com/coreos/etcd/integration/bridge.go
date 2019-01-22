@@ -224,5 +224,5 @@ func (b *bridge) ioCopy(bc *bridgeConn, dst io.Writer, src io.Reader) (err error
 			break
 		}
 	}
-	return
+	return err
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -20,7 +20,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::log::status "Ensuring prereqs"
 kube::util::ensure_single_dir_gopath
@@ -58,7 +57,13 @@ fi
 REQUIRED_BINS=(
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
-  "github.com/tools/godep"
+  "github.com/client9/misspell/cmd/misspell"
+  "github.com/cloudflare/cfssl/cmd/cfssl"
+  "github.com/cloudflare/cfssl/cmd/cfssljson"
+  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "k8s.io/kube-openapi/cmd/openapi-gen"
+  "k8s.io/repo-infra/kazel"
+  "golang.org/x/lint/golint"
   "./..."
 )
 
@@ -66,7 +71,7 @@ kube::log::status "Running godep save - this might take a while"
 # This uses $(pwd) rather than ${KUBE_ROOT} because KUBE_ROOT will be
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
-GOPATH="${GOPATH}:$(pwd)/staging" godep save "${REQUIRED_BINS[@]}"
+GOPATH="${GOPATH}:$(pwd)/staging" ${KUBE_GODEP:?} save "${REQUIRED_BINS[@]}"
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.
@@ -81,10 +86,23 @@ done
 rm -rf vendor/github.com/docker/docker/project/
 
 kube::log::status "Updating BUILD files"
+# Assume that anything imported through godep doesn't need Bazel to build.
+# Prune out any Bazel build files, since these can break the build due to
+# missing dependencies that aren't included by godep.
+find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
+  -exec rm -f {} \;
 hack/update-bazel.sh >/dev/null
 
 kube::log::status "Updating LICENSES file"
 hack/update-godep-licenses.sh >/dev/null
+
+kube::log::status "Creating OWNERS file"
+rm -f "Godeps/OWNERS" "vendor/OWNERS"
+cat <<__EOF__ > "Godeps/OWNERS"
+approvers:
+- dep-approvers
+__EOF__
+cp "Godeps/OWNERS" "vendor/OWNERS"
 
 # Clean up
 rm -rf "${BACKUP}"

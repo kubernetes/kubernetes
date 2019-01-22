@@ -119,7 +119,7 @@ func (group *dhGroup) Client(c packetConn, randSource io.Reader, magics *handsha
 		return nil, err
 	}
 
-	kInt, err := group.diffieHellman(kexDHReply.Y, x)
+	ki, err := group.diffieHellman(kexDHReply.Y, x)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +129,8 @@ func (group *dhGroup) Client(c packetConn, randSource io.Reader, magics *handsha
 	writeString(h, kexDHReply.HostKey)
 	writeInt(h, X)
 	writeInt(h, kexDHReply.Y)
-	K := make([]byte, intLength(kInt))
-	marshalInt(K, kInt)
+	K := make([]byte, intLength(ki))
+	marshalInt(K, ki)
 	h.Write(K)
 
 	return &kexResult{
@@ -164,7 +164,7 @@ func (group *dhGroup) Server(c packetConn, randSource io.Reader, magics *handsha
 	}
 
 	Y := new(big.Int).Exp(group.g, y, group.p)
-	kInt, err := group.diffieHellman(kexDHInit.X, y)
+	ki, err := group.diffieHellman(kexDHInit.X, y)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +177,8 @@ func (group *dhGroup) Server(c packetConn, randSource io.Reader, magics *handsha
 	writeInt(h, kexDHInit.X)
 	writeInt(h, Y)
 
-	K := make([]byte, intLength(kInt))
-	marshalInt(K, kInt)
+	K := make([]byte, intLength(ki))
+	marshalInt(K, ki)
 	h.Write(K)
 
 	H := h.Sum(nil)
@@ -462,9 +462,9 @@ func (kex *curve25519sha256) Client(c packetConn, rand io.Reader, magics *handsh
 	writeString(h, kp.pub[:])
 	writeString(h, reply.EphemeralPubKey)
 
-	kInt := new(big.Int).SetBytes(secret[:])
-	K := make([]byte, intLength(kInt))
-	marshalInt(K, kInt)
+	ki := new(big.Int).SetBytes(secret[:])
+	K := make([]byte, intLength(ki))
+	marshalInt(K, ki)
 	h.Write(K)
 
 	return &kexResult{
@@ -510,9 +510,9 @@ func (kex *curve25519sha256) Server(c packetConn, rand io.Reader, magics *handsh
 	writeString(h, kexInit.ClientPubKey)
 	writeString(h, kp.pub[:])
 
-	kInt := new(big.Int).SetBytes(secret[:])
-	K := make([]byte, intLength(kInt))
-	marshalInt(K, kInt)
+	ki := new(big.Int).SetBytes(secret[:])
+	K := make([]byte, intLength(ki))
+	marshalInt(K, ki)
 	h.Write(K)
 
 	H := h.Sum(nil)

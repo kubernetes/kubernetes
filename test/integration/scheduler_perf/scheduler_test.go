@@ -18,12 +18,12 @@ package benchmark
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 	"math"
 	"strconv"
@@ -49,10 +49,6 @@ var (
 	baseNodeTemplate = &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "sample-node-",
-		},
-		Spec: v1.NodeSpec{
-			// TODO: investigate why this is needed.
-			ExternalID: "foo",
 		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -109,7 +105,7 @@ type testConfig struct {
 	numNodes                  int
 	mutatedNodeTemplate       *v1.Node
 	mutatedPodTemplate        *v1.Pod
-	schedulerSupportFunctions scheduler.Configurator
+	schedulerSupportFunctions factory.Configurator
 	destroyFunc               func()
 }
 
@@ -141,10 +137,10 @@ func schedulePods(config *testConfig) int32 {
 		time.Sleep(50 * time.Millisecond)
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
-		// TODO Find out why sometimes there may be scheduling blips in the beggining.
+		// TODO Find out why sometimes there may be scheduling blips in the beginning.
 		if len(scheduled) > config.numPods/100 {
 			break
 		}
@@ -159,15 +155,19 @@ func schedulePods(config *testConfig) int32 {
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 
 		// We will be completed when all pods are done being scheduled.
 		// return the worst-case-scenario interval that was seen during this time.
 		// Note this should never be low due to cold-start, so allow bake in sched time if necessary.
 		if len(scheduled) >= config.numPods {
+			consumed := int(time.Since(start) / time.Second)
+			if consumed <= 0 {
+				consumed = 1
+			}
 			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average). min QPS was %v\n",
-				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second), minQps)
+				config.numPods, consumed, config.numPods/consumed, minQps)
 			return minQps
 		}
 

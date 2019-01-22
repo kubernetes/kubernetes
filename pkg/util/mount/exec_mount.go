@@ -20,8 +20,9 @@ package mount
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ExecMounter is a mounter that uses provided Exec interface to mount and
@@ -43,10 +44,10 @@ var _ Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := m.doExecMount(source, target, fstype, []string{"bind"})
+		err := m.doExecMount(source, target, fstype, bindOpts)
 		if err != nil {
 			return err
 		}
@@ -56,12 +57,12 @@ func (m *execMounter) Mount(source string, target string, fstype string, options
 	return m.doExecMount(source, target, fstype, options)
 }
 
-// doExecMount calls exec(mount <waht> <where>) using given exec interface.
+// doExecMount calls exec(mount <what> <where>) using given exec interface.
 func (m *execMounter) doExecMount(source, target, fstype string, options []string) error {
-	glog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
+	klog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
 	mountArgs := makeMountArgs(source, target, fstype, options)
 	output, err := m.exec.Run("mount", mountArgs...)
-	glog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
+	klog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
 	if err != nil {
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, "mount", source, target, fstype, options, string(output))
@@ -74,9 +75,9 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 func (m *execMounter) Unmount(target string) error {
 	outputBytes, err := m.exec.Run("umount", target)
 	if err == nil {
-		glog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
+		klog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
 	} else {
-		glog.V(5).Infof("Failed to exec unmount %s: err: %q, umount output: %s", target, err, string(outputBytes))
+		klog.V(5).Infof("Failed to exec unmount %s: err: %q, umount output: %s", target, err, string(outputBytes))
 	}
 
 	return err
@@ -135,6 +136,38 @@ func (m *execMounter) MakeDir(pathname string) error {
 	return m.wrappedMounter.MakeDir(pathname)
 }
 
-func (m *execMounter) ExistsPath(pathname string) bool {
+func (m *execMounter) ExistsPath(pathname string) (bool, error) {
 	return m.wrappedMounter.ExistsPath(pathname)
+}
+
+func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
+	return m.wrappedMounter.EvalHostSymlinks(pathname)
+}
+
+func (m *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return m.wrappedMounter.PrepareSafeSubpath(subPath)
+}
+
+func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return m.wrappedMounter.CleanSubPaths(podDir, volumeName)
+}
+
+func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
+}
+
+func (m *execMounter) GetMountRefs(pathname string) ([]string, error) {
+	return m.wrappedMounter.GetMountRefs(pathname)
+}
+
+func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
+	return m.wrappedMounter.GetFSGroup(pathname)
+}
+
+func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return m.wrappedMounter.GetSELinuxSupport(pathname)
+}
+
+func (m *execMounter) GetMode(pathname string) (os.FileMode, error) {
+	return m.wrappedMounter.GetMode(pathname)
 }

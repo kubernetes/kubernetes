@@ -10,7 +10,6 @@ go_library(
 go_binary(
     name = "conformance",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:public"],
 )
 
@@ -35,7 +34,7 @@ genrule(
         "//test/e2e_node:all-srcs",
     ],
     outs = ["conformance.txt"],
-    cmd = "./$(location :conformance) $(locations //test/e2e:all-srcs) $(locations //test/e2e_node:all-srcs) > $@",
+    cmd = "./$(location :conformance) $(locations //test/e2e:all-srcs) > $@",
     message = "Listing all conformance tests.",
     tools = [":conformance"],
 )
@@ -54,5 +53,4 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/conformance",
 )

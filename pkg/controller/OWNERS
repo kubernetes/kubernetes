@@ -5,3 +5,6 @@ approvers:
 - janetkuo
 reviewers:
 - deads2k
+- cheftako
+labels:
+- sig/apps

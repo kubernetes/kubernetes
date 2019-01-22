@@ -12,6 +12,7 @@ go_library(
         "local.go",
         "tr.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/chai2010/gettext-go/gettext",
     importpath = "github.com/chai2010/gettext-go/gettext",
     visibility = ["//visibility:public"],
     deps = [

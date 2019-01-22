@@ -17,7 +17,7 @@ spec:
         version: v1
     spec:
       containers:
-      - image: gcr.io/google_containers/servicelb:0.1
+      - image: k8s.gcr.io/servicelb:0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

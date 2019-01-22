@@ -312,13 +312,9 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 	if err != nil {
 		return nil, err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
 	cr, err := history.NewControllerRevision(set,
 		controllerKind,
-		selector,
+		set.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
 		revision,
 		collisionCount)

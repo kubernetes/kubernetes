@@ -75,7 +75,7 @@ func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
 			if err := client.Core().Nodes().Delete(name, &metav1.DeleteOptions{}); err != nil {
-				t.Fatalf("Failed to create node: %v", err)
+				t.Fatalf("Failed to delete node: %v", err)
 			}
 		}(i)
 	}

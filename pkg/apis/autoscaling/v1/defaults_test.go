@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultHPA(t *testing.T) {
@@ -43,7 +44,7 @@ func TestSetDefaultHPA(t *testing.T) {
 		{
 			hpa: autoscalingv1.HorizontalPodAutoscaler{
 				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-					MinReplicas: newInt32(3),
+					MinReplicas: utilpointer.Int32Ptr(3),
 				},
 			},
 			expectReplicas: 3,
@@ -84,10 +85,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
 }

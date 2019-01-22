@@ -5,7 +5,8 @@ approvers:
 - mfojtik
 reviewers:
 - janetkuo
-- nikhiljindal
 - kargakis
 - mfojtik
 - tnozicka
+labels:
+- sig/apps

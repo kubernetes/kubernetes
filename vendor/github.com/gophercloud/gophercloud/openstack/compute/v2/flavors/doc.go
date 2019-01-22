@@ -73,6 +73,19 @@ Example to Grant Access to a Flavor
 		panic(err)
 	}
 
+Example to Remove/Revoke Access to a Flavor
+
+	flavorID := "e91758d6-a54a-4778-ad72-0c73a1cb695b"
+
+	accessOpts := flavors.RemoveAccessOpts{
+		Tenant: "15153a0979884b59b0592248ef947921",
+	}
+
+	accessList, err := flavors.RemoveAccess(computeClient, flavor.ID, accessOpts).Extract()
+	if err != nil {
+		panic(err)
+	}
+
 Example to Create Extra Specs for a Flavor
 
 	flavorID := "e91758d6-a54a-4778-ad72-0c73a1cb695b"
@@ -99,5 +112,26 @@ Example to Get Extra Specs for a Flavor
 
 	fmt.Printf("%+v", extraSpecs)
 
+Example to Update Extra Specs for a Flavor
+
+	flavorID := "e91758d6-a54a-4778-ad72-0c73a1cb695b"
+
+	updateOpts := flavors.ExtraSpecsOpts{
+		"hw:cpu_thread_policy": "CPU-THREAD-POLICY-UPDATED",
+	}
+	updatedExtraSpec, err := flavors.UpdateExtraSpec(computeClient, flavorID, updateOpts).Extract()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v", updatedExtraSpec)
+
+Example to Delete an Extra Spec for a Flavor
+
+	flavorID := "e91758d6-a54a-4778-ad72-0c73a1cb695b"
+	err := flavors.DeleteExtraSpec(computeClient, flavorID, "hw:cpu_thread_policy").ExtractErr()
+	if err != nil {
+		panic(err)
+	}
 */
 package flavors

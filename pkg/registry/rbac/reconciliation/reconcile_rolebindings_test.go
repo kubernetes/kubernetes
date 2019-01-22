@@ -19,24 +19,24 @@ package reconciliation
 import (
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
-func binding(roleRef rbac.RoleRef, subjects []rbac.Subject) *rbac.ClusterRoleBinding {
-	return &rbac.ClusterRoleBinding{RoleRef: roleRef, Subjects: subjects}
+func binding(roleRef rbacv1.RoleRef, subjects []rbacv1.Subject) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{RoleRef: roleRef, Subjects: subjects}
 }
 
-func ref(name string) rbac.RoleRef {
-	return rbac.RoleRef{Name: name}
+func ref(name string) rbacv1.RoleRef {
+	return rbacv1.RoleRef{Name: name}
 }
 
-func subject(name string) rbac.Subject {
-	return rbac.Subject{Name: name}
+func subject(name string) rbacv1.Subject {
+	return rbacv1.Subject{Name: name}
 }
 
-func subjects(names ...string) []rbac.Subject {
-	r := []rbac.Subject{}
+func subjects(names ...string) []rbacv1.Subject {
+	r := []rbacv1.Subject{}
 	for _, name := range names {
 		r = append(r, subject(name))
 	}
@@ -45,10 +45,10 @@ func subjects(names ...string) []rbac.Subject {
 
 func TestDiffObjectReferenceLists(t *testing.T) {
 	tests := map[string]struct {
-		A             []rbac.Subject
-		B             []rbac.Subject
-		ExpectedOnlyA []rbac.Subject
-		ExpectedOnlyB []rbac.Subject
+		A             []rbacv1.Subject
+		B             []rbacv1.Subject
+		ExpectedOnlyA []rbacv1.Subject
+		ExpectedOnlyB []rbacv1.Subject
 	}{
 		"empty": {},
 
@@ -92,11 +92,11 @@ func TestDiffObjectReferenceLists(t *testing.T) {
 
 func TestComputeUpdate(t *testing.T) {
 	tests := map[string]struct {
-		ExpectedBinding     *rbac.ClusterRoleBinding
-		ActualBinding       *rbac.ClusterRoleBinding
+		ExpectedBinding     *rbacv1.ClusterRoleBinding
+		ActualBinding       *rbacv1.ClusterRoleBinding
 		RemoveExtraSubjects bool
 
-		ExpectedUpdatedBinding *rbac.ClusterRoleBinding
+		ExpectedUpdatedBinding *rbacv1.ClusterRoleBinding
 		ExpectedUpdateNeeded   bool
 	}{
 		"match without union": {

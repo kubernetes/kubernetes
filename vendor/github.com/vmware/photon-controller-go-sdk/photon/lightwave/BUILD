@@ -5,42 +5,10 @@ go_library(
     srcs = [
         "jwttoken.go",
         "oidcclient.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "oidcclient_sspi_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "oidcclient_sspi.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "oidcclient_sspi.go",
+        "oidcclient_sspi_unsupported.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     importpath = "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     visibility = ["//visibility:public"],
     deps = select({

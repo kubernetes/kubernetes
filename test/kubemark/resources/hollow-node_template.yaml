@@ -18,7 +18,7 @@ spec:
       initContainers:
       - name: init-inotify-limit
         image: busybox
-        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=200']
+        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=1000']
         securityContext:
           privileged: true
       volumes:
@@ -35,7 +35,7 @@ spec:
         emptyDir: {}
       containers:
       - name: hollow-kubelet
-        image: {{registry}}/{{project}}/kubemark:latest
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
         ports:
         - containerPort: 4194
         - containerPort: 10250
@@ -53,7 +53,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - /kubemark --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubelet_verbosity_level}} 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        - /kubemark --morph=kubelet --name=$(NODE_NAME) {{hollow_kubelet_params}} --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -67,7 +67,7 @@ spec:
         securityContext:
           privileged: true
       - name: hollow-proxy
-        image: {{registry}}/{{project}}/kubemark:latest
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
         env:
         - name: CONTENT_TYPE
           valueFrom:
@@ -81,7 +81,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - /kubemark --morph=proxy --name=$(NODE_NAME) --use-real-proxier={{use_real_proxier}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        - /kubemark --morph=proxy --name=$(NODE_NAME) {{hollow_proxy_params}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -93,7 +93,7 @@ spec:
             cpu: {{HOLLOW_PROXY_CPU}}m
             memory: {{HOLLOW_PROXY_MEM}}Ki
       - name: hollow-node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.4.1
         env:
         - name: NODE_NAME
           valueFrom:
@@ -121,3 +121,12 @@ spec:
             memory: 20Mi
         securityContext:
           privileged: true
+      # Keep the pod running on unreachable node for 15 minutes.
+      # This time should be sufficient for a VM reboot and should
+      # avoid recreating a new hollow node.
+      # See https://github.com/kubernetes/kubernetes/issues/67120 for context.
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 900

@@ -17,22 +17,16 @@ limitations under the License.
 package printers
 
 import (
-	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ResourcePrinter is an interface that knows how to print runtime objects.
 type ResourcePrinter interface {
 	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
-	HandledResources() []string
-	//Can be used to print out warning/clarifications if needed
-	//after all objects were printed
-	AfterPrint(io.Writer, string) error
-	// Identify if it is a generic printer
-	IsGeneric() bool
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -41,19 +35,6 @@ type ResourcePrinterFunc func(runtime.Object, io.Writer) error
 // PrintObj implements ResourcePrinter
 func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
-}
-
-// TODO: implement HandledResources()
-func (fn ResourcePrinterFunc) HandledResources() []string {
-	return []string{}
-}
-
-func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
-	return nil
-}
-
-func (fn ResourcePrinterFunc) IsGeneric() bool {
-	return true
 }
 
 type PrintOptions struct {
@@ -68,44 +49,11 @@ type PrintOptions struct {
 	ShowAll            bool
 	ShowLabels         bool
 	AbsoluteTimestamps bool
-	Kind               string
+	Kind               schema.GroupKind
 	ColumnLabels       []string
 
 	SortBy string
 
 	// indicates if it is OK to ignore missing keys for rendering an output template.
 	AllowMissingKeys bool
-}
-
-// Describer generates output for the named resource or an error
-// if the output could not be generated. Implementers typically
-// abstract the retrieval of the named object from a remote server.
-type Describer interface {
-	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
-}
-
-// DescriberSettings holds display configuration for each object
-// describer to control what is printed.
-type DescriberSettings struct {
-	ShowEvents bool
-}
-
-// ObjectDescriber is an interface for displaying arbitrary objects with extra
-// information. Use when an object is in hand (on disk, or already retrieved).
-// Implementers may ignore the additional information passed on extra, or use it
-// by default. ObjectDescribers may return ErrNoDescriber if no suitable describer
-// is found.
-type ObjectDescriber interface {
-	DescribeObject(object interface{}, extra ...interface{}) (output string, err error)
-}
-
-// ErrNoDescriber is a structured error indicating the provided object or objects
-// cannot be described.
-type ErrNoDescriber struct {
-	Types []string
-}
-
-// Error implements the error interface.
-func (e ErrNoDescriber) Error() string {
-	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }

@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type PrivilegedPodTestConfig struct {
@@ -36,7 +37,7 @@ type PrivilegedPodTestConfig struct {
 	pod *v1.Pod
 }
 
-var _ = framework.KubeDescribe("PrivilegedPod", func() {
+var _ = framework.KubeDescribe("PrivilegedPod [NodeConformance]", func() {
 	config := &PrivilegedPodTestConfig{
 		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
 		privilegedPod:          "privileged-pod",
@@ -90,14 +91,14 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            c.privilegedContainer,
-					Image:           busyboxImage,
+					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &isPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},
 				},
 				{
 					Name:            c.notPrivilegedContainer,
-					Image:           busyboxImage,
+					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{Privileged: &notPrivileged},
 					Command:         []string{"/bin/sleep", "10000"},

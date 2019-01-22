@@ -39,7 +39,8 @@ type AuthorizationManager struct {
 func NewAuthorizationManager(ref types.ManagedObjectReference) object.Reference {
 	m := &AuthorizationManager{}
 	m.Self = ref
-	m.RoleList = esx.RoleList
+	m.RoleList = make([]types.AuthorizationRole, len(esx.RoleList))
+	copy(m.RoleList, esx.RoleList)
 	m.permissions = make(map[types.ManagedObjectReference][]types.Permission)
 
 	l := object.AuthorizationRoleList(m.RoleList)

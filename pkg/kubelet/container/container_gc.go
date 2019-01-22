@@ -19,6 +19,8 @@ package container
 import (
 	"fmt"
 	"time"
+
+	"k8s.io/klog"
 )
 
 // Specified a policy for garbage collecting containers.
@@ -80,5 +82,6 @@ func (cgc *realContainerGC) GarbageCollect() error {
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
+	klog.Infof("attempting to delete unused containers")
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

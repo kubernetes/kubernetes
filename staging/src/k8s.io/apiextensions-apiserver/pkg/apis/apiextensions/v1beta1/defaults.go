@@ -31,6 +31,14 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_CustomResourceDefinition(obj *CustomResourceDefinition) {
 	SetDefaults_CustomResourceDefinitionSpec(&obj.Spec)
+	if len(obj.Status.StoredVersions) == 0 {
+		for _, v := range obj.Spec.Versions {
+			if v.Storage {
+				obj.Status.StoredVersions = append(obj.Status.StoredVersions, v.Name)
+				break
+			}
+		}
+	}
 }
 
 func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec) {
@@ -43,4 +51,31 @@ func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec)
 	if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 		obj.Names.ListKind = obj.Names.Kind + "List"
 	}
+	// If there is no list of versions, create on using deprecated Version field.
+	if len(obj.Versions) == 0 && len(obj.Version) != 0 {
+		obj.Versions = []CustomResourceDefinitionVersion{{
+			Name:    obj.Version,
+			Storage: true,
+			Served:  true,
+		}}
+	}
+	// For backward compatibility set the version field to the first item in versions list.
+	if len(obj.Version) == 0 && len(obj.Versions) != 0 {
+		obj.Version = obj.Versions[0].Name
+	}
+	if obj.Conversion == nil {
+		obj.Conversion = &CustomResourceConversion{
+			Strategy: NoneConverter,
+		}
+	}
+}
+
+// hasPerVersionColumns returns true if a CRD uses per-version columns.
+func hasPerVersionColumns(versions []CustomResourceDefinitionVersion) bool {
+	for _, v := range versions {
+		if len(v.AdditionalPrinterColumns) > 0 {
+			return true
+		}
+	}
+	return false
 }

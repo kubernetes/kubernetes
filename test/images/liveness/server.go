@@ -29,11 +29,11 @@ func main() {
 	started := time.Now()
 	http.HandleFunc("/started", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		data := (time.Now().Sub(started)).String()
+		data := (time.Since(started)).String()
 		w.Write([]byte(data))
 	})
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		duration := time.Now().Sub(started)
+		duration := time.Since(started)
 		if duration.Seconds() > 10 {
 			w.WriteHeader(500)
 			w.Write([]byte(fmt.Sprintf("error: %v", duration.Seconds())))

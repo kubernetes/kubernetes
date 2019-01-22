@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 )
 
 func TestCalculateStatus(t *testing.T) {
@@ -38,9 +38,9 @@ func TestCalculateStatus(t *testing.T) {
 
 	rsStatusTests := []struct {
 		name                     string
-		replicaset               *extensions.ReplicaSet
+		replicaset               *apps.ReplicaSet
 		filteredPods             []*v1.Pod
-		expectedReplicaSetStatus extensions.ReplicaSetStatus
+		expectedReplicaSetStatus apps.ReplicaSetStatus
 	}{
 		{
 			"1 fully labelled pod",
@@ -48,7 +48,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        1,
@@ -61,7 +61,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 0,
 				ReadyReplicas:        1,
@@ -75,7 +75,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 2,
 				ReadyReplicas:        2,
@@ -89,7 +89,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
 				newPod("pod2", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 0,
 				ReadyReplicas:        2,
@@ -103,7 +103,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        2,
@@ -116,7 +116,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", fullyLabelledRS, v1.PodPending, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        0,
@@ -129,7 +129,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true),
 			},
-			extensions.ReplicaSetStatus{
+			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        1,
@@ -150,19 +150,19 @@ func TestCalculateStatusConditions(t *testing.T) {
 	labelMap := map[string]string{"name": "foo"}
 	rs := newReplicaSet(2, labelMap)
 	replicaFailureRS := newReplicaSet(10, labelMap)
-	replicaFailureRS.Status.Conditions = []extensions.ReplicaSetCondition{
+	replicaFailureRS.Status.Conditions = []apps.ReplicaSetCondition{
 		{
-			Type:   extensions.ReplicaSetReplicaFailure,
+			Type:   apps.ReplicaSetReplicaFailure,
 			Status: v1.ConditionTrue,
 		},
 	}
 
 	rsStatusConditionTests := []struct {
 		name                         string
-		replicaset                   *extensions.ReplicaSet
+		replicaset                   *apps.ReplicaSet
 		filteredPods                 []*v1.Pod
 		manageReplicasErr            error
-		expectedReplicaSetConditions []extensions.ReplicaSetCondition
+		expectedReplicaSetConditions []apps.ReplicaSetCondition
 	}{
 
 		{
@@ -172,9 +172,9 @@ func TestCalculateStatusConditions(t *testing.T) {
 				newPod("pod1", rs, v1.PodRunning, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
-			[]extensions.ReplicaSetCondition{
+			[]apps.ReplicaSetCondition{
 				{
-					Type:    extensions.ReplicaSetReplicaFailure,
+					Type:    apps.ReplicaSetReplicaFailure,
 					Status:  v1.ConditionTrue,
 					Reason:  "FailedCreate",
 					Message: "fake manageReplicasErr",
@@ -190,9 +190,9 @@ func TestCalculateStatusConditions(t *testing.T) {
 				newPod("pod3", rs, v1.PodRunning, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
-			[]extensions.ReplicaSetCondition{
+			[]apps.ReplicaSetCondition{
 				{
-					Type:    extensions.ReplicaSetReplicaFailure,
+					Type:    apps.ReplicaSetReplicaFailure,
 					Status:  v1.ConditionTrue,
 					Reason:  "FailedDelete",
 					Message: "fake manageReplicasErr",
@@ -215,9 +215,9 @@ func TestCalculateStatusConditions(t *testing.T) {
 				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, true),
 			},
 			fmt.Errorf("fake manageReplicasErr"),
-			[]extensions.ReplicaSetCondition{
+			[]apps.ReplicaSetCondition{
 				{
-					Type:   extensions.ReplicaSetReplicaFailure,
+					Type:   apps.ReplicaSetReplicaFailure,
 					Status: v1.ConditionTrue,
 				},
 			},

@@ -14,7 +14,7 @@ This library contains code to create Kubernetes aggregation server complete with
 
 There are *NO compatibility guarantees* for this repository, yet.  It is in direct support of Kubernetes, so branches
 will track Kubernetes and be compatible with that repo.  As we more cleanly separate the layers, we will review the
-compatibility guarantee.  We have a goal to make this easier to use in 2017.
+compatibility guarantee. We have a goal to make this easier to use in the future.
 
 
 ## Where does it come from?

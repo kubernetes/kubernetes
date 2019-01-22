@@ -6,6 +6,14 @@ go:
     - 1.4
     - 1.5
     - 1.6
+    - 1.7
+    - 1.8
+    - 1.9
+    - tip
+matrix:
+    allow_failures:
+        - go: tip
+    fast_finish: true
 before_install:
     - go get github.com/mattn/goveralls
     - go get golang.org/x/tools/cmd/cover

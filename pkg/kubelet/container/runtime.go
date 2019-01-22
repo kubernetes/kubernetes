@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -24,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/klog"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -95,7 +96,7 @@ type Runtime interface {
 	// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 	KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
-	// information of all containers in the pod that are visble in Runtime.
+	// information of all containers in the pod that are visible in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
 	// Returns the filesystem path of the pod's network namespace; if the
 	// runtime does not handle namespace creation itself, or cannot return
@@ -113,7 +114,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
 	// ImageService provides methods to image-related methods.
@@ -124,22 +125,10 @@ type Runtime interface {
 	UpdatePodCIDR(podCIDR string) error
 }
 
-// DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
-// (exec/attach/port-forward) should be served directly by the Kubelet.
-type DirectStreamingRuntime interface {
-	// Runs the command in the container of the specified pod. Attaches
-	// the processes stdin, stdout, and stderr. Optionally uses a tty.
-	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
-	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod *Pod, port int32, stream io.ReadWriteCloser) error
-	// ContainerAttach encapsulates the attaching to containers for testability
-	ContainerAttacher
-}
-
-// IndirectStreamingRuntime is the interface implemented by runtimes that handle the serving of the
+// StreamingRuntime is the interface implemented by runtimes that handle the serving of the
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
 // the runtime server.
-type IndirectStreamingRuntime interface {
+type StreamingRuntime interface {
 	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
@@ -148,7 +137,7 @@ type IndirectStreamingRuntime interface {
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error)
+	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)
@@ -198,7 +187,7 @@ type PodPair struct {
 
 // ContainerID is a type that identifies a container.
 type ContainerID struct {
-	// The type of the container runtime. e.g. 'docker', 'rkt'.
+	// The type of the container runtime. e.g. 'docker'.
 	Type string
 	// The identification of the container, this is comsumable by
 	// the underlying container runtime. (Note that the container
@@ -214,7 +203,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 	return id
 }
@@ -265,13 +254,6 @@ const (
 	ContainerStateUnknown ContainerState = "unknown"
 )
 
-type ContainerType string
-
-const (
-	ContainerTypeInit    ContainerType = "INIT"
-	ContainerTypeRegular ContainerType = "REGULAR"
-)
-
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {
@@ -300,7 +282,7 @@ type PodStatus struct {
 	ID types.UID
 	// Name of the pod.
 	Name string
-	// Namspace of the pod.
+	// Namespace of the pod.
 	Namespace string
 	// IP of the pod.
 	IP string
@@ -382,6 +364,11 @@ type EnvVar struct {
 	Value string
 }
 
+type Annotation struct {
+	Name  string
+	Value string
+}
+
 type Mount struct {
 	// Name of the volume mount.
 	// TODO(yifan): Remove this field, as this is not representing the unique name of the mount,
@@ -431,12 +418,14 @@ type RunContainerOptions struct {
 	Devices []DeviceInfo
 	// The port mappings for the containers.
 	PortMappings []PortMapping
+	// The annotations for the container
+	// These annotations are generated by other components (i.e.,
+	// not users). Currently, only device plugins populate the annotations.
+	Annotations []Annotation
 	// If the container has specified the TerminationMessagePath, then
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
 	PodContainerDir string
-	// The parent cgroup to pass to Docker
-	CgroupParent string
 	// The type of container rootfs
 	ReadOnly bool
 	// hostname for pod containers
@@ -461,6 +450,9 @@ type VolumeInfo struct {
 	// Whether the volume permission is set to read-only or not
 	// This value is passed from volume.spec
 	ReadOnly bool
+	// Inner volume spec name, which is the PV name if used, otherwise
+	// it is the same as the outer volume spec name.
+	InnerVolumeSpecName string
 }
 
 type VolumeMap map[string]VolumeInfo

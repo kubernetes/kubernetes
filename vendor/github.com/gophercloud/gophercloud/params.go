@@ -115,10 +115,15 @@ func BuildRequestBody(opts interface{}, parent string) (map[string]interface{}, 
 				}
 			}
 
+			jsonTag := f.Tag.Get("json")
+			if jsonTag == "-" {
+				continue
+			}
+
 			if v.Kind() == reflect.Struct || (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct) {
 				if zero {
 					//fmt.Printf("value before change: %+v\n", optsValue.Field(i))
-					if jsonTag := f.Tag.Get("json"); jsonTag != "" {
+					if jsonTag != "" {
 						jsonTagPieces := strings.Split(jsonTag, ",")
 						if len(jsonTagPieces) > 1 && jsonTagPieces[1] == "omitempty" {
 							if v.CanSet() {

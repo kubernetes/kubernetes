@@ -1,0 +1,10 @@
+approvers:
+- luxas
+- timothysc
+- fabriziopandini
+reviewers:
+- luxas
+- timothysc
+- fabriziopandini
+labels:
+- kind/documentation

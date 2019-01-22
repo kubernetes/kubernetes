@@ -1,3 +1,5 @@
+// +build windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,10 +20,16 @@ limitations under the License.
 package winstats
 
 import (
+	"syscall"
 	"time"
+	"unsafe"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+)
+
+var (
+	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 )
 
 // Client is an interface that is used to get stats information.
@@ -29,10 +37,11 @@ type Client interface {
 	WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error)
 	WinMachineInfo() (*cadvisorapi.MachineInfo, error)
 	WinVersionInfo() (*cadvisorapi.VersionInfo, error)
+	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
 }
 
 // StatsClient is a client that implements the Client interface
-type statsClient struct {
+type StatsClient struct {
 	client winNodeStatsClient
 }
 
@@ -61,7 +70,7 @@ type nodeInfo struct {
 
 // newClient constructs a Client.
 func newClient(statsNodeClient winNodeStatsClient) (Client, error) {
-	statsClient := new(statsClient)
+	statsClient := new(StatsClient)
 	statsClient.client = statsNodeClient
 
 	err := statsClient.client.startMonitoring()
@@ -74,7 +83,7 @@ func newClient(statsNodeClient winNodeStatsClient) (Client, error) {
 
 // WinContainerInfos returns a map of container infos. The map contains node and
 // pod level stats. Analogous to cadvisor GetContainerInfoV2 method.
-func (c *statsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error) {
+func (c *StatsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInfo, error) {
 	infos := make(map[string]cadvisorapiv2.ContainerInfo)
 	rootContainerInfo, err := c.createRootContainerInfo()
 	if err != nil {
@@ -88,17 +97,17 @@ func (c *statsClient) WinContainerInfos() (map[string]cadvisorapiv2.ContainerInf
 
 // WinMachineInfo returns a cadvisorapi.MachineInfo with details about the
 // node machine. Analogous to cadvisor MachineInfo method.
-func (c *statsClient) WinMachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (c *StatsClient) WinMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return c.client.getMachineInfo()
 }
 
 // WinVersionInfo returns a  cadvisorapi.VersionInfo with version info of
 // the kernel and docker runtime. Analogous to cadvisor VersionInfo method.
-func (c *statsClient) WinVersionInfo() (*cadvisorapi.VersionInfo, error) {
+func (c *StatsClient) WinVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return c.client.getVersionInfo()
 }
 
-func (c *statsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, error) {
+func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, error) {
 	nodeMetrics, err := c.client.getNodeMetrics()
 
 	if err != nil {
@@ -133,4 +142,31 @@ func (c *statsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 	}
 
 	return &rootInfo, nil
+}
+
+// GetDirFsInfo returns filesystem capacity and usage information.
+func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
+	var err error
+
+	ret, _, err := syscall.Syscall6(
+		procGetDiskFreeSpaceEx.Addr(),
+		4,
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(path))),
+		uintptr(unsafe.Pointer(&freeBytesAvailable)),
+		uintptr(unsafe.Pointer(&totalNumberOfBytes)),
+		uintptr(unsafe.Pointer(&totalNumberOfFreeBytes)),
+		0,
+		0,
+	)
+	if ret == 0 {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+
+	return cadvisorapiv2.FsInfo{
+		Timestamp: time.Now(),
+		Capacity:  uint64(totalNumberOfBytes),
+		Available: uint64(freeBytesAvailable),
+		Usage:     uint64(totalNumberOfBytes - freeBytesAvailable),
+	}, nil
 }

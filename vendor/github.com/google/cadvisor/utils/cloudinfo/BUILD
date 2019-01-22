@@ -8,6 +8,7 @@ go_library(
         "cloudinfo.go",
         "gce.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/utils/cloudinfo",
     importpath = "github.com/google/cadvisor/utils/cloudinfo",
     visibility = ["//visibility:public"],
     deps = [
@@ -15,8 +16,8 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/ec2metadata:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

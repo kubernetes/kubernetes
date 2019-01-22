@@ -252,12 +252,13 @@ func (p *ResourcePool) CreateVApp(req *types.CreateVApp) soap.HasFault {
 	return body
 }
 
-func (a *VirtualApp) CreateChildVMTask(req *types.CreateChildVM_Task) soap.HasFault {
+func (a *VirtualApp) CreateChildVMTask(ctx *Context, req *types.CreateChildVM_Task) soap.HasFault {
+	ctx.Caller = &a.Self
 	body := &methods.CreateChildVM_TaskBody{}
 
 	folder := Map.Get(*a.ParentFolder).(*Folder)
 
-	res := folder.CreateVMTask(&types.CreateVM_Task{
+	res := folder.CreateVMTask(ctx, &types.CreateVM_Task{
 		This:   folder.Self,
 		Config: req.Config,
 		Host:   req.Host,
@@ -286,18 +287,19 @@ func (p *ResourcePool) DestroyTask(req *types.Destroy_Task) soap.HasFault {
 
 		parent := &pp.ResourcePool
 		// Remove child reference from rp
-		parent.ResourcePool = RemoveReference(req.This, parent.ResourcePool)
+		Map.RemoveReference(parent, &parent.ResourcePool, req.This)
 
 		// The grandchildren become children of the parent (rp)
-		parent.ResourcePool = append(parent.ResourcePool, p.ResourcePool.ResourcePool...)
+		Map.AppendReference(parent, &parent.ResourcePool, p.ResourcePool.ResourcePool...)
 
 		// And VMs move to the parent
 		vms := p.ResourcePool.Vm
-		for _, vm := range vms {
-			Map.Get(vm).(*VirtualMachine).ResourcePool = &parent.Self
+		for _, ref := range vms {
+			vm := Map.Get(ref).(*VirtualMachine)
+			Map.WithLock(vm, func() { vm.ResourcePool = &parent.Self })
 		}
 
-		parent.Vm = append(parent.Vm, vms...)
+		Map.AppendReference(parent, &parent.Vm, vms...)
 
 		Map.Remove(req.This)
 

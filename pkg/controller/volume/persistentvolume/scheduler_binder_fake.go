@@ -16,18 +16,15 @@ limitations under the License.
 
 package persistentvolume
 
-import (
-	"k8s.io/api/core/v1"
-)
+import "k8s.io/api/core/v1"
 
 type FakeVolumeBinderConfig struct {
-	AllBound              bool
-	FindUnboundSatsified  bool
-	FindBoundSatsified    bool
-	FindErr               error
-	AssumeBindingRequired bool
-	AssumeErr             error
-	BindErr               error
+	AllBound             bool
+	FindUnboundSatsified bool
+	FindBoundSatsified   bool
+	FindErr              error
+	AssumeErr            error
+	BindErr              error
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make
@@ -44,13 +41,13 @@ type FakeVolumeBinder struct {
 	BindCalled   bool
 }
 
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, nodeName string) (unboundVolumesSatisfied, boundVolumesSatsified bool, err error) {
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatsified bool, err error) {
 	return b.config.FindUnboundSatsified, b.config.FindBoundSatsified, b.config.FindErr
 }
 
-func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (bool, bool, error) {
+func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (bool, error) {
 	b.AssumeCalled = true
-	return b.config.AllBound, b.config.AssumeBindingRequired, b.config.AssumeErr
+	return b.config.AllBound, b.config.AssumeErr
 }
 
 func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {

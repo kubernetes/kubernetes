@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -173,14 +172,16 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		defer srv.Close()
 
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		clientPool := dynamic.NewClientPool(clientConfig, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+		dynamicClient, err := dynamic.NewForConfig(clientConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		fn := func() ([]*metav1.APIResourceList, error) {
 			return resources, nil
 		}
-		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), clientPool, mockClient.Core(), fn, v1.FinalizerKubernetes, true)
-		err := d.Delete(testInput.testNamespace.Name)
-		if err != nil {
+		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), dynamicClient, mockClient.Core(), fn, v1.FinalizerKubernetes, true)
+		if err := d.Delete(testInput.testNamespace.Name); err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
 
@@ -233,8 +234,8 @@ func TestSyncNamespaceThatIsTerminatingNonExperimental(t *testing.T) {
 	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{})
 }
 
-func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{Versions: []string{"extensions/v1beta1"}})
+func TestSyncNamespaceThatIsTerminatingV1(t *testing.T) {
+	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{Versions: []string{"apps/v1"}})
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
@@ -330,7 +331,7 @@ func testResources() []*metav1.APIResourceList {
 			},
 		},
 		{
-			GroupVersion: "extensions/v1beta1",
+			GroupVersion: "apps/v1",
 			APIResources: []metav1.APIResource{
 				{
 					Name:       "deployments",

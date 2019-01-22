@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -94,42 +94,6 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 	})
 }
 
-// updates labels of nodes given by nodeNames.
-// In case a given label already exists, it overwrites it. If label to remove doesn't exist
-// it silently ignores it.
-// TODO: migrate to use framework.AddOrUpdateLabelOnNode/framework.RemoveLabelOffNode
-func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
-	const maxRetries = 5
-	for nodeName := range nodeNames {
-		var node *v1.Node
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-			if err != nil {
-				framework.Logf("Error getting node %s: %v", nodeName, err)
-				continue
-			}
-			if toAdd != nil {
-				for k, v := range toAdd {
-					node.ObjectMeta.Labels[k] = v
-				}
-			}
-			if toRemove != nil {
-				for k := range toRemove {
-					delete(node.ObjectMeta.Labels, k)
-				}
-			}
-			_, err = c.CoreV1().Nodes().Update(node)
-			if err != nil {
-				framework.Logf("Error updating node %s: %v", nodeName, err)
-			} else {
-				break
-			}
-		}
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
 // Restart the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 1` command in the
 // pod's (only) container. This command changes the number of nfs server threads from
 // (presumably) zero back to 1, and therefore allows nfs to open connections again.
@@ -159,7 +123,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pod-nfs-vol-",
@@ -169,7 +133,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			Containers: []v1.Container{
 				{
 					Name:    "pod-nfs-vol",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    cmdLine,
 					VolumeMounts: []v1.VolumeMount{
@@ -317,7 +281,11 @@ var _ = SIGDescribe("kubelet", func() {
 			for i := 0; i < numNodes; i++ {
 				nodeNames.Insert(nodes.Items[i].Name)
 			}
-			updateNodeLabels(c, nodeNames, nodeLabels, nil)
+			for nodeName := range nodeNames {
+				for k, v := range nodeLabels {
+					framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+				}
+			}
 
 			// Start resourceMonitor only in small clusters.
 			if len(nodes.Items) <= maxNodesToCheck {
@@ -331,7 +299,11 @@ var _ = SIGDescribe("kubelet", func() {
 				resourceMonitor.Stop()
 			}
 			// If we added labels to nodes in this test, remove them now.
-			updateNodeLabels(c, nodeNames, nil, nodeLabels)
+			for nodeName := range nodeNames {
+				for k := range nodeLabels {
+					framework.RemoveLabelOffNode(c, nodeName, k)
+				}
+			}
 		})
 
 		for _, itArg := range deleteTests {
@@ -347,7 +319,7 @@ var _ = SIGDescribe("kubelet", func() {
 					InternalClient: f.InternalClientset,
 					Name:           rcName,
 					Namespace:      f.Namespace.Name,
-					Image:          framework.GetPauseImageName(f.ClientSet),
+					Image:          imageutils.GetPauseImageName(),
 					Replicas:       totalPods,
 					NodeSelector:   nodeLabels,
 				})).NotTo(HaveOccurred())
@@ -362,7 +334,7 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
+				framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of
@@ -400,7 +372,6 @@ var _ = SIGDescribe("kubelet", func() {
 			var (
 				nfsServerPod *v1.Pod
 				nfsIP        string
-				NFSconfig    framework.VolumeTestConfig
 				pod          *v1.Pod // client pod
 			)
 
@@ -418,7 +389,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				NFSconfig, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			AfterEach(func() {

@@ -241,11 +241,11 @@ func (p *hashed) Hash() []byte {
 		n = 3
 	}
 	arr[n] = '$'
-	n += 1
+	n++
 	copy(arr[n:], []byte(fmt.Sprintf("%02d", p.cost)))
 	n += 2
 	arr[n] = '$'
-	n += 1
+	n++
 	copy(arr[n:], p.salt)
 	n += encodedSaltSize
 	copy(arr[n:], p.hash)

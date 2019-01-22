@@ -17,6 +17,7 @@ limitations under the License.
 package apiextensions
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,4 +116,34 @@ func CRDRemoveFinalizer(crd *CustomResourceDefinition, needle string) {
 		}
 	}
 	crd.Finalizers = newFinalizers
+}
+
+// HasServedCRDVersion returns true if `version` is in the list of CRD's versions and the Served flag is set.
+func HasServedCRDVersion(crd *CustomResourceDefinition, version string) bool {
+	for _, v := range crd.Spec.Versions {
+		if v.Name == version {
+			return v.Served
+		}
+	}
+	return false
+}
+
+// GetCRDStorageVersion returns the storage version for given CRD.
+func GetCRDStorageVersion(crd *CustomResourceDefinition) (string, error) {
+	for _, v := range crd.Spec.Versions {
+		if v.Storage {
+			return v.Name, nil
+		}
+	}
+	// This should not happened if crd is valid
+	return "", fmt.Errorf("invalid CustomResourceDefinition, no storage version")
+}
+
+func IsStoredVersion(crd *CustomResourceDefinition, version string) bool {
+	for _, v := range crd.Status.StoredVersions {
+		if version == v {
+			return true
+		}
+	}
+	return false
 }

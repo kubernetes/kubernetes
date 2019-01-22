@@ -17,6 +17,7 @@ limitations under the License.
 package quota
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -28,20 +29,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/quota/generic"
-	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -62,16 +62,15 @@ func TestQuota(t *testing.T) {
 	}))
 
 	admissionCh := make(chan struct{})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	config := &resourcequotaapi.Configuration{}
 	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.SetInternalKubeClientSet(internalClientset)
-	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.SetInternalKubeInformerFactory(internalInformers)
+	admission.SetExternalKubeClientSet(clientset)
+	internalInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	admission.SetExternalKubeInformerFactory(internalInformers)
 	qca := quotainstall.NewQuotaConfigurationForAdmission()
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
@@ -161,7 +160,9 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = watch.Until(1*time.Minute, w, func(event watch.Event) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:
@@ -218,7 +219,9 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = watch.Until(3*time.Minute, w, func(event watch.Event) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:
@@ -250,8 +253,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	}))
 
 	admissionCh := make(chan struct{})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	// stop creation of a pod resource unless there is a quota
 	config := &resourcequotaapi.Configuration{
@@ -267,9 +269,9 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.SetInternalKubeClientSet(internalClientset)
-	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.SetInternalKubeInformerFactory(internalInformers)
+	admission.SetExternalKubeClientSet(clientset)
+	externalInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	admission.SetExternalKubeInformerFactory(externalInformers)
 	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
@@ -318,7 +320,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
 
-	internalInformers.Start(controllerCh)
+	externalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
 	close(informersStarted)
 

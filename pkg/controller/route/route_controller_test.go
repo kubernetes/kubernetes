@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -27,8 +28,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	cloudprovider "k8s.io/cloud-provider"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -97,12 +98,12 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -114,11 +115,11 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -131,8 +132,8 @@ func TestReconcile(t *testing.T) {
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -144,14 +145,14 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
-				{cluster + "-03", "node-3", "10.120.2.0/24", false},
-				{cluster + "-04", "node-4", "10.120.3.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "10.120.2.0/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "10.120.3.0/24", Blackhole: false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -163,12 +164,12 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-03", "node-3", "10.120.2.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "10.120.2.0/24", Blackhole: false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -181,7 +182,7 @@ func TestReconcile(t *testing.T) {
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, false},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, nodeNoCidr}}),
@@ -193,13 +194,13 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
-				{cluster + "-03", "", "10.120.2.0/24", true},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", DestinationCIDR: "10.120.2.0/24", Blackhole: true},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -211,14 +212,14 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
-				{cluster + "-03", "", "10.1.2.0/24", true},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", DestinationCIDR: "10.1.2.0/24", Blackhole: true},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", false},
-				{cluster + "-02", "node-2", "10.120.1.0/24", false},
-				{cluster + "-03", "", "10.1.2.0/24", true},
+				{Name: cluster + "-01", TargetNode: "node-1", DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", DestinationCIDR: "10.1.2.0/24", Blackhole: true},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -279,7 +280,7 @@ func TestReconcile(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				if finalRoutes, err = routes.ListRoutes(cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+				if finalRoutes, err = routes.ListRoutes(context.TODO(), cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
 					break poll
 				}
 			case <-timeoutChan:

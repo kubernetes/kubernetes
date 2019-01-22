@@ -12,12 +12,11 @@ go_test(
         "main_test.go",
         "openshift_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/openshift",
     tags = ["integration"],
     deps = [
         "//pkg/master:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
     ],
 )
 

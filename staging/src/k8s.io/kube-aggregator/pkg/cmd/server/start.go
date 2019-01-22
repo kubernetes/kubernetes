@@ -50,9 +50,9 @@ type AggregatorOptions struct {
 }
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
-func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewDefaultOptions(out, err)
-
+// with a default AggregatorOptions.
+func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
@@ -85,8 +85,12 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
-		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("kube-aggregator", "kube-system"),
+		),
+		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: err,
@@ -98,7 +102,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
-	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Registry)...)
+	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Scheme)...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -117,7 +121,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, aggregatorscheme.Scheme); err != nil {
 		return err
 	}
-	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Registry); err != nil {
+	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Scheme); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
@@ -144,7 +148,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return err
 	}

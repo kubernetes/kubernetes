@@ -4,38 +4,51 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
 )
 
 type tomlValue struct {
-	value    interface{}
-	position Position
+	value     interface{} // string, int64, uint64, float64, bool, time.Time, [] of any of this list
+	comment   string
+	commented bool
+	multiline bool
+	position  Position
 }
 
-// TomlTree is the result of the parsing of a TOML file.
-type TomlTree struct {
-	values   map[string]interface{}
-	position Position
+// Tree is the result of the parsing of a TOML file.
+type Tree struct {
+	values    map[string]interface{} // string -> *tomlValue, *Tree, []*Tree
+	comment   string
+	commented bool
+	position  Position
 }
 
-func newTomlTree() *TomlTree {
-	return &TomlTree{
+func newTree() *Tree {
+	return &Tree{
 		values:   make(map[string]interface{}),
 		position: Position{},
 	}
 }
 
-// TreeFromMap initializes a new TomlTree object using the given map.
-func TreeFromMap(m map[string]interface{}) *TomlTree {
-	return &TomlTree{
-		values: m,
+// TreeFromMap initializes a new Tree object using the given map.
+func TreeFromMap(m map[string]interface{}) (*Tree, error) {
+	result, err := toTree(m)
+	if err != nil {
+		return nil, err
 	}
+	return result.(*Tree), nil
+}
+
+// Position returns the position of the tree.
+func (t *Tree) Position() Position {
+	return t.position
 }
 
 // Has returns a boolean indicating if the given key exists.
-func (t *TomlTree) Has(key string) bool {
+func (t *Tree) Has(key string) bool {
 	if key == "" {
 		return false
 	}
@@ -43,38 +56,36 @@ func (t *TomlTree) Has(key string) bool {
 }
 
 // HasPath returns true if the given path of keys exists, false otherwise.
-func (t *TomlTree) HasPath(keys []string) bool {
+func (t *Tree) HasPath(keys []string) bool {
 	return t.GetPath(keys) != nil
 }
 
-// Keys returns the keys of the toplevel tree.
-// Warning: this is a costly operation.
-func (t *TomlTree) Keys() []string {
-	var keys []string
+// Keys returns the keys of the toplevel tree (does not recurse).
+func (t *Tree) Keys() []string {
+	keys := make([]string, len(t.values))
+	i := 0
 	for k := range t.values {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 	return keys
 }
 
-// Get the value at key in the TomlTree.
-// Key is a dot-separated path (e.g. a.b.c).
+// Get the value at key in the Tree.
+// Key is a dot-separated path (e.g. a.b.c) without single/double quoted strings.
+// If you need to retrieve non-bare keys, use GetPath.
 // Returns nil if the path does not exist in the tree.
 // If keys is of length zero, the current tree is returned.
-func (t *TomlTree) Get(key string) interface{} {
+func (t *Tree) Get(key string) interface{} {
 	if key == "" {
 		return t
 	}
-	comps, err := parseKey(key)
-	if err != nil {
-		return nil
-	}
-	return t.GetPath(comps)
+	return t.GetPath(strings.Split(key, "."))
 }
 
 // GetPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
-func (t *TomlTree) GetPath(keys []string) interface{} {
+func (t *Tree) GetPath(keys []string) interface{} {
 	if len(keys) == 0 {
 		return t
 	}
@@ -85,9 +96,9 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 			return nil
 		}
 		switch node := value.(type) {
-		case *TomlTree:
+		case *Tree:
 			subtree = node
-		case []*TomlTree:
+		case []*Tree:
 			// go to most recent element
 			if len(node) == 0 {
 				return nil
@@ -107,7 +118,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 }
 
 // GetPosition returns the position of the given key.
-func (t *TomlTree) GetPosition(key string) Position {
+func (t *Tree) GetPosition(key string) Position {
 	if key == "" {
 		return t.position
 	}
@@ -116,7 +127,7 @@ func (t *TomlTree) GetPosition(key string) Position {
 
 // GetPositionPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
-func (t *TomlTree) GetPositionPath(keys []string) Position {
+func (t *Tree) GetPositionPath(keys []string) Position {
 	if len(keys) == 0 {
 		return t.position
 	}
@@ -127,9 +138,9 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 			return Position{0, 0}
 		}
 		switch node := value.(type) {
-		case *TomlTree:
+		case *Tree:
 			subtree = node
-		case []*TomlTree:
+		case []*Tree:
 			// go to most recent element
 			if len(node) == 0 {
 				return Position{0, 0}
@@ -143,9 +154,9 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 	switch node := subtree.values[keys[len(keys)-1]].(type) {
 	case *tomlValue:
 		return node.position
-	case *TomlTree:
+	case *Tree:
 		return node.position
-	case []*TomlTree:
+	case []*Tree:
 		// go to most recent element
 		if len(node) == 0 {
 			return Position{0, 0}
@@ -157,7 +168,7 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 }
 
 // GetDefault works like Get but with a default value
-func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
+func (t *Tree) GetDefault(key string, def interface{}) interface{} {
 	val := t.Get(key)
 	if val == nil {
 		return def
@@ -165,32 +176,38 @@ func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 	return val
 }
 
-// Set an element in the tree.
-// Key is a dot-separated path (e.g. a.b.c).
-// Creates all necessary intermediates trees, if needed.
-func (t *TomlTree) Set(key string, value interface{}) {
-	t.SetPath(strings.Split(key, "."), value)
+// SetOptions arguments are supplied to the SetWithOptions and SetPathWithOptions functions to modify marshalling behaviour.
+// The default values within the struct are valid default options.
+type SetOptions struct {
+	Comment   string
+	Commented bool
+	Multiline bool
 }
 
-// SetPath sets an element in the tree.
-// Keys is an array of path elements (e.g. {"a","b","c"}).
-// Creates all necessary intermediates trees, if needed.
-func (t *TomlTree) SetPath(keys []string, value interface{}) {
+// SetWithOptions is the same as Set, but allows you to provide formatting
+// instructions to the key, that will be used by Marshal().
+func (t *Tree) SetWithOptions(key string, opts SetOptions, value interface{}) {
+	t.SetPathWithOptions(strings.Split(key, "."), opts, value)
+}
+
+// SetPathWithOptions is the same as SetPath, but allows you to provide
+// formatting instructions to the key, that will be reused by Marshal().
+func (t *Tree) SetPathWithOptions(keys []string, opts SetOptions, value interface{}) {
 	subtree := t
 	for _, intermediateKey := range keys[:len(keys)-1] {
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-			nextTree = newTomlTree()
+			nextTree = newTree()
 			subtree.values[intermediateKey] = nextTree // add new element here
 		}
 		switch node := nextTree.(type) {
-		case *TomlTree:
+		case *Tree:
 			subtree = node
-		case []*TomlTree:
+		case []*Tree:
 			// go to most recent element
 			if len(node) == 0 {
 				// create element if it does not exist
-				subtree.values[intermediateKey] = append(node, newTomlTree())
+				subtree.values[intermediateKey] = append(node, newTree())
 			}
 			subtree = node[len(node)-1]
 		}
@@ -199,14 +216,81 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 	var toInsert interface{}
 
 	switch value.(type) {
-	case *TomlTree:
+	case *Tree:
+		tt := value.(*Tree)
+		tt.comment = opts.Comment
 		toInsert = value
-	case []*TomlTree:
+	case []*Tree:
 		toInsert = value
 	case *tomlValue:
-		toInsert = value
+		tt := value.(*tomlValue)
+		tt.comment = opts.Comment
+		toInsert = tt
 	default:
-		toInsert = &tomlValue{value: value}
+		toInsert = &tomlValue{value: value, comment: opts.Comment, commented: opts.Commented, multiline: opts.Multiline}
+	}
+
+	subtree.values[keys[len(keys)-1]] = toInsert
+}
+
+// Set an element in the tree.
+// Key is a dot-separated path (e.g. a.b.c).
+// Creates all necessary intermediate trees, if needed.
+func (t *Tree) Set(key string, value interface{}) {
+	t.SetWithComment(key, "", false, value)
+}
+
+// SetWithComment is the same as Set, but allows you to provide comment
+// information to the key, that will be reused by Marshal().
+func (t *Tree) SetWithComment(key string, comment string, commented bool, value interface{}) {
+	t.SetPathWithComment(strings.Split(key, "."), comment, commented, value)
+}
+
+// SetPath sets an element in the tree.
+// Keys is an array of path elements (e.g. {"a","b","c"}).
+// Creates all necessary intermediate trees, if needed.
+func (t *Tree) SetPath(keys []string, value interface{}) {
+	t.SetPathWithComment(keys, "", false, value)
+}
+
+// SetPathWithComment is the same as SetPath, but allows you to provide comment
+// information to the key, that will be reused by Marshal().
+func (t *Tree) SetPathWithComment(keys []string, comment string, commented bool, value interface{}) {
+	subtree := t
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		nextTree, exists := subtree.values[intermediateKey]
+		if !exists {
+			nextTree = newTree()
+			subtree.values[intermediateKey] = nextTree // add new element here
+		}
+		switch node := nextTree.(type) {
+		case *Tree:
+			subtree = node
+		case []*Tree:
+			// go to most recent element
+			if len(node) == 0 {
+				// create element if it does not exist
+				subtree.values[intermediateKey] = append(node, newTree())
+			}
+			subtree = node[len(node)-1]
+		}
+	}
+
+	var toInsert interface{}
+
+	switch value.(type) {
+	case *Tree:
+		tt := value.(*Tree)
+		tt.comment = comment
+		toInsert = value
+	case []*Tree:
+		toInsert = value
+	case *tomlValue:
+		tt := value.(*tomlValue)
+		tt.comment = comment
+		toInsert = tt
+	default:
+		toInsert = &tomlValue{value: value, comment: comment, commented: commented}
 	}
 
 	subtree.values[keys[len(keys)-1]] = toInsert
@@ -219,24 +303,21 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // and tree[a][b][c]
 //
 // Returns nil on success, error object on failure
-func (t *TomlTree) createSubTree(keys []string, pos Position) error {
+func (t *Tree) createSubTree(keys []string, pos Position) error {
 	subtree := t
 	for _, intermediateKey := range keys {
-		if intermediateKey == "" {
-			return fmt.Errorf("empty intermediate table")
-		}
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-			tree := newTomlTree()
+			tree := newTree()
 			tree.position = pos
 			subtree.values[intermediateKey] = tree
 			nextTree = tree
 		}
 
 		switch node := nextTree.(type) {
-		case []*TomlTree:
+		case []*Tree:
 			subtree = node[len(node)-1]
-		case *TomlTree:
+		case *Tree:
 			subtree = node
 		default:
 			return fmt.Errorf("unknown type for path %s (%s): %T (%#v)",
@@ -246,17 +327,8 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 	return nil
 }
 
-// Query compiles and executes a query on a tree and returns the query result.
-func (t *TomlTree) Query(query string) (*QueryResult, error) {
-	q, err := CompileQuery(query)
-	if err != nil {
-		return nil, err
-	}
-	return q.Execute(t), nil
-}
-
-// LoadReader creates a TomlTree from any io.Reader.
-func LoadReader(reader io.Reader) (tree *TomlTree, err error) {
+// LoadBytes creates a Tree from a []byte.
+func LoadBytes(b []byte) (tree *Tree, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -265,17 +337,27 @@ func LoadReader(reader io.Reader) (tree *TomlTree, err error) {
 			err = errors.New(r.(string))
 		}
 	}()
-	tree = parseToml(lexToml(reader))
+	tree = parseToml(lexToml(b))
 	return
 }
 
-// Load creates a TomlTree from a string.
-func Load(content string) (tree *TomlTree, err error) {
-	return LoadReader(strings.NewReader(content))
+// LoadReader creates a Tree from any io.Reader.
+func LoadReader(reader io.Reader) (tree *Tree, err error) {
+	inputBytes, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return
+	}
+	tree, err = LoadBytes(inputBytes)
+	return
 }
 
-// LoadFile creates a TomlTree from a file.
-func LoadFile(path string) (tree *TomlTree, err error) {
+// Load creates a Tree from a string.
+func Load(content string) (tree *Tree, err error) {
+	return LoadBytes([]byte(content))
+}
+
+// LoadFile creates a Tree from a file.
+func LoadFile(path string) (tree *Tree, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err

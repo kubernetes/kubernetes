@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 5
       containers:
       - name: nginx
-        image: gcr.io/google_containers/nginx-slim:0.8
+        image: k8s.gcr.io/nginx-slim:0.8
         ports:
         - containerPort: 80
           name: web
@@ -27,7 +27,7 @@ spec:
         - -c
         - 'while true; do sleep 1; done'
       - name: pause
-        image: gcr.io/google-containers/pause:2.0
+        image: k8s.gcr.io/pause:2.0
         ports:
         - containerPort: 81
           name: web-2

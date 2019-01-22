@@ -26,14 +26,21 @@ import (
 	"github.com/mailru/easyjson/jwriter"
 )
 
+// nullJSON represents a JSON object with null type
+var nullJSON = []byte("null")
+
 // DefaultJSONNameProvider the default cache for types
 var DefaultJSONNameProvider = NewNameProvider()
 
 const comma = byte(',')
 
-var closers = map[byte]byte{
-	'{': '}',
-	'[': ']',
+var closers map[byte]byte
+
+func init() {
+	closers = map[byte]byte{
+		'{': '}',
+		'[': ']',
+	}
 }
 
 type ejMarshaler interface {
@@ -79,10 +86,7 @@ func DynamicJSONToStruct(data interface{}, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	if err := ReadJSON(b, target); err != nil {
-		return err
-	}
-	return nil
+	return ReadJSON(b, target)
 }
 
 // ConcatJSON concatenates multiple json objects efficiently
@@ -90,17 +94,29 @@ func ConcatJSON(blobs ...[]byte) []byte {
 	if len(blobs) == 0 {
 		return nil
 	}
-	if len(blobs) == 1 {
+
+	last := len(blobs) - 1
+	for blobs[last] == nil || bytes.Equal(blobs[last], nullJSON) {
+		// strips trailing null objects
+		last = last - 1
+		if last < 0 {
+			// there was nothing but "null"s or nil...
+			return nil
+		}
+	}
+	if last == 0 {
 		return blobs[0]
 	}
 
-	last := len(blobs) - 1
 	var opening, closing byte
-	a := 0
-	idx := 0
+	var idx, a int
 	buf := bytes.NewBuffer(nil)
 
-	for i, b := range blobs {
+	for i, b := range blobs[:last+1] {
+		if b == nil || bytes.Equal(b, nullJSON) {
+			// a null object is in the list: skip it
+			continue
+		}
 		if len(b) > 0 && opening == 0 { // is this an array or an object?
 			opening, closing = b[0], closers[b[0]]
 		}
@@ -245,7 +261,7 @@ func (n *NameProvider) GetJSONNames(subject interface{}) []string {
 		names = n.makeNameIndex(tpe)
 	}
 
-	var res []string
+	res := make([]string, 0, len(names.jsonNames))
 	for k := range names.jsonNames {
 		res = append(res, k)
 	}

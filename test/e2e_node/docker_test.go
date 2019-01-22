@@ -30,51 +30,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
+var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("docker-feature-test")
 
 	BeforeEach(func() {
 		framework.RunIfContainerRuntimeIs("docker")
-	})
-
-	Context("when shared PID namespace is enabled", func() {
-		It("processes in different containers of the same pod should be able to see each other", func() {
-			// TODO(yguo0905): Change this test to run unless the runtime is
-			// Docker and its version is <1.13.
-			By("Check whether shared PID namespace is supported.")
-			isEnabled, err := isSharedPIDNamespaceSupported()
-			framework.ExpectNoError(err)
-			if !isEnabled {
-				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
-			}
-
-			By("Create a pod with two containers.")
-			f.PodClient().CreateSync(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    "test-container-1",
-							Image:   "busybox",
-							Command: []string{"/bin/top"},
-						},
-						{
-							Name:    "test-container-2",
-							Image:   "busybox",
-							Command: []string{"/bin/sleep"},
-							Args:    []string{"10000"},
-						},
-					},
-				},
-			})
-
-			By("Check if the process in one container is visible to the process in the other.")
-			pid1 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
-			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
-			if pid1 != pid2 {
-				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
-			}
-		})
 	})
 
 	Context("when live-restore is enabled [Serial] [Slow] [Disruptive]", func() {
@@ -101,7 +61,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					}},
 				},
 			})

@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +53,13 @@ func TestAzureTokenSource(t *testing.T) {
 
 	wantCfg := token2Cfg(token)
 	persistedCfg := persiter.Cache()
+
+	wantCfgLen := len(wantCfg)
+	persistedCfgLen := len(persistedCfg)
+	if wantCfgLen != persistedCfgLen {
+		t.Errorf("wantCfgLen and persistedCfgLen do not match, wantCfgLen=%v, persistedCfgLen=%v", wantCfgLen, persistedCfgLen)
+	}
+
 	for k, v := range persistedCfg {
 		if strings.Compare(v, wantCfg[k]) != 0 {
 			t.Errorf("Token() persisted cfg %s: got %v, want %v", k, v, wantCfg[k])
@@ -102,6 +110,7 @@ type fakeTokenSource struct {
 func (ts *fakeTokenSource) Token() (*azureToken, error) {
 	return &azureToken{
 		token:       newFackeAzureToken(ts.accessToken, ts.expiresOn),
+		environment: "testenv",
 		clientID:    "fake",
 		tenantID:    "fake",
 		apiserverID: "fake",
@@ -112,11 +121,12 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg := make(map[string]string)
 	cfg[cfgAccessToken] = token.token.AccessToken
 	cfg[cfgRefreshToken] = token.token.RefreshToken
+	cfg[cfgEnvironment] = token.environment
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
 	cfg[cfgApiserverID] = token.apiserverID
-	cfg[cfgExpiresIn] = token.token.ExpiresIn
-	cfg[cfgExpiresOn] = token.token.ExpiresOn
+	cfg[cfgExpiresIn] = string(token.token.ExpiresIn)
+	cfg[cfgExpiresOn] = string(token.token.ExpiresOn)
 	return cfg
 }
 
@@ -125,8 +135,8 @@ func newFackeAzureToken(accessToken string, expiresOn string) adal.Token {
 		AccessToken:  accessToken,
 		RefreshToken: "fake",
 		ExpiresIn:    "3600",
-		ExpiresOn:    expiresOn,
-		NotBefore:    expiresOn,
+		ExpiresOn:    json.Number(expiresOn),
+		NotBefore:    json.Number(expiresOn),
 		Resource:     "fake",
 		Type:         "fake",
 	}

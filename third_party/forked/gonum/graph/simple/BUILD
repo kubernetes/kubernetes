@@ -16,7 +16,6 @@ go_test(
         "undirected_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/third_party/forked/gonum/graph/simple",
     deps = ["//third_party/forked/gonum/graph:go_default_library"],
 )
 

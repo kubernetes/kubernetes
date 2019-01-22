@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"syscall"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -34,18 +33,19 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("NodeProblemDetector", func() {
+var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector]", func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.4.1"
+		image          = "k8s.gcr.io/node-problem-detector:v0.4.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 	framework.KubeDescribe("SystemLogMonitor", func() {
 		const (
 			// Use test condition to avoid changing the real node condition in use.
-			// TODO(random-liu): Now node condition could be arbitrary string, consider wether we need to
+			// TODO(random-liu): Now node condition could be arbitrary string, consider whether we need to
 			// add TestCondition when switching to predefined condition list.
 			condition = v1.NodeConditionType("TestCondition")
 
@@ -97,8 +97,11 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		BeforeEach(func() {
 			By("Calculate Lookback duration")
 			var err error
-			nodeTime, bootTime, err = getNodeTime()
+
+			nodeTime = time.Now()
+			bootTime, err = util.GetBootTime()
 			Expect(err).To(BeNil())
+
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
 			lookback = nodeTime.Sub(bootTime) + time.Hour
@@ -385,24 +388,6 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 		}
 	}
 	return nil
-}
-
-// getNodeTime gets node boot time and current time.
-func getNodeTime() (time.Time, time.Time, error) {
-	// Get node current time.
-	nodeTime := time.Now()
-
-	// Get system uptime.
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
-	// calculated will be a little earlier than the real boot time. This won't affect the correctness
-	// of the test result.
-	bootTime := nodeTime.Add(-time.Duration(info.Uptime) * time.Second)
-
-	return nodeTime, bootTime, nil
 }
 
 // verifyEvents verifies there are num specific events generated

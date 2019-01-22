@@ -22,18 +22,18 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, newStatus extensions.ReplicaSetStatus) (*extensions.ReplicaSet, error) {
+func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSet, newStatus apps.ReplicaSetStatus) (*apps.ReplicaSet, error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -53,9 +53,9 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *ext
 	newStatus.ObservedGeneration = rs.Generation
 
 	var getErr, updateErr error
-	var updatedRS *extensions.ReplicaSet
+	var updatedRS *apps.ReplicaSet
 	for i, rs := 0, rs; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating status for %v: %s/%s, ", rs.Kind, rs.Namespace, rs.Name) +
+		klog.V(4).Infof(fmt.Sprintf("Updating status for %v: %s/%s, ", rs.Kind, rs.Namespace, rs.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, *(rs.Spec.Replicas)) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", rs.Status.ReadyReplicas, newStatus.ReadyReplicas) +
@@ -82,7 +82,7 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *ext
 	return nil, updateErr
 }
 
-func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {
+func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) apps.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more
@@ -105,7 +105,7 @@ func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageRe
 		}
 	}
 
-	failureCond := GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+	failureCond := GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
 	if manageReplicasErr != nil && failureCond == nil {
 		var reason string
 		if diff := len(filteredPods) - int(*(rs.Spec.Replicas)); diff < 0 {
@@ -113,10 +113,10 @@ func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageRe
 		} else if diff > 0 {
 			reason = "FailedDelete"
 		}
-		cond := NewReplicaSetCondition(extensions.ReplicaSetReplicaFailure, v1.ConditionTrue, reason, manageReplicasErr.Error())
+		cond := NewReplicaSetCondition(apps.ReplicaSetReplicaFailure, v1.ConditionTrue, reason, manageReplicasErr.Error())
 		SetCondition(&newStatus, cond)
 	} else if manageReplicasErr == nil && failureCond != nil {
-		RemoveCondition(&newStatus, extensions.ReplicaSetReplicaFailure)
+		RemoveCondition(&newStatus, apps.ReplicaSetReplicaFailure)
 	}
 
 	newStatus.Replicas = int32(len(filteredPods))
@@ -127,8 +127,8 @@ func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageRe
 }
 
 // NewReplicaSetCondition creates a new replicaset condition.
-func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) extensions.ReplicaSetCondition {
-	return extensions.ReplicaSetCondition{
+func NewReplicaSetCondition(condType apps.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) apps.ReplicaSetCondition {
+	return apps.ReplicaSetCondition{
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -138,7 +138,7 @@ func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status 
 }
 
 // GetCondition returns a replicaset condition with the provided type if it exists.
-func GetCondition(status extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) *extensions.ReplicaSetCondition {
+func GetCondition(status apps.ReplicaSetStatus, condType apps.ReplicaSetConditionType) *apps.ReplicaSetCondition {
 	for _, c := range status.Conditions {
 		if c.Type == condType {
 			return &c
@@ -149,7 +149,7 @@ func GetCondition(status extensions.ReplicaSetStatus, condType extensions.Replic
 
 // SetCondition adds/replaces the given condition in the replicaset status. If the condition that we
 // are about to add already exists and has the same status and reason then we are not going to update.
-func SetCondition(status *extensions.ReplicaSetStatus, condition extensions.ReplicaSetCondition) {
+func SetCondition(status *apps.ReplicaSetStatus, condition apps.ReplicaSetCondition) {
 	currentCond := GetCondition(*status, condition.Type)
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
@@ -159,13 +159,13 @@ func SetCondition(status *extensions.ReplicaSetStatus, condition extensions.Repl
 }
 
 // RemoveCondition removes the condition with the provided type from the replicaset status.
-func RemoveCondition(status *extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) {
+func RemoveCondition(status *apps.ReplicaSetStatus, condType apps.ReplicaSetConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
 // filterOutCondition returns a new slice of replicaset conditions without conditions with the provided type.
-func filterOutCondition(conditions []extensions.ReplicaSetCondition, condType extensions.ReplicaSetConditionType) []extensions.ReplicaSetCondition {
-	var newConditions []extensions.ReplicaSetCondition
+func filterOutCondition(conditions []apps.ReplicaSetCondition, condType apps.ReplicaSetConditionType) []apps.ReplicaSetCondition {
+	var newConditions []apps.ReplicaSetCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue

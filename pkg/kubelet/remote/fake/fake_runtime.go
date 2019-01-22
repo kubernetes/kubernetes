@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )
@@ -77,7 +77,7 @@ func (f *RemoteRuntime) Version(ctx context.Context, req *kubeapi.VersionRequest
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
 // the sandbox is in the ready state on success.
 func (f *RemoteRuntime) RunPodSandbox(ctx context.Context, req *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
-	sandboxID, err := f.RuntimeService.RunPodSandbox(req.Config)
+	sandboxID, err := f.RuntimeService.RunPodSandbox(req.Config, req.RuntimeHandler)
 	if err != nil {
 		return nil, err
 	}

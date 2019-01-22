@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -20,12 +20,15 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 function get-node-instance-metadata {
   local metadata=""
   metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
+  metadata+="kubelet-config=${KUBE_TEMP}/node-kubelet-config.yaml,"
   metadata+="user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml,"
   metadata+="configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,"
+  metadata+="cluster-location=${KUBE_TEMP}/cluster-location.txt,"
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
   metadata+="gci-update-strategy=${KUBE_TEMP}/gci-update.txt,"
   metadata+="gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,"
   metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt,"
+  metadata+="shutdown-script=${KUBE_ROOT}/cluster/gce/gci/shutdown.sh,"
   metadata+="${NODE_EXTRA_METADATA}"
   echo "${metadata}"
 }

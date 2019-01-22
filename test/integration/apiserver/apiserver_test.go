@@ -26,25 +26,32 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/glog"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.ExtraConfig.EnableCoreControllers = false
+	if len(groupVersions) > 0 {
+		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig.EnableVersions(groupVersions...)
+		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+	}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
@@ -62,7 +69,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in sending req with verb: %s, URL: %s and body: %s", err, verb, URL, body)
 	}
 	transport := http.DefaultTransport
-	glog.Infof("Sending request: %v", req)
+	klog.Infof("Sending request: %v", req)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
@@ -79,17 +86,18 @@ func path(resource, namespace, name string) string {
 	return testapi.Extensions.ResourcePath(resource, namespace, name)
 }
 
-func newRS(namespace string) *v1beta1.ReplicaSet {
-	return &v1beta1.ReplicaSet{
+func newRS(namespace string) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "apiserver-test",
 		},
-		Spec: v1beta1.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "test"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "test"},
@@ -123,7 +131,7 @@ func Test202StatusCode(t *testing.T) {
 	ns := framework.CreateTestingNamespace("status-code", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
@@ -164,16 +172,14 @@ func Test202StatusCode(t *testing.T) {
 }
 
 func TestAPIListChunking(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.APIListChunking) + "=true"); err != nil {
-		t.Fatal(err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 	s, clientSet, closeFn := setup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("list-paging", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)
@@ -222,7 +228,7 @@ func TestAPIListChunking(t *testing.T) {
 	}
 	var names []string
 	if err := meta.EachListItem(listObj, func(obj runtime.Object) error {
-		rs := obj.(*v1beta1.ReplicaSet)
+		rs := obj.(*apps.ReplicaSet)
 		names = append(names, rs.Name)
 		return nil
 	}); err != nil {
@@ -230,5 +236,88 @@ func TestAPIListChunking(t *testing.T) {
 	}
 	if !reflect.DeepEqual(names, []string{"test-0", "test-1", "test-2", "test-3"}) {
 		t.Errorf("unexpected items: %#v", list)
+	}
+}
+
+func makeSecret(name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string][]byte{
+			"key": []byte("value"),
+		},
+	}
+}
+
+func TestNameInFieldSelector(t *testing.T) {
+	s, clientSet, closeFn := setup(t)
+	defer closeFn()
+
+	numNamespaces := 3
+	namespaces := make([]*v1.Namespace, 0, numNamespaces)
+	for i := 0; i < 3; i++ {
+		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
+		defer framework.DeleteTestingNamespace(ns, s, t)
+		namespaces = append(namespaces, ns)
+
+		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("foo"))
+		if err != nil {
+			t.Errorf("Couldn't create secret: %v", err)
+		}
+		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("bar"))
+		if err != nil {
+			t.Errorf("Couldn't create secret: %v", err)
+		}
+	}
+
+	testcases := []struct {
+		namespace       string
+		selector        string
+		expectedSecrets int
+	}{
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo",
+			expectedSecrets: numNamespaces,
+		},
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo,metadata.name=bar",
+			expectedSecrets: 0,
+		},
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo,metadata.namespace=ns1",
+			expectedSecrets: 1,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=ns1",
+			expectedSecrets: 1,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=ns2",
+			expectedSecrets: 0,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=",
+			expectedSecrets: 0,
+		},
+	}
+
+	for _, tc := range testcases {
+		opts := metav1.ListOptions{
+			FieldSelector: tc.selector,
+		}
+		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(opts)
+		if err != nil {
+			t.Errorf("%s: Unexpected error: %v", tc.selector, err)
+		}
+		if len(secrets.Items) != tc.expectedSecrets {
+			t.Errorf("%s: Unexpected number of secrets: %d, expected: %d", tc.selector, len(secrets.Items), tc.expectedSecrets)
+		}
 	}
 }

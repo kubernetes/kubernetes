@@ -30,11 +30,12 @@ type Layer struct {
 }
 
 type MappedDir struct {
-	HostPath         string
-	ContainerPath    string
-	ReadOnly         bool
-	BandwidthMaximum uint64
-	IOPSMaximum      uint64
+	HostPath          string
+	ContainerPath     string
+	ReadOnly          bool
+	BandwidthMaximum  uint64
+	IOPSMaximum       uint64
+	CreateInUtilityVM bool
 }
 
 type MappedPipe struct {

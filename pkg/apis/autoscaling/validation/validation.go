@@ -19,6 +19,7 @@ package validation
 import (
 	"strings"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,7 +29,7 @@ import (
 
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
 	if scale.Spec.Replicas < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
@@ -115,7 +116,7 @@ func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-var validMetricSourceTypes = sets.NewString(string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType), string(autoscaling.ResourceMetricSourceType))
+var validMetricSourceTypes = sets.NewString(string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType), string(autoscaling.ResourceMetricSourceType), string(autoscaling.ExternalMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
 func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
@@ -134,6 +135,13 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		typesPresent.Insert("object")
 		if typesPresent.Len() == 1 {
 			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"))...)
+		}
+	}
+
+	if spec.External != nil {
+		typesPresent.Insert("external")
+		if typesPresent.Len() == 1 {
+			allErrs = append(allErrs, validateExternalSource(spec.External, fldPath.Child("external"))...)
 		}
 	}
 
@@ -170,14 +178,37 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.Target, fldPath.Child("target"))...)
-
-	if len(src.MetricName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"))...)
+	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
+	if &src.Target == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
+	} else {
+		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 	}
 
-	if src.TargetValue.Sign() != 1 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetValue"), "must specify a positive target value"))
+	if src.Target.Value == nil && src.Target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
+	}
+
+	return allErrs
+}
+
+func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
+	if &src.Target == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
+	} else {
+		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
+	}
+
+	if src.Target.Value == nil && src.Target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
+	}
+
+	if src.Target.Value != nil && src.Target.AverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("value"), "may not set both a target value for metric and a per-pod target"))
 	}
 
 	return allErrs
@@ -186,12 +217,15 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(src.MetricName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
+	if &src.Target == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
+	} else {
+		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 	}
 
-	if src.TargetAverageValue.Sign() != 1 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetAverageValue"), "must specify a positive target value"))
+	if src.Target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
 	}
 
 	return allErrs
@@ -203,22 +237,60 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 	if len(src.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
 	}
-
-	if src.TargetAverageUtilization == nil && src.TargetAverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetAverageUtilization"), "must set either a target raw value or a target utilization"))
+	if &src.Target == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
+	} else {
+		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 	}
 
-	if src.TargetAverageUtilization != nil && *src.TargetAverageUtilization < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageUtilization"), src.TargetAverageUtilization, "must be greater than 0"))
+	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
 	}
 
-	if src.TargetAverageUtilization != nil && src.TargetAverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("targetAverageValue"), "may not set both a target raw value and a target utilization"))
+	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
 	}
 
-	if src.TargetAverageValue != nil && src.TargetAverageValue.Sign() != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageValue"), src.TargetAverageValue, "must be positive"))
+	return allErrs
+}
+
+func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(mt.Type) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must specify a metric target type"))
 	}
 
+	if mt.Type != autoscaling.UtilizationMetricType &&
+		mt.Type != autoscaling.ValueMetricType &&
+		mt.Type != autoscaling.AverageValueMetricType {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
+	}
+
+	if mt.Value != nil && mt.Value.Sign() != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be positive"))
+	}
+
+	if mt.AverageValue != nil && mt.AverageValue.Sign() != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be positive"))
+	}
+
+	if mt.AverageUtilization != nil && *mt.AverageUtilization < 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageUtilization"), mt.AverageUtilization, "must be greater than 0"))
+	}
+
+	return allErrs
+}
+
+func validateMetricIdentifier(id autoscaling.MetricIdentifier, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(id.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a metric name"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(id.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), id.Name, msg))
+		}
+	}
 	return allErrs
 }

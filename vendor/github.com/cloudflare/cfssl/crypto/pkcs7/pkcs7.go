@@ -1,7 +1,7 @@
 // Package pkcs7 implements the subset of the CMS PKCS #7 datatype that is typically
 // used to package certificates and CRLs.  Using openssl, every certificate converted
 // to PKCS #7 format from another encoding such as PEM conforms to this implementation.
-// reference: https://www.openssl.org/docs/apps/crl2pkcs7.html
+// reference: https://www.openssl.org/docs/man1.1.0/apps/crl2pkcs7.html
 //
 //			PKCS #7 Data type, reference: https://tools.ietf.org/html/rfc2315
 //

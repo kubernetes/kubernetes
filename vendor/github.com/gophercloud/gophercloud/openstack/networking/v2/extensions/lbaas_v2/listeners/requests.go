@@ -31,6 +31,7 @@ type ListOpts struct {
 	Name            string `q:"name"`
 	AdminStateUp    *bool  `q:"admin_state_up"`
 	TenantID        string `q:"tenant_id"`
+	ProjectID       string `q:"project_id"`
 	LoadbalancerID  string `q:"loadbalancer_id"`
 	DefaultPoolID   string `q:"default_pool_id"`
 	Protocol        string `q:"protocol"`
@@ -86,8 +87,12 @@ type CreateOpts struct {
 	ProtocolPort int `json:"protocol_port" required:"true"`
 
 	// TenantID is only required if the caller has an admin role and wants
-	// to create a pool for another tenant.
+	// to create a pool for another project.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is only required if the caller has an admin role and wants
+	// to create a pool for another project.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// Human-readable name for the Listener. Does not have to be unique.
 	Name string `json:"name,omitempty"`

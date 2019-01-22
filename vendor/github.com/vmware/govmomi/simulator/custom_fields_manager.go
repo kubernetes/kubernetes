@@ -101,9 +101,11 @@ func (c *CustomFieldsManager) SetField(req *types.SetField) soap.HasFault {
 	body := &methods.SetFieldBody{}
 
 	entity := Map.Get(req.Entity).(mo.Entity).Entity()
-	entity.CustomValue = append(entity.CustomValue, &types.CustomFieldStringValue{
-		CustomFieldValue: types.CustomFieldValue{Key: req.Key},
-		Value:            req.Value,
+	Map.WithLock(entity, func() {
+		entity.CustomValue = append(entity.CustomValue, &types.CustomFieldStringValue{
+			CustomFieldValue: types.CustomFieldValue{Key: req.Key},
+			Value:            req.Value,
+		})
 	})
 
 	body.Res = &types.SetFieldResponse{}

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package azure
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,5 +90,164 @@ func TestGetLastSegment(t *testing.T) {
 		if s != test.expected {
 			t.Errorf("expected: %s, got %s", test.expected, s)
 		}
+	}
+}
+
+func TestGenerateStorageAccountName(t *testing.T) {
+	tests := []struct {
+		prefix string
+	}{
+		{
+			prefix: "",
+		},
+		{
+			prefix: "pvc",
+		},
+		{
+			prefix: "1234512345123451234512345",
+		},
+	}
+
+	for _, test := range tests {
+		accountName := generateStorageAccountName(test.prefix)
+		if len(accountName) > storageAccountNameMaxLength || len(accountName) < 3 {
+			t.Errorf("input prefix: %s, output account name: %s, length not in [3,%d]", test.prefix, accountName, storageAccountNameMaxLength)
+		}
+
+		for _, char := range accountName {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') {
+				t.Errorf("input prefix: %s, output account name: %s, there is non-digit or non-letter(%q)", test.prefix, accountName, char)
+				break
+			}
+		}
+	}
+}
+
+func TestMapLoadBalancerNameToVMSet(t *testing.T) {
+	az := getTestCloud()
+	az.PrimaryAvailabilitySetName = "primary"
+
+	cases := []struct {
+		description   string
+		lbName        string
+		useStandardLB bool
+		clusterName   string
+		expectedVMSet string
+	}{
+		{
+			description:   "default external LB should map to primary vmset",
+			lbName:        "azure",
+			clusterName:   "azure",
+			expectedVMSet: "primary",
+		},
+		{
+			description:   "default internal LB should map to primary vmset",
+			lbName:        "azure-internal",
+			clusterName:   "azure",
+			expectedVMSet: "primary",
+		},
+		{
+			description:   "non-default external LB should map to its own vmset",
+			lbName:        "azuretest-internal",
+			clusterName:   "azure",
+			expectedVMSet: "azuretest",
+		},
+		{
+			description:   "non-default internal LB should map to its own vmset",
+			lbName:        "azuretest-internal",
+			clusterName:   "azure",
+			expectedVMSet: "azuretest",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		vmset := az.mapLoadBalancerNameToVMSet(c.lbName, c.clusterName)
+		assert.Equal(t, c.expectedVMSet, vmset, c.description)
+	}
+}
+
+func TestGetAzureLoadBalancerName(t *testing.T) {
+	az := getTestCloud()
+	az.PrimaryAvailabilitySetName = "primary"
+
+	cases := []struct {
+		description   string
+		vmSet         string
+		isInternal    bool
+		useStandardLB bool
+		clusterName   string
+		expected      string
+	}{
+		{
+			description: "default external LB should get primary vmset",
+			vmSet:       "primary",
+			clusterName: "azure",
+			expected:    "azure",
+		},
+		{
+			description: "default internal LB should get primary vmset",
+			vmSet:       "primary",
+			clusterName: "azure",
+			isInternal:  true,
+			expected:    "azure-internal",
+		},
+		{
+			description: "non-default external LB should get its own vmset",
+			vmSet:       "as",
+			clusterName: "azure",
+			expected:    "as",
+		},
+		{
+			description: "non-default internal LB should get its own vmset",
+			vmSet:       "as",
+			clusterName: "azure",
+			isInternal:  true,
+			expected:    "as-internal",
+		},
+		{
+			description:   "default standard external LB should get cluster name",
+			vmSet:         "primary",
+			useStandardLB: true,
+			clusterName:   "azure",
+			expected:      "azure",
+		},
+		{
+			description:   "default standard internal LB should get cluster name",
+			vmSet:         "primary",
+			useStandardLB: true,
+			isInternal:    true,
+			clusterName:   "azure",
+			expected:      "azure-internal",
+		},
+		{
+			description:   "non-default standard external LB should get cluster-name",
+			vmSet:         "as",
+			useStandardLB: true,
+			clusterName:   "azure",
+			expected:      "azure",
+		},
+		{
+			description:   "non-default standard internal LB should get cluster-name",
+			vmSet:         "as",
+			useStandardLB: true,
+			isInternal:    true,
+			clusterName:   "azure",
+			expected:      "azure-internal",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		loadbalancerName := az.getAzureLoadBalancerName(c.clusterName, c.vmSet, c.isInternal)
+		assert.Equal(t, c.expected, loadbalancerName, c.description)
 	}
 }

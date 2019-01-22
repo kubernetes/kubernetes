@@ -18,7 +18,6 @@ package types
 
 import (
 	"fmt"
-	"strings"
 )
 
 // NamespacedName comprises a resource name, with a mandatory namespace,
@@ -41,20 +40,4 @@ const (
 // String returns the general purpose string representation
 func (n NamespacedName) String() string {
 	return fmt.Sprintf("%s%c%s", n.Namespace, Separator, n.Name)
-}
-
-// NewNamespacedNameFromString parses the provided string and returns a NamespacedName.
-// The expected format is as per String() above.
-// If the input string is invalid, the returned NamespacedName has all empty string field values.
-// This allows a single-value return from this function, while still allowing error checks in the caller.
-// Note that an input string which does not include exactly one Separator is not a valid input (as it could never
-// have neem returned by String() )
-func NewNamespacedNameFromString(s string) NamespacedName {
-	nn := NamespacedName{}
-	result := strings.Split(s, string(Separator))
-	if len(result) == 2 {
-		nn.Namespace = result[0]
-		nn.Name = result[1]
-	}
-	return nn
 }

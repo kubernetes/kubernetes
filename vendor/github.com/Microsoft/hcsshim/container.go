@@ -201,12 +201,18 @@ func createContainerWithJSON(id string, c *ContainerConfig, additionalJSON strin
 
 	if createError == nil || IsPending(createError) {
 		if err := container.registerCallback(); err != nil {
+			// Terminate the container if it still exists. We're okay to ignore a failure here.
+			container.Terminate()
 			return nil, makeContainerError(container, operation, "", err)
 		}
 	}
 
 	err = processAsyncHcsResult(createError, resultp, container.callbackNumber, hcsNotificationSystemCreateCompleted, &defaultTimeout)
 	if err != nil {
+		if err == ErrTimeout {
+			// Terminate the container if it still exists. We're okay to ignore a failure here.
+			container.Terminate()
+		}
 		return nil, makeContainerError(container, operation, configuration, err)
 	}
 

@@ -1,8 +1,10 @@
 approvers:
 - coffeepac
-- crassirostris
+- monotek
 - piosz
 reviewers:
 - coffeepac
-- crassirostris
+- monotek
 - piosz
+labels:
+- sig/instrumentation

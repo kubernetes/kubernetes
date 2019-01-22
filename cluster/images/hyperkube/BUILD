@@ -1,33 +1,17 @@
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
 
-docker_build(
+container_image(
     name = "hyperkube-internal",
     base = "@debian-hyperkube-base-amd64//image",
     files = [
         "//cmd/hyperkube",
     ],
-    symlinks = {
-        "/%s" % path: "/hyperkube"
-        for path in [
-            "/apiserver",
-            "/controller-manager",
-            "/kubectl",
-            "/kubelet",
-            "/proxy",
-            "/scheduler",
-            "/usr/local/bin/kube-apiserver",
-            "/usr/local/bin/kube-controller-manager",
-            "/usr/local/bin/kubectl",
-            "/usr/local/bin/kubelet",
-            "/usr/local/bin/kube-proxy",
-            "/usr/local/bin/kube-scheduler",
-        ]
-    },
+    stamp = True,
 )
 
-docker_bundle(
+container_bundle(
     name = "hyperkube",
-    images = {"gcr.io/google-containers/hyperkube-amd64:{STABLE_DOCKER_TAG}": "hyperkube-internal"},
+    images = {"k8s.gcr.io/hyperkube-amd64:{STABLE_DOCKER_TAG}": "hyperkube-internal"},
     stamp = True,
 )
 

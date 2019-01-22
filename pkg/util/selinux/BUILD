@@ -10,42 +10,9 @@ go_library(
     srcs = [
         "doc.go",
         "selinux.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "selinux_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "selinux_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "selinux_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "selinux_linux.go",
+        "selinux_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/selinux",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

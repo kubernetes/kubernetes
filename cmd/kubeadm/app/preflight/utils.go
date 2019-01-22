@@ -17,19 +17,21 @@ limitations under the License.
 package preflight
 
 import (
-	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // GetKubeletVersion is helper function that returns version of kubelet available in $PATH
-func GetKubeletVersion() (*version.Version, error) {
+func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	kubeletVersionRegex := regexp.MustCompile(`^\s*Kubernetes v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?)\s*$`)
 
-	out, err := exec.Command("kubelet", "--version").Output()
+	command := execer.Command("kubelet", "--version")
+	out, err := command.CombinedOutput()
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +39,7 @@ func GetKubeletVersion() (*version.Version, error) {
 	cleanOutput := strings.TrimSpace(string(out))
 	subs := kubeletVersionRegex.FindAllStringSubmatch(cleanOutput, -1)
 	if len(subs) != 1 || len(subs[0]) < 2 {
-		return nil, fmt.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
+		return nil, errors.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
 	}
 	return version.ParseSemantic(subs[0][1])
 }

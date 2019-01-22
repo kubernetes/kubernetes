@@ -17,6 +17,7 @@ limitations under the License.
 package certificates
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -29,7 +30,7 @@ import (
 
 func TestStrategyCreate(t *testing.T) {
 	tests := map[string]struct {
-		ctx         genericapirequest.Context
+		ctx         context.Context
 		obj         runtime.Object
 		expectedObj runtime.Object
 	}{

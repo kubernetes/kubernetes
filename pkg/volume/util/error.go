@@ -20,7 +20,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
-// This error on attach indicates volume is attached to a different node
+// DanglingAttachError indicates volume is attached to a different node
 // than we expected.
 type DanglingAttachError struct {
 	msg         string
@@ -32,6 +32,7 @@ func (err *DanglingAttachError) Error() string {
 	return err.msg
 }
 
+// NewDanglingError create a new dangling error
 func NewDanglingError(msg string, node k8stypes.NodeName, devicePath string) error {
 	return &DanglingAttachError{
 		msg:         msg,

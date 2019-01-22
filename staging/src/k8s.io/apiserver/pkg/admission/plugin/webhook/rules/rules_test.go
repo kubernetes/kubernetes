@@ -38,6 +38,7 @@ func a(group, version, resource, subresource, name string, operation admission.O
 		"ns", name,
 		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
 		operation,
+		false,
 		nil,
 	)
 }

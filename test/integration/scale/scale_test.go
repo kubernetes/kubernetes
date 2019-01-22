@@ -215,7 +215,7 @@ var (
 )
 
 func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	result := apitesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	result := apitesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 
 	// TODO: Disable logging here until we resolve teardown issues which result in
 	// massive log spam. Another path forward would be to refactor

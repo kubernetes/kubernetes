@@ -1,4 +1,4 @@
-// +build !windows,!linux,!freebsd,!solaris freebsd,!cgo solaris,!cgo
+// +build !windows,!linux,!freebsd freebsd,!cgo
 
 package mount
 
@@ -7,6 +7,6 @@ import (
 	"runtime"
 )
 
-func parseMountTable() ([]*Info, error) {
+func parseMountTable(f FilterFunc) ([]*Info, error) {
 	return nil, fmt.Errorf("mount.parseMountTable is not implemented on %s/%s", runtime.GOOS, runtime.GOARCH)
 }

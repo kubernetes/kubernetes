@@ -19,7 +19,7 @@ limitations under the License.
 package leaky
 
 const (
-	// This is used in a few places outside of Kubelet, such as indexing
+	// PodInfraContainerName is used in a few places outside of Kubelet, such as indexing
 	// into the container info.
 	PodInfraContainerName = "POD"
 )

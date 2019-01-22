@@ -22,31 +22,24 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/utils/pointer"
 )
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
 func TestCreatePodSandbox(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-				},
-			},
-		},
-	}
+	require.NoError(t, err)
+	pod := newTestPod()
 
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
@@ -62,4 +55,61 @@ func TestCreatePodSandbox(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
 	// TODO Check pod sandbox configuration
+}
+
+// TestCreatePodSandbox_RuntimeClass tests creating sandbox with RuntimeClasses enabled.
+func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
+
+	rcm := runtimeclass.NewManager(rctest.NewPopulatedDynamicClient())
+	defer rctest.StartManagerSync(t, rcm)()
+
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	m.runtimeClassManager = rcm
+
+	tests := map[string]struct {
+		rcn             *string
+		expectedHandler string
+		expectError     bool
+	}{
+		"unspecified RuntimeClass": {rcn: nil, expectedHandler: ""},
+		"valid RuntimeClass":       {rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
+		"missing RuntimeClass":     {rcn: pointer.StringPtr("phantom"), expectError: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			pod := newTestPod()
+			pod.Spec.RuntimeClassName = test.rcn
+
+			id, _, err := m.createPodSandbox(pod, 1)
+			if test.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
+			} else {
+				assert.NoError(t, err)
+				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
+				assert.Equal(t, test.expectedHandler, fakeRuntime.Sandboxes[id].RuntimeHandler)
+			}
+		})
+	}
+}
+
+func newTestPod() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
 }

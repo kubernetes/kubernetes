@@ -59,8 +59,10 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		realValue := GetNamespacesFromPodAffinityTerm(fakePod(), test.podAffinityTerm)
-		assert.EqualValuesf(t, test.expectedValue, realValue, "Failed to test: %s", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			realValue := GetNamespacesFromPodAffinityTerm(fakePod(), test.podAffinityTerm)
+			assert.EqualValuesf(t, test.expectedValue, realValue, "Failed to test: %s", test.name)
+		})
 	}
 }
 
@@ -96,12 +98,14 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeTestPod := fakePod()
-		fakeTestPod.Namespace = test.podNamespaces
-		fakeTestPod.Labels = test.podLabels
+		t.Run(test.name, func(t *testing.T) {
+			fakeTestPod := fakePod()
+			fakeTestPod.Namespace = test.podNamespaces
+			fakeTestPod.Labels = test.podLabels
 
-		realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
-		assert.EqualValuesf(t, test.expectedResult, realValue, "Faild to test: %s", test.name)
+			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
+			assert.EqualValuesf(t, test.expectedResult, realValue, "Faild to test: %s", test.name)
+		})
 	}
 
 }
@@ -248,7 +252,9 @@ func TestNodesHaveSameTopologyKey(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := NodesHaveSameTopologyKey(test.nodeA, test.nodeB, test.topologyKey)
-		assert.Equalf(t, test.expected, got, "Failed to test: %s", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			got := NodesHaveSameTopologyKey(test.nodeA, test.nodeB, test.topologyKey)
+			assert.Equalf(t, test.expected, got, "Failed to test: %s", test.name)
+		})
 	}
 }

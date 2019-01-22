@@ -15,23 +15,46 @@
 # Build the hyperkube base image. This image is used to build the hyperkube image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="gcr.io/google-containers"] make (build|push)
+#   [ARCH=amd64] [REGISTRY="staging-k8s.gcr.io"] make (build|push)
 
-REGISTRY?=gcr.io/google-containers
-IMAGE?=debian-hyperkube-base
-TAG=0.8
+REGISTRY?=staging-k8s.gcr.io
+IMAGE?=$(REGISTRY)/debian-hyperkube-base
+TAG=0.12.0
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1
 
-BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.3
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
 CNI_VERSION=v0.6.0
 
 TEMP_DIR:=$(shell mktemp -d)
 CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
 
-.PHONY: all build push clean
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
 
-all: push
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
+
+.PHONY: all build push clean all-build all-push-images all-push push-manifest
+
+all: all-push
+
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+all-push: all-push-images push-manifest
+
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
+	docker manifest push --purge ${IMAGE}:${TAG}
 
 cni-tars/$(CNI_TARBALL):
 	mkdir -p cni-tars/
@@ -51,10 +74,12 @@ endif
 	mkdir -p ${TEMP_DIR}/cni-bin/bin
 	tar -xz -C ${TEMP_DIR}/cni-bin/bin -f "cni-tars/${CNI_TARBALL}"
 
+ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
+	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(IMAGE)-$(ARCH):$(TAG)

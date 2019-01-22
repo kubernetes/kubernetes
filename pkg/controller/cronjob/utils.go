@@ -20,17 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/robfig/cron"
+	"k8s.io/klog"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -67,7 +64,7 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 	}
 
 	if controllerRef.Kind != "CronJob" {
-		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
+		klog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
 		return types.UID(""), false
 	}
 
@@ -81,30 +78,12 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
-			glog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
+			klog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
 			continue
 		}
 		jobsBySj[parentUID] = append(jobsBySj[parentUID], job)
 	}
 	return jobsBySj
-}
-
-// getNextStartTimeAfter gets the latest scheduled start time that is less than "now", or an error.
-func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
-	// Using robfig/cron for cron scheduled parsing and next runtime
-	// computation. Not using the entire library because:
-	// - I want to detect when we missed a runtime due to being down.
-	//   - How do I set the time such that I can detect the last known runtime?
-	// - I guess the functions could launch a go-routine to start the job and
-	// then return.
-	// How to handle concurrency control.
-	// How to detect changes to schedules or deleted schedules and then
-	// update the jobs?
-	sched, err := cron.Parse(schedule)
-	if err != nil {
-		return time.Unix(0, 0), fmt.Errorf("Unparseable schedule: %s : %s", schedule, err)
-	}
-	return sched.Next(now), nil
 }
 
 // getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
@@ -171,9 +150,6 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 
 // getJobFromTemplate makes a Job from a CronJob
 func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
-	// TODO: consider adding the following labels:
-	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
-	// scheduled-job-name=$SJ_NAME -- for user convenience
 	labels := copyLabels(&sj.Spec.JobTemplate)
 	annotations := copyAnnotations(&sj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
@@ -196,27 +172,6 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 // getTimeHash returns Unix Epoch Time
 func getTimeHash(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix()
-}
-
-// makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value
-func makeCreatedByRefJson(object runtime.Object) (string, error) {
-	createdByRef, err := ref.GetReference(legacyscheme.Scheme, object)
-	if err != nil {
-		return "", fmt.Errorf("unable to get controller reference: %v", err)
-	}
-
-	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
-	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
-	//   We need to consistently handle this case of annotation versioning.
-	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
-
-	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
-		Reference: *createdByRef,
-	})
-	if err != nil {
-		return "", fmt.Errorf("unable to serialize controller reference: %v", err)
-	}
-	return string(createdByRefJson), nil
 }
 
 func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {

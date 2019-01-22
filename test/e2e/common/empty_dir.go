@@ -24,7 +24,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -41,7 +40,7 @@ var (
 var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	Context("when FSGroup is specified [Feature:FSGroup]", func() {
+	Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
@@ -68,141 +67,128 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	})
 
 	/*
-		    Testname: volume-emptydir-mode-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure the volume has 0777 unix file permissions and tmpfs
-			mount type.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode default
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
 	*/
-	framework.ConformanceIt("volume on tmpfs should have the correct mode", func() {
+	framework.ConformanceIt("volume on tmpfs should have the correct mode [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0644-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a root owned file with 0644 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0644
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0644,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0644,tmpfs) [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0666-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a root owned file with 0666 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0666
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0666,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0666,tmpfs) [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0777-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a root owned file with 0777 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0777
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0777,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0777,tmpfs) [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0644-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a user owned file with 0644 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0644, non-root user
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0644,tmpfs) [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0666-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a user owned file with 0666 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0666,, non-root user
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0666,tmpfs) [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0777-tmpfs
-		    Description: For a Pod created with an 'emptyDir' Volume with 'medium'
-			of 'Memory', ensure a user owned file with 0777 unix file permissions
-			is created correctly, has tmpfs mount type, and enforces the permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium memory, volume mode 0777, non-root user
+		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0777,tmpfs) [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
 	/*
-		    Testname: volume-emptydir-mode
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure the
-			volume has 0777 unix file permissions.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode default
+		Description: A Pod created with an 'emptyDir' Volume, the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
 	*/
-	framework.ConformanceIt("volume on default medium should have the correct mode", func() {
+	framework.ConformanceIt("volume on default medium should have the correct mode [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0644
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			root owned file with 0644 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0644
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0644,default)", func() {
+	framework.ConformanceIt("should support (root,0644,default) [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0666
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			root owned file with 0666 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0666
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0666,default)", func() {
+	framework.ConformanceIt("should support (root,0666,default) [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-root-0777
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			root owned file with 0777 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0777
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (root,0777,default)", func() {
+	framework.ConformanceIt("should support (root,0777,default) [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0644
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			user owned file with 0644 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0644
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,default)", func() {
+	framework.ConformanceIt("should support (non-root,0644,default) [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0666
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			user owned file with 0666 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0666
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,default)", func() {
+	framework.ConformanceIt("should support (non-root,0666,default) [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
 	/*
-		    Testname: volume-emptydir-user-0777
-		    Description: For a Pod created with an 'emptyDir' Volume, ensure a
-			user owned file with 0777 unix file permissions is created and enforced
-			correctly.
+		Release : v1.9
+		Testname: EmptyDir, medium default, volume mode 0777
+		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,default)", func() {
+	framework.ConformanceIt("should support (non-root,0777,default) [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 })
@@ -252,6 +238,7 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 		fmt.Sprintf("--fs_type=%v", volumePath),
 		fmt.Sprintf("--file_perm=%v", volumePath),
 		fmt.Sprintf("--file_owner=%v", volumePath),
+		fmt.Sprintf("--file_mode=%v", volumePath),
 	}
 
 	pod.Spec.Containers[0].VolumeMounts[0].SubPath = subPath
@@ -264,6 +251,7 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 		"perms of file \"/test-volume\": -rwxrwxrwx",
 		"owner UID of \"/test-volume\": 0",
 		"owner GID of \"/test-volume\": 123",
+		"mode of file \"/test-volume\": dgtrwxrwxrwx",
 	}
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
@@ -428,7 +416,7 @@ func testPodWithVolume(image, path string, source *v1.EmptyDirVolumeSource) *v1.
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,

@@ -15,13 +15,10 @@ go_library(
         "retry.go",
         "send.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/gensupport",
     importpath = "google.golang.org/api/gensupport",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
-        "//vendor/google.golang.org/api/googleapi:go_default_library",
-    ],
+    deps = ["//vendor/google.golang.org/api/googleapi:go_default_library"],
 )
 
 filegroup(

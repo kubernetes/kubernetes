@@ -10,7 +10,6 @@ load(
 go_binary(
     name = "genkubedocs",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genkubedocs",
 )
 
 go_library(
@@ -29,6 +28,7 @@ go_library(
         "//cmd/kube-scheduler/app:go_default_library",
         "//cmd/kubeadm/app/cmd:go_default_library",
         "//cmd/kubelet/app:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/cobra/doc:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
@@ -52,5 +52,4 @@ go_test(
     name = "go_default_test",
     srcs = ["postprocessing_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genkubedocs",
 )

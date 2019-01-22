@@ -63,7 +63,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 	errors := []error{}
 	if s.RuntimeConfig["api/all"] == "false" && len(s.RuntimeConfig) == 1 {
 		// Do not allow only set api/all=false, in such case apiserver startup has no meaning.
-		return append(errors, fmt.Errorf("invliad key with only api/all=false"))
+		return append(errors, fmt.Errorf("invalid key with only api/all=false"))
 	}
 
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
@@ -97,7 +97,7 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 func unknownGroups(groups []string, registry GroupRegisty) []string {
 	unknownGroups := []string{}
 	for _, group := range groups {
-		if !registry.IsRegistered(group) {
+		if !registry.IsGroupRegistered(group) {
 			unknownGroups = append(unknownGroups, group)
 		}
 	}
@@ -107,5 +107,5 @@ func unknownGroups(groups []string, registry GroupRegisty) []string {
 // GroupRegisty provides a method to check whether given group is registered.
 type GroupRegisty interface {
 	// IsRegistered returns true if given group is registered.
-	IsRegistered(group string) bool
+	IsGroupRegistered(group string) bool
 }

@@ -21,14 +21,20 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateNetworkPolicy(t *testing.T) {
 	protocolTCP := api.ProtocolTCP
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
+	protocolSCTP := api.ProtocolSCTP
+
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 
 	successCases := []networking.NetworkPolicy{
 		{
@@ -79,6 +85,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
 							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
+							},
 						},
 					},
 				},
@@ -115,6 +125,28 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							{
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+								PodSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"e": "f"},
 								},
 							},
 						},
@@ -240,6 +272,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
 							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
+							},
 						},
 					},
 				},
@@ -248,6 +284,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	// Success cases are expected to pass validation.
+
 	for k, v := range successCases {
 		if errs := ValidateNetworkPolicy(&v); len(errs) != 0 {
 			t.Errorf("Expected success for %d, got %v", k, errs)
@@ -256,7 +293,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	errorCases := map[string]networking.NetworkPolicy{
-		"namespaceSelector and podSelector": {
+		"namespaceSelector and ipBlock": {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: networking.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
@@ -266,15 +303,24 @@ func TestValidateNetworkPolicy(t *testing.T) {
 					{
 						From: []networking.NetworkPolicyPeer{
 							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
+								},
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 								},
 							},
 						},
 					},
+				},
+			},
+		},
+		"podSelector and ipBlock": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
 				},
 				Egress: []networking.NetworkPolicyEgressRule{
 					{
@@ -283,8 +329,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								PodSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
 								},
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 								},
 							},
 						},

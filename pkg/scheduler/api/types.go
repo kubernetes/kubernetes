@@ -22,24 +22,37 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	restclient "k8s.io/client-go/rest"
 )
 
 const (
-	MaxUint          = ^uint(0)
-	MaxInt           = int(MaxUint >> 1)
+	// MaxUint defines the max unsigned int value.
+	MaxUint = ^uint(0)
+	// MaxInt defines the max signed int value.
+	MaxInt = int(MaxUint >> 1)
+	// MaxTotalPriority defines the max total priority value.
 	MaxTotalPriority = MaxInt
-	MaxPriority      = 10
-	MaxWeight        = MaxInt / MaxPriority
+	// MaxPriority defines the max priority value.
+	MaxPriority = 10
+	// MaxWeight defines the max weight value.
+	MaxWeight = MaxInt / MaxPriority
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	DefaultPercentageOfNodesToScore = 50
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct of a policy resource in api.
 type Policy struct {
 	metav1.TypeMeta
-	// Holds the information to configure the fit predicate functions
+	// Holds the information to configure the fit predicate functions.
+	// If unspecified, the default predicate functions will be applied.
+	// If empty list, all predicates (except the mandatory ones) will be
+	// bypassed.
 	Predicates []PredicatePolicy
-	// Holds the information to configure the priority functions
+	// Holds the information to configure the priority functions.
+	// If unspecified, the default priority functions will be applied.
+	// If empty list, all priority functions will be bypassed.
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig
@@ -55,6 +68,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -64,6 +78,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -96,6 +111,8 @@ type PriorityArgument struct {
 	// The priority function that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelPreference *LabelPreference
+	// The RequestedToCapacityRatio priority function is parametrized with function shape.
+	RequestedToCapacityRatioArguments *RequestedToCapacityRatioArguments
 }
 
 // ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
@@ -130,6 +147,57 @@ type LabelPreference struct {
 	Presence bool
 }
 
+// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function
+type RequestedToCapacityRatioArguments struct {
+	// Array of point defining priority function shape
+	UtilizationShape []UtilizationShapePoint
+}
+
+// UtilizationShapePoint represents single point of priority function shape
+type UtilizationShapePoint struct {
+	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
+	Utilization int
+	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
+	Score int
+}
+
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name v1.ResourceName
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool
+}
+
+// ExtenderTLSConfig contains settings to enable TLS with extender
+type ExtenderTLSConfig struct {
+	// Server should be accessed without verifying the TLS certificate. For testing only.
+	Insecure bool
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// ceritificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string
+
+	// Server requires TLS client certificate authentication
+	CertFile string
+	// Server requires TLS client certificate authentication
+	KeyFile string
+	// Trusted root certificates for server
+	CAFile string
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -137,6 +205,8 @@ type ExtenderConfig struct {
 	URLPrefix string
 	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
 	FilterVerb string
+	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	PreemptVerb string
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string
 	// The numeric multiplier for the node scores that the prioritize call generates.
@@ -146,10 +216,10 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *restclient.TLSClientConfig
+	TLSConfig *ExtenderTLSConfig
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration
@@ -157,13 +227,63 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	ManagedResources []ExtenderManagedResource
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool
+}
+
+// ExtenderPreemptionResult represents the result returned by preemption phase of extender.
+type ExtenderPreemptionResult struct {
+	NodeNameToMetaVictims map[string]*MetaVictims
+}
+
+// ExtenderPreemptionArgs represents the arguments needed by the extender to preempt pods on nodes.
+type ExtenderPreemptionArgs struct {
+	// Pod being scheduled
+	Pod *v1.Pod
+	// Victims map generated by scheduler preemption phase
+	// Only set NodeNameToMetaVictims if ExtenderConfig.NodeCacheCapable == true. Otherwise, only set NodeNameToVictims.
+	NodeNameToVictims     map[string]*Victims
+	NodeNameToMetaVictims map[string]*MetaVictims
+}
+
+// Victims represents:
+//   pods:  a group of pods expected to be preempted.
+//   numPDBViolations: the count of violations of PodDisruptionBudget
+type Victims struct {
+	Pods             []*v1.Pod
+	NumPDBViolations int
+}
+
+// MetaPod represent identifier for a v1.Pod
+type MetaPod struct {
+	UID string
+}
+
+// MetaVictims represents:
+//   pods:  a group of pods expected to be preempted.
+//     Only Pod identifiers will be sent and user are expect to get v1.Pod in their own way.
+//   numPDBViolations: the count of violations of PodDisruptionBudget
+type MetaVictims struct {
+	Pods             []*MetaPod
+	NumPDBViolations int
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
 // nodes for a pod.
 type ExtenderArgs struct {
 	// Pod being scheduled
-	Pod v1.Pod
+	Pod *v1.Pod
 	// List of candidate nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
 	Nodes *v1.NodeList
@@ -215,6 +335,7 @@ type HostPriority struct {
 	Score int
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 
 func (h HostPriorityList) Len() int {

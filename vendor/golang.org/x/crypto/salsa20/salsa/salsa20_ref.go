@@ -203,7 +203,7 @@ func core(out *[64]byte, in *[16]byte, k *[32]byte, c *[16]byte) {
 }
 
 // XORKeyStream crypts bytes from in to out using the given key and counters.
-// In and out may be the same slice but otherwise should not overlap. Counter
+// In and out must overlap entirely or not at all. Counter
 // contains the raw salsa20 counter bytes (both nonce and block counter).
 func XORKeyStream(out, in []byte, counter *[16]byte, key *[32]byte) {
 	var block [64]byte

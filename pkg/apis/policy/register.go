@@ -48,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
+		&PodSecurityPolicy{},
+		&PodSecurityPolicyList{},
 		&Eviction{},
 	)
 	return nil

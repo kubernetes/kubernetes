@@ -19,7 +19,6 @@ reviewers:
 - ncdc
 - tallclair
 - mwielgus
-- timothysc
 - soltysh
 - piosz
 - dims
@@ -37,3 +36,5 @@ reviewers:
 - mqliang
 - lukaszo
 - jianhuiz
+labels:
+- sig/apps

@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "endian.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/cpuutil",
     importpath = "github.com/coreos/etcd/pkg/cpuutil",
     visibility = ["//visibility:public"],
 )

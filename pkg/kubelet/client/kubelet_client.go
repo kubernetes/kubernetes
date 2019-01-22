@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -62,7 +63,7 @@ type ConnectionInfo struct {
 
 // ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error)
+	GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
@@ -74,7 +75,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
 		rt = utilnet.SetOldTransportDefaults(&http.Transport{
-			Dial:            config.Dial,
+			DialContext:     config.Dial,
 			TLSClientConfig: tlsConfig,
 		})
 	}
@@ -103,14 +104,14 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 
 // NodeGetter defines an interface for looking up a node by name
 type NodeGetter interface {
-	Get(name string, options metav1.GetOptions) (*v1.Node, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
 }
 
 // NodeGetterFunc allows implementing NodeGetter with a function
-type NodeGetterFunc func(name string, options metav1.GetOptions) (*v1.Node, error)
+type NodeGetterFunc func(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
 
-func (f NodeGetterFunc) Get(name string, options metav1.GetOptions) (*v1.Node, error) {
-	return f(name, options)
+func (f NodeGetterFunc) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error) {
+	return f(ctx, name, options)
 }
 
 // NodeConnectionInfoGetter obtains connection info from the status of a Node API object
@@ -153,8 +154,8 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}, nil
 }
 
-func (k *NodeConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error) {
-	node, err := k.nodes.Get(string(nodeName), metav1.GetOptions{})
+func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error) {
+	node, err := k.nodes.Get(ctx, string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

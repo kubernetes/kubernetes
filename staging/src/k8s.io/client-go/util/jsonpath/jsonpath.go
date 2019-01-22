@@ -255,10 +255,9 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			params[1].Value = value.Len()
 		}
 
-		if params[1].Value < 0 {
+		if params[1].Value < 0 || (params[1].Value == 0 && params[1].Derived) {
 			params[1].Value += value.Len()
 		}
-
 		sliceLength := value.Len()
 		if params[1].Value != params[0].Value { // if you're requesting zero elements, allow it through.
 			if params[0].Value >= sliceLength || params[0].Value < 0 {
@@ -267,6 +266,11 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			if params[1].Value > sliceLength || params[1].Value < 0 {
 				return input, fmt.Errorf("array index out of bounds: index %d, length %d", params[1].Value-1, sliceLength)
 			}
+			if params[0].Value > params[1].Value {
+				return input, fmt.Errorf("starting index %d is greater than ending index %d", params[0].Value, params[1].Value)
+			}
+		} else {
+			return result, nil
 		}
 
 		if !params[2].Known {

@@ -17,9 +17,11 @@ limitations under the License.
 package selfsubjectrulesreview
 
 import (
+	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -37,13 +39,18 @@ func NewREST(ruleResolver authorizer.RuleResolver) *REST {
 	return &REST{ruleResolver}
 }
 
+// NamespaceScoped fulfill rest.Scoper
+func (r *REST) NamespaceScoped() bool {
+	return false
+}
+
 // New creates a new selfsubjectrulesreview object.
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectRulesReview{}
 }
 
 // Create attempts to get self subject rules in specific namespace.
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	selfSRR, ok := obj.(*authorizationapi.SelfSubjectRulesReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectRulesReview: %#v", obj))

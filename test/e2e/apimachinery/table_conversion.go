@@ -18,24 +18,34 @@ package apimachinery
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/tabwriter"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
+
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
+
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
+
+	BeforeEach(func() {
+		framework.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
+	})
 
 	It("should return pod details", func() {
 		ns := f.Namespace.Name
@@ -45,11 +55,11 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.Logf("Creating pod %s", podName)
 
 		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", podName, ns)
 
-		table := &metav1alpha1.Table{}
-		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
-		Expect(err).NotTo(HaveOccurred())
+		table := &metav1beta1.Table{}
+		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
+		Expect(err).NotTo(HaveOccurred(), "failed to get pod %s in Table form in namespace: %s", podName, ns)
 		framework.Logf("Table: %#v", table)
 
 		Expect(len(table.ColumnDefinitions)).To(BeNumerically(">", 2))
@@ -70,7 +80,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		client := c.CoreV1().PodTemplates(ns)
 
 		By("creating a large number of resources")
-		workqueue.Parallelize(5, 20, func(i int) {
+		workqueue.ParallelizeUntil(context.TODO(), 5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
 				_, err := client.Create(&v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
@@ -92,16 +102,12 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			Fail("Unable to create template %d, exiting", i)
 		})
 
-		pagedTable := &metav1alpha1.Table{}
+		pagedTable := &metav1beta1.Table{}
 		err := c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Limit: 2}, metav1.ParameterCodec).
-			SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").
+			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
-		Expect(err).NotTo(HaveOccurred())
-		// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
-		if len(pagedTable.Rows) > 2 {
-			framework.Skipf("ERROR: This cluster does not support chunking, which means it is running etcd2 and not supported.")
-		}
+		Expect(err).NotTo(HaveOccurred(), "failed to get pod templates in Table form in namespace: %s", ns)
 		Expect(len(pagedTable.Rows)).To(Equal(2))
 		Expect(pagedTable.ResourceVersion).ToNot(Equal(""))
 		Expect(pagedTable.SelfLink).ToNot(Equal(""))
@@ -111,9 +117,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 
 		err = c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
-			SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").
+			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to get pod templates in Table form in namespace: %s", ns)
 		Expect(len(pagedTable.Rows)).To(BeNumerically(">", 0))
 		Expect(pagedTable.Rows[0].Cells[0]).To(Equal("template-0002"))
 	})
@@ -121,9 +127,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	It("should return generic metadata details across all namespaces for nodes", func() {
 		c := f.ClientSet
 
-		table := &metav1alpha1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
-		Expect(err).NotTo(HaveOccurred())
+		table := &metav1beta1.Table{}
+		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
+		Expect(err).NotTo(HaveOccurred(), "failed to get nodes in Table form across all namespaces")
 		framework.Logf("Table: %#v", table)
 
 		Expect(len(table.ColumnDefinitions)).To(BeNumerically(">=", 2))
@@ -141,18 +147,26 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	It("should return a 406 for a backend which does not implement metadata", func() {
 		c := f.ClientSet
 
-		table := &metav1alpha1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("services").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
-		Expect(err).To(HaveOccurred())
+		table := &metav1beta1.Table{}
+		sar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				NonResourceAttributes: &authorizationv1.NonResourceAttributes{
+					Path: "/",
+					Verb: "get",
+				},
+			},
+		}
+		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Body(sar).Do().Into(table)
+		Expect(err).To(HaveOccurred(), "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
 		Expect(err.(errors.APIStatus).Status().Code).To(Equal(int32(406)))
 	})
 })
 
-func printTable(table *metav1alpha1.Table) string {
+func printTable(table *metav1beta1.Table) string {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
 	err := printers.PrintTable(table, tw, printers.PrintOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to print table: %+v", table)
 	tw.Flush()
 	return buf.String()
 }

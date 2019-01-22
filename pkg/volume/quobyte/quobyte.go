@@ -22,17 +22,16 @@ import (
 	"path"
 	gostrings "strings"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -95,19 +94,23 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 		qm, _ := mounter.(*quobyteMounter)
 		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
-			glog.V(4).Infof("quobyte: can support")
+			klog.V(4).Infof("quobyte: can support")
 			return true
 		}
 	} else {
-		glog.V(4).Infof("quobyte: Error: %v", err)
+		klog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
 	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
-		glog.V(4).Infof("quobyte: can support: %s", string(out))
+		klog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
 
+	return false
+}
+
+func (plugin *quobytePlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -176,7 +179,7 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 		},
 		registry:     source.Registry,
 		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -256,12 +259,12 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	//if a trailing slash is missing we add it here
-	mountOptions := volume.JoinMountOptions(mounter.mountOptions, options)
+	mountOptions := util.JoinMountOptions(mounter.mountOptions, options)
 	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
 
-	glog.V(4).Infof("quobyte: mount set up: %s", dir)
+	klog.V(4).Infof("quobyte: mount set up: %s", dir)
 
 	return nil
 }
@@ -307,7 +310,7 @@ type quobyteVolumeDeleter struct {
 
 func (plugin *quobytePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Quobyte == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Quobyte is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.Quobyte is nil")
 	}
 
 	return plugin.newDeleterInternal(spec)
@@ -355,9 +358,13 @@ type quobyteVolumeProvisioner struct {
 	options volume.VolumeOptions
 }
 
-func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
+func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
+	if !util.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(provisioner.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisioner.plugin.GetPluginName())
 	}
 
 	if provisioner.options.PVC.Spec.Selector != nil {
@@ -410,7 +417,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		return nil, err
 	}
 	pv := new(v1.PersistentVolume)
-	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
+	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, util.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
 	pv.Spec.PersistentVolumeSource.Quobyte = vol
 	pv.Spec.PersistentVolumeReclaimPolicy = provisioner.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = provisioner.options.PVC.Spec.AccessModes

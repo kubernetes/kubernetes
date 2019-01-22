@@ -71,6 +71,22 @@ func NewHostSystem(host mo.HostSystem) *HostSystem {
 	return hs
 }
 
+func (h *HostSystem) eventArgument() *types.HostEventArgument {
+	return &types.HostEventArgument{
+		Host:                h.Self,
+		EntityEventArgument: types.EntityEventArgument{Name: h.Name},
+	}
+}
+
+func (h *HostSystem) eventArgumentParent() *types.ComputeResourceEventArgument {
+	parent := hostParent(&h.HostSystem)
+
+	return &types.ComputeResourceEventArgument{
+		ComputeResource:     parent.Self,
+		EntityEventArgument: types.EntityEventArgument{Name: parent.Name},
+	}
+}
+
 func hostParent(host *mo.HostSystem) *mo.ComputeResource {
 	switch parent := Map.Get(*host.Parent).(type) {
 	case *mo.ComputeResource:
@@ -97,9 +113,7 @@ func addComputeResource(s *types.ComputeResourceSummary, h *HostSystem) {
 // CreateDefaultESX creates a standalone ESX
 // Adds objects of type: Datacenter, Network, ComputeResource, ResourcePool and HostSystem
 func CreateDefaultESX(f *Folder) {
-	dc := &esx.Datacenter
-	f.putChild(dc)
-	createDatacenterFolders(dc, false)
+	dc := NewDatacenter(f)
 
 	host := NewHostSystem(esx.HostSystem)
 
@@ -137,9 +151,15 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	summary := new(types.ComputeResourceSummary)
 	addComputeResource(summary, host)
 
-	cr := &mo.ComputeResource{Summary: summary}
+	cr := &mo.ComputeResource{
+		ConfigurationEx: &types.ComputeResourceConfigInfo{
+			VmSwapPlacement: string(types.VirtualMachineConfigInfoSwapPlacementTypeVmDirectory),
+		},
+		Summary: summary,
+	}
 
 	Map.PutEntity(cr, Map.NewEntity(host))
+	host.Summary.Host = &host.Self
 
 	Map.PutEntity(cr, Map.NewEntity(pool))
 
@@ -151,6 +171,25 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	pool.Owner = cr.Self
 
 	return host, nil
+}
+
+func (h *HostSystem) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+	task := CreateTask(h, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if len(h.Vm) > 0 {
+			return nil, &types.ResourceInUse{}
+		}
+
+		f := Map.getEntityParent(h, "Folder").(*Folder)
+		f.removeChild(h.Reference())
+
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
 }
 
 func (h *HostSystem) EnterMaintenanceModeTask(spec *types.EnterMaintenanceMode_Task) soap.HasFault {

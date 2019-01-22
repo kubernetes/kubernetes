@@ -5,8 +5,10 @@ go_library(
     srcs = [
         "bool.go",
         "bool_slice.go",
+        "bytes.go",
         "count.go",
         "duration.go",
+        "duration_slice.go",
         "flag.go",
         "float32.go",
         "float64.go",
@@ -31,6 +33,7 @@ go_library(
         "uint8.go",
         "uint_slice.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/pflag",
     importpath = "github.com/spf13/pflag",
     visibility = ["//visibility:public"],
 )

@@ -45,7 +45,7 @@ type Element interface {
 	GetRecorded() interface{}
 
 	// HasLocal returns true if the field was explicitly
-	// present in the recorded source.  This is to differentiate between
+	// present in the local source.  This is to differentiate between
 	// undefined and set to null
 	HasLocal() bool
 
@@ -88,7 +88,7 @@ type FieldMetaImpl struct {
 	// Type is the openapi type of the field - "list", "primitive", "map"
 	Type string
 
-	// Name contains of the field
+	// Name contains name of the field
 	Name string
 }
 
@@ -276,8 +276,7 @@ func (s *CombinedMapSlice) UpsertRecorded(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.recorded = l
-	item.recordedSet = true
+	item.SetRecorded(l)
 	return nil
 }
 
@@ -289,8 +288,7 @@ func (s *CombinedMapSlice) UpsertLocal(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.local = l
-	item.localSet = true
+	item.SetLocal(l)
 	return nil
 }
 
@@ -302,8 +300,7 @@ func (s *CombinedMapSlice) UpsertRemote(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.remote = l
-	item.remoteSet = true
+	item.SetRemote(l)
 	return nil
 }
 
@@ -359,13 +356,13 @@ func (b *RawElementData) SetRecorded(value interface{}) {
 	b.recordedSet = true
 }
 
-// SetLocal sets the recorded value
+// SetLocal sets the local value
 func (b *RawElementData) SetLocal(value interface{}) {
 	b.local = value
 	b.localSet = true
 }
 
-// SetRemote sets the recorded value
+// SetRemote sets the remote value
 func (b *RawElementData) SetRemote(value interface{}) {
 	b.remote = value
 	b.remoteSet = true
@@ -418,4 +415,9 @@ func (e HasElementData) HasLocal() bool {
 // HasRemote implements Element.HasRemote
 func (e HasElementData) HasRemote() bool {
 	return e.remoteSet
+}
+
+// ConflictDetector defines the capability to detect conflict. An element can examine remote/recorded value to detect conflict.
+type ConflictDetector interface {
+	HasConflict() error
 }

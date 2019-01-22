@@ -76,24 +76,6 @@ func EncodeOrDie(e Encoder, obj Object) string {
 	return string(bytes)
 }
 
-// DefaultingSerializer invokes defaulting after decoding.
-type DefaultingSerializer struct {
-	Defaulter ObjectDefaulter
-	Decoder   Decoder
-	// Encoder is optional to allow this type to be used as both a Decoder and an Encoder
-	Encoder
-}
-
-// Decode performs a decode and then allows the defaulter to act on the provided object.
-func (d DefaultingSerializer) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := d.Decoder.Decode(data, defaultGVK, into)
-	if err != nil {
-		return obj, gvk, err
-	}
-	d.Defaulter.Default(obj)
-	return obj, gvk, nil
-}
-
 // UseOrCreateObject returns obj if the canonical ObjectKind returned by the provided typer matches gvk, or
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
 func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk schema.GroupVersionKind, obj Object) (Object, error) {
@@ -281,7 +263,7 @@ func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 // GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
 type GroupVersioners []GroupVersioner
 
-// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occured.
+// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occurred.
 func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)

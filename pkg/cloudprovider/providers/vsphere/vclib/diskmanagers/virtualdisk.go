@@ -17,10 +17,10 @@ limitations under the License.
 package diskmanagers
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 
@@ -65,7 +65,7 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 		virtualDisk.VolumeOptions.DiskFormat = vclib.ThinDiskType
 	}
 	if !virtualDisk.VolumeOptions.VerifyVolumeOptions() {
-		glog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
+		klog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
 		return "", vclib.ErrInvalidVolumeOptions
 	}
 	if virtualDisk.VolumeOptions.StoragePolicyID != "" && virtualDisk.VolumeOptions.StoragePolicyName != "" {
