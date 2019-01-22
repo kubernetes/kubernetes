@@ -35,7 +35,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -326,25 +325,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					By("Deleting second pod")
 					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
-
-				It("should not set different fsGroups for two pods simultaneously", func() {
-					fsGroup1, fsGroup2 := int64(1234), int64(4321)
-					By("Create first pod and check fsGroup is set")
-					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
-					By("Create second pod and check fsGroup is still the old one")
-					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup2, fsGroup1)
-					ep := &eventPatterns{
-						reason:  "AlreadyMountedVolume",
-						pattern: make([]string, 2),
-					}
-					ep.pattern = append(ep.pattern, fmt.Sprintf("The requested fsGroup is %d", fsGroup2))
-					ep.pattern = append(ep.pattern, "The volume may not be shareable.")
-					checkPodEvents(config, pod2.Name, ep)
-					By("Deleting first pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
-					By("Deleting second pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
-				})
 			})
 
 		})
@@ -354,11 +334,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		// TODO:
 		// - check for these errors in unit tests instead
 		It("should fail due to non-existent path", func() {
-			ep := &eventPatterns{
-				reason:  "FailedMount",
-				pattern: make([]string, 2)}
-			ep.pattern = append(ep.pattern, "MountVolume.NewMounter initialization failed")
-
 			testVol := &localTestVolume{
 				node:            config.node0,
 				hostDir:         "/non-existent/location/nowhere",
@@ -368,7 +343,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			createLocalPVCsPVs(config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(config, testVol, nil)
 			Expect(err).To(HaveOccurred())
-			checkPodEvents(config, pod.Name, ep)
+			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+			Expect(err).To(HaveOccurred())
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
 
@@ -376,12 +352,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			if len(config.nodes) < 2 {
 				framework.Skipf("Runs only when number of nodes >= 2")
 			}
-
-			ep := &eventPatterns{
-				reason:  "FailedMount",
-				pattern: make([]string, 2)}
-			ep.pattern = append(ep.pattern, "NodeSelectorTerm")
-			ep.pattern = append(ep.pattern, "MountVolume.NodeAffinity check failed")
 
 			testVols := setupLocalVolumesPVCsPVs(config, DirectoryLocalVolumeType, config.node0, 1, immediateMode)
 			testVol := testVols[0]
@@ -392,7 +362,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			Expect(err).To(HaveOccurred())
-			checkPodEvents(config, pod.Name, ep)
 
 			cleanupLocalVolumes(config, []*localTestVolume{testVol})
 		})
@@ -752,28 +721,6 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 
 	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
-}
-
-type eventPatterns struct {
-	reason  string
-	pattern []string
-}
-
-func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) {
-	var events *v1.EventList
-	selector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      podName,
-		"involvedObject.namespace": config.ns,
-		"reason":                   ep.reason,
-	}.AsSelector().String()
-	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := config.client.CoreV1().Events(config.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(events.Items)).NotTo(Equal(0))
-	for _, p := range ep.pattern {
-		Expect(events.Items[0].Message).To(ContainSubstring(p))
-	}
 }
 
 // The tests below are run against multiple mount point types
