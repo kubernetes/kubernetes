@@ -278,7 +278,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 		step := 1
 		if params[2].Known {
 			if params[2].Value <= 0 {
-				return input, fmt.Errorf("step must be >= 0")
+				return input, fmt.Errorf("step must be > 0")
 			}
 			step = params[2].Value
 		}
