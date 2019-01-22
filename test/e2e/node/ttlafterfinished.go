@@ -69,7 +69,7 @@ func testFinishedJob(f *framework.Framework) {
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
 	defer cleanupJob(f, job)
 
-	framework.Logf("Create a Job %s/%s with TTL", job.Namespace, job.Name)
+	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := framework.CreateJob(c, ns, job)
 	Expect(err).NotTo(HaveOccurred())
 
