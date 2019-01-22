@@ -93,7 +93,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	f = framework.NewDefaultFramework("daemonsets")
 
-	image := framework.ServeHostnameImage
+	image := NginxImage
 	dsName := "daemon-set"
 
 	var ns string
@@ -350,8 +350,15 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 
+		// Time to complete the rolling upgrade is proportional to the number of nodes in the cluster.
+		// Get the number of nodes, and set the timeout appropriately.
+		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		nodeCount := len(nodes.Items)
+		retryTimeout := dsRetryTimeout + time.Duration(nodeCount*30)*time.Second
+
 		By("Check that daemon pods images are updated.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, RedisImage, 1))
+		err = wait.PollImmediate(dsRetryPeriod, retryTimeout, checkDaemonPodsImageAndAvailability(c, ds, RedisImage, 1))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
