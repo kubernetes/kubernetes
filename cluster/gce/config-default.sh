@@ -218,6 +218,24 @@ fi
 # Enable AESGCM encryption of secrets by default.
 ENCRYPTION_PROVIDER_CONFIG="${ENCRYPTION_PROVIDER_CONFIG:-}"
 if [[ -z "${ENCRYPTION_PROVIDER_CONFIG}" ]]; then
+  # Use "gdd" if available in order to prevent the encryption secret from being empty due to macOS's "dd" not supporting the "iflag" operand.
+  if command -v gdd >/dev/null 2>&1; then
+    set +o pipefail
+    ENCRYPTION_PROVIDER_SECRET="$(gdd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')"
+    set -o pipefail
+  else
+    set +o pipefail
+    ENCRYPTION_PROVIDER_SECRET="$(dd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')"
+    set -o pipefail
+  fi
+  # Make extra sure we don't end up using an empty secret.
+  if [[ -z "${ENCRYPTION_PROVIDER_SECRET}" ]]; then
+    echo "Failed to generate a secret for the encryption provider."
+    echo "Please ensure that \"dd\" is present in your PATH."
+    echo "On macOS we recommend you install \"coreutils\" using Homebrew and add \"\$(brew --prefix coreutils)/libexec/gnubin\" to your PATH."
+    echo "Alternatively, you must specify a non-empty value for ENCRYPTION_PROVIDER_CONFIG directly."
+    exit 1
+  fi
     ENCRYPTION_PROVIDER_CONFIG=$(cat << EOM | base64 | tr -d '\r\n'
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -228,7 +246,7 @@ resources:
     - aesgcm:
         keys:
         - name: key1
-          secret: $(dd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')
+          secret: ${ENCRYPTION_PROVIDER_SECRET}
 EOM
 )
 fi
