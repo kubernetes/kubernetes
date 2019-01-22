@@ -126,9 +126,6 @@ func (f *FIFO) Delete(pod *v1.Pod) error {
 }
 
 // Pop removes the head of FIFO and returns it.
-// This is just a copy/paste of cache.Pop(queue Queue) from fifo.go that scheduler
-// has always been using. There is a comment in that file saying that this method
-// shouldn't be used in production code, but scheduler has always been using it.
 // This function does minimal error checking.
 func (f *FIFO) Pop() (*v1.Pod, error) {
 	result, err := f.FIFO.Pop(func(obj interface{}) error { return nil })
