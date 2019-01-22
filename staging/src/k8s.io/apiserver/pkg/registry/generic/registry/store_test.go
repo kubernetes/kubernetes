@@ -2108,3 +2108,47 @@ func TestDeletionFinalizersForGarbageCollection(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkAsDeleting(t *testing.T) {
+	now := time.Now()
+	soon := now.Add(time.Second)
+	past := now.Add(-time.Second)
+
+	newTimePointer := func(t time.Time) *metav1.Time {
+		metaTime := metav1.NewTime(t)
+		return &metaTime
+	}
+	testcases := []struct {
+		name                    string
+		deletionTimestamp       *metav1.Time
+		expectDeletionTimestamp *metav1.Time
+	}{
+		{
+			name:                    "unset",
+			deletionTimestamp:       nil,
+			expectDeletionTimestamp: newTimePointer(now),
+		},
+		{
+			name:                    "set to future",
+			deletionTimestamp:       newTimePointer(soon),
+			expectDeletionTimestamp: newTimePointer(now),
+		},
+		{
+			name:                    "set to past",
+			deletionTimestamp:       newTimePointer(past),
+			expectDeletionTimestamp: newTimePointer(past),
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			rs := &example.ReplicaSet{}
+			rs.DeletionTimestamp = tc.deletionTimestamp
+			if err := markAsDeleting(rs, now); err != nil {
+				t.Error(err)
+			}
+			if reflect.DeepEqual(*rs.DeletionTimestamp, tc.expectDeletionTimestamp) {
+				t.Errorf("expected %v, got %v", tc.expectDeletionTimestamp, *rs.DeletionTimestamp)
+			}
+		})
+	}
+}
