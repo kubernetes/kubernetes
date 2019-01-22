@@ -305,6 +305,12 @@ func (f *DeltaFIFO) willObjectBeDeletedLocked(id string) bool {
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
+	if actionType == InitialSync {
+		f.queue = append(f.queue, "")
+		f.cond.Broadcast()
+		return nil
+	}
+
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -409,6 +415,9 @@ func (f *DeltaFIFO) IsClosed() bool {
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
 func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
+	var item Deltas
+	var ok bool
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
@@ -427,12 +436,16 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
 		}
-		item, ok := f.items[id]
-		if !ok {
-			// Item may have been deleted subsequently.
-			continue
+		if id == "" {
+			item = []Delta{{InitialSync, nil}}
+		} else {
+			item, ok = f.items[id]
+			if !ok {
+				// Item may have been deleted subsequently.
+				continue
+			}
+			delete(f.items, id)
 		}
-		delete(f.items, id)
 		err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
 			f.addIfNotPresent(id, item)
@@ -482,10 +495,13 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		}
 
 		if !f.populated {
+			if err := f.queueActionLocked(InitialSync, nil); err != nil {
+				return err
+			}
 			f.populated = true
 			// While there shouldn't be any queued deletions in the initial
 			// population of the queue, it's better to be on the safe side.
-			f.initialPopulationCount = len(list) + queuedDeletions
+			f.initialPopulationCount = len(list) + queuedDeletions + 1
 		}
 
 		return nil
@@ -514,8 +530,11 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	}
 
 	if !f.populated {
+		if err := f.queueActionLocked(InitialSync, nil); err != nil {
+			return err
+		}
 		f.populated = true
-		f.initialPopulationCount = len(list) + queuedDeletions
+		f.initialPopulationCount = len(list) + queuedDeletions + 1
 	}
 
 	return nil
@@ -602,6 +621,9 @@ const (
 	//  * You've turned on periodic syncs.
 	// (Anything that trigger's DeltaFIFO's Replace() method.)
 	Sync DeltaType = "Sync"
+	// You'll get InitialSync event, right after all handlers from the
+	// initial sync are delivered.
+	InitialSync DeltaType = "InitialSync"
 )
 
 // Delta is the type stored by a DeltaFIFO. It tells you what change

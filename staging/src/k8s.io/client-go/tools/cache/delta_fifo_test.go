@@ -339,6 +339,7 @@ func TestDeltaFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 		// it should get a tombstone key with the right Obj.
 		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}}},
 		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
+		{{InitialSync, nil}},
 	}
 
 	for _, expected := range expectedList {
@@ -455,6 +456,13 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{}, "0") },
 			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{}, "0") },
+				func(f *DeltaFIFO) { Pop(f) },
+			},
 			expectedSynced: true,
 		},
 		{
@@ -473,6 +481,7 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *DeltaFIFO) { Pop(f) },
 				func(f *DeltaFIFO) { Pop(f) },
 				func(f *DeltaFIFO) { Pop(f) },
 			},

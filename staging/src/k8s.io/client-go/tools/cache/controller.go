@@ -180,13 +180,22 @@ type ResourceEventHandler interface {
 	OnDelete(obj interface{})
 }
 
+// FIXME: Change name and add comment.
+type ResourceEventHandler2 interface {
+	OnAdd(obj interface{})
+	OnUpdate(oldObj, newObj interface{})
+	OnDelete(obj interface{})
+	OnInitialSync()
+}
+
 // ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
 // as few of the notification functions as you want while still implementing
 // ResourceEventHandler.
 type ResourceEventHandlerFuncs struct {
-	AddFunc    func(obj interface{})
-	UpdateFunc func(oldObj, newObj interface{})
-	DeleteFunc func(obj interface{})
+	AddFunc         func(obj interface{})
+	UpdateFunc      func(oldObj, newObj interface{})
+	DeleteFunc      func(obj interface{})
+	InitialSyncFunc func()
 }
 
 // OnAdd calls AddFunc if it's not nil.
@@ -207,6 +216,13 @@ func (r ResourceEventHandlerFuncs) OnUpdate(oldObj, newObj interface{}) {
 func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 	if r.DeleteFunc != nil {
 		r.DeleteFunc(obj)
+	}
+}
+
+// On InitialSync calls InitialSyncFunc if it's not nil.
+func (r ResourceEventHandlerFuncs) OnInitialSync() {
+	if r.InitialSyncFunc != nil {
+		r.InitialSyncFunc()
 	}
 }
 

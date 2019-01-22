@@ -49,6 +49,8 @@ type SharedInformer interface {
 	// specified resync period.  Events to a single handler are delivered sequentially, but there is
 	// no coordination between different handlers.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
+	// FIXME: Add comment.
+	AddEventHandler2(handler ResourceEventHandler2)
 	// GetStore returns the Store.
 	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
@@ -186,6 +188,9 @@ type deleteNotification struct {
 	oldObj interface{}
 }
 
+type initialSyncNotification struct {
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
@@ -274,6 +279,10 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) {
 	s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
 }
 
+func (s *sharedIndexInformer) AddEventHandler2(handler ResourceEventHandler2) {
+	s.addHandler(handler, s.defaultEventHandlerResyncPeriod)
+}
+
 func determineResyncPeriod(desired, check time.Duration) time.Duration {
 	if desired == 0 {
 		return desired
@@ -292,6 +301,15 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) {
+	newHandler := ResourceEventHandlerFuncs{
+		AddFunc:    handler.OnAdd,
+		UpdateFunc: handler.OnUpdate,
+		DeleteFunc: handler.OnDelete,
+	}
+	s.addHandler(newHandler, resyncPeriod)
+}
+
+func (s *sharedIndexInformer) addHandler(handler ResourceEventHandler2, resyncPeriod time.Duration) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -339,6 +357,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
+	listener.add(initialSyncNotification{})
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -367,6 +386,8 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 				return err
 			}
 			s.processor.distribute(deleteNotification{oldObj: d.Object}, false)
+		case InitialSync:
+			s.processor.distribute(initialSyncNotification{}, false)
 		}
 	}
 	return nil
@@ -467,7 +488,7 @@ type processorListener struct {
 	nextCh chan interface{}
 	addCh  chan interface{}
 
-	handler ResourceEventHandler
+	handler ResourceEventHandler2
 
 	// pendingNotifications is an unbounded ring buffer that holds all notifications not yet distributed.
 	// There is one per listener, but a failing/stalled listener will have infinite pendingNotifications
@@ -488,7 +509,7 @@ type processorListener struct {
 	resyncLock sync.Mutex
 }
 
-func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
+func newProcessListener(handler ResourceEventHandler2, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
@@ -554,6 +575,8 @@ func (p *processorListener) run() {
 					p.handler.OnAdd(notification.newObj)
 				case deleteNotification:
 					p.handler.OnDelete(notification.oldObj)
+				case initialSyncNotification:
+					p.handler.OnInitialSync()
 				default:
 					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
 				}
