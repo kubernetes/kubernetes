@@ -39,18 +39,26 @@ var (
 	PodColumn       = "POD"
 )
 
-type ResourceMetricsInfo struct {
-	Name      string
+type PodMetricsInfo struct {
+	Namespace     string
+	PodName       string
+	ContainerName string
+	Metrics       v1.ResourceList
+}
+
+type NodeMetricsInfo struct {
+	NodeName  string
 	Metrics   v1.ResourceList
 	Available v1.ResourceList
 }
 
 type TopCmdPrinter struct {
-	out io.Writer
+	out    io.Writer
+	sortBy string
 }
 
-func NewTopCmdPrinter(out io.Writer) *TopCmdPrinter {
-	return &TopCmdPrinter{out: out}
+func NewTopCmdPrinter(out io.Writer, sortBy string) *TopCmdPrinter {
+	return &TopCmdPrinter{out, sortBy}
 }
 
 func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]v1.ResourceList, noHeaders bool) error {
@@ -60,9 +68,23 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
-	sort.Slice(metrics, func(i, j int) bool {
-		return metrics[i].Name < metrics[j].Name
-	})
+	if printer.sortBy == "cpu" {
+		sort.Slice(metrics, func(i, j int) bool {
+			qi := metrics[i].Usage[v1.ResourceCPU]
+			qj := metrics[j].Usage[v1.ResourceCPU]
+			return qi.Cmp(qj) < 0
+		})
+	} else if printer.sortBy == "memory" {
+		sort.Slice(metrics, func(i, j int) bool {
+			qi := metrics[i].Usage[v1.ResourceMemory]
+			qj := metrics[j].Usage[v1.ResourceMemory]
+			return qi.Cmp(qj) < 0
+		})
+	} else {
+		sort.Slice(metrics, func(i, j int) bool {
+			return metrics[i].Name < metrics[j].Name
+		})
+	}
 	if !noHeaders {
 		printColumnNames(w, NodeColumns)
 	}
@@ -72,11 +94,9 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 		if err != nil {
 			return err
 		}
-		printMetricsLine(w, &ResourceMetricsInfo{
-			Name:      m.Name,
-			Metrics:   usage,
-			Available: availableResources[m.Name],
-		})
+		printValue(w, m.Name)
+		printAllResourceUsages(w, usage, availableResources[m.Name])
+		fmt.Fprint(w, "\n")
 		delete(availableResources, m.Name)
 	}
 
@@ -102,19 +122,29 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		}
 		printColumnNames(w, PodColumns)
 	}
-
-	sort.Slice(metrics, func(i, j int) bool {
-		if withNamespace && metrics[i].Namespace != metrics[j].Namespace {
-			return metrics[i].Namespace < metrics[j].Namespace
-		}
-		return metrics[i].Name < metrics[j].Name
-	})
-	for _, m := range metrics {
-		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
-		if err != nil {
-			return err
-		}
+	infos, err := convert(metrics, printContainers)
+	if err != nil {
+		return err
 	}
+	if printer.sortBy == "cpu" {
+		sort.Slice(infos, func(i, j int) bool {
+			qi := infos[i].Metrics[v1.ResourceCPU]
+			qj := infos[j].Metrics[v1.ResourceCPU]
+			return qi.Cmp(qj) < 0
+		})
+	} else if printer.sortBy == "memory" {
+		sort.Slice(infos, func(i, j int) bool {
+			qi := infos[i].Metrics[v1.ResourceMemory]
+			qj := infos[j].Metrics[v1.ResourceMemory]
+			return qi.Cmp(qj) < 0
+		})
+	} else {
+		sort.Slice(metrics, func(i, j int) bool {
+			return metrics[i].Name < metrics[j].Name
+		})
+	}
+
+	printPodMetrics(w, infos, printContainers, withNamespace)
 	return nil
 }
 
@@ -124,58 +154,18 @@ func printColumnNames(out io.Writer, names []string) {
 	}
 	fmt.Fprint(out, "\n")
 }
-
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, printContainersOnly bool, withNamespace bool) error {
-	containers := make(map[string]v1.ResourceList)
-	podMetrics := make(v1.ResourceList)
-	for _, res := range MeasuredResources {
-		podMetrics[res], _ = resource.ParseQuantity("0")
-	}
-
-	for _, c := range m.Containers {
-		var usage v1.ResourceList
-		err := scheme.Scheme.Convert(&c.Usage, &usage, nil)
-		if err != nil {
-			return err
-		}
-		containers[c.Name] = usage
-		if !printContainersOnly {
-			for _, res := range MeasuredResources {
-				quantity := podMetrics[res]
-				quantity.Add(usage[res])
-				podMetrics[res] = quantity
-			}
-		}
-	}
-	if printContainersOnly {
-		for contName := range containers {
-			if withNamespace {
-				printValue(out, m.Namespace)
-			}
-			printValue(out, m.Name)
-			printMetricsLine(out, &ResourceMetricsInfo{
-				Name:      contName,
-				Metrics:   containers[contName],
-				Available: v1.ResourceList{},
-			})
-		}
-	} else {
+func printPodMetrics(out io.Writer, infos []PodMetricsInfo, printContainersOnly bool, withNamespace bool) {
+	for _, info := range infos {
 		if withNamespace {
-			printValue(out, m.Namespace)
+			printValue(out, info.Namespace)
 		}
-		printMetricsLine(out, &ResourceMetricsInfo{
-			Name:      m.Name,
-			Metrics:   podMetrics,
-			Available: v1.ResourceList{},
-		})
+		printValue(out, info.PodName)
+		if printContainersOnly {
+			printValue(out, info.ContainerName)
+		}
+		printAllResourceUsages(out, info.Metrics, v1.ResourceList{})
+		fmt.Fprint(out, "\n")
 	}
-	return nil
-}
-
-func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
-	printValue(out, metrics.Name)
-	printAllResourceUsages(out, metrics)
-	fmt.Fprint(out, "\n")
 }
 
 func printMissingMetricsNodeLine(out io.Writer, nodeName string) {
@@ -194,12 +184,12 @@ func printValue(out io.Writer, value interface{}) {
 	fmt.Fprintf(out, "%v\t", value)
 }
 
-func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
+func printAllResourceUsages(out io.Writer, metrics v1.ResourceList, available v1.ResourceList) {
 	for _, res := range MeasuredResources {
-		quantity := metrics.Metrics[res]
+		quantity := metrics[res]
 		printSingleResourceUsage(out, res, quantity)
 		fmt.Fprint(out, "\t")
-		if available, found := metrics.Available[res]; found {
+		if available, found := available[res]; found {
 			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
 			fmt.Fprintf(out, "%d%%\t", int64(fraction))
 		}
@@ -215,4 +205,46 @@ func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quant
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
+}
+
+func convert(metrics []metricsapi.PodMetrics, printContainersOnly bool) ([]PodMetricsInfo, error) {
+	var ret []PodMetricsInfo
+
+	for _, m := range metrics {
+		pm := v1.ResourceList{}
+		for _, res := range MeasuredResources {
+			pm[res], _ = resource.ParseQuantity("0")
+		}
+		for _, c := range m.Containers {
+			var cm v1.ResourceList
+			err := scheme.Scheme.Convert(&c.Usage, &cm, nil)
+			if err != nil {
+				return nil, err
+			}
+			if !printContainersOnly {
+				for _, res := range MeasuredResources {
+					quantity := pm[res]
+					quantity.Add(cm[res])
+					pm[res] = quantity
+				}
+
+			} else {
+				ret = append(ret, PodMetricsInfo{
+					Namespace:     m.Namespace,
+					PodName:       m.Name,
+					ContainerName: c.Name,
+					Metrics:       cm,
+				})
+			}
+		}
+		if !printContainersOnly {
+			ret = append(ret, PodMetricsInfo{
+				Namespace: m.Namespace,
+				PodName:   m.Name,
+				Metrics:   pm,
+			})
+		}
+	}
+
+	return ret, nil
 }

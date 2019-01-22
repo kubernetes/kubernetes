@@ -40,9 +40,11 @@ import (
 )
 
 type TopPodOptions struct {
-	ResourceName    string
-	Namespace       string
-	Selector        string
+	ResourceName string
+	Namespace    string
+	Selector     string
+	SortBy       string
+
 	AllNamespaces   bool
 	PrintContainers bool
 	NoHeaders       bool
@@ -105,6 +107,8 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "Sort the output by columns, supports 'cpu', 'memory'")
+
 	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -139,13 +143,16 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.PodClient = clientset.CoreV1()
 	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
-	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
+	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.SortBy)
 	return nil
 }
 
 func (o *TopPodOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
+	}
+	if o.SortBy != "cpu" && o.SortBy != "memory" {
+		return errors.New("sort-by option only supports cpu and memory")
 	}
 	return nil
 }

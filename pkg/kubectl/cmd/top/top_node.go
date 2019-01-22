@@ -40,6 +40,7 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
+	SortBy          string
 	NoHeaders       bool
 	NodeClient      corev1client.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
@@ -114,6 +115,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "Sort the output by columns, supports 'cpu', 'memory'")
 
 	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
@@ -145,13 +147,16 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.NodeClient = clientset.CoreV1()
 	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
-	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
+	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.SortBy)
 	return nil
 }
 
 func (o *TopNodeOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
+	}
+	if o.SortBy != "cpu" && o.SortBy != "memory" {
+		return errors.New("sort-by option only supports cpu and memory")
 	}
 	return nil
 }
