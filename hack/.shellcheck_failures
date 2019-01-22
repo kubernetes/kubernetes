@@ -56,10 +56,6 @@
 ./hack/build-cross.sh
 ./hack/build-go.sh
 ./hack/cherry_pick_pull.sh
-./hack/dev-build-and-push.sh
-./hack/dev-build-and-up.sh
-./hack/dev-push-conformance.sh
-./hack/dev-push-hyperkube.sh
 ./hack/e2e-internal/e2e-cluster-size.sh
 ./hack/e2e-internal/e2e-down.sh
 ./hack/e2e-internal/e2e-grow-cluster.sh
