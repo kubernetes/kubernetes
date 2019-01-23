@@ -237,6 +237,8 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: coredns
         image: {{ .Image }}
