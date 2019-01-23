@@ -40,7 +40,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/klog"
 )
 
@@ -176,56 +175,46 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	options := metav1.ListOptions{ResourceVersion: "0"}
 	r.metrics.numberOfLists.Inc()
 	start := r.clock.Now()
-	if err := func() error {
-		trace := utiltrace.New("Reflector_" + r.name + "_ListAndWatch")
-		defer trace.LogIfLong(10 * time.Second)
-		var list runtime.Object
-		var err error
-		listCh := make(chan struct{}, 1)
-		panicCh := make(chan interface{}, 1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					panicCh <- r
-				}
-			}()
-			list, err = r.listerWatcher.List(options)
-			close(listCh)
+
+	var list runtime.Object
+	var err error
+	listCh := make(chan struct{}, 1)
+	panicCh := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
 		}()
-		select {
-		case <-stopCh:
-			return nil
-		case r := <-panicCh:
-			panic(r)
-		case <-listCh:
-		}
-		if err != nil {
-			return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
-		}
-		trace.Step("Objects listed")
-		r.metrics.listDuration.Observe(time.Since(start).Seconds())
-		listMetaInterface, err := meta.ListAccessor(list)
-		if err != nil {
-			return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
-		}
-		resourceVersion = listMetaInterface.GetResourceVersion()
-		trace.Step("Resource version extracted")
-		items, err := meta.ExtractList(list)
-		if err != nil {
-			return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
-		}
-		trace.Step("Objects extracted")
-		r.metrics.numberOfItemsInList.Observe(float64(len(items)))
-		if err := r.syncWith(items, resourceVersion); err != nil {
-			return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
-		}
-		trace.Step("SyncWith done")
-		r.setLastSyncResourceVersion(resourceVersion)
-		trace.Step("Resource version updated")
+		list, err = r.listerWatcher.List(options)
+		close(listCh)
+	}()
+	select {
+	case <-stopCh:
 		return nil
-	}(); err != nil {
-		return err
+	case r := <-panicCh:
+		panic(r)
+	case <-listCh:
 	}
+	if err != nil {
+		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
+	}
+
+	r.metrics.listDuration.Observe(time.Since(start).Seconds())
+	listMetaInterface, err := meta.ListAccessor(list)
+	if err != nil {
+		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
+	}
+	resourceVersion = listMetaInterface.GetResourceVersion()
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
+	}
+	r.metrics.numberOfItemsInList.Observe(float64(len(items)))
+	if err := r.syncWith(items, resourceVersion); err != nil {
+		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
+	}
+	r.setLastSyncResourceVersion(resourceVersion)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
@@ -296,6 +285,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
+
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
 				klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
