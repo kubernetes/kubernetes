@@ -155,8 +155,6 @@
 ./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
-./staging/src/k8s.io/metrics/hack/update-codegen.sh
-./staging/src/k8s.io/metrics/hack/verify-codegen.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
