@@ -1880,7 +1880,94 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			"object source type (no current)",
+			"object source type target average value (no current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricSource{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
+									Name: "some-service",
+									Kind: "Service",
+								},
+								Metric: autoscalingv2beta2.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"object source type target average value (with current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricSource{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
+									Name: "some-service",
+									Kind: "Service",
+								},
+								Metric: autoscalingv2beta2.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
+						{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricStatus{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
+									Name: "some-service",
+									Kind: "Service",
+								},
+								Metric: autoscalingv2beta2.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Current: autoscalingv2beta2.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			"object source type target value (no current)",
 			autoscalingv2beta2.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
@@ -1915,7 +2002,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 			},
 		},
 		{
-			"object source type (with current)",
+			"object source type target value (with current)",
 			autoscalingv2beta2.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
