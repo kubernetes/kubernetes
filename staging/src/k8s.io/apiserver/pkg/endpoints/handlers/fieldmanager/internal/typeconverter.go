@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/typed"
+	"sigs.k8s.io/structured-merge-diff/value"
 	"sigs.k8s.io/yaml"
 )
 
@@ -32,6 +33,38 @@ type TypeConverter interface {
 	ObjectToTyped(runtime.Object) (typed.TypedValue, error)
 	YAMLToTyped([]byte) (typed.TypedValue, error)
 	TypedToObject(typed.TypedValue) (runtime.Object, error)
+}
+
+// DeducedTypeConverter is a TypeConverter for CRDs that don't have a
+// schema. It does implement the same interface though (and create the
+// same types of objects), so that everything can still work the same.
+// CRDs are merged with all their fields being "atomic" (lists
+// included).
+//
+// Note that this is not going to be sufficient for converting to/from
+// CRDs that have a schema defined (we don't support that schema yet).
+type DeducedTypeConverter struct{}
+
+var _ TypeConverter = DeducedTypeConverter{}
+
+// ObjectToTyped converts an object into a TypedValue with a "deduced type".
+func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return typed.TypedValue{}, err
+	}
+	return typed.DeducedParseableType{}.FromUnstructured(u)
+}
+
+// YAMLToTyped parses a yaml object into a TypedValue with a "deduced type".
+func (DeducedTypeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
+	return typed.DeducedParseableType{}.FromYAML(typed.YAMLObject(from))
+}
+
+// TypedToObject transforms the typed value into a runtime.Object. That
+// is not specific to deduced type.
+func (DeducedTypeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
+	return valueToObject(value.AsValue())
 }
 
 type typeConverter struct {
@@ -75,7 +108,11 @@ func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
 }
 
 func (c *typeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
-	vu := value.AsValue().ToUnstructured(false)
+	return valueToObject(value.AsValue())
+}
+
+func valueToObject(value *value.Value) (runtime.Object, error) {
+	vu := value.ToUnstructured(false)
 	u, ok := vu.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)
