@@ -27,8 +27,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
@@ -81,7 +82,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.InitConfiguration)
 // NewServiceAccountSigningKey generate public/private key pairs for signing service account tokens.
 func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
 	// The key does NOT exist, let's generate it now
-	saSigningKey, err := certutil.NewPrivateKey()
+	saSigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		return nil, errors.Wrap(err, "failure while creating service account token signing key")
 	}
