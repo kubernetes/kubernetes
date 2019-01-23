@@ -88,7 +88,7 @@ func assertDirEmpty(t *testing.T, path string) {
 func TestNewReset(t *testing.T) {
 	var in io.Reader
 	certsDir := kubeadmapiv1beta1.DefaultCertificatesDir
-	criSocketPath := kubeadmapiv1beta1.DefaultCRISocket
+	criSocketPath := kubeadmconstants.DefaultDockerCRISocket
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}
