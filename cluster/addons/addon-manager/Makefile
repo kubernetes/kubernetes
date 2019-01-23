@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+.PHONY: build push
+
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
@@ -20,11 +22,15 @@ KUBECTL_VERSION?=v1.11.3
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
 
-.PHONY: build push
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 all: build
 
 build:
+ifneq ($(ARCH),amd64)
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
