@@ -293,8 +293,8 @@ func NewEtcdMetricsCollector() *EtcdMetricsCollector {
 
 func getEtcdMetrics() ([]*model.Sample, error) {
 	// Etcd is only exposed on localhost level. We are using ssh method
-	if TestContext.Provider == "gke" {
-		Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+	if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+		Logf("Not grabbing etcd metrics through master SSH: unsupported for %s", TestContext.Provider)
 		return nil, nil
 	}
 
@@ -620,8 +620,8 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		responseText = string(body)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
-		if TestContext.Provider == "gke" {
-			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+		if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+			Logf("Not grabbing scheduler metrics through master SSH: unsupported for %s", TestContext.Provider)
 			return "", nil
 		}
 
