@@ -51,7 +51,7 @@ var _ TypeConverter = DeducedTypeConverter{}
 func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
-		return typed.TypedValue{}, err
+		return nil, err
 	}
 	return typed.DeducedParseableType{}.FromUnstructured(u)
 }
@@ -87,12 +87,12 @@ func NewTypeConverter(models proto.Models) (TypeConverter, error) {
 func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
-		return typed.TypedValue{}, err
+		return nil, err
 	}
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
-		return typed.TypedValue{}, fmt.Errorf("no corresponding type for %v", gvk)
+		return nil, fmt.Errorf("no corresponding type for %v", gvk)
 	}
 	return t.FromUnstructured(u)
 }
@@ -101,7 +101,7 @@ func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
 	unstructured := &unstructured.Unstructured{Object: map[string]interface{}{}}
 
 	if err := yaml.Unmarshal(from, &unstructured.Object); err != nil {
-		return typed.TypedValue{}, fmt.Errorf("error decoding YAML: %v", err)
+		return nil, fmt.Errorf("error decoding YAML: %v", err)
 	}
 
 	return c.ObjectToTyped(unstructured)
