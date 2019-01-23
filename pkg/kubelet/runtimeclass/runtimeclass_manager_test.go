@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/utils/pointer"
@@ -36,12 +37,11 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		{rcn: pointer.StringPtr(""), expected: ""},
 		{rcn: pointer.StringPtr(rctest.EmptyRuntimeClass), expected: ""},
 		{rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expected: "kata-containers"},
-		{rcn: pointer.StringPtr(rctest.InvalidRuntimeClass), expectError: true},
 		{rcn: pointer.StringPtr("phantom"), expectError: true},
 	}
 
-	manager := runtimeclass.NewManager(rctest.NewPopulatedDynamicClient())
-	defer rctest.StartManagerSync(t, manager)()
+	manager := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	defer rctest.StartManagerSync(manager)()
 
 	for _, test := range tests {
 		tname := "nil"
