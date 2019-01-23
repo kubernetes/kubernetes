@@ -463,7 +463,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodeLister{c.nodeLister},
 		Algorithm:           algo,
-		GetBinder:           getBinderFunc(c.client, extenders),
+		GetBinder:           GetBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
 		Framework:           c.framework,
@@ -479,7 +479,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 }
 
 // getBinderFunc returns a func which returns an extender that supports bind or a default binder based on the given pod.
-func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerExtender) func(pod *v1.Pod) Binder {
+func GetBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerExtender) func(pod *v1.Pod) Binder {
 	var extenderBinder algorithm.SchedulerExtender
 	for i := range extenders {
 		if extenders[i].IsBinder() {

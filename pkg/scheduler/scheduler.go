@@ -412,7 +412,7 @@ func New(client clientset.Interface,
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodeLister{nodeInformer.Lister()},
 		Algorithm:           algo,
-		GetBinder:           getBinderFunc(client, extenders),
+		GetBinder:           factory.GetBinderFunc(client, extenders),
 		PodConditionUpdater: &podConditionUpdater{client},
 		PodPreemptor:        &podPreemptor{client},
 		PluginSet:           pluginSet,

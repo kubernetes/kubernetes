@@ -450,12 +450,12 @@ func TestInvalidFactoryArgs(t *testing.T) {
 		expectErr                      string
 	}{
 		{
-			name:                           "symmetric weight below range",
+			name: "symmetric weight below range",
 			hardPodAffinitySymmetricWeight: -1,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
 		{
-			name:                           "symmetric weight above range",
+			name: "symmetric weight above range",
 			hardPodAffinitySymmetricWeight: 101,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},
@@ -605,7 +605,7 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	}
 
 	f := &configFactory{}
-	binderFunc := getBinderFunc(f.client, extenders)
+	binderFunc := GetBinderFunc(f.client, extenders)
 	binder := binderFunc(pod)
 
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
