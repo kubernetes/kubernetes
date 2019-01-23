@@ -376,7 +376,7 @@ func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
 // queue. If pod is unschedulable, it adds pod to unschedulable queue if
 // p.receivedMoveRequest is false or to backoff queue if p.receivedMoveRequest
 // is true but pod is subject to backoff. In other cases, it adds pod to active
-// queue.
+// queue and clears p.receivedMoveRequest.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -412,6 +412,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 		p.nominatedPods.add(pod, "")
 		p.cond.Broadcast()
 	}
+	p.receivedMoveRequest = false
 	return err
 }
 
@@ -469,8 +470,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
-// activeQ is empty and waits until a new item is added to the queue. It also
-// clears receivedMoveRequest to mark the beginning of a new scheduling cycle.
+// activeQ is empty and waits until a new item is added to the queue.
 func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -488,7 +488,6 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 		return nil, err
 	}
 	pod := obj.(*v1.Pod)
-	p.receivedMoveRequest = false
 	return pod, err
 }
 
