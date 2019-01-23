@@ -397,6 +397,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.options.Force != nil {
 		force = *p.options.Force
 	}
+	if p.fieldManager == nil {
+		panic("FieldManager must be installed to run apply")
+	}
 	return p.fieldManager.Apply(obj, p.patch, force)
 }
 
