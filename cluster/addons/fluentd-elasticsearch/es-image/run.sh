@@ -16,6 +16,7 @@
 
 set -ex
 
+HOSTNAME=$(hostname)
 export NODE_NAME=${NODE_NAME:-${HOSTNAME}}
 export NODE_MASTER=${NODE_MASTER:-true}
 export NODE_DATA=${NODE_DATA:-true}
