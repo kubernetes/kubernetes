@@ -466,8 +466,18 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 	return base64.RawURLEncoding.EncodeToString(out), nil
 }
 
-// List implements storage.Interface.List.
+// List calls storage.Interface.List by wrapping store.doList.
 func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	return s.doList(ctx, key, resourceVersion, pred, listObj, false)
+}
+
+// ListAll implements storage.Interface.ListAll by wrapping store.doList.
+func (s *store) ListAll(ctx context.Context, keyPrefix, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	return s.doList(ctx, keyPrefix, resourceVersion, pred, listObj, true)
+}
+
+// doList is a back-end for store.List & store.ListAll
+func (s *store) doList(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object, all bool) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -483,7 +493,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	// We need to make sure the key ended with "/" so that we only get children "directories".
 	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
 	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
-	if !strings.HasSuffix(key, "/") {
+	if !strings.HasSuffix(key, "/") && !all {
 		key += "/"
 	}
 	keyPrefix := key

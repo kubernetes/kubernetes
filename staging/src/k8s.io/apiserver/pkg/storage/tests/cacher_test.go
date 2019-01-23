@@ -351,6 +351,14 @@ type injectListError struct {
 	storage.Interface
 }
 
+func (self *injectListError) ListAll(ctx context.Context, keyPrefix string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
+	if self.errors > 0 {
+		self.errors--
+		return fmt.Errorf("injected error")
+	}
+	return self.Interface.ListAll(ctx, keyPrefix, resourceVersion, p, listObj)
+}
+
 func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--

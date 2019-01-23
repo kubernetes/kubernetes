@@ -17,7 +17,13 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -72,4 +78,25 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ev"}
+}
+
+// List returns a list of events matching labels and field according to the store's PredicateFunc.
+//
+// It adds involved object name to context to optimize events retrieving from etcd,
+// see registry.Store.ListPredicate(), etcd3.store.ListAll()
+func (r *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	label := labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
+	}
+	field := fields.Everything()
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
+	}
+	objectName, ok := r.Store.PredicateFunc(label, field).Field.RequiresExactMatch("involvedObject.name")
+	if ok {
+		ctx = genericapirequest.WithInvolvedObjectName(ctx, objectName)
+	}
+
+	return r.Store.List(ctx, options)
 }

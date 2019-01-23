@@ -74,6 +74,10 @@ func (s *DryRunnableStorage) List(ctx context.Context, key string, resourceVersi
 	return s.Storage.List(ctx, key, resourceVersion, p, listObj)
 }
 
+func (s *DryRunnableStorage) ListAll(ctx context.Context, keyPrefix string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
+	return s.Storage.ListAll(ctx, keyPrefix, resourceVersion, p, listObj)
+}
+
 func (s *DryRunnableStorage) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, suggestion ...runtime.Object) error {

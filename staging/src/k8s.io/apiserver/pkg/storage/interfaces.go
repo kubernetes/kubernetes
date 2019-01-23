@@ -183,6 +183,12 @@ type Interface interface {
 	// be have at least 'resourceVersion'.
 	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
+	// ListAll unmarshalls jsons found by key prefix and opaque them
+	// into *List api object (an object that satisfies runtime.IsList definition).
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	ListAll(ctx context.Context, keyPrefix string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
 	// Note that object passed to tryUpdate may change across invocations of tryUpdate() if

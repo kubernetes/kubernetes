@@ -91,3 +91,62 @@ func TestUserContext(t *testing.T) {
 	}
 
 }
+
+//TestUIDContext validates that a UID can be get/set on a context object
+func TestUIDContext(t *testing.T) {
+	ctx := genericapirequest.NewContext()
+	_, ok := genericapirequest.UIDFrom(ctx)
+	if ok {
+		t.Fatalf("Should not be ok because there is no UID on the context")
+	}
+	ctx = genericapirequest.WithUID(
+		ctx,
+		types.UID("testUID"),
+	)
+	_, ok = genericapirequest.UIDFrom(ctx)
+	if !ok {
+		t.Fatalf("Error getting UID")
+	}
+}
+
+//TestUserAgentContext validates that a useragent can be get/set on a context object
+func TestUserAgentContext(t *testing.T) {
+	ctx := genericapirequest.NewContext()
+	_, ok := genericapirequest.UserAgentFrom(ctx)
+	if ok {
+		t.Fatalf("Should not be ok because there is no UserAgent on the context")
+	}
+
+	ctx = genericapirequest.WithUserAgent(
+		ctx,
+		"TestUserAgent",
+	)
+	result, ok := genericapirequest.UserAgentFrom(ctx)
+	if !ok {
+		t.Fatalf("Error getting UserAgent")
+	}
+	expectedResult := "TestUserAgent"
+	if result != expectedResult {
+		t.Fatalf("Get user agent error, Expected: %s, Actual: %s", expectedResult, result)
+	}
+}
+
+// TestInvolvedObjectNameContext validates that a Involved Object Name  can be get/set on a context object
+func TestInvolvedObjectNameContext(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	_, ok := genericapirequest.InvolvedObjectNameFrom(ctx)
+	if ok {
+		t.Fatalf("Should not be ok because there is no Involved Object Name on the context")
+	}
+
+	expectedResult := "testID"
+	ctx = genericapirequest.WithInvolvedObjectName(ctx, expectedResult)
+	result, ok := genericapirequest.InvolvedObjectNameFrom(ctx)
+	if !ok {
+		t.Fatalf("Error getting Involved Object Name")
+	}
+
+	if result != expectedResult {
+		t.Fatalf("Get Involved Object Name error, Expected: %s, Actual: %s", expectedResult, result)
+	}
+}

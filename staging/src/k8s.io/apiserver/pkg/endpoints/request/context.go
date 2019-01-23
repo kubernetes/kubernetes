@@ -39,6 +39,9 @@ const (
 
 	// audiencesKey is the context key for request audiences.
 	audiencesKey
+	
+	// objectNameKey is the context key for the involved object name.
+	objectNameKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -93,4 +96,21 @@ func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
 func AuditEventFrom(ctx context.Context) *audit.Event {
 	ev, _ := ctx.Value(auditKey).(*audit.Event)
 	return ev
+}
+
+// WithInvolvedObjectName returns a copy of parent in which the involved object name value is set
+func WithInvolvedObjectName(parent context.Context, involvedObjectName string) context.Context {
+	return WithValue(parent, objectNameKey, involvedObjectName)
+}
+
+// InvolvedObjectNameFrom returns the value of the involved object name key on the ctx
+func InvolvedObjectNameFrom(ctx context.Context) (string, bool) {
+	involvedObjectName, ok := ctx.Value(objectNameKey).(string)
+	return involvedObjectName, ok
+}
+
+// InvolvedObjectNameValue returns the value of the involved object name key on the ctx, or the empty string if none
+func InvolvedObjectNameValue(ctx context.Context) string {
+	involvedObjectName, _ := InvolvedObjectNameFrom(ctx)
+	return involvedObjectName
 }
