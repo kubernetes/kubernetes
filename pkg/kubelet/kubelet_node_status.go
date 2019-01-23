@@ -137,6 +137,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 			node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			requiresUpdate = true
+			break
 		}
 	}
 	return requiresUpdate
