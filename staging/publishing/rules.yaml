@@ -1,3 +1,5 @@
+skip-source-branches:
+- release-1.10
 recursive-delete-patterns:
 - BUILD
 - "*/BUILD"
