@@ -360,7 +360,7 @@ function setup-logrotate() {
   #   day).
   # * keep only 5 old (rotated) logs, and will discard older logs.
   cat > /etc/logrotate.d/allvarlogs <<EOF
-/var/log/*.log {
+/var/log/*.log /var/run/docker/*.log {
     rotate ${LOGROTATE_FILES_MAX_COUNT:-5}
     copytruncate
     missingok
