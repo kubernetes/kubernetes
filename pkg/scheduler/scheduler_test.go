@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	corelister "k8s.io/client-go/listers/core/v1"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
@@ -87,13 +86,13 @@ func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
 	return nil
 }
 
-type nodeLister struct {
-	corelister.NodeLister
-}
+// type nodeLister struct {
+// 	corelister.NodeLister
+// }
 
-func (n *nodeLister) List() ([]*v1.Node, error) {
-	return n.NodeLister.List(labels.Everything())
-}
+// func (n *nodeLister) List() ([]*v1.Node, error) {
+// 	return n.NodeLister.List(labels.Everything())
+// }
 
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
@@ -275,7 +274,7 @@ func TestScheduler(t *testing.T) {
 			var gotBinding *v1.Binding
 
 			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
-			s := NewFromConfig(&factory.Config{
+			s := &Scheduler{
 				SchedulerCache: &fakecache.Cache{
 					ForgetFunc: func(pod *v1.Pod) {
 						gotForgetPod = pod
@@ -303,7 +302,7 @@ func TestScheduler(t *testing.T) {
 				Framework:    fwk,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-			})
+			}
 			called := make(chan struct{})
 			events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 				if e, a := item.eventReason, e.Reason; e != a {
@@ -658,7 +657,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 
-	config := &factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
 		Algorithm:      algo,
@@ -682,11 +681,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	}
 
 	if recorder != nil {
-		config.Recorder = recorder
+		sched.Recorder = recorder
 	}
-
-	sched := NewFromConfig(config)
-
 	return sched, bindingChan, errChan
 }
 
@@ -710,7 +706,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 
-	sched := NewFromConfig(&factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
 		Algorithm:      algo,
@@ -736,7 +732,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		StopEverything:      stop,
 		Framework:           framework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-	})
+	}
 
 	return sched, bindingChan
 }
@@ -763,7 +759,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, predicateMap, recorder)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
-	s.config.VolumeBinder = fakeVolumeBinder
+	s.VolumeBinder = fakeVolumeBinder
 	return s, bindingChan, errChan
 }
 

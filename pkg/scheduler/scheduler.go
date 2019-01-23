@@ -269,6 +269,8 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, err
 		}
+		predicateKeys = provider.FitPredicateKeys
+		priorityKeys = provider.PriorityFunctionKeys
 		// sc, err := CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 		// if err != nil {
 		// 	return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
@@ -340,7 +342,7 @@ func New(client clientset.Interface,
 		// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
 		// Give it higher precedence than scheduler CLI configuration when it is provided.
 		if policy.HardPodAffinitySymmetricWeight != 0 {
-			hardPodAffinitySymmetricWeight := policy.HardPodAffinitySymmetricWeight
+			options.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 		}
 		// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
 		// predicates even after one or more of them fails.
