@@ -50,6 +50,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/ec2metadata:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/autoscaling:go_default_library",
