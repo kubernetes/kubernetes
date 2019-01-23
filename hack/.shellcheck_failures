@@ -165,8 +165,6 @@
 ./staging/src/k8s.io/kube-aggregator/hack/verify-codegen.sh
 ./staging/src/k8s.io/metrics/hack/update-codegen.sh
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
-./staging/src/k8s.io/node-api/hack/update-codegen.sh
-./staging/src/k8s.io/node-api/hack/verify-codegen.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
