@@ -1,6 +1,3 @@
-skip-source-branches:
-- release-1.5
-- release-1.6
 recursive-delete-patterns:
 - BUILD
 - "*/BUILD"
@@ -14,15 +11,6 @@ rules:
       branch: master
       dir: staging/src/k8s.io/code-generator
     name: master
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/code-generator
-  #   name: release-1.8
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/code-generator
-  #  name: release-1.9
-  #  go: 1.9.7
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/code-generator
@@ -50,23 +38,6 @@ rules:
       branch: master
       dir: staging/src/k8s.io/apimachinery
     name: master
-  # - source:
-  #     branch: release-1.6
-  #     dir: staging/src/k8s.io/apimachinery
-  #   name: release-1.6
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/apimachinery
-  #   name: release-1.7
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/apimachinery
-  #   name: release-1.8
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/apimachinery
-  #  name: release-1.9
-  #  go: 1.9.7
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/apimachinery
@@ -97,21 +68,6 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/api
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/api
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/api
@@ -156,43 +112,6 @@ rules:
       branch: master
     - repository: api
       branch: master
-  # - source:
-  #     branch: release-1.5
-  #     dir: staging/src/k8s.io/client-go
-  #   name: release-2.0
-  # - source:
-  #     branch: release-1.6
-  #     dir: staging/src/k8s.io/client-go
-  #   name: release-3.0
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.6
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/client-go
-  #   name: release-4.0
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/client-go
-  #   name: release-5.0
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  # - source:
-  #   branch: release-1.9
-  #    dir: staging/src/k8s.io/client-go
-  #  name: release-6.0
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/client-go
@@ -267,47 +186,6 @@ rules:
       branch: master
     - repository: component-base
       branch: master
-  # - source:
-  #     branch: release-1.6
-  #     dir: staging/src/k8s.io/apiserver
-  #   name: release-1.6
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.6
-  #   - repository: client-go
-  #     branch: release-3.0
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/apiserver
-  #   name: release-1.7
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  #   - repository: client-go
-  #     branch: release-4.0
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/apiserver
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  #   - repository: client-go
-  #     branch: release-5.0
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/apiserver
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/apiserver
@@ -373,55 +251,6 @@ rules:
       branch: master
     - repository: component-base
       branch: master
-  # - source:
-  #     branch: release-1.6
-  #     dir: staging/src/k8s.io/kube-aggregator
-  #   name: release-1.6
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.6
-  #   - repository: client-go
-  #     branch: release-3.0
-  #   - repository: apiserver
-  #     branch: release-1.6
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/kube-aggregator
-  #   name: release-1.7
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  #   - repository: client-go
-  #     branch: release-4.0
-  #   - repository: apiserver
-  #     branch: release-1.7
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/kube-aggregator
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  #   - repository: client-go
-  #     branch: release-5.0
-  #   - repository: apiserver
-  #     branch: release-1.8
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/kube-aggregator
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
-  #  - repository: apiserver
-  #    branch: release-1.9
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/kube-aggregator
@@ -499,63 +328,6 @@ rules:
       branch: master
     required-packages:
     - k8s.io/code-generator
-  # - source:
-  #     branch: release-1.6
-  #     dir: staging/src/k8s.io/sample-apiserver
-  #   name: release-1.6
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.6
-  #   - repository: client-go
-  #     branch: release-3.0
-  #   - repository: apiserver
-  #     branch: release-1.6
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/sample-apiserver
-  #   name: release-1.7
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  #   - repository: client-go
-  #     branch: release-4.0
-  #   - repository: apiserver
-  #     branch: release-1.7
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/sample-apiserver
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  #   - repository: client-go
-  #     branch: release-5.0
-  #   - repository: apiserver
-  #     branch: release-1.8
-  #   - repository: code-generator
-  #     branch: release-1.8
-  #   required-packages:
-  #   - k8s.io/code-generator
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/sample-apiserver
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
-  #  - repository: apiserver
-  #    branch: release-1.9
-  #  - repository: code-generator
-  #    branch: release-1.9
-  #  required-packages:
-  #  - k8s.io/code-generator
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/sample-apiserver
@@ -655,22 +427,6 @@ rules:
       branch: master
     required-packages:
     - k8s.io/code-generator
-  # - source:
-  #   branch: release-1.9
-  #    dir: staging/src/k8s.io/sample-controller
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
-  #  - repository: code-generator
-  #    branch: release-1.9
-  #  required-packages:
-  #  - k8s.io/code-generator
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/sample-controller
@@ -765,52 +521,6 @@ rules:
       branch: master
     required-packages:
     - k8s.io/code-generator
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/apiextensions-apiserver
-  #   name: release-1.7
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  #   - repository: client-go
-  #     branch: release-4.0
-  #   - repository: apiserver
-  #     branch: release-1.7
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/apiextensions-apiserver
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  #   - repository: client-go
-  #     branch: release-5.0
-  #   - repository: apiserver
-  #     branch: release-1.8
-  #   - repository: code-generator
-  #     branch: release-1.8
-  #   required-packages:
-  #   - k8s.io/code-generator
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/apiextensions-apiserver
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
-  #  - repository: apiserver
-  #    branch: release-1.9
-  #  - repository: code-generator
-  #    branch: release-1.9
-  #  required-packages:
-  #  - k8s.io/code-generator
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/apiextensions-apiserver
@@ -897,38 +607,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-  # - source:
-  #     branch: release-1.7
-  #     dir: staging/src/k8s.io/metrics
-  #   name: release-1.7
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.7
-  #   - repository: client-go
-  #     branch: release-4.0
-  # - source:
-  #     branch: release-1.8
-  #     dir: staging/src/k8s.io/metrics
-  #   name: release-1.8
-  #   dependencies:
-  #   - repository: apimachinery
-  #     branch: release-1.8
-  #   - repository: api
-  #     branch: release-1.8
-  #   - repository: client-go
-  #     branch: release-5.0
-  # - source:
-  #    branch: release-1.9
-  #    dir: staging/src/k8s.io/metrics
-  #  name: release-1.9
-  #  go: 1.9.7
-  #  dependencies:
-  #  - repository: apimachinery
-  #    branch: release-1.9
-  #  - repository: api
-  #    branch: release-1.9
-  #  - repository: client-go
-  #    branch: release-6.0
   - source:
       branch: release-1.10
       dir: staging/src/k8s.io/metrics
