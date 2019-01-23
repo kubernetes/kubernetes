@@ -316,7 +316,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 
 	parameters := map[string]string{"type": "pd-standard"}
 	if fsType != "" {
-		parameters["fsType"] = fsType
+		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -422,7 +422,7 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 
 	parameters := map[string]string{"type": "pd-standard"}
 	if fsType != "" {
-		parameters["fsType"] = fsType
+		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
