@@ -4879,6 +4879,7 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_core_PersistentVolumeClaimSta
 	out.AccessModes = *(*[]core.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
 	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]core.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
+	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	return nil
 }
 
@@ -4892,6 +4893,7 @@ func autoConvert_core_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimSta
 	out.AccessModes = *(*[]v1.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
 	out.Capacity = *(*v1.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]v1.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
+	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	return nil
 }
 
@@ -4903,6 +4905,9 @@ func Convert_core_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimStatus(
 func autoConvert_v1_PersistentVolumeClaimVolumeSource_To_core_PersistentVolumeClaimVolumeSource(in *v1.PersistentVolumeClaimVolumeSource, out *core.PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	out.ClaimName = in.ClaimName
 	out.ReadOnly = in.ReadOnly
+	if err := metav1.Convert_Pointer_string_To_string(&in.PermissionChangePolicy, &out.PermissionChangePolicy, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -4914,6 +4919,9 @@ func Convert_v1_PersistentVolumeClaimVolumeSource_To_core_PersistentVolumeClaimV
 func autoConvert_core_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(in *core.PersistentVolumeClaimVolumeSource, out *v1.PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	out.ClaimName = in.ClaimName
 	out.ReadOnly = in.ReadOnly
+	if err := metav1.Convert_string_To_Pointer_string(&in.PermissionChangePolicy, &out.PermissionChangePolicy, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -7464,7 +7472,15 @@ func autoConvert_v1_VolumeSource_To_core_VolumeSource(in *v1.VolumeSource, out *
 	out.NFS = (*core.NFSVolumeSource)(unsafe.Pointer(in.NFS))
 	out.ISCSI = (*core.ISCSIVolumeSource)(unsafe.Pointer(in.ISCSI))
 	out.Glusterfs = (*core.GlusterfsVolumeSource)(unsafe.Pointer(in.Glusterfs))
-	out.PersistentVolumeClaim = (*core.PersistentVolumeClaimVolumeSource)(unsafe.Pointer(in.PersistentVolumeClaim))
+	if in.PersistentVolumeClaim != nil {
+		in, out := &in.PersistentVolumeClaim, &out.PersistentVolumeClaim
+		*out = new(core.PersistentVolumeClaimVolumeSource)
+		if err := Convert_v1_PersistentVolumeClaimVolumeSource_To_core_PersistentVolumeClaimVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeClaim = nil
+	}
 	out.RBD = (*core.RBDVolumeSource)(unsafe.Pointer(in.RBD))
 	out.FlexVolume = (*core.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
 	out.Cinder = (*core.CinderVolumeSource)(unsafe.Pointer(in.Cinder))
@@ -7508,7 +7524,15 @@ func autoConvert_core_VolumeSource_To_v1_VolumeSource(in *core.VolumeSource, out
 	out.NFS = (*v1.NFSVolumeSource)(unsafe.Pointer(in.NFS))
 	out.ISCSI = (*v1.ISCSIVolumeSource)(unsafe.Pointer(in.ISCSI))
 	out.Glusterfs = (*v1.GlusterfsVolumeSource)(unsafe.Pointer(in.Glusterfs))
-	out.PersistentVolumeClaim = (*v1.PersistentVolumeClaimVolumeSource)(unsafe.Pointer(in.PersistentVolumeClaim))
+	if in.PersistentVolumeClaim != nil {
+		in, out := &in.PersistentVolumeClaim, &out.PersistentVolumeClaim
+		*out = new(v1.PersistentVolumeClaimVolumeSource)
+		if err := Convert_core_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PersistentVolumeClaim = nil
+	}
 	out.RBD = (*v1.RBDVolumeSource)(unsafe.Pointer(in.RBD))
 	out.Quobyte = (*v1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.FlexVolume = (*v1.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))

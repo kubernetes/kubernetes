@@ -334,13 +334,6 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
 			return nil
 		}
-
-		err := volume.SetVolumeOwnership(c, fsGroup)
-		if err != nil {
-			return err
-		}
-
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
 	}
 
 	return nil

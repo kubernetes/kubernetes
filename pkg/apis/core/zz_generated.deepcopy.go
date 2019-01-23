@@ -2747,6 +2747,11 @@ func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimSt
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.FSGroup != nil {
+		in, out := &in.FSGroup, &out.FSGroup
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

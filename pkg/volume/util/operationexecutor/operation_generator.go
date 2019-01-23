@@ -565,6 +565,19 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(fsGroup)
+
+		// TODO: (_alastor_)
+		source := volumeToMount.VolumeSpec.Volume.VolumeSource.PersistentVolumeClaim
+		name := source.ClaimName
+		pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(volumeToMount.Pod.Namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return volumeToMount.GenerateError("CoreV1.PersistentVolumeClaims failed", err)
+		}
+		err = util.ChangePVCOwnership(pvc, source, volumeMounter, fsGroup)
+		if err != nil {
+			return volumeToMount.GenerateError("Util.ChangePVCOwnership failed", err)
+		}
+
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)

@@ -241,6 +241,11 @@ type PersistentVolumeClaimVolumeSource struct {
 	// will force the ReadOnly setting in VolumeMounts
 	// +optional
 	ReadOnly bool
+	// "NoChange" - Don't change permissions and ownership.  "Always" - Always change the permissions and ownership
+	// to match fsGroup. This is the current behavior and it will be the default one when this proposal is
+	// implemented.  "OnDemand" - Only change permissions when fsGroup of pod and PVC don't match.
+	// +optional
+	PermissionChangePolicy string
 }
 
 const (
@@ -460,6 +465,9 @@ type PersistentVolumeClaimStatus struct {
 	Capacity ResourceList
 	// +optional
 	Conditions []PersistentVolumeClaimCondition
+	// FSGroup of PVC
+	// +optional
+	FSGroup *int64
 }
 
 type PersistentVolumeAccessMode string

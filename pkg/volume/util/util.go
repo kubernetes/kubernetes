@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/klog"
+
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -950,5 +951,25 @@ func MapBlockVolume(
 		return mapErr
 	}
 
+	return nil
+}
+
+// ChangePVCOwnership is a utility function to provide a common way of applying
+// conditional PVC ownership changes during a mount operation based on the current
+// values of PersistentVolumeClaimVolumeSource.PermissionChangePolicy and
+// PersistentVolumeClaimStatus.FSGroup value.
+func ChangePVCOwnership(pvc *v1.PersistentVolumeClaim, source *v1.PersistentVolumeClaimVolumeSource, mounter volume.Mounter, fsGroup *int64) error {
+	if *source.PermissionChangePolicy != "NoChange" {
+		if *source.PermissionChangePolicy == "Always" || pvc.Status.FSGroup != fsGroup {
+			klog.V(4).Infof("PermissionChangePolicy for %s is set to '%s'.  Original FSGroup: %d, New FSGroup %d", pvc.Name, *source.PermissionChangePolicy, *(pvc.Status.FSGroup), *fsGroup)
+			err := volume.SetVolumeOwnership(mounter, fsGroup)
+			if err != nil {
+				return err
+			}
+		}
+
+	} else {
+		klog.V(4).Infof("PermissionChangePolicy for %s is set to 'NoChange'.  Volume Ownership will not be changed", pvc.Name)
+	}
 	return nil
 }

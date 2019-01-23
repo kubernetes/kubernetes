@@ -165,6 +165,11 @@ type PersistentVolumeClaimVolumeSource struct {
 	// Default false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	// "NoChange" - Don't change permissions and ownership.  "Always" - Always change the permissions and ownership
+	// to match fsGroup. This is the current behavior and it will be the default one when this proposal is
+	// implemented.  "OnDemand" - Only change permissions when fsGroup of pod and PVC don't match.
+	// +optional
+	PermissionChangePolicy *string `json:"permissionChangePolicy,omitempty" protobuf:"bytes,3,opt,name=permissionChangePolicy"`
 }
 
 // PersistentVolumeSource is similar to VolumeSource but meant for the
@@ -518,6 +523,8 @@ type PersistentVolumeClaimStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
+	// +optional
+	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
 }
 
 type PersistentVolumeAccessMode string
