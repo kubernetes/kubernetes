@@ -21,7 +21,6 @@ set -o pipefail
 run_kubeadm_tests() {
   set -o nounset
   set -o errexit
-  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
   KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/cluster/kubeadm.sh}"
 
