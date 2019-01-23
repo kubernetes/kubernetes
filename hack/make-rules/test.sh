@@ -149,7 +149,7 @@ while getopts "hp:i:" opt ; do
       exit 0
       ;;
     p)
-      PARALLEL="$OPTARG"
+      PARALLEL="${OPTARG}"
       if ! isnum "${PARALLEL}" || [[ "${PARALLEL}" -le 0 ]]; then
         kube::log::usage "'$0': argument to -p must be numeric and greater than 0"
         kube::test::usage
@@ -166,7 +166,7 @@ while getopts "hp:i:" opt ; do
       exit 1
       ;;
     :)
-      kube::log::usage "Option -$OPTARG <value>"
+      kube::log::usage "Option -${OPTARG} <value>"
       kube::test::usage
       exit 1
       ;;
@@ -223,15 +223,15 @@ verifyAndSuggestPackagePath() {
   local original_package_path="$3"
   local suggestion_package_path="$4"
 
-  if ! [ -d "$specified_package_path" ]; then
+  if ! [ -d "${specified_package_path}" ]; then
     # Because k8s sets a localized $GOPATH for testing, seeing the actual
     # directory can be confusing. Instead, just show $GOPATH if it exists in the
     # $specified_package_path.
-    local printable_package_path=$(echo "$specified_package_path" | sed "s|$GOPATH|\$GOPATH|")
-    kube::log::error "specified test path '$printable_package_path' does not exist"
+    local printable_package_path=$(echo "${specified_package_path}" | sed "s|${GOPATH}|\${GOPATH}|")
+    kube::log::error "specified test path '${printable_package_path}' does not exist"
 
-    if [ -d "$alternative_package_path" ]; then
-      kube::log::info "try changing \"$original_package_path\" to \"$suggestion_package_path\""
+    if [ -d "${alternative_package_path}" ]; then
+      kube::log::info "try changing \"${original_package_path}\" to \"${suggestion_package_path}\""
     fi
     exit 1
   fi
@@ -241,13 +241,13 @@ verifyPathsToPackagesUnderTest() {
   local packages_under_test=($@)
 
   for package_path in "${packages_under_test[@]}"; do
-    local local_package_path="$package_path"
-    local go_package_path="$GOPATH/src/$package_path"
+    local local_package_path="${package_path}"
+    local go_package_path="${GOPATH}/src/${package_path}"
 
     if [[ "${package_path:0:2}" == "./" ]] ; then
-      verifyAndSuggestPackagePath "$local_package_path" "$go_package_path" "$package_path" "${package_path:2}"
+      verifyAndSuggestPackagePath "${local_package_path}" "${go_package_path}" "${package_path}" "${package_path:2}"
     else
-      verifyAndSuggestPackagePath "$go_package_path" "$local_package_path" "$package_path" "./$package_path"
+      verifyAndSuggestPackagePath "${go_package_path}" "${local_package_path}" "${package_path}" "./${package_path}"
     fi
   done
 }
@@ -317,7 +317,7 @@ runTests() {
   #                            https://github.com/golang/go/issues/16540
   cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
   for path in $(echo ${cover_ignore_dirs} | sed 's/|/ /g'); do
-      echo -e "skipped\tk8s.io/kubernetes/$path"
+      echo -e "skipped\tk8s.io/kubernetes/${path}"
   done
 
   printf "%s\n" "${@}" \

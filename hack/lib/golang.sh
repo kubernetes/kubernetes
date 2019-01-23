@@ -88,10 +88,10 @@ readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
 if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
-  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
   readonly KUBE_SERVER_PLATFORMS
   readonly KUBE_NODE_PLATFORMS
   readonly KUBE_TEST_PLATFORMS
@@ -268,11 +268,11 @@ kube::golang::is_statically_linked_library() {
   [[ "$(go env GOHOSTOS)" == "darwin" && "$(go env GOOS)" == "darwin" &&
     "$1" == *"/kubectl" ]] && return 1
   if [[ -n "${KUBE_CGO_OVERRIDES:+x}" ]]; then
-    for e in "${KUBE_CGO_OVERRIDES[@]}"; do [[ "$1" == *"/$e" ]] && return 1; done;
+    for e in "${KUBE_CGO_OVERRIDES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   fi
-  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   if [[ -n "${KUBE_STATIC_OVERRIDES:+x}" ]]; then
-    for e in "${KUBE_STATIC_OVERRIDES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+    for e in "${KUBE_STATIC_OVERRIDES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
   return 1;
 }
@@ -426,7 +426,7 @@ kube::golang::setup_env() {
   # resultant binaries.  Go will not let us use GOBIN with `go install` and
   # cross-compiling, and `go install -o <file>` only works for a single pkg.
   local subdir
-  subdir=$(kube::realpath . | sed "s|$KUBE_ROOT||")
+  subdir=$(kube::realpath . | sed "s|${KUBE_ROOT}||")
   cd "${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}/${subdir}"
 
   # Set GOROOT so binaries that parse code can work properly.
@@ -458,7 +458,7 @@ kube::golang::place_bins() {
     # The substitution on platform_src below will replace all slashes with
     # underscores.  It'll transform darwin/amd64 -> darwin_amd64.
     local platform_src="/${platform//\//_}"
-    if [[ "$platform" == "$host_platform" ]]; then
+    if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
       rm -f "${THIS_PLATFORM_BIN}"
       ln -s "${KUBE_OUTPUT_BINPATH}/${platform}" "${THIS_PLATFORM_BIN}"
@@ -479,7 +479,7 @@ kube::golang::outfile_for_binary() {
   local binary=$1
   local platform=$2
   local output_path="${KUBE_GOPATH}/bin"
-  if [[ "$platform" != "$host_platform" ]]; then
+  if [[ "${platform}" != "${host_platform}" ]]; then
     output_path="${output_path}/${platform//\//_}"
   fi
   local bin=$(basename "${binary}")
@@ -502,7 +502,7 @@ kube::golang::path_for_coverage_dummy_test() {
   local package="$1"
   local path="${KUBE_GOPATH}/src/${package}"
   local name=$(basename "${package}")
-  echo "$path/zz_generated_${name}_test.go"
+  echo "${path}/zz_generated_${name}_test.go"
 }
 
 # Argument: the name of a Kubernetes package (e.g. k8s.io/kubernetes/cmd/kube-scheduler).

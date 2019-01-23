@@ -45,9 +45,9 @@ kube::util::wait_for_url() {
   }
 
   local i
-  for i in $(seq 1 "$times"); do
+  for i in $(seq 1 "${times}"); do
     local out
-    if out=$(curl --max-time "$maxtime" -gkfs "$url" 2>/dev/null); then
+    if out=$(curl --max-time "${maxtime}" -gkfs "${url}" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -441,11 +441,11 @@ kube::util::ensure_no_staging_repos_in_gopath() {
   kube::util::ensure_single_dir_gopath
   local error=0
   for repo_file in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
-    if [[ ! -d "$repo_file" ]]; then
+    if [[ ! -d "${repo_file}" ]]; then
       # not a directory or there were no files
       continue;
     fi
-    repo="$(basename "$repo_file")"
+    repo="$(basename "${repo_file}")"
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
       echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
       error=1
@@ -722,7 +722,7 @@ function kube::util::ensure-cfssl {
   mkdir -p "${cfssldir}"
   pushd "${cfssldir}" > /dev/null
 
-    echo "Unable to successfully run 'cfssl' from $PATH; downloading instead..."
+    echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
     kernel=$(uname -s)
     case "${kernel}" in
       Linux)
