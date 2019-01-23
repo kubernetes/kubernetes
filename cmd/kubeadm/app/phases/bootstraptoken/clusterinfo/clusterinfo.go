@@ -41,9 +41,9 @@ const (
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
 func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
 
-	fmt.Printf("[bootstraptoken] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
+	fmt.Printf("[bootstrap-token] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
-	klog.V(1).Infoln("[bootstraptoken] loading admin kubeconfig")
+	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
 		return errors.Wrap(err, "failed to load admin kubeconfig")
@@ -51,7 +51,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
 	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
-	klog.V(1).Infoln("[bootstraptoken] copying the cluster from admin.conf to the bootstrap kubeconfig")
+	klog.V(1).Infoln("[bootstrap-token] copying the cluster from admin.conf to the bootstrap kubeconfig")
 	bootstrapConfig := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"": adminConfig.Clusters[adminCluster],
@@ -63,7 +63,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	}
 
 	// Create or update the ConfigMap in the kube-public namespace
-	klog.V(1).Infoln("[bootstraptoken] creating/updating ConfigMap in kube-public namespace")
+	klog.V(1).Infoln("[bootstrap-token] creating/updating ConfigMap in kube-public namespace")
 	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapapi.ConfigMapClusterInfo,
