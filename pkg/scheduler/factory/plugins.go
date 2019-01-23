@@ -407,9 +407,9 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
+func GetFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
 
 	fitPredicates := map[string]predicates.FitPredicate{}
 	for _, name := range names.List() {
@@ -430,7 +430,7 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	return fitPredicates, nil
 }
 
-func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMetadataProducer, error) {
+func GetPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
@@ -440,7 +440,7 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMet
 	return priorityMetadataProducer(args), nil
 }
 
-func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
+func GetPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
@@ -450,9 +450,9 @@ func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 	return predicateMetadataProducer(args), nil
 }
 
-func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
+func GetPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
 
 	var configs []priorities.PriorityConfig
 	for _, name := range names.List() {
