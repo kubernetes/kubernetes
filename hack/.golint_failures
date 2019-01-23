@@ -583,7 +583,6 @@ staging/src/k8s.io/apiserver/pkg/storage/value
 staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
-staging/src/k8s.io/apiserver/pkg/util/trace
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
@@ -649,6 +648,7 @@ staging/src/k8s.io/client-go/util/integer
 staging/src/k8s.io/client-go/util/jsonpath
 staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
+staging/src/k8s.io/client-go/util/trace
 staging/src/k8s.io/client-go/util/workqueue
 staging/src/k8s.io/cloud-provider
 staging/src/k8s.io/code-generator/cmd/client-gen/args

@@ -8,8 +8,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["trace.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/trace",
-    importpath = "k8s.io/apiserver/pkg/util/trace",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/trace",
+    importpath = "k8s.io/client-go/util/trace",
     deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
