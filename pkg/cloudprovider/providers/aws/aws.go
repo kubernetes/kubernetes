@@ -572,13 +572,13 @@ type CloudConfig struct {
 		DisableStrictZoneCheck bool
 	}
 	// [ServiceOverride "1"]
-	//  Name = s3
+	//  Service = s3
 	//  Region = region1
 	//  Url = https://s3.foo.bar
 	//  SigningRegion = signing_region
 	//
 	//  [ServiceOverride "2"]
-	//     Name = ec2
+	//     Service = ec2
 	//     Region = region2
 	//     Url = https://ec2.foo.bar
 	//     SigningRegion = signing_region
