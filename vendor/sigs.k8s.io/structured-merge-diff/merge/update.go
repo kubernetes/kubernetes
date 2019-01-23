@@ -127,18 +127,18 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpa
 func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (typed.TypedValue, fieldpath.ManagedFields, error) {
 	newObject, err := liveObject.Merge(configObject)
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
 	}
 	managers, err = s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, err
+		return nil, fieldpath.ManagedFields{}, err
 	}
 
 	// TODO: Remove unconflicting removed fields
 
 	set, err := configObject.ToFieldSet()
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
 	}
 	managers[manager] = &fieldpath.VersionedSet{
 		Set:        set,

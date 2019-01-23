@@ -4111,23 +4111,23 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
+			"Rev": "302c24c1a693093a6d7552298f86d75cf9852e1d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
-			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
+			"Rev": "302c24c1a693093a6d7552298f86d75cf9852e1d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
+			"Rev": "302c24c1a693093a6d7552298f86d75cf9852e1d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
+			"Rev": "302c24c1a693093a6d7552298f86d75cf9852e1d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
+			"Rev": "302c24c1a693093a6d7552298f86d75cf9852e1d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
