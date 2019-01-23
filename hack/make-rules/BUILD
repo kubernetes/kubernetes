@@ -42,14 +42,6 @@ sh_binary(
 )
 
 sh_binary(
-    name = "test-kubeadm-cmd",
-    srcs = ["test-kubeadm-cmd.sh"],
-    deps = [
-        "//hack/lib",
-    ],
-)
-
-sh_binary(
     name = "build",
     srcs = ["build.sh"],
     deps = [

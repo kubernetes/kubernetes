@@ -114,7 +114,6 @@
 ./hack/make-rules/test-cmd.sh
 ./hack/make-rules/test-e2e-node.sh
 ./hack/make-rules/test-integration.sh
-./hack/make-rules/test-kubeadm-cmd.sh
 ./hack/make-rules/test.sh
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
@@ -234,6 +233,7 @@
 ./test/cmd/generic-resources.sh
 ./test/cmd/get.sh
 ./test/cmd/initializers.sh
+./test/cmd/kubeadm.sh
 ./test/cmd/legacy-script.sh
 ./test/cmd/node-management.sh
 ./test/cmd/old-print.sh
