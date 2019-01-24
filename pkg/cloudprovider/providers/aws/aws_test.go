@@ -207,8 +207,8 @@ func TestOverridesActiveConfig(t *testing.T) {
 			strings.NewReader(`
 				[global]
 				`),
-				nil,
-				false, false,
+			nil,
+			false, false,
 			[]ServiceDescriptor{},
 		},
 		{
