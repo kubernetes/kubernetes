@@ -104,8 +104,6 @@
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
 ./hack/make-rules/vet.sh
-./hack/print-workspace-status.sh
-./hack/run-in-gopath.sh
 ./hack/test-go.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
