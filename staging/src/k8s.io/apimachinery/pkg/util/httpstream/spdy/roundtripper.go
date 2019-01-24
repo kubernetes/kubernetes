@@ -130,11 +130,10 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return s.dialWithoutProxy(req.Context(), req.URL)
 	}
 
-	if proxyURL.Scheme == "socks5" {
+	switch proxyURL.Scheme {
+	case "socks5":
 		return s.dialWithSocks5Proxy(req.URL, proxyURL)
-	}
-
-	if proxyURL.Scheme == "https" || "http" {
+	case "https", "http":
 		return s.dialWithHttpProxy(req.URL, proxyURL)
 	}
 
