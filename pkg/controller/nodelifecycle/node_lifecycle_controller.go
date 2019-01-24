@@ -370,17 +370,6 @@ func NewNodeLifecycleController(
 		})
 	}
 
-	// NOTE(resouer): nodeInformer to substitute deprecated taint key (notReady -> not-ready).
-	// Remove this logic when we don't need this backwards compatibility
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
-			return nc.doFixDeprecatedTaintKeyPass(node)
-		}),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-			return nc.doFixDeprecatedTaintKeyPass(newNode)
-		}),
-	})
-
 	nc.leaseLister = leaseInformer.Lister()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
 		nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
@@ -446,44 +435,6 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}, nc.nodeMonitorPeriod, stopCh)
 
 	<-stopCh
-}
-
-// doFixDeprecatedTaintKeyPass checks and replaces deprecated taint key with proper key name if needed.
-func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
-	taintsToAdd := []*v1.Taint{}
-	taintsToDel := []*v1.Taint{}
-
-	for _, taint := range node.Spec.Taints {
-		if taint.Key == schedulerapi.DeprecatedTaintNodeNotReady {
-			tDel := taint
-			taintsToDel = append(taintsToDel, &tDel)
-
-			tAdd := taint
-			tAdd.Key = schedulerapi.TaintNodeNotReady
-			taintsToAdd = append(taintsToAdd, &tAdd)
-		}
-
-		if taint.Key == schedulerapi.DeprecatedTaintNodeUnreachable {
-			tDel := taint
-			taintsToDel = append(taintsToDel, &tDel)
-
-			tAdd := taint
-			tAdd.Key = schedulerapi.TaintNodeUnreachable
-			taintsToAdd = append(taintsToAdd, &tAdd)
-		}
-	}
-
-	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
-		return nil
-	}
-
-	klog.Warningf("Detected deprecated taint keys: %v on node: %v, will substitute them with %v",
-		taintsToDel, node.GetName(), taintsToAdd)
-
-	if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
-		return fmt.Errorf("failed to swap taints of node %+v", node)
-	}
-	return nil
 }
 
 func (nc *Controller) doNoScheduleTaintingPassWorker() {
