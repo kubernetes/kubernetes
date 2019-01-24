@@ -321,8 +321,7 @@
         "k8s.io/kubernetes/pkg/util/resizefs",
         "k8s.io/kubernetes/pkg/util/version",
         "k8s.io/kubernetes/pkg/apis/apps",
-        "k8s.io/kubernetes/pkg/version",
-        "k8s.io/kubernetes/pkg/util/io"
+        "k8s.io/kubernetes/pkg/version"
       ]
     },
     {
@@ -343,6 +342,8 @@
         "k8s.io/metrics/pkg/client/custom_metrics/fake",
         "k8s.io/metrics/pkg/client/external_metrics",
         "k8s.io/metrics/pkg/client/external_metrics/fake",
+        "k8s.io/utils/nsenter",
+        "k8s.io/utils/io",
         "k8s.io/utils/pointer",
         "k8s.io/utils/exec"
       ]

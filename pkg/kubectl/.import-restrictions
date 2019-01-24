@@ -131,7 +131,6 @@
                 "k8s.io/kubernetes/pkg/util/goroutinemap",
                 "k8s.io/kubernetes/pkg/util/hash",
                 "k8s.io/kubernetes/pkg/util/interrupt",
-                "k8s.io/kubernetes/pkg/util/io",
                 "k8s.io/kubernetes/pkg/util/labels",
                 "k8s.io/kubernetes/pkg/util/metrics",
                 "k8s.io/kubernetes/pkg/util/mount",
@@ -145,6 +144,8 @@
                 "k8s.io/kubernetes/pkg/version/prometheus",
                 "k8s.io/kubernetes/pkg/volume",
                 "k8s.io/kubernetes/pkg/volume/util",
+                "k8s.io/utils/nsenter",
+                "k8s.io/utils/io",
                 "k8s.io/utils/pointer"
 		],
 		"ForbiddenPrefixes": []
