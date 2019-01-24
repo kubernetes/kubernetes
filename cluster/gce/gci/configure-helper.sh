@@ -455,7 +455,7 @@ function append_or_replace_prefixed_line {
 # EXTRA_KNOWN_TOKENS
 function write_extra_known_tokens {
   for line in ${EXTRA_KNOWN_TOKENS[@]}; do
-    append_or_replace_prefixed_line $1 line
+    append_or_replace_prefixed_line "$1" "$line"
   done
 }
 
