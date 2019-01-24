@@ -241,6 +241,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
+	deleteOpts.Quiet = o.Quiet
 
 	o.DeleteOptions = deleteOpts
 
