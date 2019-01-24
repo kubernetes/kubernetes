@@ -136,12 +136,19 @@ spec:
           initialDelaySeconds: 60
           timeoutSeconds: 5
         volumeMounts:
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+          readOnly: false
         - name: config-volume
           mountPath: /etc/coredns
       volumes:
-        - name: config-volume
-          configMap:
-            name: node-local-dns
-            items:
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+      - name: config-volume
+        configMap:
+          name: node-local-dns
+          items:
             - key: Corefile
               path: Corefile
