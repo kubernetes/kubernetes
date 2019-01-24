@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+// Version is a struct for version information
 type Version struct {
 	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
 	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
@@ -45,7 +46,8 @@ var (
 		kubectl version`))
 )
 
-type VersionOptions struct {
+// Options is a struct to support version command
+type Options struct {
 	ClientOnly bool
 	Short      bool
 	Output     string
@@ -55,15 +57,17 @@ type VersionOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewVersionOptions(ioStreams genericclioptions.IOStreams) *VersionOptions {
-	return &VersionOptions{
+// NewOptions returns initialized Options
+func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		IOStreams: ioStreams,
 	}
 
 }
 
+// NewCmdVersion returns a cobra command for fetching versions
 func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewVersionOptions(ioStreams)
+	o := NewOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "version",
 		Short:   i18n.T("Print the client and server version information"),
@@ -81,7 +85,8 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+// Complete completes all the required options
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	// if we had an empty rest.Config, continue and just print out client information.
@@ -92,7 +97,8 @@ func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
-func (o *VersionOptions) Validate() error {
+// Validate validates the provided options
+func (o *Options) Validate() error {
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
@@ -100,7 +106,8 @@ func (o *VersionOptions) Validate() error {
 	return nil
 }
 
-func (o *VersionOptions) Run() error {
+// Run executes version command
+func (o *Options) Run() error {
 	var (
 		serverVersion *apimachineryversion.Info
 		serverErr     error
