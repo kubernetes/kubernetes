@@ -90,12 +90,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file was generated using openssl by the gencerts.sh script
+// and holds raw certificates for the webhook tests.
+
+package testcerts
 EOF
 
-echo "// This file was generated using openssl by the gencerts.sh script" >> $outfile
-echo "// and holds raw certificates for the webhook tests." >> $outfile
-echo "" >> $outfile
-echo "package testcerts" >> $outfile
 for file in CAKey CACert BadCAKey BadCACert ServerKey ServerCert ClientKey ClientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
@@ -103,7 +103,7 @@ for file in CAKey CACert BadCAKey BadCACert ServerKey ServerCert ClientKey Clien
 done
 
 # Clean up after we're done.
-rm *.pem
-rm *.csr
-rm *.srl
-rm *.conf
+rm ./*.pem
+rm ./*.csr
+rm ./*.srl
+rm ./*.conf
