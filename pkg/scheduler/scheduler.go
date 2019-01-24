@@ -224,7 +224,8 @@ func New(client clientset.Interface,
 	scheduledPodsHasSynced := podInformer.Informer().HasSynced
 	// ScheduledPodLister is something we provide to plug-in functions that
 	// they may need to call.
-	scheduledPodLister := assignedPodLister{podInformer.Lister()}
+	// scheduledPodLister := assignedPodLister{podInformer.Lister()}
+
 	// Setup cache debugger
 	debugger := cachedebugger.New(
 		nodeInformer.Lister(),
@@ -403,12 +404,7 @@ func New(client clientset.Interface,
 	)
 
 	podBackoff := util.CreateDefaultPodBackoff()
-	// Additional tweaks to the config produced by the configurator.
-	config.Recorder = recorder
-	config.DisablePreemption = options.disablePreemption
-	config.StopEverything = stopCh
-
-	// Create the scheduler.
+	metrics.Register()
 	sched := &Scheduler{
 		SchedulerCache: schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
@@ -421,8 +417,9 @@ func New(client clientset.Interface,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(stopEverything, scheduledPodsHasSynced)
 		},
-		NextPod:           internalqueue.MakeNextPodFunc(podQueue),
-		Error:             MakeDefaultErrorFunc(podBackoff, podQueue),
+		NextPod: internalqueue.MakeNextPodFunc(podQueue),
+		// c.client, podBackoff, c.podQueue, c.schedulerCache, c.StopEverything
+		Error:             factory.MakeDefaultErrorFunc(client, podBackoff, podQueue, schedulerCache, stopEverything),
 		StopEverything:    stopEverything,
 		VolumeBinder:      volumeBinder,
 		SchedulingQueue:   podQueue,
@@ -623,13 +620,25 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 	return nil
 }
 
-// // NewFromConfig returns a new scheduler using the provided Config.
-// func NewFromConfig(config *factory.Config) *Scheduler {
-// 	metrics.Register()
-// 	return &Scheduler{
-// 		config: config,
-// 	}
-// }
+// NewFromConfig returns a new scheduler using the provided Config.
+func NewFromConfig(config *factory.Config) *Scheduler {
+	metrics.Register()
+	return &Scheduler{
+		Algorithm:           config.Algorithm,
+		GetBinder:           config.GetBinder,
+		PodConditionUpdater: config.PodConditionUpdater,
+		PodPreemptor:        config.PodPreemptor,
+		PluginSet:           config.PluginSet,
+		NextPod:             config.NextPod,
+		WaitForCacheSync:    config.WaitForCacheSync,
+		Error:               config.Error,
+		Recorder:            config.Recorder,
+		StopEverything:      config.StopEverything,
+		VolumeBinder:        config.VolumeBinder,
+		DisablePreemption:   config.DisablePreemption,
+		SchedulingQueue:     config.SchedulingQueue,
+	}
+}
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
