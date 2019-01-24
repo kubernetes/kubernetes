@@ -22,6 +22,7 @@ import (
 )
 
 var onlyOneSignalHandler = make(chan struct{})
+var shutdownHandler = make(chan os.Signal, 2)
 
 // SetupSignalHandler registered for SIGTERM and SIGINT. A stop channel is returned
 // which is closed on one of these signals. If a second signal is caught, the program
@@ -30,14 +31,21 @@ func SetupSignalHandler() <-chan struct{} {
 	close(onlyOneSignalHandler) // panics when called twice
 
 	stop := make(chan struct{})
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, shutdownSignals...)
+	signal.Notify(shutdownHandler, shutdownSignals...)
 	go func() {
-		<-c
+		<-shutdownHandler
 		close(stop)
-		<-c
+		<-shutdownHandler
 		os.Exit(1) // second signal. Exit directly.
 	}()
 
 	return stop
+}
+
+// RequestShutdown emulates a received event that is considered as shutdown signal (SIGTERM/SIGINT)
+func RequestShutdown() {
+	select {
+	case shutdownHandler <- shutdownSignals[0]:
+	default:
+	}
 }
