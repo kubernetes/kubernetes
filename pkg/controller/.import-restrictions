@@ -317,7 +317,6 @@
         "k8s.io/kubernetes/pkg/kubeapiserver/admission/util",
         "k8s.io/kubernetes/pkg/scheduler/volumebinder",
         "k8s.io/kubernetes/pkg/scheduler/internal/cache",
-        "k8s.io/kubernetes/pkg/util/nsenter",
         "k8s.io/kubernetes/pkg/util/resizefs",
         "k8s.io/kubernetes/pkg/util/version",
         "k8s.io/kubernetes/pkg/apis/apps",

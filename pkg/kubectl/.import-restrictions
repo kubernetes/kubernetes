@@ -136,7 +136,6 @@
                 "k8s.io/kubernetes/pkg/util/mount",
                 "k8s.io/kubernetes/pkg/util/net/sets",
                 "k8s.io/kubernetes/pkg/util/node",
-                "k8s.io/kubernetes/pkg/util/nsenter",
                 "k8s.io/kubernetes/pkg/util/parsers",
                 "k8s.io/kubernetes/pkg/util/slice",
                 "k8s.io/kubernetes/pkg/util/taints",
