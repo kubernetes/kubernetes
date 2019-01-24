@@ -123,7 +123,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		userInfo, _ := request.UserFrom(ctx)
 		transformers := []rest.TransformFunc{}
 		if scope.FieldManager != nil {
-			transformers = append(transformers, func(_ context.Context, liveObj, newObj runtime.Object) (runtime.Object, error) {
+			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
 				if obj, err = scope.FieldManager.Update(liveObj, newObj, "update"); err != nil {
 					return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 				}
