@@ -51,7 +51,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/integer"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
@@ -116,6 +115,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/integer"
 )
 
 const (

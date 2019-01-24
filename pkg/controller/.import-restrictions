@@ -162,7 +162,6 @@
         "k8s.io/client-go/tools/watch",
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
-        "k8s.io/client-go/util/integer",
         "k8s.io/client-go/util/retry",
         "k8s.io/client-go/util/testing",
         "k8s.io/client-go/util/workqueue"
@@ -342,6 +341,7 @@
         "k8s.io/metrics/pkg/client/external_metrics",
         "k8s.io/metrics/pkg/client/external_metrics/fake",
         "k8s.io/utils/nsenter",
+        "k8s.io/utils/integer",
         "k8s.io/utils/io",
         "k8s.io/utils/pointer",
         "k8s.io/utils/exec"
