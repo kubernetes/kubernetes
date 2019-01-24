@@ -515,6 +515,8 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 			}
 		}
 	}
+
+	//add related taint when taintNodeByCondition is enabled
 	if nc.taintNodeByCondition && node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
 		taints = append(taints, v1.Taint{
@@ -956,7 +958,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 				status:                   &node.Status,
 				probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,
 				readyTransitionTimestamp: nc.now(),
-				lease: observedLease,
+				lease:                    observedLease,
 			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}
