@@ -72,7 +72,7 @@ func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefini
 	}
 	c.syncHandler = c.handleVersionUpdate
 
-	crdinformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdinformer.Informer().AddEventHandler2(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cast := obj.(*apiextensions.CustomResourceDefinition)
 			c.enqueueCRD(cast)
@@ -99,6 +99,9 @@ func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefini
 			}
 			c.enqueueCRD(cast)
 		},
+		InitialSyncFunc: func() {
+			close(c.syncedInitialSet)
+		},
 	})
 
 	return c
@@ -117,22 +120,16 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 		return
 	}
 
-	// process each item in the list once
-	if crds, err := c.crdLister.List(labels.Everything()); err != nil {
-		utilruntime.HandleError(err)
-	} else {
-		for _, crd := range crds {
-			for _, version := range crd.Spec.Versions {
-				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}); err != nil {
-					utilruntime.HandleError(err)
-				}
-			}
-		}
-	}
-	close(c.syncedInitialSet)
+	// At the point, registered event handlers are already delivered.
+	// Informer framework will first deliver an OnAdd() event handler for each
+	// object and only then will start sending the stream of incoming events.
+	// We start a single work to process those initial handlers and wait until
+	// all of them are processed.
+	go wait.Until(c.runWorker, time.Second, stopCh)
+	c.WaitForInitialSync()
 
-	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
-	for i := 0; i < threadiness; i++ {
+	// Now we start the remaining workers based on threadiness.
+	for i := 1; i < threadiness; i++ {
 		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
 		// after one second
 		go wait.Until(c.runWorker, time.Second, stopCh)
