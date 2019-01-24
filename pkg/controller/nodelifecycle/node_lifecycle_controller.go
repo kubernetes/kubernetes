@@ -508,10 +508,19 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	for _, condition := range node.Status.Conditions {
 		if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
 			if taintKey, found := taintMap[condition.Status]; found {
-				taints = append(taints, v1.Taint{
-					Key:    taintKey,
-					Effect: v1.TaintEffectNoSchedule,
-				})
+				if taintKey == schedulerapi.TaintNodeUnschedulable {
+					if node.Spec.Unschedulable {
+						taints = append(taints, v1.Taint{
+							Key:    taintKey,
+							Effect: v1.TaintEffectNoSchedule,
+						})
+					}
+				} else {
+					taints = append(taints, v1.Taint{
+						Key:    taintKey,
+						Effect: v1.TaintEffectNoSchedule,
+					})
+				}
 			}
 		}
 	}
@@ -956,7 +965,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 				status:                   &node.Status,
 				probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,
 				readyTransitionTimestamp: nc.now(),
-				lease:                    observedLease,
+				lease: observedLease,
 			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}
