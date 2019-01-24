@@ -163,8 +163,6 @@
 ./staging/src/k8s.io/apiextensions-apiserver/hack/build-image.sh
 ./staging/src/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 ./staging/src/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
-./staging/src/k8s.io/code-generator/generate-groups.sh
-./staging/src/k8s.io/code-generator/generate-internal-groups.sh
 ./staging/src/k8s.io/csi-api/hack/update-codegen.sh
 ./staging/src/k8s.io/csi-api/hack/verify-codegen.sh
 ./staging/src/k8s.io/kube-aggregator/hack/build-image.sh
