@@ -17,6 +17,8 @@ limitations under the License.
 package routes
 
 import (
+	"time"
+
 	restful "github.com/emicklei/go-restful"
 	"k8s.io/klog"
 
@@ -32,8 +34,11 @@ type OpenAPI struct {
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
+	start := time.Now()
 	_, err := handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux)
 	if err != nil {
 		klog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}
+	elapsed := time.Since(start)
+	klog.Errorf(">>>>> BuildAndRegisterOpenAPI took %s", elapsed)
 }
