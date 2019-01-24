@@ -583,7 +583,6 @@ staging/src/k8s.io/apiserver/pkg/storage/value
 staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
-staging/src/k8s.io/apiserver/pkg/util/trace
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log

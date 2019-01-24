@@ -104,7 +104,6 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/util/globalflag:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/proxy:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/util/trace:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit:all-srcs",
