@@ -254,11 +254,6 @@ func TestPodAdmission(t *testing.T) {
 			pod := test.pod
 			pod.Spec.Tolerations = test.podTolerations
 
-			// copy the original pod for tests of uninitialized pod updates.
-			oldPod := *pod
-			oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
-			oldPod.Spec.Tolerations = []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}}
-
 			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 			if test.admit && err != nil {
 				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
@@ -267,19 +262,6 @@ func TestPodAdmission(t *testing.T) {
 			}
 
 			updatedPodTolerations := pod.Spec.Tolerations
-			if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
-				t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
-			}
-
-			// handles update of uninitialized pod like it's newly created.
-			err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
-			if test.admit && err != nil {
-				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-			} else if !test.admit && err == nil {
-				t.Errorf("Test: %s, expected an error", test.testName)
-			}
-
-			updatedPodTolerations = pod.Spec.Tolerations
 			if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
 				t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
 			}

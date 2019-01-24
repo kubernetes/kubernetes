@@ -12,7 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1beta1:go_default_library",
@@ -63,7 +62,6 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/fake:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:all-srcs",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1beta1:all-srcs",

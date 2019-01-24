@@ -65,17 +65,16 @@ type ApplyOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	Selector                   string
-	DryRun                     bool
-	ServerDryRun               bool
-	Prune                      bool
-	PruneResources             []pruneResource
-	cmdBaseName                string
-	All                        bool
-	Overwrite                  bool
-	OpenAPIPatch               bool
-	PruneWhitelist             []string
-	ShouldIncludeUninitialized bool
+	Selector       string
+	DryRun         bool
+	ServerDryRun   bool
+	Prune          bool
+	PruneResources []pruneResource
+	cmdBaseName    string
+	All            bool
+	Overwrite      bool
+	OpenAPIPatch   bool
+	PruneWhitelist []string
 
 	Validator       validation.Schema
 	Builder         *resource.Builder
@@ -224,7 +223,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	o.ShouldIncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, o.Prune)
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -315,7 +313,6 @@ func (o *ApplyOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		LabelSelectorParam(o.Selector).
-		IncludeUninitialized(o.ShouldIncludeUninitialized).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -535,13 +532,13 @@ func (o *ApplyOptions) Run() error {
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, o.ShouldIncludeUninitialized); err != nil {
+			if err := p.prune(n, m); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, o.ShouldIncludeUninitialized); err != nil {
+		if err := p.prune(metav1.NamespaceNone, m); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -617,13 +614,12 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUninitialized bool) error {
+func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
 		List(metav1.ListOptions{
-			LabelSelector:        p.labelSelector,
-			FieldSelector:        p.fieldSelector,
-			IncludeUninitialized: includeUninitialized,
+			LabelSelector: p.labelSelector,
+			FieldSelector: p.fieldSelector,
 		})
 	if err != nil {
 		return err

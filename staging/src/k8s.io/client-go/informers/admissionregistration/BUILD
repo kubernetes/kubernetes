@@ -11,7 +11,6 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/admissionregistration",
     importpath = "k8s.io/client-go/informers/admissionregistration",
     deps = [
-        "//staging/src/k8s.io/client-go/informers/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
     ],
@@ -28,7 +27,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/informers/admissionregistration/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/informers/admissionregistration/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],

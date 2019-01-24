@@ -86,7 +86,7 @@ func waitForPodInNamespace(c clientset.Interface, ns, podName string) *v1.Pod {
 	var pod *v1.Pod
 	var err error
 	err = wait.PollImmediate(2*time.Second, 15*time.Second, func() (bool, error) {
-		pod, err = c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{IncludeUninitialized: true})
+		pod, err = c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -130,28 +130,6 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	By("Waiting for the pod to have running status")
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
-	By("Creating an uninitialized pod in the namespace")
-	podB := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:         "test-pod-uninitialized",
-			Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "test.initializer.k8s.io"}}},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nginx",
-					Image: imageutils.GetPauseImageName(),
-				},
-			},
-		},
-	}
-	go func() {
-		_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Create(podB)
-		// This error is ok, because we will delete the pod before it completes initialization
-		framework.Logf("error from create uninitialized namespace: %v", err)
-	}()
-	podB = waitForPodInNamespace(f.ClientSet, namespace.Name, podB.Name)
-
 	By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.Name, nil)
 	Expect(err).NotTo(HaveOccurred(), "failed to delete namespace: %s", namespace.Name)
@@ -174,8 +152,6 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	By("Verifying there are no pods in the namespace")
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).To(HaveOccurred(), "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
-	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(podB.Name, metav1.GetOptions{IncludeUninitialized: true})
-	Expect(err).To(HaveOccurred(), "failed to get pod %s in namespace: %s", podB.Name, namespace.Name)
 }
 
 func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {

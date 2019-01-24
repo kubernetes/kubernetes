@@ -79,8 +79,6 @@ type GetOptions struct {
 	IgnoreNotFound bool
 	Export         bool
 
-	IncludeUninitialized bool
-
 	genericclioptions.IOStreams
 }
 
@@ -224,8 +222,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.IsHumanReadablePrinter = true
 	}
 
-	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
-
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -256,9 +252,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	switch {
 	case o.Watch || o.WatchOnly:
-		// include uninitialized objects when watching on a single object
-		// unless explicitly set --include-uninitialized=false
-		o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestAPIResources(o.CmdParent))
@@ -428,7 +421,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FieldSelectorParam(o.FieldSelector).
 		ExportParam(o.Export).
 		RequestChunksOf(chunkSize).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -613,7 +605,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		FieldSelectorParam(o.FieldSelector).
 		ExportParam(o.Export).
 		RequestChunksOf(o.ChunkSize).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

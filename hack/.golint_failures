@@ -15,7 +15,6 @@ pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admission/v1beta1
 pkg/apis/admissionregistration
-pkg/apis/admissionregistration/v1alpha1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
@@ -254,7 +253,6 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
-pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
 pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
@@ -423,7 +421,6 @@ plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/api/admission/v1beta1
-staging/src/k8s.io/api/admissionregistration/v1alpha1
 staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
@@ -520,7 +517,6 @@ staging/src/k8s.io/apimachinery/pkg/watch
 staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/initializer
-staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts

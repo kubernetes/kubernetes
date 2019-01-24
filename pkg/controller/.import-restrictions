@@ -80,14 +80,12 @@
         "k8s.io/apiserver/pkg/storage",
         "k8s.io/api/batch/v2alpha1",
         "k8s.io/apiserver/pkg/registry/rest",
-        "k8s.io/apimachinery/pkg/util/initialization",
         "k8s.io/api/scheduling/v1alpha1",
         "k8s.io/api/admissionregistration/v1beta1",
         "k8s.io/api/authorization/v1",
         "k8s.io/api/settings/v1alpha1",
         "k8s.io/api/admission/v1beta1",
         "k8s.io/api/networking/v1",
-        "k8s.io/api/admissionregistration/v1alpha1",
         "k8s.io/component-base/config",
         "k8s.io/component-base/config/v1alpha1"
       ]
@@ -314,7 +312,6 @@
         "k8s.io/kubernetes/pkg/util/net/sets",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
-        "k8s.io/kubernetes/pkg/kubeapiserver/admission/util",
         "k8s.io/kubernetes/pkg/scheduler/volumebinder",
         "k8s.io/kubernetes/pkg/scheduler/internal/cache",
         "k8s.io/kubernetes/pkg/util/nsenter",

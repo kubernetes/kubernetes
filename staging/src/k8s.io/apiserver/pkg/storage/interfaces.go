@@ -86,8 +86,6 @@ type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
 var Everything = SelectionPredicate{
 	Label: labels.Everything(),
 	Field: fields.Everything(),
-	// TODO: split this into a new top level constant?
-	IncludeUninitialized: true,
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update

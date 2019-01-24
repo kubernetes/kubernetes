@@ -13,7 +13,6 @@
                 "k8s.io/kubernetes/pkg/api/v1/service",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration",
                 "k8s.io/kubernetes/pkg/apis/admissionregistration/install",
-                "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1",
                 "k8s.io/kubernetes/pkg/apis/apps",
                 "k8s.io/kubernetes/pkg/apis/apps/install",
                 "k8s.io/kubernetes/pkg/apis/apps/v1",
