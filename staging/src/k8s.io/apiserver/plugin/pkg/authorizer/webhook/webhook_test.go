@@ -616,10 +616,10 @@ func TestWebhookCache(t *testing.T) {
 		{name: "ridiculous unauthorized request", attr: bobRidiculousAttr, allow: false, statusCode: 200, expectedErr: false, expectedAuthorized: false, expectedCalls: 1},
 		// later ridiculous requests within the cache window still hit the backend
 		{name: "ridiculous unauthorized request again", attr: bobRidiculousAttr, allow: false, statusCode: 200, expectedErr: false, expectedAuthorized: false, expectedCalls: 1},
-		// ridiculous authorized requests are still cached.
+		// ridiculous authorized requests are not cached.
 		{name: "ridiculous authorized request", attr: aliceRidiculousAttr, allow: true, statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCalls: 1},
-		// later ridiculous requests within the cache window don't hit the backend
-		{name: "ridiculous authorized request again", attr: aliceRidiculousAttr, allow: false, statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCalls: 0},
+		// later ridiculous requests within the cache window still hit the backend
+		{name: "ridiculous authorized request again", attr: aliceRidiculousAttr, allow: true, statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCalls: 1},
 	}
 
 	for i, test := range tests {

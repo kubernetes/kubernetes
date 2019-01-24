@@ -41,8 +41,8 @@ var (
 
 const (
 	retryBackoff = 500 * time.Millisecond
-	// The maximum key length for unauthorized request keys to qualify for caching.
-	maxUnauthorizedCachedKeySize = 10000
+	// The maximum length of requester-controlled attributes to allow caching.
+	maxControlledAttrCacheSize = 10000
 )
 
 // Ensure Webhook implements the authorizer.Authorizer interface.
@@ -197,10 +197,10 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
-		if r.Status.Allowed {
-			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
-		} else {
-			if callerControlledAttributeSize(attr) < maxUnauthorizedCachedKeySize {
+		if shouldCache(attr) {
+			if r.Status.Allowed {
+				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+			} else {
 				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 			}
 		}
@@ -269,8 +269,10 @@ func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.Su
 	return result, err
 }
 
-func callerControlledAttributeSize(attr authorizer.Attributes) int64 {
-	return int64(len(attr.GetNamespace())) +
+// shouldCache determines whether it is safe to cache the given request attributes. If the
+// requester-controlled attributes are too large, this may be a DoS attempt, so we skip the cache.
+func shouldCache(attr authorizer.Attributes) bool {
+	controlledAttrSize := int64(len(attr.GetNamespace())) +
 		int64(len(attr.GetVerb())) +
 		int64(len(attr.GetAPIGroup())) +
 		int64(len(attr.GetAPIVersion())) +
@@ -278,4 +280,5 @@ func callerControlledAttributeSize(attr authorizer.Attributes) int64 {
 		int64(len(attr.GetSubresource())) +
 		int64(len(attr.GetName())) +
 		int64(len(attr.GetPath()))
+	return controlledAttrSize < maxControlledAttrCacheSize
 }
