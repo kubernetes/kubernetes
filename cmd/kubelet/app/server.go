@@ -110,7 +110,7 @@ func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
 	cleanFlagSet.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
-	// programmer error
+	// Program error
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -158,7 +158,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// short-circuit on help
 			help, err := cleanFlagSet.GetBool("help")
 			if err != nil {
-				klog.Fatal(`"help" flag is non-bool, programmer error, please correct`)
+				klog.Fatal(`"help" flag is non-bool, Program error, please correct`)
 			}
 			if help {
 				cmd.Help()
