@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
         "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned/fake:go_default_library",

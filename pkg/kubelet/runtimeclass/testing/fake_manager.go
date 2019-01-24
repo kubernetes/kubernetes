@@ -18,7 +18,6 @@ package testing
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	nodev1alpha1 "k8s.io/node-api/pkg/apis/node/v1alpha1"
 	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
@@ -65,23 +64,6 @@ func NewRuntimeClass(name, handler string) *nodev1alpha1.RuntimeClass {
 		},
 		Spec: nodev1alpha1.RuntimeClassSpec{
 			RuntimeHandler: &handler,
-		},
-	}
-}
-
-// NewUnstructuredRuntimeClass is a helper to generate an unstructured RuntimeClass resource with
-// the given name & handler.
-func NewUnstructuredRuntimeClass(name, handler string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "node.k8s.io/v1alpha1",
-			"kind":       "RuntimeClass",
-			"metadata": map[string]interface{}{
-				"name": name,
-			},
-			"spec": map[string]interface{}{
-				"runtimeHandler": handler,
-			},
 		},
 	}
 }

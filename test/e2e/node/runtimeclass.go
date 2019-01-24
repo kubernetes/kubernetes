@@ -69,14 +69,15 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 
 	It("should reject a Pod requesting a deleted RuntimeClass", func() {
 		rcName := createRuntimeClass(f, "delete-me", "")
+		rcClient := f.NodeAPIClientSet.NodeV1alpha1().RuntimeClasses()
 
 		By("Deleting RuntimeClass "+rcName, func() {
-			err := f.DynamicClient.Resource(runtimeClassGVR).Delete(rcName, nil)
+			err := rcClient.Delete(rcName, nil)
 			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
 			By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
-				_, err := f.DynamicClient.Resource(runtimeClassGVR).Get(rcName, metav1.GetOptions{})
+				_, err := rcClient.Get(rcName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					return true, nil // done
 				}
@@ -143,11 +144,11 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 })
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
-// synchronously creates it with the dynamic client, and returns the resulting name.
+// synchronously creates it, and returns the generated name.
 func createRuntimeClass(f *framework.Framework, name, handler string) string {
 	uniqueName := fmt.Sprintf("%s-%s", f.Namespace.Name, name)
-	rc := runtimeclasstest.NewUnstructuredRuntimeClass(uniqueName, handler)
-	rc, err := f.DynamicClient.Resource(runtimeClassGVR).Create(rc, metav1.CreateOptions{})
+	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
+	rc, err := f.NodeAPIClientSet.NodeV1alpha1().RuntimeClasses().Create(rc)
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
 }
