@@ -62,6 +62,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
+  - k8s.io/utils
 
 # prevent core machinery from taking explicit v1 references unless
 # necessary
@@ -84,6 +85,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/apiserver/"
   allowedImports:
