@@ -27,7 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -317,6 +317,7 @@ func (config *DeploymentConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -392,6 +393,7 @@ func (config *ReplicaSetConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -459,6 +461,7 @@ func (config *JobConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
