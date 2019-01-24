@@ -99,7 +99,9 @@ type TestContextType struct {
 	ContainerRuntimePidFile     string
 	// SystemdServices are comma separated list of systemd services the test framework
 	// will dump logs for.
-	SystemdServices          string
+	SystemdServices string
+	// DumpSystemdJournal controls whether to dump the full systemd journal.
+	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
 	MasterOSDistro           string
 	NodeOSDistro             string
@@ -249,6 +251,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
 	flag.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flag.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
