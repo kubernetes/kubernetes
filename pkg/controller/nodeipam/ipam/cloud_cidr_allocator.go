@@ -90,7 +90,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(klog.Infof)
-	klog.V(0).Infof("Sending events to api server.")
+	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	gceCloud, ok := cloud.(*gce.Cloud)
@@ -127,7 +127,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
-	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
+	klog.Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
 	return ca, nil
 }
 

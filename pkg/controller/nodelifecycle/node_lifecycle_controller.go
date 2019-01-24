@@ -960,7 +960,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 	if !allAreFullyDisrupted || !allWasFullyDisrupted {
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
-			klog.V(0).Info("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
+			klog.Info("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
 			for i := range nodes {
 				if nc.useTaintBasedEvictions {
 					_, err := nc.markNodeAsReachable(nodes[i])
@@ -987,7 +987,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 		}
 		// We're exiting full disruption mode
 		if allWasFullyDisrupted {
-			klog.V(0).Info("Controller detected that some Nodes are Ready. Exiting master disruption mode.")
+			klog.Info("Controller detected that some Nodes are Ready. Exiting master disruption mode.")
 			// When exiting disruption mode update probe timestamps on all Nodes.
 			now := nc.now()
 			for i := range nodes {
@@ -1010,7 +1010,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 			if v == newState {
 				continue
 			}
-			klog.V(0).Infof("Controller detected that zone %v is now in state %v.", k, newState)
+			klog.Infof("Controller detected that zone %v is now in state %v.", k, newState)
 			nc.setLimiterInZone(k, len(zoneToNodeConditions[k]), newState)
 			nc.zoneStates[k] = newState
 		}

@@ -75,7 +75,7 @@ func newProxyServer(
 
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
-		klog.V(0).Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
+		klog.Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
 		protocol = utiliptables.ProtocolIpv6
 	}
 

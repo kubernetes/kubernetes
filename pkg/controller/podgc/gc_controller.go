@@ -163,7 +163,7 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }
@@ -181,7 +181,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }
