@@ -218,7 +218,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 
                 [ServiceOverride "1"]
                  Region=sregion
-                 Url=https://s3.foo.bar
+                 URL=https://s3.foo.bar
                  SigningRegion=sregion
                 `),
 			nil,
@@ -232,7 +232,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 
                 [ServiceOverride "1"]
                  Service=s3
-                 Url=https://s3.foo.bar
+                 URL=https://s3.foo.bar
                  SigningRegion=sregion
                  `),
 			nil,
@@ -261,7 +261,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                 [ServiceOverride "1"]
                  Service=s3
                  Region=sregion
-                 Url=https://s3.foo.bar
+                 URL=https://s3.foo.bar
                  `),
 			nil,
 			true, false,
@@ -275,7 +275,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                [ServiceOverride "1"]
                 Service = s3
                 Region = sregion
-                Url = https://s3.foo.bar
+                URL = https://s3.foo.bar
                 SigningRegion = sregion
                 `),
 			nil,
@@ -291,13 +291,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 				[ServiceOverride "1"]
                   Service=s3
                   Region=sregion1
-                  Url=https://s3.foo.bar
+                  URL=https://s3.foo.bar
                   SigningRegion=sregion
 
 				[ServiceOverride "2"]
                   Service=ec2
                   Region=sregion2
-                  Url=https://ec2.foo.bar
+                  URL=https://ec2.foo.bar
                   SigningRegion=sregion`),
 			nil,
 			false, true,
@@ -312,13 +312,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 				[ServiceOverride "1"]
                   Service=s3
                   Region=sregion1
-                  Url=https://s3.foo.bar
+                  URL=https://s3.foo.bar
                   SigningRegion=sregion
 
 				[ServiceOverride "2"]
                   Service=s3
                   Region=sregion1
-                  Url=https://s3.foo.bar
+                  URL=https://s3.foo.bar
                   SigningRegion=sregion`),
 			nil,
 			true, false,
@@ -332,13 +332,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 				[ServiceOverride "1"]
                  Service=s3
                  Region=region1
-                 Url=https://s3.foo.bar
+                 URL=https://s3.foo.bar
                  SigningRegion=sregion
 
 				[ServiceOverride "2"]
                  Service=ec2
                  Region=region2
-                 Url=https://ec2.foo.bar
+                 URL=https://ec2.foo.bar
                  SigningRegion=sregion
                  `),
 			nil,
@@ -353,13 +353,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 				[ServiceOverride "1"]
                 Service=s3
                 Region=region1
-                Url=https://s3.foo.bar
+                URL=https://s3.foo.bar
                 SigningRegion=sregion
 
 				[ServiceOverride "2"]
                  Service=s3
                  Region=region2
-                 Url=https://s3.foo.bar
+                 URL=https://s3.foo.bar
                  SigningRegion=sregion
                  `),
 			nil,
@@ -391,7 +391,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 					var found *struct {
 						Service       string
 						Region        string
-						Url           string
+						URL           string
 						SigningRegion string
 					}
 					for _, v := range cfg.ServiceOverride {
@@ -409,9 +409,9 @@ func TestOverridesActiveConfig(t *testing.T) {
 								found.SigningRegion, test.name)
 						}
 						targetName := fmt.Sprintf("https://%s.foo.bar", sd.name)
-						if found.Url != targetName {
+						if found.URL != targetName {
 							t.Errorf("Expected Endpoint '%s', received '%s' for case %s",
-								targetName, found.Url, test.name)
+								targetName, found.URL, test.name)
 						}
 
 						fn := cfg.getResolver()

@@ -574,18 +574,18 @@ type CloudConfig struct {
 	// [ServiceOverride "1"]
 	//  Service = s3
 	//  Region = region1
-	//  Url = https://s3.foo.bar
+	//  URL = https://s3.foo.bar
 	//  SigningRegion = signing_region
 	//
 	//  [ServiceOverride "2"]
 	//     Service = ec2
 	//     Region = region2
-	//     Url = https://ec2.foo.bar
+	//     URL = https://ec2.foo.bar
 	//     SigningRegion = signing_region
 	ServiceOverride map[string]*struct {
 		Service       string
 		Region        string
-		Url           string
+		URL           string
 		SigningRegion string
 	}
 }
@@ -604,9 +604,9 @@ func (cfg *CloudConfig) validateOverrides() error {
 		if region == "" {
 			return fmt.Errorf("service region is missing [Region is \"\"] in override %s", onum)
 		}
-		url := strings.TrimSpace(ovrd.Url)
+		url := strings.TrimSpace(ovrd.URL)
 		if url == "" {
-			return fmt.Errorf("url is missing [Url is \"\"] in override %s", onum)
+			return fmt.Errorf("url is missing [URL is \"\"] in override %s", onum)
 		}
 		signingRegion := strings.TrimSpace(ovrd.SigningRegion)
 		if signingRegion == "" {
@@ -614,9 +614,8 @@ func (cfg *CloudConfig) validateOverrides() error {
 		}
 		if _, ok := set[name+"_"+region]; ok {
 			return fmt.Errorf("duplicate entry found for service override [%s] (%s in %s)", onum, name, region)
-		} else {
-			set[name+"_"+region] = true
 		}
+		set[name+"_"+region] = true
 	}
 	return nil
 }
@@ -636,7 +635,7 @@ func (cfg *CloudConfig) getResolver() func(service, region string,
 		for _, override := range cfg.ServiceOverride {
 			if override.Service == service && override.Region == region {
 				return endpoints.ResolvedEndpoint{
-					URL:           override.Url,
+					URL:           override.URL,
 					SigningRegion: override.SigningRegion,
 				}, nil
 			}
