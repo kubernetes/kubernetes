@@ -28,7 +28,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "envelope_test.go",
-        "grpc_service_unix_test.go",
+        "grpc_service_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

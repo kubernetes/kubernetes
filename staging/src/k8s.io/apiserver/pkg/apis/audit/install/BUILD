@@ -36,7 +36,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["roundtrip_test.go"],
+    srcs = ["install_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",

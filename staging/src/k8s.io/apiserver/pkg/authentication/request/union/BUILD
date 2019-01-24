@@ -8,7 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["unionauth_test.go"],
+    srcs = ["union_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
