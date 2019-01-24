@@ -31,7 +31,7 @@ import (
 func FromYAML(input []byte) (Value, error) {
 	var decoded interface{}
 
-	if len(input) == 0 || (len(input) == 4 && string(input) == "null") {
+	if len(input) == 4 && string(input) == "null" {
 		// Special case since the yaml package doesn't accurately
 		// preserve this.
 		return Value{Null: true}, nil

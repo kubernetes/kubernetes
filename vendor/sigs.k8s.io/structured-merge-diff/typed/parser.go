@@ -100,7 +100,7 @@ func (p *parseableType) IsValid() bool {
 func (p *parseableType) FromYAML(object YAMLObject) (TypedValue, error) {
 	v, err := value.FromYAML([]byte(object))
 	if err != nil {
-		return TypedValue{}, err
+		return nil, err
 	}
 	return AsTyped(v, &p.parser.Schema, p.typename)
 }
@@ -110,7 +110,7 @@ func (p *parseableType) FromYAML(object YAMLObject) (TypedValue, error) {
 func (p *parseableType) FromUnstructured(in interface{}) (TypedValue, error) {
 	v, err := value.FromUnstructured(in)
 	if err != nil {
-		return TypedValue{}, err
+		return nil, err
 	}
 	return AsTyped(v, &p.parser.Schema, p.typename)
 }
@@ -131,7 +131,7 @@ func (p DeducedParseableType) IsValid() bool {
 func (p DeducedParseableType) FromYAML(object YAMLObject) (TypedValue, error) {
 	v, err := value.FromYAML([]byte(object))
 	if err != nil {
-		return TypedValue{}, err
+		return nil, err
 	}
 	return AsTypedDeduced(v), nil
 }
@@ -141,7 +141,7 @@ func (p DeducedParseableType) FromYAML(object YAMLObject) (TypedValue, error) {
 func (p DeducedParseableType) FromUnstructured(in interface{}) (TypedValue, error) {
 	v, err := value.FromUnstructured(in)
 	if err != nil {
-		return TypedValue{}, err
+		return nil, err
 	}
 	return AsTypedDeduced(v), nil
 }
