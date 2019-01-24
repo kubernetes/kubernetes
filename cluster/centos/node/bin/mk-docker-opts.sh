@@ -30,7 +30,7 @@ OPTIONS:
     -c  Output combined Docker options into DOCKER_OPTS var
     -k  Set the combined options key to this value (default DOCKER_OPTS=)
     -m  Do not output --ip-masq (useful for older Docker version)
-" >/dev/stderr 
+" >/dev/stderr
   exit 1
 }
 
@@ -40,8 +40,9 @@ combined_opts_key="DOCKER_OPTS"
 indiv_opts=false
 combined_opts=false
 ipmasq=true
+val=""
 
-while getopts "f:d:ick:" opt; do
+while getopts "f:d:icmk:" opt; do
   case $opt in
     f)
       flannel_env=$OPTARG
@@ -72,37 +73,41 @@ if [[ $indiv_opts = false ]] && [[ $combined_opts = false ]]; then
   combined_opts=true
 fi
 
-if [[ -f "$flannel_env" ]]; then
-  source $flannel_env
+if [[ -f "${flannel_env}" ]]; then
+  source "${flannel_env}"
 fi
 
 if [[ -n "$FLANNEL_SUBNET" ]]; then
+  # shellcheck disable=SC2034  # Variable name referenced in OPT_LOOP below
   DOCKER_OPT_BIP="--bip=$FLANNEL_SUBNET"
 fi
 
 if [[ -n "$FLANNEL_MTU" ]]; then
+  # shellcheck disable=SC2034  # Variable name referenced in OPT_LOOP below
   DOCKER_OPT_MTU="--mtu=$FLANNEL_MTU"
 fi
 
 if [[ "$FLANNEL_IPMASQ" = true ]] && [[ $ipmasq = true ]]; then
+  # shellcheck disable=SC2034  # Variable name referenced in OPT_LOOP below
   DOCKER_OPT_IPMASQ="--ip-masq=false"
 fi
 
 eval docker_opts="\$${combined_opts_key}"
 docker_opts+=" "
 
-echo -n "" >$docker_env
+echo -n "" >"${docker_env}"
+
+# OPT_LOOP
 for opt in $(compgen -v DOCKER_OPT_); do
-  eval val=\$$opt
+  eval val=\$"${opt}"
 
   if [[ "$indiv_opts" = true ]]; then
-    echo "$opt=\"$val\"" >>$docker_env
+    echo "$opt=\"$val\"" >>"${docker_env}"
   fi
 
   docker_opts+="$val "
 done
 
 if [[ "$combined_opts" = true ]]; then
-  echo "${combined_opts_key}=\"${docker_opts}\"" >>$docker_env
+  echo "${combined_opts_key}=\"${docker_opts}\"" >>"${docker_env}"
 fi
-

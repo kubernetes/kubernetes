@@ -3,16 +3,6 @@
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
 ./cluster/addons/fluentd-elasticsearch/fluentd-es-image/run.sh
-./cluster/centos/build.sh
-./cluster/centos/config-build.sh
-./cluster/centos/config-default.sh
-./cluster/centos/config-test.sh
-./cluster/centos/deployAddons.sh
-./cluster/centos/make-ca-cert.sh
-./cluster/centos/master/scripts/flannel.sh
-./cluster/centos/node/bin/mk-docker-opts.sh
-./cluster/centos/node/scripts/flannel.sh
-./cluster/centos/util.sh
 ./cluster/clientbin.sh
 ./cluster/common.sh
 ./cluster/gce/config-common.sh
