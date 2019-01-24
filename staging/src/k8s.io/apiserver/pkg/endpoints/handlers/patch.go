@@ -551,7 +551,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 }
 
 func (p *patcher) prefixFromUserAgent() string {
-	return strings.Split(p.userAgent, "/")[0]
+	return prefixFromUserAgent(p.userAgent)
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
