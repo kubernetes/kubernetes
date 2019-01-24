@@ -132,7 +132,11 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 
 		rcName := createRuntimeClass(f, "valid", "")
 		pod := createRuntimeClassPod(f, rcName)
-		expectPodSuccess(f, pod)
+
+		// Before the pod can be run, the RuntimeClass informer must time out, by which time the Kubelet
+		// will probably be in a backoff state, so the pod can take a long time to start.
+		framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(
+			f.ClientSet, pod.Name, f.Namespace.Name))
 	})
 
 	// TODO(tallclair): Test an actual configured non-default runtimeHandler.
