@@ -1163,6 +1163,10 @@
 			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
 		},
 		{
+			"ImportPath": "k8s.io/utils/trace",
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+		},
+		{
 			"ImportPath": "sigs.k8s.io/yaml",
 			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		}
