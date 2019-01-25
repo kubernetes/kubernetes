@@ -55,7 +55,7 @@ func (a *APIServer) Start() error {
 	}
 	o.ServiceClusterIPRange = *ipnet
 	o.AllowPrivileged = true
-	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
