@@ -156,6 +156,9 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
 func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
+	// To help debugging, immediately log version
+	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
+
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory.Core().V1().Nodes(),
