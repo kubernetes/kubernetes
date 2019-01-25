@@ -67,7 +67,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			if criSocketPath != "" {
+			if criSocketPath == "" {
 				criSocketPath, err = resetDetectCRISocket(client)
 				kubeadmutil.CheckErr(err)
 				klog.V(1).Infof("[reset] detected and using CRI socket: %s", criSocketPath)
