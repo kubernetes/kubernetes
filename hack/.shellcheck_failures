@@ -200,7 +200,6 @@
 ./test/cmd/discovery.sh
 ./test/cmd/generic-resources.sh
 ./test/cmd/get.sh
-./test/cmd/initializers.sh
 ./test/cmd/legacy-script.sh
 ./test/cmd/node-management.sh
 ./test/cmd/old-print.sh

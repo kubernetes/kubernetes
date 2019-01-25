@@ -36,8 +36,7 @@ func NewStrategy(typer runtime.ObjectTyper) fischerStrategy {
 	return fischerStrategy{typer, names.SimpleNameGenerator}
 }
 
-// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
-// and error in case the given runtime.Object is not a Fischer
+// GetAttrs returns labels.Set, fields.Set, and error in case the given runtime.Object is not a Fischer
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*wardle.Fischer)
 	if !ok {
