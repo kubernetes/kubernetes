@@ -27,7 +27,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/capabilities"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	capabilitiespkg "k8s.io/kubernetes/pkg/kubelet/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -1122,6 +1123,8 @@ func TestHostNetworkAllowed(t *testing.T) {
 			HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1150,6 +1153,8 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			HostNetworkSources: []string{},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1177,6 +1182,8 @@ func TestHostPIDAllowed(t *testing.T) {
 			HostPIDSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1205,6 +1212,8 @@ func TestHostPIDDisallowed(t *testing.T) {
 			HostPIDSources: []string{},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1232,6 +1241,8 @@ func TestHostIPCAllowed(t *testing.T) {
 			HostIPCSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1260,6 +1271,8 @@ func TestHostIPCDisallowed(t *testing.T) {
 			HostIPCSources: []string{},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
 			{Name: "foo"},
@@ -1285,6 +1298,8 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	privileged := true
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
@@ -1309,6 +1324,8 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 	privileged := true
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
@@ -1335,6 +1352,8 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 			HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
 		},
 	})
+	caps := capabilitiespkg.NewCapabilities(capabilities.Get())
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(caps)
 
 	pod := podWithUIDNameNsSpec("12345678", "hostnetwork", "new", v1.PodSpec{
 		HostNetwork: false,
