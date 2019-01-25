@@ -178,7 +178,7 @@ func getSupportedComponentConfigAPIObjects() []string {
 }
 
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{
+	return configutil.FileOrDefaultToInitConfiguration("", &kubeadmapiv1beta1.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
 		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
@@ -387,13 +387,13 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 // uploadConfiguration handles the uploading of the configuration internally
 func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1beta1.InitConfiguration) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	// of the version from the internet when executing FileOrDefaultToInitConfiguration
 	phaseutil.SetKubernetesVersion(&defaultcfg.ClusterConfiguration)
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
 	klog.V(1).Infoln("[config] converting to internal API type")
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
+	internalcfg, err := configutil.FileOrDefaultToInitConfiguration(cfgPath, defaultcfg)
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 		Run: func(_ *cobra.Command, _ []string) {
 			externalcfg.ClusterConfiguration.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			kubeadmutil.CheckErr(err)
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, externalcfg)
+			internalcfg, err := configutil.FileOrDefaultToInitConfiguration(cfgPath, externalcfg)
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.GetCRISocket())
 			kubeadmutil.CheckErr(err)
@@ -496,7 +496,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
-	initcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+	initcfg, err := configutil.FileOrDefaultToInitConfiguration(cfgPath, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}

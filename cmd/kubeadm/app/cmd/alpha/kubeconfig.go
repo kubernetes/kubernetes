@@ -80,7 +80,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 			}
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", cfg)
+			internalcfg, err := configutil.FileOrDefaultToInitConfiguration("", cfg)
 			kubeadmutil.CheckErr(err)
 
 			// if the kubeconfig file for an additional user has to use a token, use it

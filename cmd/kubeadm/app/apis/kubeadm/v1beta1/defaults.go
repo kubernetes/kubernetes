@@ -65,15 +65,15 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_InitConfiguration assigns default values for the InitConfiguration
-func SetDefaults_InitConfiguration(obj *InitConfiguration) {
-	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
-	SetDefaults_BootstrapTokens(obj)
-	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
+// SetDefaultsInitConfiguration assigns default values for the InitConfiguration
+func SetDefaultsInitConfiguration(obj *InitConfiguration) {
+	SetDefaultsClusterConfiguration(&obj.ClusterConfiguration)
+	SetDefaultsBootstrapTokens(obj)
+	SetDefaultsAPIEndpoint(&obj.LocalAPIEndpoint)
 }
 
-// SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
-func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
+// SetDefaultsClusterConfiguration assigns default values for the ClusterConfiguration
+func SetDefaultsClusterConfiguration(obj *ClusterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
@@ -98,13 +98,13 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaults_DNS(obj)
-	SetDefaults_Etcd(obj)
-	SetDefaults_APIServer(&obj.APIServer)
+	SetDefaultsDNS(obj)
+	SetDefaultsEtcd(obj)
+	SetDefaultsAPIServer(&obj.APIServer)
 }
 
-// SetDefaults_APIServer assigns default values for the API Server
-func SetDefaults_APIServer(obj *APIServer) {
+// SetDefaultsAPIServer assigns default values for the API Server
+func SetDefaultsAPIServer(obj *APIServer) {
 	if obj.TimeoutForControlPlane == nil {
 		obj.TimeoutForControlPlane = &metav1.Duration{
 			Duration: constants.DefaultControlPlaneTimeout,
@@ -112,15 +112,15 @@ func SetDefaults_APIServer(obj *APIServer) {
 	}
 }
 
-// SetDefaults_DNS assigns default values for the DNS component
-func SetDefaults_DNS(obj *ClusterConfiguration) {
+// SetDefaultsDNS assigns default values for the DNS component
+func SetDefaultsDNS(obj *ClusterConfiguration) {
 	if obj.DNS.Type == "" {
 		obj.DNS.Type = CoreDNS
 	}
 }
 
-// SetDefaults_Etcd assigns default values for the proxy
-func SetDefaults_Etcd(obj *ClusterConfiguration) {
+// SetDefaultsEtcd assigns default values for the proxy
+func SetDefaultsEtcd(obj *ClusterConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
 		obj.Etcd.Local = &LocalEtcd{}
 	}
@@ -131,24 +131,25 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	}
 }
 
-// SetDefaults_JoinConfiguration assigns default values to a regular node
-func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
+// SetDefaultsJoinConfiguration assigns default values to a regular node
+func SetDefaultsJoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
 
-	SetDefaults_JoinControlPlane(obj.ControlPlane)
-	SetDefaults_Discovery(&obj.Discovery)
+	SetDefaultsJoinControlPlane(obj.ControlPlane)
+	SetDefaultsDiscovery(&obj.Discovery)
 }
 
-func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
+// SetDefaultsJoinControlPlane assignes default value for JoinControlPlane
+func SetDefaultsJoinControlPlane(obj *JoinControlPlane) {
 	if obj != nil {
-		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
+		SetDefaultsAPIEndpoint(&obj.LocalAPIEndpoint)
 	}
 }
 
-// SetDefaults_Discovery assigns default values for the discovery process
-func SetDefaults_Discovery(obj *Discovery) {
+// SetDefaultsDiscovery assigns default values for the discovery process
+func SetDefaultsDiscovery(obj *Discovery) {
 	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
 		obj.TLSBootstrapToken = obj.BootstrapToken.Token
 	}
@@ -160,12 +161,12 @@ func SetDefaults_Discovery(obj *Discovery) {
 	}
 
 	if obj.File != nil {
-		SetDefaults_FileDiscovery(obj.File)
+		SetDefaultsFileDiscovery(obj.File)
 	}
 }
 
-// SetDefaults_FileDiscovery assigns default values for file based discovery
-func SetDefaults_FileDiscovery(obj *FileDiscovery) {
+// SetDefaultsFileDiscovery assigns default values for file based discovery
+func SetDefaultsFileDiscovery(obj *FileDiscovery) {
 	// Make sure file URL becomes path
 	if len(obj.KubeConfigPath) != 0 {
 		u, err := url.Parse(obj.KubeConfigPath)
@@ -175,24 +176,24 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 	}
 }
 
-// SetDefaults_BootstrapTokens sets the defaults for the .BootstrapTokens field
+// SetDefaultsBootstrapTokens sets the defaults for the .BootstrapTokens field
 // If the slice is empty, it's defaulted with one token. Otherwise it just loops
 // through the slice and sets the defaults for the omitempty fields that are TTL,
 // Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
 // layer, but set to a random value later at runtime if not set before.
-func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
+func SetDefaultsBootstrapTokens(obj *InitConfiguration) {
 
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []BootstrapToken{{}}
 	}
 
 	for i := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
+		SetDefaultsBootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 
-// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+// SetDefaultsBootstrapToken sets the defaults for an individual Bootstrap Token
+func SetDefaultsBootstrapToken(bt *BootstrapToken) {
 	if bt.TTL == nil {
 		bt.TTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
@@ -207,8 +208,8 @@ func SetDefaults_BootstrapToken(bt *BootstrapToken) {
 	}
 }
 
-// SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
-func SetDefaults_APIEndpoint(obj *APIEndpoint) {
+// SetDefaultsAPIEndpoint sets the defaults for the API server instance deployed on a node.
+func SetDefaultsAPIEndpoint(obj *APIEndpoint) {
 	if obj.BindPort == 0 {
 		obj.BindPort = DefaultAPIBindPort
 	}

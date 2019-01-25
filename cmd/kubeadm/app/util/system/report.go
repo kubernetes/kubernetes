@@ -47,12 +47,14 @@ func colorize(s string, c color) string {
 	return fmt.Sprintf("\033[0;%dm%s\033[0m", c, s)
 }
 
-// The default reporter for the system verification test
+// StreamReporter reports the results of system verification test to a Writer stream.
+// verification results are colorized base on result type.
 type StreamReporter struct {
 	// The stream that this reporter is writing to
 	WriteStream io.Writer
 }
 
+// Report reports the results of system verification test to a Writer stream.
 func (dr *StreamReporter) Report(key, value string, resultType ValidationResultType) error {
 	var c color
 	switch resultType {

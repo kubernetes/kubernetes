@@ -65,15 +65,15 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_InitConfiguration assigns default values for the InitConfiguration
-func SetDefaults_InitConfiguration(obj *InitConfiguration) {
-	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
-	SetDefaults_BootstrapTokens(obj)
-	SetDefaults_APIEndpoint(&obj.APIEndpoint)
+// SetDefaultsInitConfiguration assigns default values for the InitConfiguration
+func SetDefaultsInitConfiguration(obj *InitConfiguration) {
+	SetDefaultsClusterConfiguration(&obj.ClusterConfiguration)
+	SetDefaultsBootstrapTokens(obj)
+	SetDefaultsAPIEndpoint(&obj.APIEndpoint)
 }
 
-// SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
-func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
+// SetDefaultsClusterConfiguration assigns default values for the ClusterConfiguration
+func SetDefaultsClusterConfiguration(obj *ClusterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
@@ -98,12 +98,12 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaults_Etcd(obj)
-	SetDefaults_AuditPolicyConfiguration(obj)
+	SetDefaultsEtcd(obj)
+	SetDefaultsAuditPolicyConfiguration(obj)
 }
 
-// SetDefaults_Etcd assigns default values for the Proxy
-func SetDefaults_Etcd(obj *ClusterConfiguration) {
+// SetDefaultsEtcd assigns default values for the Proxy
+func SetDefaultsEtcd(obj *ClusterConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
 		obj.Etcd.Local = &LocalEtcd{}
 	}
@@ -114,8 +114,8 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	}
 }
 
-// SetDefaults_JoinConfiguration assigns default values to a regular node
-func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
+// SetDefaultsJoinConfiguration assigns default values to a regular node
+func SetDefaultsJoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
@@ -138,11 +138,11 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 		}
 	}
 
-	SetDefaults_APIEndpoint(&obj.APIEndpoint)
+	SetDefaultsAPIEndpoint(&obj.APIEndpoint)
 }
 
-// SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
-func SetDefaults_AuditPolicyConfiguration(obj *ClusterConfiguration) {
+// SetDefaultsAuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
+func SetDefaultsAuditPolicyConfiguration(obj *ClusterConfiguration) {
 	if obj.AuditPolicyConfiguration.LogDir == "" {
 		obj.AuditPolicyConfiguration.LogDir = constants.StaticPodAuditPolicyLogDir
 	}
@@ -151,24 +151,24 @@ func SetDefaults_AuditPolicyConfiguration(obj *ClusterConfiguration) {
 	}
 }
 
-// SetDefaults_BootstrapTokens sets the defaults for the .BootstrapTokens field
+// SetDefaultsBootstrapTokens sets the defaults for the .BootstrapTokens field
 // If the slice is empty, it's defaulted with one token. Otherwise it just loops
 // through the slice and sets the defaults for the omitempty fields that are TTL,
 // Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
 // layer, but set to a random value later at runtime if not set before.
-func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
+func SetDefaultsBootstrapTokens(obj *InitConfiguration) {
 
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []BootstrapToken{{}}
 	}
 
 	for i := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
+		SetDefaultsBootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 
-// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+// SetDefaultsBootstrapToken sets the defaults for an individual Bootstrap Token
+func SetDefaultsBootstrapToken(bt *BootstrapToken) {
 	if bt.TTL == nil {
 		bt.TTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
@@ -183,8 +183,8 @@ func SetDefaults_BootstrapToken(bt *BootstrapToken) {
 	}
 }
 
-// SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
-func SetDefaults_APIEndpoint(obj *APIEndpoint) {
+// SetDefaultsAPIEndpoint sets the defaults for the API server instance deployed on a node.
+func SetDefaultsAPIEndpoint(obj *APIEndpoint) {
 	if obj.BindPort == 0 {
 		obj.BindPort = DefaultAPIBindPort
 	}

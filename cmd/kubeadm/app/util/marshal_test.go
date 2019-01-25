@@ -128,7 +128,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		// at the kubeadmapiv1beta1.InitConfiguration definition.
 	}
 
-	kubeadmapiv1beta1.SetDefaults_InitConfiguration(cfg)
+	kubeadmapiv1beta1.SetDefaultsInitConfiguration(cfg)
 	scheme := runtime.NewScheme()
 	if err := kubeadmapiv1beta1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)

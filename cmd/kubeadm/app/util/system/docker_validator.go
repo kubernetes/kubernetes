@@ -27,11 +27,12 @@ import (
 
 var _ Validator = &DockerValidator{}
 
-// DockerValidator validates docker configuration.
+// DockerValidator validates docker configuration, currently only docker version and graph driver are checked.
 type DockerValidator struct {
 	Reporter Reporter
 }
 
+// Name returns name of DockerValidator
 func (d *DockerValidator) Name() string {
 	return "docker"
 }
@@ -41,6 +42,8 @@ const (
 	latestValidatedDockerVersion = "18.09"
 )
 
+// Validate validates whether the used docker runtime is supported or not, it does nothing
+// if current runtime is not docker.
 // TODO(random-liu): Add more validating items.
 func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 	if spec.RuntimeSpec.DockerSpec == nil {

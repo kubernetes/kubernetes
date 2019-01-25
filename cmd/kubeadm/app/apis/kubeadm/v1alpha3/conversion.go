@@ -46,6 +46,8 @@ func Convert_kubeadm_InitConfiguration_To_v1alpha3_InitConfiguration(in *kubeadm
 	return Convert_kubeadm_APIEndpoint_To_v1alpha3_APIEndpoint(&in.LocalAPIEndpoint, &out.APIEndpoint, s)
 }
 
+// Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration converts
+// v1alpha3.JoinConfiguration to kubeadm.JoinConfiguration
 func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s); err != nil {
 		return err
@@ -96,6 +98,8 @@ func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinCon
 	return nil
 }
 
+// Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration converts
+// kubeadm.JoinConfiguration to v1alpha3.JoinConfiguration
 func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in, out, s); err != nil {
 		return err

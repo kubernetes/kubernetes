@@ -92,7 +92,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if flags.cfgPath != "" {
 				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+				cfg, err := configutil.FileOrDefaultToInitConfiguration(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

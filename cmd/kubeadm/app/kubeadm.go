@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
+	// init klog
 	_ "k8s.io/klog"
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"

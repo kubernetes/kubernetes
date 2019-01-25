@@ -30,7 +30,7 @@ import (
 // NewBootstrapTokenOptions creates a new BootstrapTokenOptions object with the default values
 func NewBootstrapTokenOptions() *BootstrapTokenOptions {
 	bto := &BootstrapTokenOptions{&kubeadmapiv1beta1.BootstrapToken{}, ""}
-	kubeadmapiv1beta1.SetDefaults_BootstrapToken(bto.BootstrapToken)
+	kubeadmapiv1beta1.SetDefaultsBootstrapToken(bto.BootstrapToken)
 	return bto
 }
 

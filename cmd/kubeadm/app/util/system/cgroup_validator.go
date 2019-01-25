@@ -26,10 +26,12 @@ import (
 
 var _ Validator = &CgroupsValidator{}
 
+// CgroupsValidator validates whether all the required cgroup subsystems are enabled or not
 type CgroupsValidator struct {
 	Reporter Reporter
 }
 
+// Name returns name of CgroupsValidator
 func (c *CgroupsValidator) Name() string {
 	return "cgroups"
 }
@@ -38,6 +40,8 @@ const (
 	cgroupsConfigPrefix = "CGROUPS_"
 )
 
+// Validate validates whether all the required cgroup subsystems are enabled or not,
+// an error will be returned if any subsystem is missing.
 func (c *CgroupsValidator) Validate(spec SysSpec) (error, error) {
 	subsystems, err := c.getCgroupSubsystems()
 	if err != nil {

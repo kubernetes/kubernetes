@@ -28,39 +28,39 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*ClusterConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&ClusterStatus{}, func(obj interface{}) { SetObjectDefaults_ClusterStatus(obj.(*ClusterStatus)) })
-	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaultsClusterConfiguration(obj.(*ClusterConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&ClusterStatus{}, func(obj interface{}) { SetObjectDefaultsClusterStatus(obj.(*ClusterStatus)) })
+	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaultsInitConfiguration(obj.(*InitConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaultsJoinConfiguration(obj.(*JoinConfiguration)) })
 	return nil
 }
 
-func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
-	SetDefaults_ClusterConfiguration(in)
-	SetDefaults_APIServer(&in.APIServer)
+func SetObjectDefaultsClusterConfiguration(in *ClusterConfiguration) {
+	SetDefaultsClusterConfiguration(in)
+	SetDefaultsAPIServer(&in.APIServer)
 }
 
-func SetObjectDefaults_ClusterStatus(in *ClusterStatus) {
+func SetObjectDefaultsClusterStatus(in *ClusterStatus) {
 }
 
-func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
-	SetDefaults_InitConfiguration(in)
-	SetObjectDefaults_ClusterConfiguration(&in.ClusterConfiguration)
+func SetObjectDefaultsInitConfiguration(in *InitConfiguration) {
+	SetDefaultsInitConfiguration(in)
+	SetObjectDefaultsClusterConfiguration(&in.ClusterConfiguration)
 	for i := range in.BootstrapTokens {
 		a := &in.BootstrapTokens[i]
-		SetDefaults_BootstrapToken(a)
+		SetDefaultsBootstrapToken(a)
 	}
-	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
+	SetDefaultsAPIEndpoint(&in.LocalAPIEndpoint)
 }
 
-func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
-	SetDefaults_JoinConfiguration(in)
-	SetDefaults_Discovery(&in.Discovery)
+func SetObjectDefaultsJoinConfiguration(in *JoinConfiguration) {
+	SetDefaultsJoinConfiguration(in)
+	SetDefaultsDiscovery(&in.Discovery)
 	if in.Discovery.File != nil {
-		SetDefaults_FileDiscovery(in.Discovery.File)
+		SetDefaultsFileDiscovery(in.Discovery.File)
 	}
 	if in.ControlPlane != nil {
-		SetDefaults_JoinControlPlane(in.ControlPlane)
-		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+		SetDefaultsJoinControlPlane(in.ControlPlane)
+		SetDefaultsAPIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
 	}
 }

@@ -63,7 +63,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
 				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+				cfg, err := configutil.FileOrDefaultToInitConfiguration(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

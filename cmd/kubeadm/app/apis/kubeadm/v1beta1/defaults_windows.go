@@ -21,6 +21,6 @@ package v1beta1
 const (
 	// DefaultCACertPath defines default location of CA certificate on Windows
 	DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
-	// DefaultUrlScheme defines default socket url prefix
-	DefaultUrlScheme = "tcp"
+	// DefaultURLScheme defines default socket url prefix
+	DefaultURLScheme = "tcp"
 )

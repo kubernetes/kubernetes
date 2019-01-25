@@ -44,6 +44,7 @@ type KernelValidator struct {
 	Reporter      Reporter
 }
 
+// Name returns name of KernelValidator
 func (k *KernelValidator) Name() string {
 	return "kernel"
 }
@@ -58,10 +59,11 @@ const (
 
 	// validKConfigRegex is the regex matching kernel configuration line.
 	validKConfigRegex = "^CONFIG_[A-Z0-9_]+=[myn]"
-	// kConfigPrefix is the prefix of kernel configuration.
-	kConfigPrefix = "CONFIG_"
+	// kernelCfgPrefix is the prefix of kernel configuration.
+	kernelCfgPrefix = "CONFIG_"
 )
 
+// Validate validates whether the kernel is supported or not.
 func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 	helper := KernelValidatorHelperImpl{}
 	release, err := helper.GetKernelReleaseVersion()
@@ -79,8 +81,8 @@ func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 }
 
 // validateKernelVersion validates the kernel version.
-func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
-	versionRegexps := kSpec.Versions
+func (k *KernelValidator) validateKernelVersion(kernelSpec KernelSpec) error {
+	versionRegexps := kernelSpec.Versions
 	for _, versionRegexp := range versionRegexps {
 		r := regexp.MustCompile(versionRegexp)
 		if r.MatchString(k.kernelRelease) {
@@ -93,16 +95,16 @@ func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
 }
 
 // validateKernelConfig validates the kernel configurations.
-func (k *KernelValidator) validateKernelConfig(kSpec KernelSpec) error {
+func (k *KernelValidator) validateKernelConfig(kernelSpec KernelSpec) error {
 	allConfig, err := k.getKernelConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to parse kernel config")
 	}
-	return k.validateCachedKernelConfig(allConfig, kSpec)
+	return k.validateCachedKernelConfig(allConfig, kernelSpec)
 }
 
 // validateCachedKernelConfig validates the kernel confgiurations cached in internal data type.
-func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfigOption, kSpec KernelSpec) error {
+func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfigOption, kernelSpec KernelSpec) error {
 	badConfigs := []string{}
 	// reportAndRecord is a helper function to record bad config when
 	// report.
@@ -135,7 +137,7 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 		var opt kConfigOption
 		var ok bool
 		for _, name = range append([]string{config.Name}, config.Aliases...) {
-			name = kConfigPrefix + name
+			name = kernelCfgPrefix + name
 			if opt, ok = allConfig[name]; ok {
 				break
 			}
@@ -155,13 +157,13 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 			reportAndRecord(name, fmt.Sprintf("unknown option: %s", opt), config.Description, missing)
 		}
 	}
-	for _, config := range kSpec.Required {
+	for _, config := range kernelSpec.Required {
 		validateOpt(config, required)
 	}
-	for _, config := range kSpec.Optional {
+	for _, config := range kernelSpec.Optional {
 		validateOpt(config, optional)
 	}
-	for _, config := range kSpec.Forbidden {
+	for _, config := range kernelSpec.Forbidden {
 		validateOpt(config, forbidden)
 	}
 	if len(badConfigs) > 0 {
