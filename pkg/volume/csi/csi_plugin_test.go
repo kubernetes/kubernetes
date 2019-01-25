@@ -105,13 +105,16 @@ func makeTestPV(name string, sizeGig int, driverName, volID string) *api.Persist
 }
 
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
-	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
 		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
 	}
 
-	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint, highestSupportedVersion: highestSupportedVersions}
+	csiDrivers.Clear()
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersions,
+	})
 }
 
 func TestPluginGetPluginName(t *testing.T) {
@@ -839,13 +842,16 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 		highestSupportedVersions1, err := highestSupportedVersion(tc.versions1)
 		if err != nil {
 			t.Fatalf("unexpected error parsing version for testcase: %#v", tc)
 		}
 
-		csiDrivers.driversMap[tc.pluginName1] = csiDriver{driverName: tc.pluginName1, driverEndpoint: tc.endpoint1, highestSupportedVersion: highestSupportedVersions1}
+		csiDrivers.Clear()
+		csiDrivers.Set(tc.pluginName1, Driver{
+			endpoint:                tc.endpoint1,
+			highestSupportedVersion: highestSupportedVersions1,
+		})
 
 		// Arrange & Act
 		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)
