@@ -28,20 +28,24 @@ import (
 
 // VolumeBinder sets up the volume binding library
 type VolumeBinder struct {
-	Binder persistentvolume.SchedulerVolumeBinder
+	Binder         persistentvolume.SchedulerVolumeBinder
+	PVCAssumeCache persistentvolume.PVCAssumeCache
+	PVAssumeCache  persistentvolume.PVAssumeCache
 }
 
 // NewVolumeBinder sets up the volume binding library and binding queue
 func NewVolumeBinder(
 	client clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	bindTimeout time.Duration) *VolumeBinder {
 
+	pvcCache := persistentvolume.NewPVCAssumeCache()
+	pvCache := persistentvolume.NewPVAssumeCache()
 	return &VolumeBinder{
-		Binder: persistentvolume.NewVolumeBinder(client, nodeInformer, pvcInformer, pvInformer, storageClassInformer, bindTimeout),
+		Binder:         persistentvolume.NewVolumeBinder(client, nodeInformer, pvcCache, pvCache, storageClassInformer, bindTimeout),
+		PVCAssumeCache: pvcCache,
+		PVAssumeCache:  pvCache,
 	}
 }
 

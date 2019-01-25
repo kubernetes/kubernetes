@@ -123,11 +123,16 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
+	pvcCache := NewPVCAssumeCache()
+	pvCache := NewPVAssumeCache()
+	pvcInformer.Informer().AddEventHandler(pvcCache.ResourceEventHandler())
+	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(pvCache.ResourceEventHandler())
+
 	binder := NewVolumeBinder(
 		client,
 		nodeInformer,
-		pvcInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
+		pvcCache,
+		pvCache,
 		classInformer,
 		10*time.Second)
 
@@ -203,13 +208,11 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		t.Fatalf("Failed to convert to internal binder")
 	}
 
-	pvCache := internalBinder.pvCache
 	internalPVCache, ok := pvCache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PV cache")
 	}
 
-	pvcCache := internalBinder.pvcCache
 	internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PVC cache")

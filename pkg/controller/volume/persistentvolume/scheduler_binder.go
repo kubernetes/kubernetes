@@ -115,8 +115,8 @@ type volumeBinder struct {
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
+	pvcCache PVCAssumeCache,
+	pvCache PVAssumeCache,
 	storageClassInformer storageinformers.StorageClassInformer,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 
@@ -129,8 +129,8 @@ func NewVolumeBinder(
 	b := &volumeBinder{
 		ctrl:            ctrl,
 		nodeInformer:    nodeInformer,
-		pvcCache:        NewPVCAssumeCache(pvcInformer.Informer()),
-		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
+		pvcCache:        pvcCache,
+		pvCache:         pvCache,
 		podBindingCache: NewPodBindingCache(),
 		bindTimeout:     bindTimeout,
 	}

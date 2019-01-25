@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -96,4 +97,31 @@ func (l *SortableList) Sort() {
 // SortableList, but expects those arguments to be *v1.Pod.
 func HigherPriorityPod(pod1, pod2 interface{}) bool {
 	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+}
+
+// OrderedResourceEventHandlers implements cache.ResourceEventHandler. It
+// applies received events on multiple event handlers in order.
+type OrderedResourceEventHandlers []cache.ResourceEventHandler
+
+var _ = cache.ResourceEventHandler(OrderedResourceEventHandlers{})
+
+// OnAdd calls OnAdd methods of handlers in order.
+func (handlers OrderedResourceEventHandlers) OnAdd(obj interface{}) {
+	for _, h := range handlers {
+		h.OnAdd(obj)
+	}
+}
+
+// OnUpdate calls OnUpdate methods of handlers in order.
+func (handlers OrderedResourceEventHandlers) OnUpdate(oldObj, newObj interface{}) {
+	for _, h := range handlers {
+		h.OnUpdate(oldObj, newObj)
+	}
+}
+
+// OnDelete calls OnDelete methods of handlers in order.
+func (handlers OrderedResourceEventHandlers) OnDelete(obj interface{}) {
+	for _, h := range handlers {
+		h.OnDelete(obj)
+	}
 }

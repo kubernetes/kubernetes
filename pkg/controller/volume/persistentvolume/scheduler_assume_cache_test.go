@@ -107,7 +107,7 @@ func TestAssumePV(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVAssumeCache(nil)
+		cache := NewPVAssumeCache()
 		internal_cache, ok := cache.(*pvAssumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
@@ -141,7 +141,7 @@ func TestAssumePV(t *testing.T) {
 }
 
 func TestRestorePV(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
+	cache := NewPVAssumeCache()
 	internal_cache, ok := cache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -181,7 +181,7 @@ func TestRestorePV(t *testing.T) {
 }
 
 func TestBasicPVCache(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
+	cache := NewPVAssumeCache()
 	internal_cache, ok := cache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -225,7 +225,7 @@ func TestBasicPVCache(t *testing.T) {
 }
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
+	cache := NewPVAssumeCache()
 	internal_cache, ok := cache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -271,7 +271,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 }
 
 func TestAssumeUpdatePVCache(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
+	cache := NewPVAssumeCache()
 	internal_cache, ok := cache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -364,7 +364,7 @@ func TestAssumePVC(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVCAssumeCache(nil)
+		cache := NewPVCAssumeCache()
 		internal_cache, ok := cache.(*pvcAssumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
@@ -398,7 +398,7 @@ func TestAssumePVC(t *testing.T) {
 }
 
 func TestRestorePVC(t *testing.T) {
-	cache := NewPVCAssumeCache(nil)
+	cache := NewPVCAssumeCache()
 	internal_cache, ok := cache.(*pvcAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -438,7 +438,7 @@ func TestRestorePVC(t *testing.T) {
 }
 
 func TestAssumeUpdatePVCCache(t *testing.T) {
-	cache := NewPVCAssumeCache(nil)
+	cache := NewPVCAssumeCache()
 	internal_cache, ok := cache.(*pvcAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")

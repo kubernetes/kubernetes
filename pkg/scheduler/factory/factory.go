@@ -340,6 +340,9 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	// they may need to call.
 	c.scheduledPodLister = assignedPodLister{args.PodInformer.Lister()}
 
+	// Setup volume binder
+	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
+
 	args.NodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,
@@ -349,18 +352,24 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	)
 
 	args.PvInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
-			AddFunc:    c.onPvAdd,
-			UpdateFunc: c.onPvUpdate,
+		util.OrderedResourceEventHandlers{
+			c.volumeBinder.PVAssumeCache.ResourceEventHandler(),
+			cache.ResourceEventHandlerFuncs{
+				// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
+				AddFunc:    c.onPvAdd,
+				UpdateFunc: c.onPvUpdate,
+			},
 		},
 	)
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
 	args.PvcInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.onPvcAdd,
-			UpdateFunc: c.onPvcUpdate,
+		util.OrderedResourceEventHandlers{
+			c.volumeBinder.PVCAssumeCache.ResourceEventHandler(),
+			cache.ResourceEventHandlerFuncs{
+				AddFunc:    c.onPvcAdd,
+				UpdateFunc: c.onPvcUpdate,
+			},
 		},
 	)
 
@@ -372,9 +381,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 			DeleteFunc: c.onServiceDelete,
 		},
 	)
-
-	// Setup volume binder
-	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 	args.StorageClassInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
