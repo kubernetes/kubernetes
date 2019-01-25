@@ -41,7 +41,7 @@ var _ = SIGDescribe("Job", func() {
 		By("Creating a job")
 		job := framework.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
 		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -60,7 +60,7 @@ var _ = SIGDescribe("Job", func() {
 		// test timeout.
 		job := framework.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
 		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -81,7 +81,7 @@ var _ = SIGDescribe("Job", func() {
 		// test less flaky, for now.
 		job := framework.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, 3, nil, 999)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
 		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
@@ -93,7 +93,7 @@ var _ = SIGDescribe("Job", func() {
 		var activeDeadlineSeconds int64 = 1
 		job := framework.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		By("Ensuring job past active deadline")
 		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+10)*time.Second, "DeadlineExceeded")
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
@@ -103,7 +103,7 @@ var _ = SIGDescribe("Job", func() {
 		By("Creating a job")
 		job := framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring active pods == parallelism")
 		err = framework.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
@@ -114,7 +114,7 @@ var _ = SIGDescribe("Job", func() {
 
 		By("Ensuring job was deleted")
 		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		Expect(err).To(HaveOccurred(), "failed to get Job %s in namespace: %s", job.Name, f.Namespace.Name)
+		Expect(err).To(HaveOccurred(), "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
 
@@ -125,7 +125,7 @@ var _ = SIGDescribe("Job", func() {
 		// Save Kind since it won't be populated in the returned job.
 		kind := job.Kind
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		job.Kind = kind
 
 		By("Ensuring active pods == parallelism")
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Job", func() {
 		backoff := 1
 		job := framework.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Job in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		By("Ensuring job exceed backofflimit")
 
 		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, framework.JobTimeout, "BackoffLimitExceeded")
