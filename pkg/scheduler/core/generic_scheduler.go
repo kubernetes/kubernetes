@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,7 +46,7 @@ import (
 	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
-	v1 "k8s.io/kubernetes/staging/src/k8s.io/api/core/v1"
+	// v1 "k8s.io/kubernetes/staging/src/k8s.io/api/core/v1"
 	utiltrace "k8s.io/utils/trace"
 )
 
