@@ -157,7 +157,7 @@ func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []au
 	// the request passes through its stages
 	e := ev.DeepCopy()
 	audit.ObserveEvent()
-	return sink.ProcessEvents(ev)
+	return sink.ProcessEvents(e)
 }
 
 func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink, omitStages []auditinternal.Stage) http.ResponseWriter {

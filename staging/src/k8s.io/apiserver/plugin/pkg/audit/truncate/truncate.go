@@ -124,6 +124,13 @@ func truncate(e *auditinternal.Event) *auditinternal.Event {
 	newEvent := &auditinternal.Event{}
 	*newEvent = *e
 
+	// copy annotations map before modifying
+	newAnnotations := map[string]string{}
+	for k, v := range e.Annotations {
+		newAnnotations[k] = v
+	}
+	newEvent.Annotations = newAnnotations
+
 	newEvent.RequestObject = nil
 	newEvent.ResponseObject = nil
 	audit.LogAnnotation(newEvent, annotationKey, annotationValue)

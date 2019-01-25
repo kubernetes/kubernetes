@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -176,6 +177,24 @@ func TestDynamic(t *testing.T) {
 		require.NoError(t, err, "unable to find events sent to sink 1")
 		err = checkForEvent(eventList2, testEvent)
 		require.NoError(t, err, "unable to find events sent to sink 2")
+
+		// test that backends don't race
+		var wg sync.WaitGroup
+		numTestEvents := 100
+		wg.Add(2)
+		go func() {
+			for i := 0; i < numTestEvents; i++ {
+				b.ProcessEvents(&testEvent)
+			}
+			wg.Done()
+		}()
+		go func() {
+			for i := 0; i < numTestEvents; i++ {
+				b.ProcessEvents(&testEvent)
+			}
+			wg.Done()
+		}()
+		wg.Wait()
 	})
 	require.True(t, success) // propagate failure
 
