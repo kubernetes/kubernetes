@@ -187,8 +187,8 @@ func TestReadAWSCloudConfig(t *testing.T) {
 }
 
 type ServiceDescriptor struct {
-	name   string
-	region string
+	name                         string
+	region                       string
 	signingRegion, signingMethod string
 }
 
@@ -309,7 +309,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                   SigningMethod = v4`),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name:"s3", region: "sregion1", signingRegion: "sregion1", signingMethod: "v4"},
+			[]ServiceDescriptor{{name: "s3", region: "sregion1", signingRegion: "sregion1", signingMethod: "v4"},
 				{name: "ec2", region: "sregion2", signingRegion: "sregion2", signingMethod: "v4"}},
 		},
 		{
@@ -356,7 +356,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 			nil,
 			false, true,
 			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: ""},
-				{name:"ec2", region: "region2", signingRegion: "sregion", signingMethod: "v4"}},
+				{name: "ec2", region: "region2", signingRegion: "sregion", signingMethod: "v4"}},
 		},
 		{
 			"Multiple regions, Same Service",
@@ -380,8 +380,8 @@ func TestOverridesActiveConfig(t *testing.T) {
                  `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name:"s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
-				{name:"s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4"}},
+			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
+				{name: "s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4"}},
 		},
 	}
 

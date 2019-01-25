@@ -615,14 +615,14 @@ func (cfg *CloudConfig) validateOverrides() error {
 		ovrd.Region = region
 
 		url := strings.TrimSpace(ovrd.URL)
-		if url== "" {
+		if url == "" {
 			return fmt.Errorf("url is missing [URL is \"\"] in override %s", onum)
 		}
 		signingRegion := strings.TrimSpace(ovrd.SigningRegion)
 		if signingRegion == "" {
 			return fmt.Errorf("signingRegion is missing [SigningRegion is \"\"] in override %s", onum)
 		}
-		signature := name+"_"+region
+		signature := name + "_" + region
 		if set[signature] {
 			return fmt.Errorf("duplicate entry found for service override [%s] (%s in %s)", onum, name, region)
 		}
