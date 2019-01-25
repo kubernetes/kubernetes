@@ -482,6 +482,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
 	genericfeatures.DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},

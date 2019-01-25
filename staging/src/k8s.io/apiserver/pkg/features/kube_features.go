@@ -37,6 +37,7 @@ const (
 
 	// owner: @tallclair
 	// alpha: v1.10
+	// beta: v1.14
 	//
 	// ValidateProxyRedirects controls whether the apiserver should validate that redirects are only
 	// followed to the same host. Only used if StreamingProxyRedirects is enabled.
@@ -92,7 +93,7 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	ValidateProxyRedirects:  {Default: false, PreRelease: utilfeature.Alpha},
+	ValidateProxyRedirects:  {Default: true, PreRelease: utilfeature.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
 	DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
