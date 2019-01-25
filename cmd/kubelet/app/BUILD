@@ -75,7 +75,6 @@ go_library(
         "//pkg/util/flock:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
-        "//pkg/util/nsenter:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/rlimit:go_default_library",
         "//pkg/version:go_default_library",
@@ -142,6 +141,7 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/nsenter:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/sigma/go-inotify:go_default_library",

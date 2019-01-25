@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
+	utilio "k8s.io/utils/io"
 )
 
 const (

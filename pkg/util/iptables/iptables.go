@@ -28,10 +28,10 @@ import (
 	godbus "github.com/godbus/dbus"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/klog"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/utils/exec"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type RulePosition string

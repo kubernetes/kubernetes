@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 func TestParseFindMnt(t *testing.T) {

@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 const (

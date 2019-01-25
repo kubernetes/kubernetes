@@ -22,7 +22,7 @@ import (
 	"errors"
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 type NsenterMounter struct{}

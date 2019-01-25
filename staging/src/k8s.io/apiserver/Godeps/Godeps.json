@@ -1919,10 +1919,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/client-go/util/buffer",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/client-go/util/cert",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1936,10 +1932,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/util/homedir",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/client-go/util/integer",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -2059,8 +2051,20 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/utils/buffer",
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+		},
+		{
+			"ImportPath": "k8s.io/utils/integer",
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+		},
+		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+		},
+		{
+			"ImportPath": "k8s.io/utils/trace",
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
