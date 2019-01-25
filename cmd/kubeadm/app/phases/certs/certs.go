@@ -220,7 +220,7 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key *rsa.PrivateKey) error {
+func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key *rsa.PrivateKey, cfg *certutil.Config) error {
 
 	// Checks if the signed certificate exists in the PKI directory
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
@@ -235,10 +235,11 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 			return errors.Errorf("certificate %s is not signed by corresponding CA", baseName)
 		}
 
-		// kubeadm doesn't validate the existing certificate more than this;
-		// Basically, if we find a certificate file with the same path; and it is signed by
-		// the expected certificate authority, kubeadm thinks those files are equal and
-		// doesn't bother writing a new file
+		// Check if the certificate has the correct attributes
+		if err := validateCertificateWithConfig(signedCert, baseName, cfg); err != nil {
+			return err
+		}
+
 		fmt.Printf("[certs] Using the existing %q certificate and key\n", baseName)
 	} else {
 		// Write .crt and .key files to disk
@@ -455,6 +456,22 @@ func validatePrivatePublicKey(l certKeyLocation) error {
 	_, _, err := pkiutil.TryLoadPrivatePublicKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {
 		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
+	}
+	return nil
+}
+
+// validateCertificateWithConfig makes sure that a given certificate is valid at
+// least for the SANs defined in the configuration.
+func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg *certutil.Config) error {
+	for _, dnsName := range cfg.AltNames.DNSNames {
+		if err := cert.VerifyHostname(dnsName); err != nil {
+			return errors.Wrapf(err, "certificate %s is invalid", baseName)
+		}
+	}
+	for _, ipAddress := range cfg.AltNames.IPs {
+		if err := cert.VerifyHostname(ipAddress.String()); err != nil {
+			return errors.Wrapf(err, "certificate %s is invalid", baseName)
+		}
 	}
 	return nil
 }

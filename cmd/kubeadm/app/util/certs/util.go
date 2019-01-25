@@ -145,17 +145,18 @@ func CreateCACert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	return cert, key
 }
 
-// CreateTestCert makes a generic certficate with the given CA.
-func CreateTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey) {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey,
-		&certutil.Config{
-			CommonName: "testCert",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		})
+// CreateTestCert makes a generic certificate with the given CA and alternative names.
+func CreateTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*x509.Certificate, *rsa.PrivateKey, *certutil.Config) {
+	config := &certutil.Config{
+		CommonName: "testCert",
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		AltNames:   altNames,
+	}
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
 		t.Fatalf("couldn't create test cert: %v", err)
 	}
-	return cert, key
+	return cert, key, config
 }
 
 // CertTestCase is a configuration of certificates and whether it's expected to work.
@@ -172,7 +173,7 @@ func GetSparseCertTestCases(t *testing.T) []CertTestCase {
 	fpCACert, fpCAKey := CreateCACert(t)
 	etcdCACert, etcdCAKey := CreateCACert(t)
 
-	fpCert, fpKey := CreateTestCert(t, fpCACert, fpCAKey)
+	fpCert, fpKey, _ := CreateTestCert(t, fpCACert, fpCAKey, certutil.AltNames{})
 
 	return []CertTestCase{
 		{
