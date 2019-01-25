@@ -38,7 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // UpdateResource returns a function that will handle a resource update
@@ -63,6 +63,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
 
 		body, err := readBody(req)
 		if err != nil {
@@ -174,24 +180,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 		trace.Step("Object stored in database")
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-link added")
-
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
 
 		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 

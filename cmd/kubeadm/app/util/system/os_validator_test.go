@@ -44,11 +44,13 @@ func TestValidateOS(t *testing.T) {
 			err: true,
 		},
 	} {
-		err := v.validateOS(test.os, specOS)
-		if !test.err {
-			assert.Nil(t, err, "Expect error not to occur with os %q", test.os)
-		} else {
-			assert.NotNil(t, err, "Expect error to occur with os %q", test.os)
-		}
+		t.Run(test.os, func(t *testing.T) {
+			err := v.validateOS(test.os, specOS)
+			if !test.err {
+				assert.Nil(t, err, "Expect error not to occur with os %q", test.os)
+			} else {
+				assert.NotNil(t, err, "Expect error to occur with os %q", test.os)
+			}
+		})
 	}
 }

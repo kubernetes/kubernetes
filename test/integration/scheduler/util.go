@@ -33,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,7 +44,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -91,7 +88,6 @@ func createConfiguratorWithPodInformer(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             600,
@@ -149,7 +145,7 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, true, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -161,16 +157,8 @@ func initTestSchedulerWithOptions(
 	policy *schedulerapi.Policy,
 	pluginSet plugins.PluginSet,
 	disablePreemption bool,
-	disableEquivalenceCache bool,
 	resyncPeriod time.Duration,
 ) *TestContext {
-	if !disableEquivalenceCache {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(
-			t,
-			utilfeature.DefaultFeatureGate,
-			features.EnableEquivalenceClassCache, true)()
-	}
-
 	// 1. Create scheduler
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
 
@@ -224,12 +212,7 @@ func initTestSchedulerWithOptions(
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
 
-	context.scheduler, err = scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{
-		Config: context.schedulerConfig},
-		nil...)
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler: %v", err)
-	}
+	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
 	context.scheduler.Run()
 	return context
 }
@@ -243,9 +226,9 @@ func initDisruptionController(context *TestContext) *disruption.DisruptionContro
 		informers.Core().V1().Pods(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Extensions().V1beta1().Deployments(),
-		informers.Apps().V1beta1().StatefulSets(),
+		informers.Apps().V1().ReplicaSets(),
+		informers.Apps().V1().Deployments(),
+		informers.Apps().V1().StatefulSets(),
 		context.clientSet)
 
 	informers.Start(context.schedulerConfig.StopEverything)
@@ -264,7 +247,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, true, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
@@ -596,6 +579,17 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 
 // podUnschedulable returns a condition function that returns true if the given pod
 // gets unschedulable status.
+func podSchedulableCondition(c clientset.Interface, podNamespace, podName string) (*v1.PodCondition, error) {
+	pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+	return cond, nil
+}
+
+// podUnschedulable returns a condition function that returns true if the given pod
+// gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
@@ -722,7 +716,7 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 		}
 	}
 	for _, p := range pods {
-		if err := wait.Poll(time.Second, wait.ForeverTestTimeout,
+		if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout,
 			podDeleted(cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}

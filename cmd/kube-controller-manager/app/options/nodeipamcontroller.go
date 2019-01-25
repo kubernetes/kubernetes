@@ -24,8 +24,7 @@ import (
 
 // NodeIPAMControllerOptions holds the NodeIpamController options.
 type NodeIPAMControllerOptions struct {
-	ServiceCIDR      string
-	NodeCIDRMaskSize int32
+	*kubectrlmgrconfig.NodeIPAMControllerConfiguration
 }
 
 // AddFlags adds flags related to NodeIpamController for controller manager to the specified FlagSet.

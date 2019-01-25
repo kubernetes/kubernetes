@@ -191,7 +191,7 @@ func (m *monitorGatherer) rewriteExportedMetrics(metrics map[string]*dto.MetricF
 	return results, nil
 }
 
-// Struct for unmarshalling the json response from etcd's /version endpoint.
+// EtcdVersion struct for unmarshalling the json response from etcd's /version endpoint.
 type EtcdVersion struct {
 	BinaryVersion  string `json:"etcdserver"`
 	ClusterVersion string `json:"etcdcluster"`

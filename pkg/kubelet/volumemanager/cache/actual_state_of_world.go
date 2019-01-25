@@ -313,6 +313,11 @@ func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	return asw.addVolume(volumeName, volumeSpec, devicePath)
 }
 
+func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
+	return nil
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)

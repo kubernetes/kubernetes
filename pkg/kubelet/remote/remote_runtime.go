@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -40,6 +41,7 @@ type RemoteRuntimeService struct {
 	lastError map[string]string
 	// Time last per-container error message was printed
 	errorPrinted map[string]time.Time
+	errorMapLock sync.Mutex
 }
 
 const (
@@ -236,8 +238,10 @@ func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) 
 	ctx, cancel := getContextWithTimeout(t)
 	defer cancel()
 
+	r.errorMapLock.Lock()
 	delete(r.lastError, containerID)
 	delete(r.errorPrinted, containerID)
+	r.errorMapLock.Unlock()
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
 		ContainerId: containerID,
 		Timeout:     timeout,
@@ -256,8 +260,10 @@ func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
+	r.errorMapLock.Lock()
 	delete(r.lastError, containerID)
 	delete(r.errorPrinted, containerID)
+	r.errorMapLock.Unlock()
 	_, err := r.runtimeClient.RemoveContainer(ctx, &runtimeapi.RemoveContainerRequest{
 		ContainerId: containerID,
 	})
@@ -287,6 +293,8 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter
 
 // Clean up any expired last-error timers
 func (r *RemoteRuntimeService) cleanupErrorTimeouts() {
+	r.errorMapLock.Lock()
+	defer r.errorMapLock.Unlock()
 	for ID, timeout := range r.errorPrinted {
 		if time.Now().Sub(timeout) >= identicalErrorDelay {
 			delete(r.lastError, ID)
@@ -304,6 +312,8 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 		ContainerId: containerID,
 	})
 	r.cleanupErrorTimeouts()
+	r.errorMapLock.Lock()
+	defer r.errorMapLock.Unlock()
 	if err != nil {
 		// Don't spam the log with endless messages about the same failure.
 		lastMsg, ok := r.lastError[containerID]
@@ -491,6 +501,8 @@ func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.C
 		ContainerId: containerID,
 	})
 	r.cleanupErrorTimeouts()
+	r.errorMapLock.Lock()
+	defer r.errorMapLock.Unlock()
 	if err != nil {
 		lastMsg, ok := r.lastError[containerID]
 		if !ok || err.Error() != lastMsg || time.Now().Sub(r.errorPrinted[containerID]) >= identicalErrorDelay {

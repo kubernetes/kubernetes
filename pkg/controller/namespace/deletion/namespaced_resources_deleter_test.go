@@ -234,8 +234,8 @@ func TestSyncNamespaceThatIsTerminatingNonExperimental(t *testing.T) {
 	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{})
 }
 
-func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
-	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{Versions: []string{"extensions/v1beta1"}})
+func TestSyncNamespaceThatIsTerminatingV1(t *testing.T) {
+	testSyncNamespaceThatIsTerminating(t, &metav1.APIVersions{Versions: []string{"apps/v1"}})
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
@@ -331,7 +331,7 @@ func testResources() []*metav1.APIResourceList {
 			},
 		},
 		{
-			GroupVersion: "extensions/v1beta1",
+			GroupVersion: "apps/v1",
 			APIResources: []metav1.APIResource{
 				{
 					Name:       "deployments",

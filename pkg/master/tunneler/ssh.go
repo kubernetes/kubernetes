@@ -29,11 +29,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/ssh"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
 )
 
 type InstallSSHKey func(ctx context.Context, user string, data []byte) error
@@ -83,9 +81,8 @@ type SSHTunneler struct {
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
-	tunnels        *ssh.SSHTunnelList
-	lastSyncMetric prometheus.GaugeFunc
-	clock          clock.Clock
+	tunnels *ssh.SSHTunnelList
+	clock   clock.Clock
 
 	getAddresses AddressFunc
 	stopChan     chan struct{}

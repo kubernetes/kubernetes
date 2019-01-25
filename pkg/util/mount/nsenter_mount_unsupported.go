@@ -22,7 +22,7 @@ import (
 	"errors"
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 type NsenterMounter struct{}
@@ -46,7 +46,7 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 }
 
 func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(m, dir)
+	return isNotMountPoint(m, dir)
 }
 
 func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {

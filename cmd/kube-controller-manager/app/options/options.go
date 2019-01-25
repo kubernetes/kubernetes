@@ -96,84 +96,67 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	}
 
 	s := KubeControllerManagerOptions{
-		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(componentConfig.Generic),
-		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
+		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
+		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
+		ServiceController: &cmoptions.ServiceControllerOptions{
+			ServiceControllerConfiguration: &componentConfig.ServiceController,
+		},
 		AttachDetachController: &AttachDetachControllerOptions{
-			ReconcilerSyncLoopPeriod: componentConfig.AttachDetachController.ReconcilerSyncLoopPeriod,
+			&componentConfig.AttachDetachController,
 		},
 		CSRSigningController: &CSRSigningControllerOptions{
-			ClusterSigningCertFile: componentConfig.CSRSigningController.ClusterSigningCertFile,
-			ClusterSigningKeyFile:  componentConfig.CSRSigningController.ClusterSigningKeyFile,
-			ClusterSigningDuration: componentConfig.CSRSigningController.ClusterSigningDuration,
+			&componentConfig.CSRSigningController,
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
-			ConcurrentDaemonSetSyncs: componentConfig.DaemonSetController.ConcurrentDaemonSetSyncs,
+			&componentConfig.DaemonSetController,
 		},
 		DeploymentController: &DeploymentControllerOptions{
-			ConcurrentDeploymentSyncs:      componentConfig.DeploymentController.ConcurrentDeploymentSyncs,
-			DeploymentControllerSyncPeriod: componentConfig.DeploymentController.DeploymentControllerSyncPeriod,
+			&componentConfig.DeploymentController,
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
-			RegisterRetryCount: componentConfig.DeprecatedController.RegisterRetryCount,
+			&componentConfig.DeprecatedController,
 		},
 		EndpointController: &EndpointControllerOptions{
-			ConcurrentEndpointSyncs: componentConfig.EndpointController.ConcurrentEndpointSyncs,
+			&componentConfig.EndpointController,
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
-			ConcurrentGCSyncs:      componentConfig.GarbageCollectorController.ConcurrentGCSyncs,
-			EnableGarbageCollector: componentConfig.GarbageCollectorController.EnableGarbageCollector,
+			&componentConfig.GarbageCollectorController,
 		},
 		HPAController: &HPAControllerOptions{
-			HorizontalPodAutoscalerSyncPeriod:                   componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
-			HorizontalPodAutoscalerUpscaleForbiddenWindow:       componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
-			HorizontalPodAutoscalerDownscaleForbiddenWindow:     componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
-			HorizontalPodAutoscalerDownscaleStabilizationWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow,
-			HorizontalPodAutoscalerCPUInitializationPeriod:      componentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod,
-			HorizontalPodAutoscalerInitialReadinessDelay:        componentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay,
-			HorizontalPodAutoscalerTolerance:                    componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
-			HorizontalPodAutoscalerUseRESTClients:               componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,
+			&componentConfig.HPAController,
 		},
 		JobController: &JobControllerOptions{
-			ConcurrentJobSyncs: componentConfig.JobController.ConcurrentJobSyncs,
+			&componentConfig.JobController,
 		},
 		NamespaceController: &NamespaceControllerOptions{
-			NamespaceSyncPeriod:      componentConfig.NamespaceController.NamespaceSyncPeriod,
-			ConcurrentNamespaceSyncs: componentConfig.NamespaceController.ConcurrentNamespaceSyncs,
+			&componentConfig.NamespaceController,
 		},
 		NodeIPAMController: &NodeIPAMControllerOptions{
-			NodeCIDRMaskSize: componentConfig.NodeIPAMController.NodeCIDRMaskSize,
+			&componentConfig.NodeIPAMController,
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
-			EnableTaintManager:     componentConfig.NodeLifecycleController.EnableTaintManager,
-			NodeMonitorGracePeriod: componentConfig.NodeLifecycleController.NodeMonitorGracePeriod,
-			NodeStartupGracePeriod: componentConfig.NodeLifecycleController.NodeStartupGracePeriod,
-			PodEvictionTimeout:     componentConfig.NodeLifecycleController.PodEvictionTimeout,
+			&componentConfig.NodeLifecycleController,
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
-			PVClaimBinderSyncPeriod: componentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod,
-			VolumeConfiguration:     componentConfig.PersistentVolumeBinderController.VolumeConfiguration,
+			&componentConfig.PersistentVolumeBinderController,
 		},
 		PodGCController: &PodGCControllerOptions{
-			TerminatedPodGCThreshold: componentConfig.PodGCController.TerminatedPodGCThreshold,
+			&componentConfig.PodGCController,
 		},
 		ReplicaSetController: &ReplicaSetControllerOptions{
-			ConcurrentRSSyncs: componentConfig.ReplicaSetController.ConcurrentRSSyncs,
+			&componentConfig.ReplicaSetController,
 		},
 		ReplicationController: &ReplicationControllerOptions{
-			ConcurrentRCSyncs: componentConfig.ReplicationController.ConcurrentRCSyncs,
+			&componentConfig.ReplicationController,
 		},
 		ResourceQuotaController: &ResourceQuotaControllerOptions{
-			ResourceQuotaSyncPeriod:      componentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod,
-			ConcurrentResourceQuotaSyncs: componentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs,
+			&componentConfig.ResourceQuotaController,
 		},
 		SAController: &SAControllerOptions{
-			ConcurrentSATokenSyncs: componentConfig.SAController.ConcurrentSATokenSyncs,
-		},
-		ServiceController: &cmoptions.ServiceControllerOptions{
-			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
+			&componentConfig.SAController,
 		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
-			ConcurrentTTLSyncs: componentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs,
+			&componentConfig.TTLAfterFinishedController,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{

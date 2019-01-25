@@ -23,6 +23,4 @@ const (
 	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
 	// DefaultUrlScheme defines default socket url prefix
 	DefaultUrlScheme = "unix"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "/var/run/dockershim.sock"
 )

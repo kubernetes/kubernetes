@@ -19,11 +19,9 @@ package cache
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
-
-// PodFilter is a function to filter a pod. If pod passed return true else return false.
-type PodFilter func(*v1.Pod) bool
 
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
@@ -100,13 +98,13 @@ type Cache interface {
 	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
-	UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error
+	UpdateNodeNameToInfoMap(infoMap map[string]*schedulernodeinfo.NodeInfo) error
 
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*v1.Pod, error)
 
 	// FilteredList returns all cached pods that pass the filter.
-	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+	FilteredList(filter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
@@ -118,5 +116,5 @@ type Cache interface {
 // Snapshot is a snapshot of cache state
 type Snapshot struct {
 	AssumedPods map[string]bool
-	Nodes       map[string]*schedulercache.NodeInfo
+	Nodes       map[string]*schedulernodeinfo.NodeInfo
 }

@@ -88,7 +88,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		"--enable-admission-plugins", "NodeRestriction",
 		// The "default" SA is not installed, causing the ServiceAccount plugin to retry for ~1s per
 		// API request.
-		"--disable-admission-plugins", "ServiceAccount",
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 

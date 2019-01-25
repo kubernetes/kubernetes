@@ -37,12 +37,12 @@ const (
 	defaultKeepAlivePeriod = 3 * time.Minute
 )
 
-// serveSecurely runs the secure http server. It fails only if certificates cannot
-// be loaded or the initial listen call fails. The actual server loop (stoppable by closing
-// stopCh) runs in a go routine, i.e. serveSecurely does not block.
-func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
+// Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
+// The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. Serve does not block.
+// It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
+func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, error) {
 	if s.Listener == nil {
-		return fmt.Errorf("listener must not be nil")
+		return nil, fmt.Errorf("listener must not be nil")
 	}
 
 	secureServer := &http.Server{
@@ -110,7 +110,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 
 	// apply settings to the server
 	if err := http2.ConfigureServer(secureServer, http2Options); err != nil {
-		return fmt.Errorf("error configuring http2: %v", err)
+		return nil, fmt.Errorf("error configuring http2: %v", err)
 	}
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
@@ -118,21 +118,25 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 }
 
 // RunServer listens on the given port if listener is not given,
-// then spawns a go-routine continuously serving
-// until the stopCh is closed. This function does not block.
+// then spawns a go-routine continuously serving until the stopCh is closed.
+// It returns a stoppedCh that is closed when all non-hijacked active requests
+// have been processed.
+// This function does not block
 // TODO: make private when insecure serving is gone from the kube-apiserver
 func RunServer(
 	server *http.Server,
 	ln net.Listener,
 	shutDownTimeout time.Duration,
 	stopCh <-chan struct{},
-) error {
+) (<-chan struct{}, error) {
 	if ln == nil {
-		return fmt.Errorf("listener must not be nil")
+		return nil, fmt.Errorf("listener must not be nil")
 	}
 
 	// Shutdown server gracefully.
+	stoppedCh := make(chan struct{})
 	go func() {
+		defer close(stoppedCh)
 		<-stopCh
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
 		server.Shutdown(ctx)
@@ -159,18 +163,18 @@ func RunServer(
 		}
 	}()
 
-	return nil
+	return stoppedCh, nil
 }
 
 type NamedTLSCert struct {
 	TLSCert tls.Certificate
 
-	// names is a list of domain patterns: fully qualified domain names, possibly prefixed with
+	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
 	// wildcard segments.
 	Names []string
 }
 
-// getNamedCertificateMap returns a map of *tls.Certificate by name. It's is
+// GetNamedCertificateMap returns a map of *tls.Certificate by name. It's
 // suitable for use in tls.Config#NamedCertificates. Returns an error if any of the certs
 // cannot be loaded. Returns nil if len(certs) == 0
 func GetNamedCertificateMap(certs []NamedTLSCert) (map[string]*tls.Certificate, error) {

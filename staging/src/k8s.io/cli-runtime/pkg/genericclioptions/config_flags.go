@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -92,6 +93,13 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+
+	clientConfig clientcmd.ClientConfig
+	lock         sync.Mutex
+	// If set to true, will use persistent client config and
+	// propagate the config to the places that need it, rather than
+	// loading the config multiple times
+	usePersistentConfig bool
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -106,6 +114,13 @@ func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
 // Returns an interactive clientConfig if the password flag is enabled,
 // or a non-interactive clientConfig otherwise.
 func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	if f.usePersistentConfig {
+		return f.toRawKubePersistentConfigLoader()
+	}
+	return f.toRawKubeConfigLoader()
+}
+
+func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	// use the standard defaults for this client command
 	// DEPRECATED: remove and replace with something more accurate
@@ -179,6 +194,19 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 
 	return clientConfig
+}
+
+// toRawKubePersistentConfigLoader binds config flag values to config overrides
+// Returns a persistent clientConfig for propagation.
+func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.clientConfig == nil {
+		f.clientConfig = f.toRawKubeConfigLoader()
+	}
+
+	return f.clientConfig
 }
 
 // ToDiscoveryClient implements RESTClientGetter.
@@ -285,7 +313,7 @@ func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
 }
 
 // NewConfigFlags returns ConfigFlags with default values set
-func NewConfigFlags() *ConfigFlags {
+func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
 	insecure := false
 
@@ -306,6 +334,8 @@ func NewConfigFlags() *ConfigFlags {
 		BearerToken:      stringptr(""),
 		Impersonate:      stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
+
+		usePersistentConfig: usePersistentConfig,
 	}
 }
 

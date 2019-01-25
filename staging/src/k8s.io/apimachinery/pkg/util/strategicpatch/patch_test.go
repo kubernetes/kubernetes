@@ -282,7 +282,7 @@ testCases:
 
 func TestSortMergeLists(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -673,7 +673,7 @@ mergingList:
 
 func TestCustomStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6029,7 +6029,7 @@ func TestStrategicMergePatch(t *testing.T) {
 		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), mergepatch.ErrBadArgKind(struct{}{}, []byte{}))
 
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6413,7 +6413,7 @@ func TestNumberConversion(t *testing.T) {
 	}
 
 	precisionItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakePrecisionItemSchema, "precisionItem"),
+		Schema: sptest.GetSchemaOrDie(&fakePrecisionItemSchema, "precisionItem"),
 	}
 	precisionItemSchemas := []LookupPatchMeta{
 		precisionItemStructSchema,
@@ -6623,7 +6623,7 @@ replacingItem:
 
 func TestReplaceWithRawExtension(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6695,7 +6695,7 @@ func TestUnknownField(t *testing.T) {
 	}
 
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,

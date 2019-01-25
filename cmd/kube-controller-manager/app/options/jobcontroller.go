@@ -24,7 +24,7 @@ import (
 
 // JobControllerOptions holds the JobController options.
 type JobControllerOptions struct {
-	ConcurrentJobSyncs int32
+	*kubectrlmgrconfig.JobControllerConfiguration
 }
 
 // AddFlags adds flags related to JobController for controller manager to the specified FlagSet.

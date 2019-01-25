@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
+	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -124,8 +125,8 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Coordination().V1beta1().Leases(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
-		ctx.Cloud,
+		ctx.InformerFactory.Apps().V1().DaemonSets(),
+		// node lifecycle controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
@@ -143,6 +144,25 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		return nil, true, err
 	}
 	go lifecycleController.Run(ctx.Stop)
+	return nil, true, nil
+}
+
+func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
+	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
+		ctx.InformerFactory.Core().V1().Nodes(),
+		// cloud node lifecycle controller uses existing cluster role from node-controller
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		ctx.Cloud,
+		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+	)
+	if err != nil {
+		// the controller manager should continue to run if the "Instances" interface is not
+		// supported, though it's unlikely for a cloud provider to not support it
+		klog.Errorf("failed to start cloud node lifecycle controller: %v", err)
+		return nil, false, nil
+	}
+
+	go cloudNodeLifecycleController.Run(ctx.Stop)
 	return nil, true, nil
 }
 
@@ -193,7 +213,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
 	// csiClient works with CRDs that support json only

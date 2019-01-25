@@ -1,8 +1,11 @@
-apiVersion: extensions/v1beta1 
+apiVersion: apps/v1 
 kind: DaemonSet
 metadata:
   name: prometheus-node-exporter
 spec:
+  selector:
+    matchLabels:
+      daemon: prom-node-exp
   template:
     metadata:
       name: prometheus-node-exporter

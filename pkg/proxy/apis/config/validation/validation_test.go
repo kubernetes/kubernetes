@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
@@ -575,7 +575,7 @@ func TestValidateProxyMode(t *testing.T) {
 func TestValidateClientConnectionConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 
-	successCases := []apimachineryconfig.ClientConnectionConfiguration{
+	successCases := []componentbaseconfig.ClientConnectionConfiguration{
 		{
 			Burst: 0,
 		},
@@ -591,11 +591,11 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	}
 
 	errorCases := []struct {
-		ccc apimachineryconfig.ClientConnectionConfiguration
+		ccc componentbaseconfig.ClientConnectionConfiguration
 		msg string
 	}{
 		{
-			ccc: apimachineryconfig.ClientConnectionConfiguration{Burst: -5},
+			ccc: componentbaseconfig.ClientConnectionConfiguration{Burst: -5},
 			msg: "must be greater than or equal to 0",
 		},
 	}

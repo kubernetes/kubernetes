@@ -89,6 +89,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *emptyDirPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *emptyDirPlugin) RequiresRemount() bool {
 	return false
 }

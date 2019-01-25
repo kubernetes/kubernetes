@@ -112,7 +112,6 @@ func setupScheduler(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    false,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       100,
 	})
@@ -133,11 +132,7 @@ func setupScheduler(
 		Interface: cs.CoreV1().Events(""),
 	})
 
-	sched, err := scheduler.NewFromConfigurator(
-		&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
-	if err != nil {
-		t.Fatalf("error creating scheduler: %v", err)
-	}
+	sched := scheduler.NewFromConfig(schedulerConfig)
 
 	algorithmprovider.ApplyFeatureGates()
 
@@ -279,7 +274,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: metav1.NamespaceDefault,
+			Namespace: metav1.NamespaceNone,
 		},
 		Status: v1.NodeStatus{
 			Conditions:  []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},

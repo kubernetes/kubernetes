@@ -45,3 +45,8 @@ func UnlockPath(fileHandles []uintptr) {
 func LocalEndpoint(path, file string) string {
 	return ""
 }
+
+// GetBootTime empty implementation
+func GetBootTime() (time.Time, error) {
+	return time.Time{}, fmt.Errorf("GetBootTime is unsupported in this build")
+}

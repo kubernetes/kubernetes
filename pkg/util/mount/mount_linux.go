@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
+	utilio "k8s.io/utils/io"
 )
 
 const (
@@ -55,6 +55,7 @@ const (
 	fsckErrorsUncorrected = 4
 
 	// place for subpath mounts
+	// TODO: pass in directory using kubelet_getters instead
 	containerSubPathDirectoryName = "volume-subpaths"
 	// syscall.Openat flags used to traverse directories not following symlinks
 	nofollowFlags = unix.O_RDONLY | unix.O_NOFOLLOW
@@ -228,7 +229,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 }
 
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
+	return isNotMountPoint(mounter, dir)
 }
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
@@ -756,7 +757,7 @@ func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	notMount, err := mounter.IsNotMountPoint(bindPathTarget)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
@@ -890,15 +891,22 @@ func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error 
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
-		subPaths, err := ioutil.ReadDir(fullContainerDirPath)
-		if err != nil {
-			return fmt.Errorf("error reading %s: %s", fullContainerDirPath, err)
-		}
-		for _, subPath := range subPaths {
-			if err = doCleanSubPath(mounter, fullContainerDirPath, subPath.Name()); err != nil {
+		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, err error) error {
+			if path == fullContainerDirPath {
+				// Skip top level directory
+				return nil
+			}
+
+			// pass through errors and let doCleanSubPath handle them
+			if err = doCleanSubPath(mounter, fullContainerDirPath, filepath.Base(path)); err != nil {
 				return err
 			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("error processing %s: %s", fullContainerDirPath, err)
 		}
+
 		// Whole container has been processed, remove its directory.
 		if err := os.Remove(fullContainerDirPath); err != nil {
 			return fmt.Errorf("error deleting %s: %s", fullContainerDirPath, err)
@@ -925,22 +933,12 @@ func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string
 	// process /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/<subPathName>
 	klog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
 	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
-	notMnt, err := IsNotMountPoint(mounter, fullSubPath)
-	if err != nil {
-		return fmt.Errorf("error checking %s for mount: %s", fullSubPath, err)
+
+	if err := CleanupMountPoint(fullSubPath, mounter, true); err != nil {
+		return fmt.Errorf("error cleaning subpath mount %s: %s", fullSubPath, err)
 	}
-	// Unmount it
-	if !notMnt {
-		if err = mounter.Unmount(fullSubPath); err != nil {
-			return fmt.Errorf("error unmounting %s: %s", fullSubPath, err)
-		}
-		klog.V(5).Infof("Unmounted %s", fullSubPath)
-	}
-	// Remove it *non*-recursively, just in case there were some hiccups.
-	if err = os.Remove(fullSubPath); err != nil {
-		return fmt.Errorf("error deleting %s: %s", fullSubPath, err)
-	}
-	klog.V(5).Infof("Removed %s", fullSubPath)
+
+	klog.V(4).Infof("Successfully cleaned subpath directory %s", fullSubPath)
 	return nil
 }
 

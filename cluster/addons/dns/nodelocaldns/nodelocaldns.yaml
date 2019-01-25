@@ -84,10 +84,13 @@ metadata:
   name: node-local-dns
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
+    k8s-app: node-local-dns
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 10%
   selector:
     matchLabels:
       k8s-app: node-local-dns
@@ -133,12 +136,19 @@ spec:
           initialDelaySeconds: 60
           timeoutSeconds: 5
         volumeMounts:
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+          readOnly: false
         - name: config-volume
           mountPath: /etc/coredns
       volumes:
-        - name: config-volume
-          configMap:
-            name: node-local-dns
-            items:
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+      - name: config-volume
+        configMap:
+          name: node-local-dns
+          items:
             - key: Corefile
               path: Corefile

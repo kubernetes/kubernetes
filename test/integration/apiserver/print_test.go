@@ -74,10 +74,6 @@ var kindWhiteList = sets.NewString(
 	"AdmissionReview",
 	// --
 
-	// k8s.io/api/admissionregistration
-	"InitializerConfiguration",
-	// --
-
 	// k8s.io/api/authentication
 	"TokenRequest",
 	"TokenReview",

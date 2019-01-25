@@ -30,7 +30,7 @@ spec:
       serviceAccountName: csi-attacher
       containers:
         - name: csi-attacher
-          image: gcr.io/gke-release/csi-attacher:v0.4.1-gke.0
+          image: quay.io/k8scsi/csi-attacher:v0.4.1
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

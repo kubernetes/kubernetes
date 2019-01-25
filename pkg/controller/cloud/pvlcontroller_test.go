@@ -27,11 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	sets "k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -132,13 +129,6 @@ func TestCreatePatch(t *testing.T) {
 	ignoredPV := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "noncloud",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -151,13 +141,6 @@ func TestCreatePatch(t *testing.T) {
 	awsPV := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awsPV",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -220,13 +203,6 @@ func TestCreatePatch(t *testing.T) {
 	awsPVWithAffinity := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awsPV",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -451,7 +427,6 @@ func TestCreatePatch(t *testing.T) {
 		},
 	}
 
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	for d, tc := range testCases {
 		cloud := &fakecloud.FakeCloud{}
 		client := fake.NewSimpleClientset()
@@ -462,9 +437,12 @@ func TestCreatePatch(t *testing.T) {
 		}
 		obj := &v1.PersistentVolume{}
 		json.Unmarshal(patch, obj)
-		if obj.ObjectMeta.Initializers != nil {
-			t.Errorf("%s: initializer wasn't removed: %v", d, obj.ObjectMeta.Initializers)
-		}
+
+		// TODO: check if object was marked as initialized
+		// if ... object was not marked as initialized ... {
+		// 	t.Errorf("%s: wasn't marked as initialized: %#v", d, obj)
+		// }
+
 		if tc.labels == nil {
 			continue
 		}
@@ -495,32 +473,25 @@ func TestAddLabelsToVolume(t *testing.T) {
 
 	testCases := map[string]struct {
 		vol                       v1.PersistentVolume
-		initializers              *metav1.Initializers
 		shouldLabelAndSetAffinity bool
 	}{
 		"PV without initializer": {
 			vol:                       pv,
-			initializers:              nil,
 			shouldLabelAndSetAffinity: false,
 		},
-		"PV with initializer to remove": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
-			shouldLabelAndSetAffinity: true,
-		},
-		"PV with other initializers only": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}}},
-			shouldLabelAndSetAffinity: false,
-		},
-		"PV with other initializers first": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}, {Name: initializerName}}},
-			shouldLabelAndSetAffinity: false,
-		},
+		// "PV with initializer to remove": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: true,
+		// },
+		// "PV with other initializers only": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: false,
+		// },
+		// "PV with other initializers first": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: false,
+		// },
 	}
-
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	for d, tc := range testCases {
 		labeledCh := make(chan bool, 1)
@@ -556,7 +527,6 @@ func TestAddLabelsToVolume(t *testing.T) {
 			VolumeLabelMap: map[string]map[string]string{"awsPV": {"a": "1"}},
 		}
 		pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
-		tc.vol.ObjectMeta.Initializers = tc.initializers
 		pvlController.addLabelsAndAffinityToVolume(&tc.vol)
 
 		select {

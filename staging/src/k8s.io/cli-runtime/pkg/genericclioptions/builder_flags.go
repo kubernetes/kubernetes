@@ -28,12 +28,11 @@ import (
 type ResourceBuilderFlags struct {
 	FileNameFlags *FileNameFlags
 
-	LabelSelector        *string
-	FieldSelector        *string
-	AllNamespaces        *bool
-	All                  *bool
-	Local                *bool
-	IncludeUninitialized *bool
+	LabelSelector *string
+	FieldSelector *string
+	AllNamespaces *bool
+	All           *bool
+	Local         *bool
 
 	Scheme           *runtime.Scheme
 	Latest           bool
@@ -88,12 +87,6 @@ func (o *ResourceBuilderFlags) WithLocal(defaultVal bool) *ResourceBuilderFlags 
 	return o
 }
 
-// WithUninitialized is using an alpha feature and may be dropped
-func (o *ResourceBuilderFlags) WithUninitialized(defaultVal bool) *ResourceBuilderFlags {
-	o.IncludeUninitialized = &defaultVal
-	return o
-}
-
 func (o *ResourceBuilderFlags) WithScheme(scheme *runtime.Scheme) *ResourceBuilderFlags {
 	o.Scheme = scheme
 	return o
@@ -120,16 +113,13 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 		flagset.StringVar(o.FieldSelector, "field-selector", *o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	}
 	if o.AllNamespaces != nil {
-		flagset.BoolVar(o.AllNamespaces, "all-namespaces", *o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+		flagset.BoolVarP(o.AllNamespaces, "all-namespaces", "A", *o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	}
 	if o.All != nil {
 		flagset.BoolVar(o.All, "all", *o.All, "Select all resources in the namespace of the specified resource types")
 	}
 	if o.Local != nil {
 		flagset.BoolVar(o.Local, "local", *o.Local, "If true, annotation will NOT contact api-server but run locally.")
-	}
-	if o.IncludeUninitialized != nil {
-		flagset.BoolVar(o.IncludeUninitialized, "include-uninitialized", *o.IncludeUninitialized, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 	}
 }
 
@@ -177,10 +167,6 @@ func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, reso
 		if len(resources) > 0 {
 			builder.AddError(resource.LocalResourceError)
 		}
-	}
-
-	if o.IncludeUninitialized != nil {
-		builder.IncludeUninitialized(*o.IncludeUninitialized)
 	}
 
 	if !o.StopOnFirstError {

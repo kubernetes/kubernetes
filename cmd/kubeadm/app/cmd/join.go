@@ -37,6 +37,9 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -152,206 +155,327 @@ var (
 		`)
 )
 
+// joinOptions defines all the options exposed via flags by kubeadm join.
+// Please note that this structure includes the public kubeadm config API, but only a subset of the options
+// supported by this api will be exposed as a flag.
+type joinOptions struct {
+	args                  *[]string
+	cfgPath               string
+	token                 string
+	controlPlane          bool
+	ignorePreflightErrors []string
+	externalcfg           *kubeadmapiv1beta1.JoinConfiguration
+}
+
+// joinData defines all the runtime information used when running the kubeadm join worklow;
+// this data is shared across all the phases that are included in the workflow.
+type joinData struct {
+	cfg                   *kubeadmapi.JoinConfiguration
+	initCfg               *kubeadmapi.InitConfiguration
+	tlsBootstrapCfg       *clientcmdapi.Config
+	ignorePreflightErrors sets.String
+	outputWriter          io.Writer
+}
+
 // NewCmdJoin returns "kubeadm join" command.
-func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiv1beta1.JoinConfiguration{}
-	kubeadmscheme.Scheme.Default(cfg)
-
-	fd := &kubeadmapiv1beta1.FileDiscovery{}
-	btd := &kubeadmapiv1beta1.BootstrapTokenDiscovery{}
-
-	var token string
-	var cfgPath string
-	var ignorePreflightErrors []string
-	var controlPlane bool
-	var advertiseAddress string
-	var bindPort int32 = kubeadmapiv1beta1.DefaultAPIBindPort
+// NB. joinOptions is exposed as parameter for allowing unit testing of
+//     the newJoinData method, that implements all the command options validation logic
+func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
+	if joinOptions == nil {
+		joinOptions = newJoinOptions()
+	}
+	joinRunner := workflow.NewRunner()
 
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
+			joinOptions.args = &args
 
-			if len(fd.KubeConfigPath) != 0 {
-				cfg.Discovery.File = fd
-			} else {
-				cfg.Discovery.BootstrapToken = btd
-				if len(cfg.Discovery.BootstrapToken.Token) == 0 {
-					cfg.Discovery.BootstrapToken.Token = token
-				}
-				if len(args) > 0 {
-					if len(cfgPath) == 0 && len(args) > 1 {
-						klog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
-					}
-					cfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
-				}
-			}
-
-			if len(cfg.Discovery.TLSBootstrapToken) == 0 {
-				cfg.Discovery.TLSBootstrapToken = token
-			}
-
-			if controlPlane {
-				cfg.ControlPlane = &kubeadmapiv1beta1.JoinControlPlane{
-					LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
-						AdvertiseAddress: advertiseAddress,
-						BindPort:         bindPort,
-					},
-				}
-			}
-
-			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, cfgPath, ignorePreflightErrors)
+			c, err := joinRunner.InitData()
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(j.Run(out))
+
+			err = joinRunner.Run()
+			kubeadmutil.CheckErr(err)
+
+			// TODO: remove this once we have all phases in place.
+			// the method joinData.Run() itself should be removed too.
+			data := c.(joinData)
+			err = data.Run()
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
-	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &token)
-	AddJoinBootstrapTokenDiscoveryFlags(cmd.PersistentFlags(), btd)
-	AddJoinFileDiscoveryFlags(cmd.PersistentFlags(), fd)
-	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &ignorePreflightErrors, &controlPlane, &advertiseAddress, &bindPort)
+	AddJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
+	AddJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token)
+
+	// initialize the workflow runner with the list of phases
+	// TODO: append phases here like so:
+	//     joinRunner.AppendPhase(phases.NewPreflightMasterPhase())
+
+	// sets the data builder function, that will be used by the runner
+	// both when running the entire workflow or single phases
+	joinRunner.SetDataInitializer(func(cmd *cobra.Command) (workflow.RunData, error) {
+		return newJoinData(cmd, joinOptions, out)
+	})
+
+	// binds the Runner to kubeadm join command by altering
+	// command help, adding --skip-phases flag and by adding phases subcommands
+	joinRunner.BindToCommand(cmd)
 
 	return cmd
 }
 
-// NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, cfgPath string, ignorePreflightErrors []string) (*Join, error) {
-	var err error
-
-	if err = validation.ValidateMixedArguments(flagSet); err != nil {
-		return nil, err
-	}
-
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewJoin(cfgPath, cfg, ignorePreflightErrorsSet)
-}
-
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, token *string) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration) {
 	flagSet.StringVar(
-		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
-		"Specify the node name.")
-	flagSet.StringVar(
-		token, "token", "",
-		"Use this token for both discovery-token and tls-bootstrap-token when those values are not provided.")
-	flagSet.StringVar(
-		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
-		`Specify the CRI socket to connect to.`,
+		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
+		`Specify the node name.`,
 	)
+	flagSet.StringVar(
+		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
+		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
+	)
+	AddControlPlaneFlags(flagSet, cfg.ControlPlane)
+	AddJoinBootstrapTokenDiscoveryFlags(flagSet, cfg.Discovery.BootstrapToken)
+	AddJoinFileDiscoveryFlags(flagSet, cfg.Discovery.File)
+	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
 
 // AddJoinBootstrapTokenDiscoveryFlags adds bootstrap token specific discovery flags to the specified flagset
 func AddJoinBootstrapTokenDiscoveryFlags(flagSet *flag.FlagSet, btd *kubeadmapiv1beta1.BootstrapTokenDiscovery) {
 	flagSet.StringVar(
-		&btd.Token, "discovery-token", "",
-		"A token used to validate cluster information fetched from the API server.")
+		&btd.Token, options.TokenDiscovery, "",
+		"For token-based discovery, the token used to validate cluster information fetched from the API server.",
+	)
 	flagSet.StringSliceVar(
-		&btd.CACertHashes, "discovery-token-ca-cert-hash", []string{},
-		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
+		&btd.CACertHashes, options.TokenDiscoveryCAHash, []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").",
+	)
 	flagSet.BoolVar(
-		&btd.UnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
-		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
+		&btd.UnsafeSkipCAVerification, options.TokenDiscoverySkipCAHash, false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.",
+	)
 }
 
 // AddJoinFileDiscoveryFlags adds file discovery flags to the specified flagset
 func AddJoinFileDiscoveryFlags(flagSet *flag.FlagSet, fd *kubeadmapiv1beta1.FileDiscovery) {
 	flagSet.StringVar(
-		&fd.KubeConfigPath, "discovery-file", "",
-		"A file or URL from which to load cluster information.")
+		&fd.KubeConfigPath, options.FileDiscovery, "",
+		"For file-based discovery, a file or URL from which to load cluster information.",
+	)
+}
+
+// AddControlPlaneFlags adds file control plane flags to the specified flagset
+func AddControlPlaneFlags(flagSet *flag.FlagSet, cp *kubeadmapiv1beta1.JoinControlPlane) {
+	flagSet.StringVar(
+		&cp.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cp.LocalAPIEndpoint.AdvertiseAddress,
+		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
+	)
+	flagSet.Int32Var(
+		&cp.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cp.LocalAPIEndpoint.BindPort,
+		"If the node should host a new control plane instance, the port for the API Server to bind to.",
+	)
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string, controlPlane *bool, advertiseAddress *string, bindPort *int32) {
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string, controlPlane *bool, token *string) {
 	flagSet.StringVar(
-		cfgPath, "config", *cfgPath,
-		"Path to kubeadm config file.")
+		cfgPath, options.CfgPath, *cfgPath,
+		"Path to kubeadm config file.",
+	)
 	flagSet.StringSliceVar(
-		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
-		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
-	flagSet.BoolVar(
-		controlPlane, "experimental-control-plane", *controlPlane,
-		"Create a new control plane instance on this node")
+		ignorePreflightErrors, options.IgnorePreflightErrors, *ignorePreflightErrors,
+		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+	)
 	flagSet.StringVar(
-		advertiseAddress, "apiserver-advertise-address", *advertiseAddress,
-		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on.")
-	flagSet.Int32Var(
-		bindPort, "apiserver-bind-port", *bindPort,
-		"If the node should host a new control plane instance, the port for the API Server to bind to.")
+		token, options.TokenStr, "",
+		"Use this token for both discovery-token and tls-bootstrap-token when those values are not provided.",
+	)
+	flagSet.BoolVar(
+		controlPlane, options.ControlPlane, *controlPlane,
+		"Create a new control plane instance on this node",
+	)
 }
 
-// Join defines struct used by kubeadm join command
-type Join struct {
-	cfg                   *kubeadmapi.JoinConfiguration
-	initCfg               *kubeadmapi.InitConfiguration
-	tlsBootstrapCfg       *clientcmdapi.Config
-	ignorePreflightErrors sets.String
+// newJoinOptions returns a struct ready for being used for creating cmd join flags.
+func newJoinOptions() *joinOptions {
+	// initialize the public kubeadm config API by appling defaults
+	externalcfg := &kubeadmapiv1beta1.JoinConfiguration{}
+
+	// Add optional config objects to host flags.
+	// un-set objects will be cleaned up afterwards (into newJoinData func)
+	externalcfg.Discovery.File = &kubeadmapiv1beta1.FileDiscovery{}
+	externalcfg.Discovery.BootstrapToken = &kubeadmapiv1beta1.BootstrapTokenDiscovery{}
+	externalcfg.ControlPlane = &kubeadmapiv1beta1.JoinControlPlane{}
+
+	// Apply defaults
+	kubeadmscheme.Scheme.Default(externalcfg)
+
+	return &joinOptions{
+		externalcfg: externalcfg,
+	}
 }
 
-// NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
+// newJoinData returns a new joinData struct to be used for the execution of the kubeadm join workflow.
+// This func takes care of validating joinOptions passed to the command, and then it converts
+// options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
+func newJoinData(cmd *cobra.Command, options *joinOptions, out io.Writer) (joinData, error) {
+	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
+	kubeadmscheme.Scheme.Default(options.externalcfg)
 
-	if defaultcfg.NodeRegistration.Name == "" {
-		klog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
-	}
+	// Validate standalone flags values and/or combination of flags and then assigns
+	// validated values to the public kubeadm config API when applicable
 
-	if defaultcfg.ControlPlane != nil && defaultcfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress == "" {
-		klog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
-	}
-
-	internalCfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// override node name and CRI socket from the command line options
-	if defaultcfg.NodeRegistration.Name != "" {
-		internalCfg.NodeRegistration.Name = defaultcfg.NodeRegistration.Name
-	}
-	if defaultcfg.NodeRegistration.CRISocket != kubeadmapiv1beta1.DefaultCRISocket {
-		internalCfg.NodeRegistration.CRISocket = defaultcfg.NodeRegistration.CRISocket
-	}
-
-	if defaultcfg.ControlPlane != nil {
-		if err := configutil.VerifyAPIServerBindAddress(internalCfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-			return nil, err
+	// if a token is provided, use this value for both discovery-token and tls-bootstrap-token when those values are not provided
+	if len(options.token) > 0 {
+		if len(options.externalcfg.Discovery.TLSBootstrapToken) == 0 {
+			options.externalcfg.Discovery.TLSBootstrapToken = options.token
+		}
+		if len(options.externalcfg.Discovery.BootstrapToken.Token) == 0 {
+			options.externalcfg.Discovery.BootstrapToken.Token = options.token
 		}
 	}
 
+	// if a file or URL from which to load cluster information was not provided, unset the Discovery.File object
+	if len(options.externalcfg.Discovery.File.KubeConfigPath) == 0 {
+		options.externalcfg.Discovery.File = nil
+	}
+
+	// if an APIServerEndpoint from which to retrive cluster information was not provided, unset the Discovery.BootstrapToken object
+	if len(*options.args) == 0 {
+		options.externalcfg.Discovery.BootstrapToken = nil
+	} else {
+		if len(options.cfgPath) == 0 && len(*options.args) > 1 {
+			klog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", *options.args)
+		}
+		options.externalcfg.Discovery.BootstrapToken.APIServerEndpoint = (*options.args)[0]
+	}
+
+	// if not joining a control plane, unset the ControlPlane object
+	if !options.controlPlane {
+		options.externalcfg.ControlPlane = nil
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
+	if err != nil {
+		return joinData{}, err
+	}
+
+	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+		return joinData{}, err
+	}
+
+	// Either use the config file if specified, or convert public kubeadm API to the internal JoinConfiguration
+	// and validates JoinConfiguration
+	if options.externalcfg.NodeRegistration.Name == "" {
+		klog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
+	}
+
+	if options.externalcfg.ControlPlane != nil && options.externalcfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress == "" {
+		klog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
+	}
+
+	cfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
+	if err != nil {
+		return joinData{}, err
+	}
+
+	// override node name and CRI socket from the command line options
+	if options.externalcfg.NodeRegistration.Name != "" {
+		cfg.NodeRegistration.Name = options.externalcfg.NodeRegistration.Name
+	}
+	if options.externalcfg.NodeRegistration.CRISocket != "" {
+		cfg.NodeRegistration.CRISocket = options.externalcfg.NodeRegistration.CRISocket
+	}
+
+	if cfg.ControlPlane != nil {
+		if err := configutil.VerifyAPIServerBindAddress(cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+			return joinData{}, err
+		}
+	}
+
+	return joinData{
+		cfg:                   cfg,
+		ignorePreflightErrors: ignorePreflightErrorsSet,
+		outputWriter:          out,
+	}, nil
+}
+
+// Cfg returns the JoinConfiguration.
+func (j *joinData) Cfg() *kubeadmapi.JoinConfiguration {
+	return j.cfg
+}
+
+// TLSBootstrapCfg returns the cluster-info (kubeconfig).
+func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
+	if j.tlsBootstrapCfg != nil {
+		return j.tlsBootstrapCfg, nil
+	}
+	klog.V(1).Infoln("[join] Discovering cluster-info")
+	tlsBootstrapCfg, err := discovery.For(j.cfg)
+	j.tlsBootstrapCfg = tlsBootstrapCfg
+	return tlsBootstrapCfg, err
+}
+
+// InitCfg returns the InitConfiguration.
+func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
+	if j.initCfg != nil {
+		return j.initCfg, nil
+	}
+	if _, err := j.TLSBootstrapCfg(); err != nil {
+		return nil, err
+	}
+	klog.V(1).Infoln("[join] Fetching init configuration")
+	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, j.tlsBootstrapCfg)
+	j.initCfg = initCfg
+	return initCfg, err
+}
+
+// IgnorePreflightErrors returns the list of preflight errors to ignore.
+func (j *joinData) IgnorePreflightErrors() sets.String {
+	return j.ignorePreflightErrors
+}
+
+// OutputWriter returns the io.Writer used to write messages such as the "join done" message.
+func (j *joinData) OutputWriter() io.Writer {
+	return j.outputWriter
+}
+
+// Run executes worker node provisioning and tries to join an existing cluster.
+func (j *joinData) Run() error {
 	fmt.Println("[preflight] Running pre-flight checks")
 
 	// Start with general checks
 	klog.V(1).Infoln("[preflight] Running general checks")
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), internalCfg, ignorePreflightErrors); err != nil {
-		return nil, err
+	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.cfg, j.ignorePreflightErrors); err != nil {
+		return err
 	}
 
-	// Fetch the init configuration based on the join configuration
-	klog.V(1).Infoln("[preflight] Fetching init configuration")
-	initCfg, tlsBootstrapCfg, err := fetchInitConfigurationFromJoinConfiguration(internalCfg)
+	// Fetch the init configuration based on the join configuration.
+	// TODO: individual phases should call these:
+	//   - phases that need initCfg should call joinData.InitCfg().
+	//   - phases that need tlsBootstrapCfg should call joinData.TLSBootstrapCfg().
+	tlsBootstrapCfg, err := j.TLSBootstrapCfg()
 	if err != nil {
-		return nil, err
+		return err
+	}
+	initCfg, err := j.InitCfg()
+	if err != nil {
+		return err
 	}
 
 	// Continue with more specific checks based on the init configuration
 	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
-	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
-		return nil, err
+	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), initCfg, j.ignorePreflightErrors); err != nil {
+		return err
 	}
 
-	return &Join{cfg: internalCfg, initCfg: initCfg, tlsBootstrapCfg: tlsBootstrapCfg, ignorePreflightErrors: ignorePreflightErrors}, nil
-}
-
-// Run executes worker node provisioning and tries to join an existing cluster.
-func (j *Join) Run(out io.Writer) error {
 	if j.cfg.ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
-		if err := j.CheckIfReadyForAdditionalControlPlane(j.initCfg); err != nil {
+		if err := j.CheckIfReadyForAdditionalControlPlane(initCfg); err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
@@ -363,12 +487,16 @@ func (j *Join) Run(out io.Writer) error {
 		}
 
 		// run kubeadm init preflight checks for checking all the prequisites
-		fmt.Printf("[join] Running pre-flight checks before initializing the new control plane instance\n")
-		preflight.RunInitMasterChecks(utilsexec.New(), j.initCfg, j.ignorePreflightErrors)
+		fmt.Println("[join] Running pre-flight checks before initializing the new control plane instance")
+		preflight.RunInitMasterChecks(utilsexec.New(), initCfg, j.ignorePreflightErrors)
 
+		fmt.Println("[join] Pulling control-plane images")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.ignorePreflightErrors); err != nil {
+			return err
+		}
 		// Prepares the node for hosting a new control plane instance by writing necessary
 		// kubeconfig files, and static pod manifests
-		if err := j.PrepareForHostingControlPlane(j.initCfg); err != nil {
+		if err := j.PrepareForHostingControlPlane(initCfg); err != nil {
 			return err
 		}
 	}
@@ -379,21 +507,21 @@ func (j *Join) Run(out io.Writer) error {
 	// if the node is hosting a new control plane instance, since it uses static pods for the control plane,
 	// as soon as the kubelet starts it will take charge of creating control plane
 	// components on the node.
-	if err := j.BootstrapKubelet(); err != nil {
+	if err := j.BootstrapKubelet(tlsBootstrapCfg, initCfg); err != nil {
 		return err
 	}
 
 	// if the node is hosting a new control plane instance
 	if j.cfg.ControlPlane != nil {
 		// Completes the control plane setup
-		if err := j.PostInstallControlPlane(j.initCfg); err != nil {
+		if err := j.PostInstallControlPlane(initCfg); err != nil {
 			return err
 		}
 
 		// outputs the join control plane done template and exits
 		etcdMessage := ""
 		// in case of local etcd
-		if j.initCfg.Etcd.External == nil {
+		if initCfg.Etcd.External == nil {
 			etcdMessage = "* A new etcd member was added to the local/stacked etcd cluster."
 		}
 
@@ -401,19 +529,19 @@ func (j *Join) Run(out io.Writer) error {
 			"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 			"etcdMessage":    etcdMessage,
 		}
-		joinControPlaneDoneTemp.Execute(out, ctx)
+		joinControPlaneDoneTemp.Execute(j.outputWriter, ctx)
 		return nil
 	}
 
 	// otherwise, if the node joined as a worker node;
 	// outputs the join done message and exits
-	fmt.Fprintf(out, joinWorkerNodeDoneMsg)
+	fmt.Fprintf(j.outputWriter, joinWorkerNodeDoneMsg)
 	return nil
 }
 
 // CheckIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to join
-func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
+func (j *joinData) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
 		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
@@ -428,7 +556,7 @@ func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadma
 }
 
 // PrepareForHostingControlPlane makes all preparation activities require for a node hosting a new control plane instance
-func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
+func (j *joinData) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 
 	// Generate missing certificates (if any)
 	if err := certsphase.CreatePKIAssets(initConfiguration); err != nil {
@@ -471,19 +599,19 @@ func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitC
 // BootstrapKubelet executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func (j *Join) BootstrapKubelet() error {
+func (j *joinData) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config, initConfiguration *kubeadmapi.InitConfiguration) error {
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
 	klog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
-	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, j.tlsBootstrapCfg); err != nil {
+	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
-	cluster := j.tlsBootstrapCfg.Contexts[j.tlsBootstrapCfg.CurrentContext].Cluster
+	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
 	if _, err := os.Stat(j.cfg.CACertPath); os.IsNotExist(err) {
-		if err := certutil.WriteCert(j.cfg.CACertPath, j.tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
+		if err := certutil.WriteCert(j.cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 			return errors.Wrap(err, "couldn't save the CA certificate to disk")
 		}
 	}
@@ -512,7 +640,7 @@ func (j *Join) BootstrapKubelet() error {
 	// register the joining node with the specified taints if the node
 	// is not a master. The markmaster phase will register the taints otherwise.
 	registerTaintsUsingFlags := j.cfg.ControlPlane == nil
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(j.initCfg, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(initConfiguration, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 
@@ -544,7 +672,7 @@ func (j *Join) BootstrapKubelet() error {
 }
 
 // PostInstallControlPlane marks the new node as master and update the cluster status with information about current node
-func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
+func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
 
 	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
@@ -586,29 +714,23 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 func waitForTLSBootstrappedClient() error {
 	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
 
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
-		_, err := os.Stat(kubeletKubeConfig)
+		// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
+		// only that the kubeconfig file exists, but that other files required by it also exist (like
+		// client certificate and key)
+		_, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
 		return (err == nil), nil
 	})
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
-func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration) (*kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
-	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
-	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
-	klog.V(1).Infoln("[join] Discovering cluster-info")
-	tlsBootstrapCfg, err := discovery.For(cfg)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
 	// Retrieves the kubeadm configuration
 	klog.V(1).Infoln("[join] Retrieving KubeConfig objects")
 	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
@@ -624,7 +746,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 		initConfiguration.LocalAPIEndpoint = cfg.ControlPlane.LocalAPIEndpoint
 	}
 
-	return initConfiguration, tlsBootstrapCfg, nil
+	return initConfiguration, nil
 }
 
 // fetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap

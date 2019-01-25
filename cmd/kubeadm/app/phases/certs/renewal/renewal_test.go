@@ -33,9 +33,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 func TestRenewImplementations(t *testing.T) {

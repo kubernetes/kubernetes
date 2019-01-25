@@ -36,7 +36,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
@@ -46,8 +45,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )
 

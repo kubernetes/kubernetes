@@ -74,6 +74,10 @@ func (info *BaseServiceInfo) GetHealthCheckNodePort() int {
 	return info.HealthCheckNodePort
 }
 
+// GetNodePort is part of the ServicePort interface.
+func (info *BaseServiceInfo) GetNodePort() int {
+	return info.NodePort
+}
 // ExternalIPStrings is part of ServicePort interface.
 func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.ExternalIPs

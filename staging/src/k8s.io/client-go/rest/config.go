@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
@@ -70,6 +71,11 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
+	// Path to a file containing a BearerToken.
+	// If set, the contents are periodically read.
+	// The last successfully read value takes precedence over BearerToken.
+	BearerTokenFile string
+
 	// Impersonate is the configuration that RESTClient will use for impersonation.
 	Impersonate ImpersonationConfig
 
@@ -90,13 +96,16 @@ type Config struct {
 
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options. Use WrapTransport
-	// for most client level operations.
+	// to provide additional per-server middleware behavior.
 	Transport http.RoundTripper
 	// WrapTransport will be invoked for custom HTTP behavior after the underlying
 	// transport is initialized (either the transport created from TLSClientConfig,
 	// Transport, or http.DefaultTransport). The config may layer other RoundTrippers
 	// on top of the returned RoundTripper.
-	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+	//
+	// A future release will change this field to an array. Use config.Wrap()
+	// instead of setting this value directly.
+	WrapTransport transport.WrapperFunc
 
 	// QPS indicates the maximum QPS to the master from this client.
 	// If it's zero, the created RESTClient will use DefaultQPS: 5
@@ -118,6 +127,47 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+}
+
+var _ fmt.Stringer = new(Config)
+var _ fmt.GoStringer = new(Config)
+
+type sanitizedConfig *Config
+
+type sanitizedAuthConfigPersister struct{ AuthProviderConfigPersister }
+
+func (sanitizedAuthConfigPersister) GoString() string {
+	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
+}
+func (sanitizedAuthConfigPersister) String() string {
+	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
+}
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of Config
+// to prevent accidental leaking via logs.
+func (c *Config) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of Config to
+// prevent accidental leaking via logs.
+func (c *Config) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	cc := sanitizedConfig(CopyConfig(c))
+	// Explicitly mark non-empty credential fields as redacted.
+	if cc.Password != "" {
+		cc.Password = "--- REDACTED ---"
+	}
+	if cc.BearerToken != "" {
+		cc.BearerToken = "--- REDACTED ---"
+	}
+	if cc.AuthConfigPersister != nil {
+		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
+	}
+
+	return fmt.Sprintf("%#v", cc)
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -157,6 +207,40 @@ type TLSClientConfig struct {
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
+}
+
+var _ fmt.Stringer = TLSClientConfig{}
+var _ fmt.GoStringer = TLSClientConfig{}
+
+type sanitizedTLSClientConfig TLSClientConfig
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of
+// TLSClientConfig to prevent accidental leaking via logs.
+func (c TLSClientConfig) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of
+// TLSClientConfig to prevent accidental leaking via logs.
+func (c TLSClientConfig) String() string {
+	cc := sanitizedTLSClientConfig{
+		Insecure:   c.Insecure,
+		ServerName: c.ServerName,
+		CertFile:   c.CertFile,
+		KeyFile:    c.KeyFile,
+		CAFile:     c.CAFile,
+		CertData:   c.CertData,
+		KeyData:    c.KeyData,
+		CAData:     c.CAData,
+	}
+	// Explicitly mark non-empty credential fields as redacted.
+	if len(cc.CertData) != 0 {
+		cc.CertData = []byte("--- TRUNCATED ---")
+	}
+	if len(cc.KeyData) != 0 {
+		cc.KeyData = []byte("--- REDACTED ---")
+	}
+	return fmt.Sprintf("%#v", cc)
 }
 
 type ContentConfig struct {
@@ -322,9 +406,8 @@ func InClusterConfig() (*Config, error) {
 		return nil, ErrNotInCluster
 	}
 
-	ts := NewCachedFileTokenSource(tokenFile)
-
-	if _, err := ts.Token(); err != nil {
+	token, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
 		return nil, err
 	}
 
@@ -340,7 +423,8 @@ func InClusterConfig() (*Config, error) {
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(host, port),
 		TLSClientConfig: tlsClientConfig,
-		WrapTransport:   TokenSourceWrapTransport(ts),
+		BearerToken:     string(token),
+		BearerTokenFile: tokenFile,
 	}, nil
 }
 
@@ -430,12 +514,13 @@ func AnonymousClientConfig(config *Config) *Config {
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
 	return &Config{
-		Host:          config.Host,
-		APIPath:       config.APIPath,
-		ContentConfig: config.ContentConfig,
-		Username:      config.Username,
-		Password:      config.Password,
-		BearerToken:   config.BearerToken,
+		Host:            config.Host,
+		APIPath:         config.APIPath,
+		ContentConfig:   config.ContentConfig,
+		Username:        config.Username,
+		Password:        config.Password,
+		BearerToken:     config.BearerToken,
+		BearerTokenFile: config.BearerTokenFile,
 		Impersonate: ImpersonationConfig{
 			Groups:   config.Impersonate.Groups,
 			Extra:    config.Impersonate.Extra,

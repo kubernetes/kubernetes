@@ -41,8 +41,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -144,7 +144,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 		}
 		requestInfo, _ := request.RequestInfoFrom(ctx)
-		metrics.RecordLongRunning(req, requestInfo, func() {
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 			handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})
 			if err != nil {
 				scope.err(err, w, req)
@@ -190,9 +190,9 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 				buf := make([]byte, size)
 				buf = buf[:goruntime.Stack(buf, false)]
 				panicReason = strings.TrimSuffix(fmt.Sprintf("%v\n%s", panicReason, string(buf)), "\n")
+				// Propagate to parent goroutine
+				panicCh <- panicReason
 			}
-			// Propagate to parent goroutine
-			panicCh <- panicReason
 		}()
 
 		if result, err := fn(); err != nil {
@@ -280,23 +280,26 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
-// setListSelfLink sets the self link of a list to the base URL, then sets the self links
-// on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request, namer ScopeNamer) (int, error) {
+// setObjectSelfLink sets the self link of an object as needed.
+func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if !meta.IsListType(obj) {
-		return 0, nil
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			return fmt.Errorf("missing requestInfo")
+		}
+		return setSelfLink(obj, requestInfo, namer)
 	}
 
 	uri, err := namer.GenerateListLink(req)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
 		klog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
-		return 0, fmt.Errorf("missing requestInfo")
+		return fmt.Errorf("missing requestInfo")
 	}
 
 	count := 0
@@ -304,7 +307,14 @@ func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request,
 		count++
 		return setSelfLink(obj, requestInfo, namer)
 	})
-	return count, err
+
+	if count == 0 {
+		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func summarizeData(data []byte, maxLength int) string {

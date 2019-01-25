@@ -23,10 +23,10 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	configv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/proxy/apis/config"
 )

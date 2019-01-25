@@ -30,8 +30,7 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -243,6 +242,33 @@ func TestVolumeCountConflicts(t *testing.T) {
 						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 							ClaimName: "anotherUnboundPVC",
 						},
+					},
+				},
+			},
+		},
+	}
+	twoVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp1"},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	oneVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "ovp"},
 					},
 				},
 			},
@@ -740,15 +766,32 @@ func TestVolumeCountConflicts(t *testing.T) {
 			fits:         true,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
+		// filterName:CinderVolumeFilterType
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's Cinder volumes",
+		},
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      2,
+			fits:         false,
+			test:         "not fit when node capacity < new pod's Cinder volumes",
+		},
 	}
 
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
+	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	// running attachable predicate tests without feature gate and no limit present on nodes
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
 		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
+		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), schedulernodeinfo.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -766,7 +809,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 	for _, test := range tests {
 		node := getNodeWithPodAndVolumeLimits(test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), node)
+		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -895,8 +938,8 @@ func TestMaxVolumeFuncM4(t *testing.T) {
 	}
 }
 
-func getNodeWithPodAndVolumeLimits(pods []*v1.Pod, limit int64, filter string) *schedulercache.NodeInfo {
-	nodeInfo := schedulercache.NewNodeInfo(pods...)
+func getNodeWithPodAndVolumeLimits(pods []*v1.Pod, limit int64, filter string) *schedulernodeinfo.NodeInfo {
+	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 		Status: v1.NodeStatus{
@@ -917,6 +960,8 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case AzureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}

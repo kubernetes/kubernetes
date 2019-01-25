@@ -52,7 +52,6 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	master, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
@@ -62,7 +61,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.Handler.Director)
 	defer server.Close()
-	resp, err := http.Get(server.URL + "/swagger.json")
+	resp, err := http.Get(server.URL + "/openapi/v2")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -70,7 +69,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 
 	master.GenericAPIServer.PrepareRun()
 
-	resp, err = http.Get(server.URL + "/swagger.json")
+	resp, err = http.Get(server.URL + "/openapi/v2")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -85,7 +84,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 
 	// Validate OpenApi spec
-	doc, err := loads.Spec(server.URL + "/swagger.json")
+	doc, err := loads.Spec(server.URL + "/openapi/v2")
 	if assert.NoError(err) {
 		validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
 		res, warns := validator.Validate(doc)

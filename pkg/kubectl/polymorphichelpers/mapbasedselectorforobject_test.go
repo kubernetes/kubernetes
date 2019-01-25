@@ -383,6 +383,92 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 		},
 		// Node can not be exposed -- error
 		{
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectSelector: "foo=bar",
+		},
+		{
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			object: &appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectSelector: "foo=bar",
+		},
+		{
+			object: &appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+
+		{
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Selector: nil,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Selector: nil,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			object: &appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Selector: nil,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			object: &appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Selector: nil,
+				},
+			},
+			expectErr: true,
+		},
+
+		{
 			object:    &corev1.Node{},
 			expectErr: true,
 		},

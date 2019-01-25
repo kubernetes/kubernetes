@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,19 +36,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
-	enableEquivalenceCache = true
-	disablePodPreemption   = false
-	bindTimeoutSeconds     = 600
+	disablePodPreemption = false
+	bindTimeoutSeconds   = 600
 )
 
 func TestCreate(t *testing.T) {
@@ -230,19 +231,19 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	}
 }
 
-func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -254,10 +255,10 @@ func TestDefaultErrorFunc(t *testing.T) {
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
+	schedulerCache := schedulerinternalcache.New(30*time.Second, stopCh)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
-	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
+	errFunc := MakeDefaultErrorFunc(client, podBackoff, queue, schedulerCache, stopCh)
 
 	errFunc(testPod, nil)
 
@@ -366,18 +367,15 @@ func testBind(binding *v1.Binding, t *testing.T) {
 
 	pod := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
 
-	bind, err := pod.GetBinding(binding.GetName())
+	actualBinding, err := pod.GetBinding(binding.GetName())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 		return
 	}
-
-	expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), binding)
-	bind.APIVersion = ""
-	bind.Kind = ""
-	body := runtime.EncodeOrDie(schedulertesting.Test.Codec(), bind)
-	if expectedBody != body {
-		t.Errorf("Expected body %s, Got %s", expectedBody, body)
+	if !reflect.DeepEqual(binding, actualBinding) {
+		t.Errorf("Binding did not match expectation")
+		t.Logf("Expected: %v", binding)
+		t.Logf("Actual:   %v", actualBinding)
 	}
 }
 
@@ -535,7 +533,6 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
@@ -560,7 +557,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	return nil, nil
 }
@@ -572,7 +569,7 @@ func (f *fakeExtender) SupportsPreemption() bool {
 func (f *fakeExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
 	return nil, nil, nil
 }
@@ -649,11 +646,154 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	}
 
 	f := &configFactory{}
-	binderFunc := f.getBinderFunc(extenders)
+	binderFunc := getBinderFunc(f.client, extenders)
 	binder := binderFunc(pod)
 
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
 	if binderType != expectedBinderType {
 		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
+	}
+}
+
+func TestNodeAllocatableChanged(t *testing.T) {
+	newQuantity := func(value int64) resource.Quantity {
+		return *resource.NewQuantity(value, resource.BinarySI)
+	}
+	for _, c := range []struct {
+		Name           string
+		Changed        bool
+		OldAllocatable v1.ResourceList
+		NewAllocatable v1.ResourceList
+	}{
+		{
+			Name:           "no allocatable resources changed",
+			Changed:        false,
+			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+		},
+		{
+			Name:           "new node has more allocatable resources",
+			Changed:        true,
+			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
+		},
+	} {
+		oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.OldAllocatable}}
+		newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.NewAllocatable}}
+		changed := nodeAllocatableChanged(newNode, oldNode)
+		if changed != c.Changed {
+			t.Errorf("nodeAllocatableChanged should be %t, got %t", c.Changed, changed)
+		}
+	}
+}
+
+func TestNodeLabelsChanged(t *testing.T) {
+	for _, c := range []struct {
+		Name      string
+		Changed   bool
+		OldLabels map[string]string
+		NewLabels map[string]string
+	}{
+		{
+			Name:      "no labels changed",
+			Changed:   false,
+			OldLabels: map[string]string{"foo": "bar"},
+			NewLabels: map[string]string{"foo": "bar"},
+		},
+		// Labels changed.
+		{
+			Name:      "new node has more labels",
+			Changed:   true,
+			OldLabels: map[string]string{"foo": "bar"},
+			NewLabels: map[string]string{"foo": "bar", "test": "value"},
+		},
+	} {
+		oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.OldLabels}}
+		newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.NewLabels}}
+		changed := nodeLabelsChanged(newNode, oldNode)
+		if changed != c.Changed {
+			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
+		}
+	}
+}
+
+func TestNodeTaintsChanged(t *testing.T) {
+	for _, c := range []struct {
+		Name      string
+		Changed   bool
+		OldTaints []v1.Taint
+		NewTaints []v1.Taint
+	}{
+		{
+			Name:      "no taint changed",
+			Changed:   false,
+			OldTaints: []v1.Taint{{Key: "key", Value: "value"}},
+			NewTaints: []v1.Taint{{Key: "key", Value: "value"}},
+		},
+		{
+			Name:      "taint value changed",
+			Changed:   true,
+			OldTaints: []v1.Taint{{Key: "key", Value: "value1"}},
+			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
+		},
+	} {
+		oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.OldTaints}}
+		newNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.NewTaints}}
+		changed := nodeTaintsChanged(newNode, oldNode)
+		if changed != c.Changed {
+			t.Errorf("Test case %q failed: should be %t, not %t", c.Name, c.Changed, changed)
+		}
+	}
+}
+
+func TestNodeConditionsChanged(t *testing.T) {
+	nodeConditionType := reflect.TypeOf(v1.NodeCondition{})
+	if nodeConditionType.NumField() != 6 {
+		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
+	}
+
+	for _, c := range []struct {
+		Name          string
+		Changed       bool
+		OldConditions []v1.NodeCondition
+		NewConditions []v1.NodeCondition
+	}{
+		{
+			Name:          "no condition changed",
+			Changed:       false,
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+		},
+		{
+			Name:          "only LastHeartbeatTime changed",
+			Changed:       false,
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
+		},
+		{
+			Name:          "new node has more healthy conditions",
+			Changed:       true,
+			OldConditions: []v1.NodeCondition{},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+		},
+		{
+			Name:          "new node has less unhealthy conditions",
+			Changed:       true,
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			NewConditions: []v1.NodeCondition{},
+		},
+		{
+			Name:          "condition status changed",
+			Changed:       true,
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+		},
+	} {
+		oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.OldConditions}}
+		newNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.NewConditions}}
+		changed := nodeConditionsChanged(newNode, oldNode)
+		if changed != c.Changed {
+			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
+		}
 	}
 }

@@ -40,6 +40,7 @@
 			"SelectorRegexp": "k8s[.]io/utils",
 			"AllowedPrefixes": [
 				"k8s.io/utils/exec",
+				"k8s.io/utils/integer",
 				"k8s.io/utils/pointer"
 			]
 		},
@@ -71,7 +72,7 @@
 				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
 				"k8s.io/kubernetes/pkg/scheduler/algorithm",
 				"k8s.io/kubernetes/pkg/scheduler/api",
-				"k8s.io/kubernetes/pkg/scheduler/cache",
+				"k8s.io/kubernetes/pkg/scheduler/nodeinfo",
 				"k8s.io/kubernetes/pkg/scheduler/internal/cache",
 				"k8s.io/kubernetes/pkg/scheduler/util",
 				"k8s.io/kubernetes/pkg/security/apparmor",

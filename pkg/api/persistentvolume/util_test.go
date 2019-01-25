@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -106,13 +107,12 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:       specWithMode(nil),
 			expectOldSpec: specWithMode(nil),
 		},
-		// TODO: consider changing this case to preserve
-		"disabled block clears old and new on update when old pv did use block": {
+		"disabled block does not clear new on update when old pv did use block": {
 			blockEnabled:  false,
 			newSpec:       specWithMode(&modeBlock),
-			expectNewSpec: specWithMode(nil),
+			expectNewSpec: specWithMode(&modeBlock),
 			oldSpec:       specWithMode(&modeBlock),
-			expectOldSpec: specWithMode(nil),
+			expectOldSpec: specWithMode(&modeBlock),
 		},
 
 		"enabled block preserves new": {
@@ -151,5 +151,101 @@ func TestDropDisabledFields(t *testing.T) {
 				t.Error(diff.ObjectReflectDiff(tc.oldSpec, tc.expectOldSpec))
 			}
 		})
+	}
+}
+
+func TestDropDisabledFieldsPersistentLocalVolume(t *testing.T) {
+	pvWithoutLocalVolume := func() *api.PersistentVolume {
+		return &api.PersistentVolume{
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Local: nil,
+				},
+			},
+		}
+	}
+	pvWithLocalVolume := func() *api.PersistentVolume {
+		fsType := "ext4"
+		return &api.PersistentVolume{
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Local: &api.LocalVolumeSource{
+						Path:   "/a/b/c",
+						FSType: &fsType,
+					},
+				},
+			},
+		}
+	}
+
+	pvInfo := []struct {
+		description    string
+		hasLocalVolume bool
+		pv             func() *api.PersistentVolume
+	}{
+		{
+			description:    "pv without LocalVolume",
+			hasLocalVolume: false,
+			pv:             pvWithoutLocalVolume,
+		},
+		{
+			description:    "pv with LocalVolume",
+			hasLocalVolume: true,
+			pv:             pvWithLocalVolume,
+		},
+		{
+			description:    "is nil",
+			hasLocalVolume: false,
+			pv:             func() *api.PersistentVolume { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldpvInfo := range pvInfo {
+			for _, newpvInfo := range pvInfo {
+				oldpvHasLocalVolume, oldpv := oldpvInfo.hasLocalVolume, oldpvInfo.pv()
+				newpvHasLocalVolume, newpv := newpvInfo.hasLocalVolume, newpvInfo.pv()
+				if newpv == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldpvInfo.description, newpvInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, enabled)()
+
+					var oldpvSpec *api.PersistentVolumeSpec
+					if oldpv != nil {
+						oldpvSpec = &oldpv.Spec
+					}
+					DropDisabledFields(&newpv.Spec, oldpvSpec)
+
+					// old pv should never be changed
+					if !reflect.DeepEqual(oldpv, oldpvInfo.pv()) {
+						t.Errorf("old pv changed: %v", diff.ObjectReflectDiff(oldpv, oldpvInfo.pv()))
+					}
+
+					switch {
+					case enabled || oldpvHasLocalVolume:
+						// new pv should not be changed if the feature is enabled, or if the old pv had LocalVolume source
+						if !reflect.DeepEqual(newpv, newpvInfo.pv()) {
+							t.Errorf("new pv changed: %v", diff.ObjectReflectDiff(newpv, newpvInfo.pv()))
+						}
+					case newpvHasLocalVolume:
+						// new pv should be changed
+						if reflect.DeepEqual(newpv, newpvInfo.pv()) {
+							t.Errorf("new pv was not changed")
+						}
+						// new pv should not have LocalVolume
+						if !reflect.DeepEqual(newpv, pvWithoutLocalVolume()) {
+							t.Errorf("new pv had LocalVolume source: %v", diff.ObjectReflectDiff(newpv, pvWithoutLocalVolume()))
+						}
+					default:
+						// new pv should not need to be changed
+						if !reflect.DeepEqual(newpv, newpvInfo.pv()) {
+							t.Errorf("new pv changed: %v", diff.ObjectReflectDiff(newpv, newpvInfo.pv()))
+						}
+					}
+				})
+			}
+		}
 	}
 }

@@ -28,7 +28,7 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export GOPATH=${HOME}/_gopath
-export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
+export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 # Install a few things needed by the verification tests.
 command -v etcd &>/dev/null || ./hack/install-etcd.sh

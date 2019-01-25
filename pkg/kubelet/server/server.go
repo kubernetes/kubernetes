@@ -31,7 +31,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
@@ -40,7 +40,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -53,7 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"

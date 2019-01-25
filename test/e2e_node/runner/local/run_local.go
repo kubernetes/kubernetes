@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/e2e_node/system"
 	"k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
@@ -33,11 +34,7 @@ import (
 var buildDependencies = flag.Bool("build-dependencies", true, "If true, build all dependencies.")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
-var systemSpecName = flag.String("system-spec-name", "", "The name of the system spec used for validating the image in the node conformance test. The specs are at k8s.io/kubernetes/cmd/kubeadm/app/util/system/specs/. If unspecified, the default built-in spec (system.DefaultSpec) will be used.")
-
-const (
-	systemSpecPath = "k8s.io/kubernetes/cmd/kubeadm/app/util/system/specs"
-)
+var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 
 func main() {
 	klog.InitFlags(nil)
@@ -65,7 +62,7 @@ func main() {
 		if err != nil {
 			klog.Fatalf("Failed to get k8s root directory: %v", err)
 		}
-		systemSpecFile := filepath.Join(rootDir, systemSpecPath, *systemSpecName+".yaml")
+		systemSpecFile := filepath.Join(rootDir, system.SystemSpecPath, *systemSpecName+".yaml")
 		args = append(args, fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s", *systemSpecName, systemSpecFile))
 	}
 	if err := runCommand(ginkgo, args...); err != nil {

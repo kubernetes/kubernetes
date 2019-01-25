@@ -36,7 +36,7 @@ if (( ${KUBE_VERBOSE} >= 6 )); then
 fi
 
 while getopts ":df" opt; do
-  case $opt in
+  case ${opt} in
     d) # do not godep-restore into a temporary directory, but use the existing GOPATH
       DRY_RUN=true
       ;;
@@ -44,7 +44,7 @@ while getopts ":df" opt; do
       FAIL_ON_DIFF=true
       ;;
     \?)
-      echo "Invalid option: -$OPTARG" >&2
+      echo "Invalid option: -${OPTARG}" >&2
       exit 1
       ;;
   esac

@@ -45,12 +45,13 @@ func TestValidateCgroupSubsystem(t *testing.T) {
 			err:        false,
 		},
 	} {
-		err := v.validateCgroupSubsystems(cgroupSpec, test.subsystems)
-		if !test.err {
-			assert.Nil(t, err, "%q: Expect error not to occur with cgroup", desc)
-		} else {
-			assert.NotNil(t, err, "%q: Expect error to occur with docker info", desc)
-		}
-
+		t.Run(desc, func(t *testing.T) {
+			err := v.validateCgroupSubsystems(cgroupSpec, test.subsystems)
+			if !test.err {
+				assert.Nil(t, err, "%q: Expect error not to occur with cgroup", desc)
+			} else {
+				assert.NotNil(t, err, "%q: Expect error to occur with docker info", desc)
+			}
+		})
 	}
 }

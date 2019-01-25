@@ -48,6 +48,14 @@ func TestUpdateGetBindings(t *testing.T) {
 			getPod:              "pod1",
 			getNode:             "node2",
 		},
+		"binding-nil": {
+			updatePod:           "pod1",
+			updateNode:          "node1",
+			updateBindings:      nil,
+			updateProvisionings: nil,
+			getPod:              "pod1",
+			getNode:             "node1",
+		},
 		"binding-exists": {
 			updatePod:           "pod1",
 			updateNode:          "node1",
@@ -65,8 +73,7 @@ func TestUpdateGetBindings(t *testing.T) {
 
 		// Perform updates
 		updatePod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: scenario.updatePod, Namespace: "ns"}}
-		cache.UpdateBindings(updatePod, scenario.updateNode, scenario.updateBindings)
-		cache.UpdateProvisionedPVCs(updatePod, scenario.updateNode, scenario.updateProvisionings)
+		cache.UpdateBindings(updatePod, scenario.updateNode, scenario.updateBindings, scenario.updateProvisionings)
 
 		// Verify updated bindings
 		bindings := cache.GetBindings(updatePod, scenario.updateNode)
@@ -116,8 +123,7 @@ func TestDeleteBindings(t *testing.T) {
 	cache.DeleteBindings(pod)
 
 	// Perform updates
-	cache.UpdateBindings(pod, "node1", initialBindings)
-	cache.UpdateProvisionedPVCs(pod, "node1", initialProvisionings)
+	cache.UpdateBindings(pod, "node1", initialBindings, initialProvisionings)
 
 	// Get bindings and provisionings
 	bindings = cache.GetBindings(pod, "node1")

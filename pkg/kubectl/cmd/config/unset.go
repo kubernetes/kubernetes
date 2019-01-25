@@ -49,6 +49,7 @@ var (
 		kubectl config unset contexts.foo.namespace`)
 )
 
+// NewCmdConfigUnset returns a Command instance for 'config unset' sub command
 func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &unsetOptions{configAccess: configAccess}
 

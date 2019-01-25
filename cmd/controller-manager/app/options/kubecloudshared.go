@@ -19,39 +19,25 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
 type KubeCloudSharedOptions struct {
-	CloudProvider                *CloudProviderOptions
-	ExternalCloudVolumePlugin    string
-	UseServiceAccountCredentials bool
-	AllowUntaggedCloud           bool
-	RouteReconciliationPeriod    metav1.Duration
-	NodeMonitorPeriod            metav1.Duration
-	ClusterName                  string
-	ClusterCIDR                  string
-	AllocateNodeCIDRs            bool
-	CIDRAllocatorType            string
-	ConfigureCloudRoutes         bool
-	NodeSyncPeriod               metav1.Duration
+	*kubectrlmgrconfig.KubeCloudSharedConfiguration
+	CloudProvider *CloudProviderOptions
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewKubeCloudSharedOptions(cfg kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+func NewKubeCloudSharedOptions(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
-		CloudProvider:                &CloudProviderOptions{},
-		ExternalCloudVolumePlugin:    cfg.ExternalCloudVolumePlugin,
-		UseServiceAccountCredentials: cfg.UseServiceAccountCredentials,
-		RouteReconciliationPeriod:    cfg.RouteReconciliationPeriod,
-		NodeMonitorPeriod:            cfg.NodeMonitorPeriod,
-		ClusterName:                  cfg.ClusterName,
-		ConfigureCloudRoutes:         cfg.ConfigureCloudRoutes,
+		KubeCloudSharedConfiguration: cfg,
+		CloudProvider: &CloudProviderOptions{
+			CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{},
+		},
 	}
 
 	return o
@@ -92,6 +78,7 @@ func (o *KubeCloudSharedOptions) ApplyTo(cfg *kubectrlmgrconfig.KubeCloudSharedC
 	if err := o.CloudProvider.ApplyTo(&cfg.CloudProvider); err != nil {
 		return err
 	}
+
 	cfg.ExternalCloudVolumePlugin = o.ExternalCloudVolumePlugin
 	cfg.UseServiceAccountCredentials = o.UseServiceAccountCredentials
 	cfg.AllowUntaggedCloud = o.AllowUntaggedCloud

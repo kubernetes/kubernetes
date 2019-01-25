@@ -176,8 +176,7 @@ type Creater interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
 
-	// Create creates a new version of a resource. If includeUninitialized is set, the object may be returned
-	// without completing initialization.
+	// Create creates a new version of a resource.
 	Create(ctx context.Context, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 
@@ -189,8 +188,7 @@ type NamedCreater interface {
 
 	// Create creates a new version of a resource. It expects a name parameter from the path.
 	// This is needed for create operations on subresources which include the name of the parent
-	// resource in the path. If includeUninitialized is set, the object may be returned without
-	// completing initialization.
+	// resource in the path.
 	Create(ctx context.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 

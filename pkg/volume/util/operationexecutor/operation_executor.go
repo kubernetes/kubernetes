@@ -192,6 +192,12 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// volumes.  See issue 29695.
 	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
+	// Marks the specified volume as *possibly* attached to the specified node.
+	// If an attach operation fails, the attach/detach controller does not know for certain if the volume is attached or not.
+	// If the volume name is supplied, that volume name will be used.  If not, the
+	// volume name is computed using the result from querying the plugin.
+	MarkVolumeAsUncertain(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
+
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 

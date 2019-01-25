@@ -127,7 +127,6 @@ docs/man/man1/kubeadm-config-images-list.1
 docs/man/man1/kubeadm-config-images-pull.1
 docs/man/man1/kubeadm-config-images.1
 docs/man/man1/kubeadm-config-migrate.1
-docs/man/man1/kubeadm-config-print-default.1
 docs/man/man1/kubeadm-config-print-init-defaults.1
 docs/man/man1/kubeadm-config-print-join-defaults.1
 docs/man/man1/kubeadm-config-print.1

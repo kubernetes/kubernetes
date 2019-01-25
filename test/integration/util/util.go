@@ -21,14 +21,11 @@ import (
 	"net/http/httptest"
 
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -69,13 +66,12 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 	stopCh := make(chan struct{})
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
-	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *factory.Config) {
-		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
-	})
+	config, err := schedulerConfigurator.CreateFromConfig(schedulerapi.Policy{})
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
 
+	sched := scheduler.NewFromConfig(config)
 	informerFactory.Start(stopCh)
 	sched.Run()
 
@@ -94,6 +90,7 @@ func createSchedulerConfigurator(
 	informerFactory informers.SharedInformerFactory,
 	stopCh <-chan struct{},
 ) factory.Configurator {
+
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  v1.DefaultSchedulerName,
 		Client:                         clientSet,
@@ -108,7 +105,6 @@ func createSchedulerConfigurator(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		StopCh:                         stopCh,

@@ -32,6 +32,7 @@ go_test(
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
         "//test/e2e/ui:go_default_library",
+        "//test/e2e/windows:go_default_library",
     ],
 )
 
@@ -54,9 +55,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
@@ -120,6 +121,7 @@ filegroup(
         "//test/e2e/testing-manifests:all-srcs",
         "//test/e2e/ui:all-srcs",
         "//test/e2e/upgrades:all-srcs",
+        "//test/e2e/windows:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -248,11 +248,11 @@ __custom_func() {
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs | kubectl_attach)
+        kubectl_logs)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
             __kubectl_get_resource_pod
             return
             ;;
@@ -423,7 +423,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	addProfilingFlags(flags)
 
-	kubeConfigFlags := genericclioptions.NewConfigFlags()
+	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())

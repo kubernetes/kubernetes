@@ -104,7 +104,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.ServerList, []string{"/server2"}) {
+	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.Transport.ServerList, []string{"/server2"}) {
 		t.Errorf("unexpected config %#v", config)
 	}
 	if !called {
@@ -136,8 +136,10 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
 		defaultConfig := storagebackend.Config{
-			Prefix:     "/registry",
-			ServerList: defaultEtcdLocation,
+			Prefix: "/registry",
+			Transport: storagebackend.TransportConfig{
+				ServerList: defaultEtcdLocation,
+			},
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
@@ -148,8 +150,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, test.servers) {
-			t.Errorf("%d: expected %v, got %v", i, test.servers, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, test.servers) {
+			t.Errorf("%d: expected %v, got %v", i, test.servers, config.Transport.ServerList)
 			continue
 		}
 
@@ -158,8 +160,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, defaultEtcdLocation) {
-			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, defaultEtcdLocation) {
+			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.Transport.ServerList)
 			continue
 		}
 

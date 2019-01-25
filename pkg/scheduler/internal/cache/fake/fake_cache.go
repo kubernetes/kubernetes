@@ -19,8 +19,9 @@ package fake
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Cache is used for testing
@@ -75,7 +76,7 @@ func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
 // UpdateNodeNameToInfoMap is a fake method for testing.
-func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
+func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulernodeinfo.NodeInfo) error {
 	return nil
 }
 
@@ -83,7 +84,7 @@ func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeI
 func (c *Cache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
 
 // FilteredList is a fake method for testing.
-func (c *Cache) FilteredList(filter schedulerinternalcache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (c *Cache) FilteredList(filter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
 

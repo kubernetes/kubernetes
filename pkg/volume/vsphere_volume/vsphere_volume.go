@@ -81,6 +81,10 @@ func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
 }
 
+func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
 	return false
 }
