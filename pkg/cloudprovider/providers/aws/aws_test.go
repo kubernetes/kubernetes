@@ -189,6 +189,7 @@ func TestReadAWSCloudConfig(t *testing.T) {
 type ServiceDescriptor struct {
 	name   string
 	region string
+	signingRegion, signingMethod string
 }
 
 func TestOverridesActiveConfig(t *testing.T) {
@@ -220,6 +221,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                  Region=sregion
                  URL=https://s3.foo.bar
                  SigningRegion=sregion
+                 SigningMethod = sign
                 `),
 			nil,
 			true, false,
@@ -234,6 +236,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                  Service=s3
                  URL=https://s3.foo.bar
                  SigningRegion=sregion
+                 SigningMethod = sign
                  `),
 			nil,
 			true, false,
@@ -245,9 +248,10 @@ func TestOverridesActiveConfig(t *testing.T) {
                   [global]
 
                   [ServiceOverride "1"]
-                   Service=s3
+                   Service="s3"
                    Region=sregion
                    SigningRegion=sregion
+                   SigningMethod = sign
                   `),
 			nil,
 			true, false,
@@ -262,6 +266,7 @@ func TestOverridesActiveConfig(t *testing.T) {
                  Service=s3
                  Region=sregion
                  URL=https://s3.foo.bar
+                 SigningMethod = sign
                  `),
 			nil,
 			true, false,
@@ -273,14 +278,15 @@ func TestOverridesActiveConfig(t *testing.T) {
                 [Global]
 
                [ServiceOverride "1"]
-                Service = s3
+                Service = "s3      "
                 Region = sregion
                 URL = https://s3.foo.bar
                 SigningRegion = sregion
+                SigningMethod = v4
                 `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{name: "s3", region: "sregion"}},
+			[]ServiceDescriptor{{name: "s3", region: "sregion", signingRegion: "sregion", signingMethod: "v4"}},
 		},
 		{
 			"Multiple Overridden Services",
@@ -292,16 +298,19 @@ func TestOverridesActiveConfig(t *testing.T) {
                   Service=s3
                   Region=sregion1
                   URL=https://s3.foo.bar
-                  SigningRegion=sregion
+                  SigningRegion=sregion1
+                  SigningMethod = v4
 
 				[ServiceOverride "2"]
                   Service=ec2
                   Region=sregion2
                   URL=https://ec2.foo.bar
-                  SigningRegion=sregion`),
+                  SigningRegion=sregion2
+                  SigningMethod = v4`),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{"s3", "sregion1"}, {"ec2", "sregion2"}},
+			[]ServiceDescriptor{{name:"s3", region: "sregion1", signingRegion: "sregion1", signingMethod: "v4"},
+				{name: "ec2", region: "sregion2", signingRegion: "sregion2", signingMethod: "v4"}},
 		},
 		{
 			"Duplicate Services",
@@ -314,12 +323,14 @@ func TestOverridesActiveConfig(t *testing.T) {
                   Region=sregion1
                   URL=https://s3.foo.bar
                   SigningRegion=sregion
+                  SigningMethod = sign
 
 				[ServiceOverride "2"]
                   Service=s3
                   Region=sregion1
                   URL=https://s3.foo.bar
-                  SigningRegion=sregion`),
+                  SigningRegion=sregion
+                  SigningMethod = sign`),
 			nil,
 			true, false,
 			[]ServiceDescriptor{},
@@ -333,17 +344,19 @@ func TestOverridesActiveConfig(t *testing.T) {
                  Service=s3
                  Region=region1
                  URL=https://s3.foo.bar
-                 SigningRegion=sregion
+                 SigningRegion=sregion1
 
 				[ServiceOverride "2"]
                  Service=ec2
                  Region=region2
                  URL=https://ec2.foo.bar
                  SigningRegion=sregion
+                 SigningMethod = v4
                  `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{"s3", "region1"}, {"ec2", "region2"}},
+			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: ""},
+				{name:"ec2", region: "region2", signingRegion: "sregion", signingMethod: "v4"}},
 		},
 		{
 			"Multiple regions, Same Service",
@@ -354,17 +367,21 @@ func TestOverridesActiveConfig(t *testing.T) {
                 Service=s3
                 Region=region1
                 URL=https://s3.foo.bar
-                SigningRegion=sregion
+                SigningRegion=sregion1
+                SigningMethod = v3
 
 				[ServiceOverride "2"]
                  Service=s3
                  Region=region2
                  URL=https://s3.foo.bar
-                 SigningRegion=sregion
+                 SigningRegion=sregion1
+				 SigningMethod = v4
+                 
                  `),
 			nil,
 			false, true,
-			[]ServiceDescriptor{{"s3", "region1"}, {"s3", "region2"}},
+			[]ServiceDescriptor{{name:"s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
+				{name:"s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4"}},
 		},
 	}
 
@@ -393,6 +410,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 						Region        string
 						URL           string
 						SigningRegion string
+						SigningMethod string
 					}
 					for _, v := range cfg.ServiceOverride {
 						if v.Service == sd.name && v.Region == sd.region {
@@ -404,9 +422,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 						t.Errorf("Missing override for service %s in case %s",
 							sd.name, test.name)
 					} else {
-						if found.SigningRegion != "sregion" {
-							t.Errorf("Expected signing region 'sregion', received '%s' for case %s",
-								found.SigningRegion, test.name)
+						if found.SigningRegion != sd.signingRegion {
+							t.Errorf("Expected signing region '%s', received '%s' for case %s",
+								sd.signingRegion, found.SigningRegion, test.name)
+						}
+						if found.SigningMethod != sd.signingMethod {
+							t.Errorf("Expected signing method '%s', received '%s' for case %s",
+								sd.signingMethod, found.SigningRegion, test.name)
 						}
 						targetName := fmt.Sprintf("https://%s.foo.bar", sd.name)
 						if found.URL != targetName {
@@ -425,9 +447,13 @@ func TestOverridesActiveConfig(t *testing.T) {
 								t.Errorf("Expected endpoint url: %s, received %s in case %s",
 									targetName, ep1.URL, test.name)
 							}
-							if ep1.SigningRegion != "sregion" {
-								t.Errorf("Expected signing region 'sregion', received '%s' in case %s",
-									ep1.SigningRegion, test.name)
+							if ep1.SigningRegion != sd.signingRegion {
+								t.Errorf("Expected signing region '%s', received '%s' in case %s",
+									sd.signingRegion, ep1.SigningRegion, test.name)
+							}
+							if ep1.SigningMethod != sd.signingMethod {
+								t.Errorf("Expected signing method '%s', received '%s' in case %s",
+									sd.signingMethod, ep1.SigningRegion, test.name)
 							}
 						}
 					}
