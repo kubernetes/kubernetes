@@ -33,7 +33,7 @@ rules:
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
-  - apiGroups: ["extensions"]
+  - apiGroups: ["extensions","apps"]
     resources: ["deployments/scale", "replicasets/scale"]
     verbs: ["get", "update"]
 # Remove the configmaps rule once below issue is fixed:
@@ -85,7 +85,7 @@ spec:
         fsGroup: 65534
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.3.0
+        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.4.0
         resources:
             requests:
                 cpu: "20m"
