@@ -85,6 +85,9 @@ func (dc *Datacenter) GetVMByUUID(ctx context.Context, vmUUID string) (*VirtualM
 // GetHostByVMUUID gets the host object from the given vmUUID
 func (dc *Datacenter) GetHostByVMUUID(ctx context.Context, vmUUID string) (*types.ManagedObjectReference, error) {
 	virtualMachine, err := dc.GetVMByUUID(ctx, vmUUID)
+	if err != nil {
+		return nil, err
+	}
 	var vmMo mo.VirtualMachine
 	pc := property.DefaultCollector(virtualMachine.Client())
 	err = pc.RetrieveOne(ctx, virtualMachine.Reference(), []string{"summary.runtime.host"}, &vmMo)

@@ -204,7 +204,10 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 			t.Fatal("Failed to get all secrets from sharedInformer. error: ", err)
 		}
 		for _, secret := range secrets {
-			secretInformer.Informer().GetIndexer().Delete(secret)
+			err := secretInformer.Informer().GetIndexer().Delete(secret)
+			if err != nil {
+				t.Fatalf("Failed to delete secret from informer: %v", err)
+			}
 		}
 	}
 

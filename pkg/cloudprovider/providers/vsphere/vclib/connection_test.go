@@ -94,7 +94,7 @@ func TestWithValidCaCert(t *testing.T) {
 	}
 
 	// Ignoring error here, because we only care about the TLS connection
-	connection.NewClient(context.Background())
+	_, _ = connection.NewClient(context.Background())
 
 	verifyConnectionWasMade()
 }
@@ -151,7 +151,7 @@ func TestWithValidThumbprint(t *testing.T) {
 	}
 
 	// Ignoring error here, because we only care about the TLS connection
-	connection.NewClient(context.Background())
+	_, _ = connection.NewClient(context.Background())
 
 	verifyConnectionWasMade()
 }
