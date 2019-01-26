@@ -71,6 +71,12 @@ const (
 	// LogDebugWithRequestErrors states the SDK should log when service requests fail
 	// to build, send, validate, or unmarshal.
 	LogDebugWithRequestErrors
+
+	// LogDebugWithEventStreamBody states the SDK should log EventStream
+	// request and response bodys. This should be used to log the EventStream
+	// wire unmarshaled message content of requests and responses made while
+	// using the SDK Will also enable LogDebug.
+	LogDebugWithEventStreamBody
 )
 
 // A Logger is a minimalistic interface for the SDK to log messages to. Should

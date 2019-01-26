@@ -13,8 +13,8 @@ const (
 	// ErrCodeImageAlreadyExistsException for service response error code
 	// "ImageAlreadyExistsException".
 	//
-	// The specified image has already been pushed, and there are no changes to
-	// the manifest or image tag since the last push.
+	// The specified image has already been pushed, and there were no changes to
+	// the manifest or image tag after the last push.
 	ErrCodeImageAlreadyExistsException = "ImageAlreadyExistsException"
 
 	// ErrCodeImageNotFoundException for service response error code
@@ -44,6 +44,14 @@ const (
 	// API request.
 	ErrCodeInvalidParameterException = "InvalidParameterException"
 
+	// ErrCodeInvalidTagParameterException for service response error code
+	// "InvalidTagParameterException".
+	//
+	// An invalid parameter has been specified. Tag keys can have a maximum character
+	// length of 128 characters, and tag values can have a maximum length of 256
+	// characters.
+	ErrCodeInvalidTagParameterException = "InvalidTagParameterException"
+
 	// ErrCodeLayerAlreadyExistsException for service response error code
 	// "LayerAlreadyExistsException".
 	//
@@ -70,13 +78,32 @@ const (
 	// for this repository.
 	ErrCodeLayersNotFoundException = "LayersNotFoundException"
 
+	// ErrCodeLifecyclePolicyNotFoundException for service response error code
+	// "LifecyclePolicyNotFoundException".
+	//
+	// The lifecycle policy could not be found, and no policy is set to the repository.
+	ErrCodeLifecyclePolicyNotFoundException = "LifecyclePolicyNotFoundException"
+
+	// ErrCodeLifecyclePolicyPreviewInProgressException for service response error code
+	// "LifecyclePolicyPreviewInProgressException".
+	//
+	// The previous lifecycle policy preview request has not completed. Please try
+	// again later.
+	ErrCodeLifecyclePolicyPreviewInProgressException = "LifecyclePolicyPreviewInProgressException"
+
+	// ErrCodeLifecyclePolicyPreviewNotFoundException for service response error code
+	// "LifecyclePolicyPreviewNotFoundException".
+	//
+	// There is no dry run for this repository.
+	ErrCodeLifecyclePolicyPreviewNotFoundException = "LifecyclePolicyPreviewNotFoundException"
+
 	// ErrCodeLimitExceededException for service response error code
 	// "LimitExceededException".
 	//
 	// The operation did not succeed because it would have exceeded a service limit
 	// for your account. For more information, see Amazon ECR Default Service Limits
 	// (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
-	// in the Amazon EC2 Container Registry User Guide.
+	// in the Amazon Elastic Container Registry User Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 
 	// ErrCodeRepositoryAlreadyExistsException for service response error code
@@ -111,6 +138,13 @@ const (
 	//
 	// These errors are usually caused by a server-side issue.
 	ErrCodeServerException = "ServerException"
+
+	// ErrCodeTooManyTagsException for service response error code
+	// "TooManyTagsException".
+	//
+	// The list of tags on the repository is over the limit. The maximum number
+	// of tags that can be applied to a repository is 50.
+	ErrCodeTooManyTagsException = "TooManyTagsException"
 
 	// ErrCodeUploadNotFoundException for service response error code
 	// "UploadNotFoundException".

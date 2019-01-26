@@ -29,8 +29,9 @@ var initRequest func(*request.Request)
 
 // Service information constants
 const (
-	ServiceName = "kms"       // Service endpoint prefix API calls made to.
-	EndpointsID = ServiceName // Service ID for Regions and Endpoints metadata.
+	ServiceName = "kms"       // Name of service.
+	EndpointsID = ServiceName // ID to lookup a service endpoint with.
+	ServiceID   = "KMS"       // ServiceID is a unique identifer of a specific service.
 )
 
 // New creates a new instance of the KMS client with a session.
@@ -55,6 +56,7 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 			cfg,
 			metadata.ClientInfo{
 				ServiceName:   ServiceName,
+				ServiceID:     ServiceID,
 				SigningName:   signingName,
 				SigningRegion: signingRegion,
 				Endpoint:      endpoint,

@@ -25,7 +25,7 @@ func Build(r *request.Request) {
 		return
 	}
 
-	if r.ExpireTime == 0 {
+	if !r.IsPresigned() {
 		r.HTTPRequest.Method = "POST"
 		r.HTTPRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 		r.SetBufferBody([]byte(body.Encode()))
