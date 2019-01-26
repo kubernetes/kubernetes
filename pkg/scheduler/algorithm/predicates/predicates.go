@@ -950,7 +950,7 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 	return true, nil, nil
 }
 
-// ServiceAffinity defines a struct used for create service affinity predicates.
+// ServiceAffinity defines a struct used for creating service affinity predicates.
 type ServiceAffinity struct {
 	podLister     algorithm.PodLister
 	serviceLister algorithm.ServiceLister
@@ -1012,7 +1012,7 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 //
 // 	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
 //	These backfilled labels in the selector "L" are defined like so:
-// 		- L is a label that the ServiceAffinity object needs as a matching constraints.
+// 		- L is a label that the ServiceAffinity object needs as a matching constraint.
 // 		- L is not defined in the pod itself already.
 // 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 //
