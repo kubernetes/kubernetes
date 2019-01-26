@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,6 +122,7 @@ func GetHollowKubeletConfig(
 	f.MaxPerPodContainerCount = 2
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
+	f.ProviderID = fmt.Sprintf("kubemark://%v", nodeName)
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
