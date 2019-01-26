@@ -36,7 +36,7 @@ func TestTaintToString(t *testing.T) {
 				Key:    "foo",
 				Effect: TaintEffectNoSchedule,
 			},
-			expectedString: "foo:NoSchedule",
+			expectedString: "foo=:NoSchedule",
 		},
 	}
 
