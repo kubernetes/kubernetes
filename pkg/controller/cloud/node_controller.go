@@ -57,14 +57,6 @@ type CloudNodeController struct {
 	nodeStatusUpdateFrequency time.Duration
 }
 
-const (
-	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
-	nodeStatusUpdateRetry = 5
-
-	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
-	retrySleepTime = 20 * time.Millisecond
-)
-
 // NewCloudNodeController creates a CloudNodeController object
 func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
