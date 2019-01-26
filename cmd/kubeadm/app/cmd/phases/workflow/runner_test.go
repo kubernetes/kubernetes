@@ -172,7 +172,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 		t.Run(u.name, func(t *testing.T) {
 			callstack = []string{}
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -241,7 +241,7 @@ func TestRunHandleErrors(t *testing.T) {
 	for _, u := range usecases {
 		t.Run(u.name, func(t *testing.T) {
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if (err != nil) != u.expectedError {
 				t.Errorf("Unexpected error: %v", err)
 			}

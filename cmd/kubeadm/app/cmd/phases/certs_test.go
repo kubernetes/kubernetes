@@ -91,7 +91,7 @@ func TestCreateSparseCerts(t *testing.T) {
 
 			r := workflow.NewRunner()
 			r.AppendPhase(NewCertsPhase())
-			r.SetDataInitializer(func(*cobra.Command) (workflow.RunData, error) {
+			r.SetDataInitializer(func(*cobra.Command, []string) (workflow.RunData, error) {
 				certsData := &testCertsData{
 					cfg: testutil.GetDefaultInternalConfig(t),
 				}
@@ -99,7 +99,7 @@ func TestCreateSparseCerts(t *testing.T) {
 				return certsData, nil
 			})
 
-			if err := r.Run(); (err != nil) != test.ExpectError {
+			if err := r.Run([]string{}); (err != nil) != test.ExpectError {
 				t.Fatalf("expected error to be %t, got %t (%v)", test.ExpectError, (err != nil), err)
 			}
 		})
