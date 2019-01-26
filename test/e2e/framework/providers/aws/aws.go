@@ -63,6 +63,23 @@ func (p *Provider) GroupSize(group string) (int, error) {
 	return instanceGroup.CurrentSize()
 }
 
+func (p *Provider) DeleteNode(node *v1.Node) error {
+	client := newAWSClient("")
+
+	instanceID, err := awscloud.KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+	if err != nil {
+		return err
+	}
+
+	req := &ec2.TerminateInstancesInput{
+		InstanceIds: []*string{
+			aws.String(string(instanceID)),
+		},
+	}
+	_, err = client.TerminateInstances(req)
+	return err
+}
+
 func (p *Provider) CreatePD(zone string) (string, error) {
 	client := newAWSClient(zone)
 	request := &ec2.CreateVolumeInput{}

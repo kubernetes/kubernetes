@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -50,6 +51,10 @@ type Provider struct {
 	framework.NullProvider
 
 	azureCloud *azure.Cloud
+}
+
+func (p *Provider) DeleteNode(node *v1.Node) error {
+	return errors.New("not implemented yet")
 }
 
 func (p *Provider) CreatePD(zone string) (string, error) {

@@ -190,6 +190,13 @@ func getGCEZoneForGroup(group string) (string, error) {
 	return zone, nil
 }
 
+func (p *Provider) DeleteNode(node *v1.Node) error {
+	zone := framework.TestContext.CloudConfig.Zone
+	project := framework.TestContext.CloudConfig.ProjectID
+
+	return p.gceCloud.DeleteInstance(project, zone, node.Name)
+}
+
 func (p *Provider) CreatePD(zone string) (string, error) {
 	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
 
