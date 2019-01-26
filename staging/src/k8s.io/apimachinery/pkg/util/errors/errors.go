@@ -199,3 +199,7 @@ func AggregateGoroutines(funcs ...func() error) Aggregate {
 
 // ErrPreconditionViolated is returned when the precondition is violated
 var ErrPreconditionViolated = errors.New("precondition is violated")
+
+// ErrUIDNotMatch is returned when the ReplicaSet returned from the cluster doesn't have
+// the same UID as the ReplicaSet in the cache.
+var ErrUIDNotMatch = errors.New("object was found with new uid than cache")

@@ -69,12 +69,6 @@ const (
 	statusUpdateRetries = 1
 )
 
-var (
-	// ErrUIDNotMatch is returned when the ReplicaSet returned from the cluster doesn't have
-	// the same UID as the ReplicaSet in the cache.
-	ErrUIDNotMatch error = fmt.Errorf("Replicaset was found with new uid than cache")
-)
-
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
 type ReplicaSetController struct {
