@@ -1758,19 +1758,18 @@ var _ = SIGDescribe("Services", func() {
 		labels := map[string]string{
 			"nopods": "nopods",
 		}
+		port := 80
 		ports := []v1.ServicePort{{
-			Port:       80,
+			Port:       int32(port),
 			TargetPort: intstr.FromInt(80),
 		}}
 
 		By("creating a service with no endpoints")
-		svc, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
+		_, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
 		if err != nil {
 			framework.Failf("Failed to create service: %v", err)
 		}
 
-		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-		servicePort := net.JoinHostPort(serviceName, port)
 		nodeName := nodes.Items[0].Name
 		podName := "execpod-noendpoints"
 
@@ -1781,10 +1780,11 @@ var _ = SIGDescribe("Services", func() {
 		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		framework.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, servicePort)
-		cmd := fmt.Sprintf(`wget -T 10 -qO- %v`, servicePort)
+		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
+		framework.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
+		cmd := fmt.Sprintf(`wget -T 3 -qO- %v`, serviceAddress)
 
-		By(fmt.Sprintf("hitting service %v from pod %v on node %v", servicePort, podName, nodeName))
+		By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "connection refused"
 		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyEndpointLagTimeout, func() (bool, error) {
 			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
