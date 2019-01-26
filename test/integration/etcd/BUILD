@@ -15,6 +15,7 @@ go_test(
         "integration",
     ],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
