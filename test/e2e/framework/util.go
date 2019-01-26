@@ -4916,7 +4916,7 @@ func GetNodeInternalIP(node *v1.Node) (string, error) {
 		}
 	}
 	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
 }
