@@ -154,7 +154,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -193,7 +192,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -240,7 +238,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -284,7 +281,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -330,7 +326,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=baz",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -378,7 +373,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -407,7 +401,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "insecure-port extra-args",
+			name: "secure-port extra-args",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
@@ -416,7 +410,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 					APIServer: kubeadmapi.APIServer{
 						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 							ExtraArgs: map[string]string{
-								"insecure-port": "1234",
+								"secure-port": "123",
 							},
 						},
 					},
@@ -424,7 +418,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=1234",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -470,7 +463,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",

@@ -40,6 +40,7 @@
 			"SelectorRegexp": "k8s[.]io/utils",
 			"AllowedPrefixes": [
 				"k8s.io/utils/exec",
+				"k8s.io/utils/integer",
 				"k8s.io/utils/pointer"
 			]
 		},
@@ -163,7 +164,7 @@
 				"github.com/prometheus/procfs",
 				"github.com/PuerkitoBio/purell",
 				"github.com/PuerkitoBio/urlesc",
-				"github.com/renstrom/dedent",
+				"github.com/lithammer/dedent",
 				"github.com/russross/blackfriday",
 				"github.com/shurcooL/sanitized_anchor_name",
 				"github.com/sirupsen/logrus",

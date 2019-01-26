@@ -111,10 +111,11 @@ func newCertSubPhases() []workflow.Phase {
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
 	saPhase := workflow.Phase{
-		Name:  "sa",
-		Short: "Generates a private key for signing service account tokens along with its public key",
-		Long:  saKeyLongDesc,
-		Run:   runCertsSa,
+		Name:         "sa",
+		Short:        "Generates a private key for signing service account tokens along with its public key",
+		Long:         saKeyLongDesc,
+		Run:          runCertsSa,
+		InheritFlags: []string{options.CertificatesDir},
 	}
 
 	subPhases = append(subPhases, saPhase)

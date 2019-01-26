@@ -24,8 +24,7 @@ import (
 
 // DebuggingOptions holds the Debugging options.
 type DebuggingOptions struct {
-	EnableProfiling           bool
-	EnableContentionProfiling bool
+	*componentbaseconfig.DebuggingConfiguration
 }
 
 // AddFlags adds flags related to debugging for controller manager to the specified FlagSet.

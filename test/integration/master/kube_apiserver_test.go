@@ -96,11 +96,11 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result := kubeclient.RESTClient().Get().AbsPath("/swagger.json").Do()
+	result := kubeclient.RESTClient().Get().AbsPath("/openapi/v2").Do()
 	status := 0
 	result.StatusCode(&status)
 	if status != http.StatusOK {
-		t.Fatalf("GET /swagger.json failed: expected status=%d, got=%d", http.StatusOK, status)
+		t.Fatalf("GET /openapi/v2 failed: expected status=%d, got=%d", http.StatusOK, status)
 	}
 
 	raw, err := result.Raw()

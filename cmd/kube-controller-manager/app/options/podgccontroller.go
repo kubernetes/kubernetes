@@ -24,7 +24,7 @@ import (
 
 // PodGCControllerOptions holds the PodGCController options.
 type PodGCControllerOptions struct {
-	TerminatedPodGCThreshold int32
+	*kubectrlmgrconfig.PodGCControllerConfiguration
 }
 
 // AddFlags adds flags related to PodGCController for controller manager to the specified FlagSet.

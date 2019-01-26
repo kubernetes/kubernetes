@@ -487,8 +487,7 @@ function compute-etcd-events-params {
 
 # Computes command line arguments to be passed to apiserver.
 function compute-kube-apiserver-params {
-	local params="${APISERVER_TEST_ARGS:-}"
-	params+=" --insecure-bind-address=0.0.0.0"
+	local params="--insecure-bind-address=0.0.0.0"
 	params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
 	if [[ -z "${ETCD_SERVERS:-}" ]]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#${EVENT_STORE_URL}}"
@@ -549,6 +548,9 @@ function compute-kube-apiserver-params {
 		params+=" --audit-log-maxbackup=0"
 		params+=" --audit-log-maxsize=2000000000"
 	fi
+        # Append APISERVER_TEST_ARGS to the end, which will allow for
+        # the above defaults to be overridden.
+	params+=" ${APISERVER_TEST_ARGS:-}"
 	echo "${params}"
 }
 

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-// Downloader is the OpenAPI downloader type. It will try to download spec from /swagger.json endpoint.
+// Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
 type Downloader struct {
 }
 
@@ -89,7 +89,7 @@ func etagFor(data []byte) string {
 	return fmt.Sprintf("%s%X\"", locallyGeneratedEtagPrefix, sha512.Sum512(data))
 }
 
-// Download downloads openAPI spec from /swagger.json endpoint of the given handler.
+// Download downloads openAPI spec from /openapi/v2 or /swagger.json endpoint of the given handler.
 // httpStatus is only valid if err == nil
 func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *spec.Swagger, newEtag string, httpStatus int, err error) {
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})

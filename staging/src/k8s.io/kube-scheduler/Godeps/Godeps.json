@@ -152,7 +152,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
 		}
 	]
 }

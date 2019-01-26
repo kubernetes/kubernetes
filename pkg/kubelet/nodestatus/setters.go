@@ -91,17 +91,16 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			if nodeIP != nil {
 				enforcedNodeAddresses := []v1.NodeAddress{}
 
-				var nodeIPType v1.NodeAddressType
+				nodeIPTypes := make(map[v1.NodeAddressType]bool)
 				for _, nodeAddress := range nodeAddresses {
 					if nodeAddress.Address == nodeIP.String() {
 						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-						nodeIPType = nodeAddress.Type
-						break
+						nodeIPTypes[nodeAddress.Type] = true
 					}
 				}
 				if len(enforcedNodeAddresses) > 0 {
 					for _, nodeAddress := range nodeAddresses {
-						if nodeAddress.Type != nodeIPType && nodeAddress.Type != v1.NodeHostName {
+						if !nodeIPTypes[nodeAddress.Type] && nodeAddress.Type != v1.NodeHostName {
 							enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
 						}
 					}
@@ -744,6 +743,21 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 				node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
 			}
 		}
+		return nil
+	}
+}
+
+// RemoveOutOfDiskCondition removes stale OutOfDisk condition
+// OutOfDisk condition has been removed from kubelet in 1.12
+func RemoveOutOfDiskCondition() Setter {
+	return func(node *v1.Node) error {
+		var conditions []v1.NodeCondition
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type != v1.NodeOutOfDisk {
+				conditions = append(conditions, node.Status.Conditions[i])
+			}
+		}
+		node.Status.Conditions = conditions
 		return nil
 	}
 }

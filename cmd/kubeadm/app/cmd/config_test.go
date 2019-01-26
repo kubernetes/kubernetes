@@ -28,7 +28,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -145,6 +145,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
 				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
+				},
 			},
 		},
 		{
@@ -158,6 +161,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 					},
 					KubernetesVersion: dummyKubernetesVersion,
 				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
+				},
 			},
 			expectedImages: defaultNumberOfImages - 1,
 		},
@@ -166,6 +172,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			cfg: kubeadmapiv1beta1.InitConfiguration{
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
+				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
 			expectedImages: defaultNumberOfImages,
@@ -178,6 +187,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 					DNS: kubeadmapiv1beta1.DNS{
 						Type: kubeadmapiv1beta1.KubeDNS,
 					},
+				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
 			expectedImages: defaultNumberOfImages + 2,
@@ -226,7 +238,7 @@ func TestImagesPull(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1beta1.DefaultCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}

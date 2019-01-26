@@ -68,14 +68,17 @@ func IsProbableEOF(err error) bool {
 	if uerr, ok := err.(*url.Error); ok {
 		err = uerr.Err
 	}
+	msg := err.Error()
 	switch {
 	case err == io.EOF:
 		return true
-	case err.Error() == "http: can't write HTTP request on broken connection":
+	case msg == "http: can't write HTTP request on broken connection":
 		return true
-	case strings.Contains(err.Error(), "connection reset by peer"):
+	case strings.Contains(msg, "http2: server sent GOAWAY and closed the connection"):
 		return true
-	case strings.Contains(strings.ToLower(err.Error()), "use of closed network connection"):
+	case strings.Contains(msg, "connection reset by peer"):
+		return true
+	case strings.Contains(strings.ToLower(msg), "use of closed network connection"):
 		return true
 	}
 	return false

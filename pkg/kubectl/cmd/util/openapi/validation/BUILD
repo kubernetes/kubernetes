@@ -26,7 +26,7 @@ go_test(
         "validation_suite_test.go",
         "validation_test.go",
     ],
-    data = ["//api/openapi-spec:swagger-spec"],
+    data = ["//api/openapi-spec"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/util/openapi:go_default_library",

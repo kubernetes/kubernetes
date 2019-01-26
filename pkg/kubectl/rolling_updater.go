@@ -33,11 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/utils/integer"
 )
 
 func newInt32Ptr(val int) *int32 {

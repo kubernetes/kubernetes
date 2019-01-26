@@ -381,7 +381,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 	var info version.Info
 	err = json.Unmarshal(body, &info)
 	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+		return nil, fmt.Errorf("unable to parse the server version: %v", err)
 	}
 	return &info, nil
 }

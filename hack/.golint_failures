@@ -1,4 +1,3 @@
-cluster/images/etcd-version-monitor
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -16,7 +15,6 @@ pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admission/v1beta1
 pkg/apis/admissionregistration
-pkg/apis/admissionregistration/v1alpha1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
@@ -255,7 +253,6 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
-pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
 pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
@@ -424,7 +421,6 @@ plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/api/admission/v1beta1
-staging/src/k8s.io/api/admissionregistration/v1alpha1
 staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
@@ -521,7 +517,6 @@ staging/src/k8s.io/apimachinery/pkg/watch
 staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/initializer
-staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
@@ -568,7 +563,6 @@ staging/src/k8s.io/apiserver/pkg/server
 staging/src/k8s.io/apiserver/pkg/server/healthz
 staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
-staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
 staging/src/k8s.io/apiserver/pkg/storage/errors
@@ -585,7 +579,6 @@ staging/src/k8s.io/apiserver/pkg/storage/value
 staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
-staging/src/k8s.io/apiserver/pkg/util/trace
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
@@ -647,7 +640,6 @@ staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
 staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
-staging/src/k8s.io/client-go/util/integer
 staging/src/k8s.io/client-go/util/jsonpath
 staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
@@ -703,6 +695,7 @@ test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
 test/e2e/chaosmonkey
+test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress

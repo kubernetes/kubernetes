@@ -157,7 +157,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  Reason,
-		Message: fmt.Sprintf(nodeLowMessageFmt, m.nodeConditions),
+		Message: fmt.Sprintf(nodeConditionMessageFmt, m.nodeConditions),
 	}
 }
 

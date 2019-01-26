@@ -72,7 +72,6 @@ type LabelOptions struct {
 
 	namespace                    string
 	enforceNamespace             bool
-	includeUninitialized         bool
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -192,7 +191,6 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
@@ -224,7 +222,6 @@ func (o *LabelOptions) RunLabel() error {
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(o.includeUninitialized).
 		Flatten()
 
 	if !o.local {

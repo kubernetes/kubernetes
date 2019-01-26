@@ -80,7 +80,6 @@ func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions
 			WithScheme(scheme.Scheme).
 			WithAll(false).
 			WithLocal(false).
-			WithUninitialized(false).
 			WithLatest(),
 		PrintFlags:  genericclioptions.NewPrintFlags("selector updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),

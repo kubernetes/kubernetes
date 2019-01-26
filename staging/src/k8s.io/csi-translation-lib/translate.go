@@ -25,8 +25,9 @@ import (
 
 var (
 	inTreePlugins = map[string]plugins.InTreePlugin{
-		plugins.GCEPDDriverName:  &plugins.GCEPD{},
-		plugins.AWSEBSDriverName: &plugins.AWSEBS{},
+		plugins.GCEPDDriverName:  plugins.NewGCEPersistentDiskCSITranslator(),
+		plugins.AWSEBSDriverName: plugins.NewAWSElasticBlockStoreCSITranslator(),
+		plugins.CinderDriverName: plugins.NewOpenStackCinderCSITranslator(),
 	}
 )
 

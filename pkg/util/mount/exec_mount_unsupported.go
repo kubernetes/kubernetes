@@ -48,7 +48,7 @@ func (mounter *execMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 }
 
 func (mounter *execMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
+	return isNotMountPoint(mounter, dir)
 }
 
 func (mounter *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {

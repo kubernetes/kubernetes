@@ -188,7 +188,7 @@ func TestNewInformerWatcher(t *testing.T) {
 					return fake.Core().Secrets("").Watch(options)
 				},
 			}
-			_, _, w := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
 
 			var result []watch.Event
 		loop:
@@ -227,9 +227,7 @@ func TestNewInformerWatcher(t *testing.T) {
 			// Stop before reading all the data to make sure the informer can deal with closed channel
 			w.Stop()
 
-			// Wait a bit to see if the informer won't panic
-			// TODO: Try to figure out a more reliable mechanism than time.Sleep (https://github.com/kubernetes/kubernetes/pull/50102/files#r184716591)
-			time.Sleep(1 * time.Second)
+			<-done
 		})
 	}
 

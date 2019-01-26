@@ -118,6 +118,10 @@ type VolumePlugin interface {
 	// const.
 	CanSupport(spec *Spec) bool
 
+	// IsMigratedToCSI tests whether a CSIDriver implements this plugin's
+	// functionality
+	IsMigratedToCSI() bool
+
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
 	// this to update the contents of the volume.
@@ -599,6 +603,37 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 	return matches[0], nil
+}
+
+// IsPluginMigratableBySpec looks for a plugin that can support a given volume
+// specification and whether that plugin is Migratable. If no plugins can
+// support or more than one plugin can support it, return error.
+func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	if spec == nil {
+		return false, fmt.Errorf("could not find if plugin is migratable because volume spec is nil")
+	}
+
+	matchedPluginNames := []string{}
+	matches := []VolumePlugin{}
+	for k, v := range pm.plugins {
+		if v.CanSupport(spec) {
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
+		}
+	}
+
+	if len(matches) == 0 {
+		// Not a known plugin (flex) in which case it is not migratable
+		return false, nil
+	}
+	if len(matches) > 1 {
+		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+
+	return matches[0].IsMigratedToCSI(), nil
 }
 
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin

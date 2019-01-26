@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 const (
@@ -145,7 +145,7 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 }
 
 func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(m, dir)
+	return isNotMountPoint(m, dir)
 }
 
 func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {

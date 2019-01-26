@@ -654,7 +654,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return nil, err
 	}
-	// run has compiled knowledge of the thing is is creating
+	// run has compiled knowledge of the thing is creating
 	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, err

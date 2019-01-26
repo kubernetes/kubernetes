@@ -6,6 +6,7 @@ go_library(
         "aws_ebs.go",
         "gce_pd.go",
         "in_tree_volume.go",
+        "openstack_cinder.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/csi-translation-lib/plugins",
     importpath = "k8s.io/csi-translation-lib/plugins",

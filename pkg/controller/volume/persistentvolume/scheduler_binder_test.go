@@ -328,8 +328,6 @@ func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, 
 		}
 	}
 
-	env.internalBinder.podBindingCache.UpdateBindings(pod, node, bindings)
-
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range provisionings {
 		if err := pvcCache.Assume(pvc); err != nil {
@@ -337,14 +335,12 @@ func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, 
 		}
 	}
 
-	env.internalBinder.podBindingCache.UpdateProvisionedPVCs(pod, node, provisionings)
+	env.internalBinder.podBindingCache.UpdateBindings(pod, node, bindings, provisionings)
 }
 
 func (env *testEnv) initPodCache(pod *v1.Pod, node string, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
 	cache := env.internalBinder.podBindingCache
-	cache.UpdateBindings(pod, node, bindings)
-
-	cache.UpdateProvisionedPVCs(pod, node, provisionings)
+	cache.UpdateBindings(pod, node, bindings, provisionings)
 }
 
 func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Pod, expectedBindings []*bindingInfo, expectedProvisionings []*v1.PersistentVolumeClaim) {
@@ -471,7 +467,10 @@ func (env *testEnv) validateBind(
 		if err != nil {
 			t.Errorf("Test %q failed: GetPV %q returned error: %v", name, pv.Name, err)
 		}
-		if !reflect.DeepEqual(cachedPV, pv) {
+		// Cache may be overridden by API object with higher version, compare but ignore resource version.
+		newCachedPV := cachedPV.DeepCopy()
+		newCachedPV.ResourceVersion = pv.ResourceVersion
+		if !reflect.DeepEqual(newCachedPV, pv) {
 			t.Errorf("Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pv, cachedPV))
 		}
 	}
@@ -496,7 +495,10 @@ func (env *testEnv) validateProvision(
 		if err != nil {
 			t.Errorf("Test %q failed: GetPVC %q returned error: %v", name, getPVCName(pvc), err)
 		}
-		if !reflect.DeepEqual(cachedPVC, pvc) {
+		// Cache may be overridden by API object with higher version, compare but ignore resource version.
+		newCachedPVC := cachedPVC.DeepCopy()
+		newCachedPVC.ResourceVersion = pvc.ResourceVersion
+		if !reflect.DeepEqual(newCachedPVC, pvc) {
 			t.Errorf("Test %q failed: cached PVC check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pvc, cachedPVC))
 		}
 	}

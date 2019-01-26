@@ -50,7 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = ["apply_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
         "//test/fixtures",
     ],
     embed = [":go_default_library"],

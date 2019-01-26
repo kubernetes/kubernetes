@@ -49,6 +49,10 @@ var (
 	queueClosed = "scheduling queue is closed"
 )
 
+// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
+// the pod will be moved from unschedulableQ to activeQ.
+const unschedulableQTimeInterval = 60 * time.Second
+
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
@@ -279,6 +283,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 // run starts the goroutine to pump from podBackoffQ to activeQ
 func (p *PriorityQueue) run() {
 	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, p.stop)
+	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, p.stop)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -371,7 +376,7 @@ func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
 // queue. If pod is unschedulable, it adds pod to unschedulable queue if
 // p.receivedMoveRequest is false or to backoff queue if p.receivedMoveRequest
 // is true but pod is subject to backoff. In other cases, it adds pod to active
-// queue.
+// queue and clears p.receivedMoveRequest.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -407,6 +412,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 		p.nominatedPods.add(pod, "")
 		p.cond.Broadcast()
 	}
+	p.receivedMoveRequest = false
 	return err
 }
 
@@ -443,9 +449,28 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 	}
 }
 
+// flushUnschedulableQLeftover moves pod which stays in unschedulableQ longer than the durationStayUnschedulableQ
+// to activeQ.
+func (p *PriorityQueue) flushUnschedulableQLeftover() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	var podsToMove []*v1.Pod
+	currentTime := p.clock.Now()
+	for _, pod := range p.unschedulableQ.pods {
+		lastScheduleTime := podTimestamp(pod)
+		if !lastScheduleTime.IsZero() && currentTime.Sub(lastScheduleTime.Time) > unschedulableQTimeInterval {
+			podsToMove = append(podsToMove, pod)
+		}
+	}
+
+	if len(podsToMove) > 0 {
+		p.movePodsToActiveQueue(podsToMove)
+	}
+}
+
 // Pop removes the head of the active queue and returns it. It blocks if the
-// activeQ is empty and waits until a new item is added to the queue. It also
-// clears receivedMoveRequest to mark the beginning of a new scheduling cycle.
+// activeQ is empty and waits until a new item is added to the queue.
 func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -463,7 +488,6 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 		return nil, err
 	}
 	pod := obj.(*v1.Pod)
-	p.receivedMoveRequest = false
 	return pod, err
 }
 

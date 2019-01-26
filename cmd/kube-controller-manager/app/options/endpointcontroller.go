@@ -24,7 +24,7 @@ import (
 
 // EndpointControllerOptions holds the EndPointController options.
 type EndpointControllerOptions struct {
-	ConcurrentEndpointSyncs int32
+	*kubectrlmgrconfig.EndpointControllerConfiguration
 }
 
 // AddFlags adds flags related to EndPointController for controller manager to the specified FlagSet.

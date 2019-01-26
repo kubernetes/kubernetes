@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -88,7 +88,7 @@ func assertDirEmpty(t *testing.T, path string) {
 func TestNewReset(t *testing.T) {
 	var in io.Reader
 	certsDir := kubeadmapiv1beta1.DefaultCertificatesDir
-	criSocketPath := kubeadmapiv1beta1.DefaultCRISocket
+	criSocketPath := kubeadmconstants.DefaultDockerCRISocket
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}

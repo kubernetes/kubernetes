@@ -80,6 +80,10 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
 
+func (plugin *azureFilePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *azureFilePlugin) RequiresRemount() bool {
 	return false
 }

@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh/terminal"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,8 +74,10 @@ func newCache() *cache {
 	return &cache{m: make(map[string]*Authenticator)}
 }
 
+var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
+
 func cacheKey(c *api.ExecConfig) string {
-	return fmt.Sprintf("%#v", c)
+	return spewConfig.Sprint(c)
 }
 
 type cache struct {

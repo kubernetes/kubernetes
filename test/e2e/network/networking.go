@@ -66,7 +66,7 @@ var _ = SIGDescribe("Networking", func() {
 			{path: "/api"},
 			{path: "/apis"},
 			{path: "/metrics"},
-			{path: "/swaggerapi"},
+			{path: "/openapi/v2"},
 			{path: "/version"},
 			// TODO: test proxy links here
 		}

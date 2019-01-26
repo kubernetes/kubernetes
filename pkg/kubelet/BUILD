@@ -140,7 +140,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//staging/src/k8s.io/client-go/util/integer:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
@@ -150,6 +149,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/integer:go_default_library",
     ],
 )
 

@@ -286,7 +286,9 @@ func (b *backend) updateSink(oldSink, newSink *auditregv1alpha1.AuditSink) {
 		delete(delegates, oldSink.UID)
 		delegates[newSink.UID] = d
 		b.setDelegates(delegates)
-		oldDelegate.gracefulShutdown()
+
+		// graceful shutdown in goroutine as to not block
+		go oldDelegate.gracefulShutdown()
 	}
 
 	klog.V(2).Infof("Updated audit sink: %s", newSink.Name)
@@ -305,7 +307,9 @@ func (b *backend) deleteSink(sink *auditregv1alpha1.AuditSink) {
 	}
 	delete(delegates, sink.UID)
 	b.setDelegates(delegates)
-	delegate.gracefulShutdown()
+
+	// graceful shutdown in goroutine as to not block
+	go delegate.gracefulShutdown()
 	klog.V(2).Infof("Deleted audit sink: %s", sink.Name)
 	klog.V(2).Infof("Current audit sinks: %v", delegates.Names())
 }

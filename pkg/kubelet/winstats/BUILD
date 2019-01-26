@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "network_stats.go",
         "perfcounter_nodestats.go",
         "perfcounters.go",
         "version.go",
