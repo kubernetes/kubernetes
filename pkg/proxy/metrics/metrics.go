@@ -30,8 +30,18 @@ var (
 	SyncProxyRulesLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: kubeProxySubsystem,
+			Name:      "sync_proxy_rules_latency_seconds",
+			Help:      "SyncProxyRules latency in seconds",
+			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
+		},
+	)
+
+	// DeprecatedSyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
+	DeprecatedSyncProxyRulesLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Subsystem: kubeProxySubsystem,
 			Name:      "sync_proxy_rules_latency_microseconds",
-			Help:      "SyncProxyRules latency",
+			Help:      "(Deprecated) SyncProxyRules latency in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -43,10 +53,16 @@ var registerMetricsOnce sync.Once
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
+		prometheus.MustRegister(DeprecatedSyncProxyRulesLatency)
 	})
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+// SinceInSeconds gets the time since the specified start in seconds.
+func SinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }
