@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 
 	"net/http"
 	"os"

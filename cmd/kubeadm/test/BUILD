@@ -16,7 +16,7 @@ go_library(
         "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
+        "//vendor/github.com/lithammer/dedent:go_default_library",
     ],
 )
 

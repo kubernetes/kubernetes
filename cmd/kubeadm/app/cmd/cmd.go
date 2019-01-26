@@ -19,7 +19,7 @@ package cmd
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha"
