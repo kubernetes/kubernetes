@@ -129,7 +129,7 @@ func isSysFSWritable() (bool, error) {
 		return false, errReadOnlySysFS
 	}
 
-	return false, errors.New("No sysfs mounted")
+	return false, errors.New("no sysfs mounted")
 }
 
 func readIntStringFile(filename string) (int, error) {
