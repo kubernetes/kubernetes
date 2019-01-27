@@ -1,5 +1,8 @@
 startup --expand_configs_in_place
 
+# don't error on error on deprecated native http_archive rule
+build --incompatible_remove_native_http_archive=false
+
 # Show us information about failures.
 build --verbose_failures
 test --test_output=errors
