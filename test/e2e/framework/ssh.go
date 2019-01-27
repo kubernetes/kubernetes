@@ -239,27 +239,12 @@ func LogSSHResult(result SSHResult) {
 }
 
 func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult, error) {
-	Logf("Getting external IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
-		}
+	host, err := GetNodeExternalIP(node)
+	if err != nil {
+		host, err = GetNodeInternalIP(node)
 	}
-
 	if host == "" {
-		// No external IPs were found, let's try to use internal as plan B
-		for _, a := range node.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				host = net.JoinHostPort(a.Address, sshPort)
-				break
-			}
-		}
-	}
-
-	if host == "" {
-		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
+		return nil, fmt.Errorf("couldn't find any IP address for node %s with addresses: %v", node.Name, node.Status.Addresses)
 	}
 
 	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
