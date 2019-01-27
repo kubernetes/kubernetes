@@ -463,6 +463,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
 	//TODO make config struct use int instead of int32?
+	// https://github.com/kubernetes/kubernetes/issues/73375
 	kubeConfig.Burst = int(config.Burst)
 
 	client, err := clientset.NewForConfig(kubeConfig)
