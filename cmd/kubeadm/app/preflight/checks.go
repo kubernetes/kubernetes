@@ -946,27 +946,21 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
 
-	addIPv6Checks := false
 	if cfg.Discovery.BootstrapToken != nil {
 		ipstr, _, err := net.SplitHostPort(cfg.Discovery.BootstrapToken.APIServerEndpoint)
-		if err == nil {
-			checks = append(checks,
-				HTTPProxyCheck{Proto: "https", Host: ipstr},
-			)
-			if !addIPv6Checks {
-				if ip := net.ParseIP(ipstr); ip != nil {
-					if ip.To4() == nil && ip.To16() != nil {
-						addIPv6Checks = true
-					}
-				}
+		if err != nil {
+			fmt.Printf("[preflight] WARNING: Couldn't split host and port: %v\n", err)
+			return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+		}
+		checks = append(checks, HTTPProxyCheck{Proto: "https", Host: ipstr})
+		// add ipv6 checks if needed
+		if ip := net.ParseIP(ipstr); ip != nil {
+			if ip.To4() == nil && ip.To16() != nil {
+				checks = append(checks, FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+				)
 			}
 		}
-	}
-	if addIPv6Checks {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-		)
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -978,9 +972,7 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.I
 
 	// Check ipvs required kernel module if we use ipvs kube-proxy mode
 	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks,
-			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-		)
+		checks = append(checks, ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -1077,16 +1069,18 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 			found = append(found, checkErrors{Name: name, Errors: errs})
 		}
 	}
-	if len(found) > 0 {
-		var errs bytes.Buffer
-		for _, c := range found {
-			for _, i := range c.Errors {
-				errs.WriteString(fmt.Sprintf("\t[ERROR %s]: %v\n", c.Name, i.Error()))
-			}
-		}
-		return &Error{Msg: errs.String()}
+
+	if len(found) == 0 {
+		return nil
 	}
-	return nil
+	// if we land here we have found some errors
+	var errs bytes.Buffer
+	for _, c := range found {
+		for _, i := range c.Errors {
+			errs.WriteString(fmt.Sprintf("\t[ERROR %s]: %v\n", c.Name, i.Error()))
+		}
+	}
+	return &Error{Msg: errs.String()}
 }
 
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
