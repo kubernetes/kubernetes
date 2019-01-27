@@ -63,12 +63,12 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/naming:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/github.com/modern-go/reflect2:go_default_library",
     ],
 )
 

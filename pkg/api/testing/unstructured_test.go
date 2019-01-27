@@ -17,6 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -29,8 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -114,10 +120,55 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 		return
 	}
 
-	if !apiequality.Semantic.DeepEqual(item, newObj) {
+	if !unstructuredEqualities.DeepEqual(item, newObj) {
+		other, _ := json.Marshal(newObj)
+		t.Logf("data:\n%s\nother:\n%s", string(data), string(other))
 		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
 	}
 }
+
+// unstructuredEqualities has a special case for comparing runtime.RawExtension
+// that allows the serialization to have different orderings.
+var unstructuredEqualities = conversion.EqualitiesOrDie(
+	// If the Raw marshalled ordering is identical, that's sufficient.
+	func(a, b runtime.RawExtension) bool {
+		if reflect.DeepEqual(a, b) {
+			return true
+		}
+		if bytes.Equal(a.Raw, b.Raw) {
+			return true
+		}
+		var ai, bi interface{}
+		if err := json.Unmarshal(a.Raw, &ai); err != nil {
+			return false
+		}
+		if err := json.Unmarshal(b.Raw, &bi); err != nil {
+			return false
+		}
+		return reflect.DeepEqual(ai, bi)
+	},
+	// Keep the below equivalent to apiequality.Semantic
+	//
+	func(a, b resource.Quantity) bool {
+		// Ignore formatting, only care that numeric value stayed the same.
+		// TODO: if we decide it's important, it should be safe to start comparing the format.
+		//
+		// Uninitialized quantities are equivalent to 0 quantities.
+		return a.Cmp(b) == 0
+	},
+	func(a, b metav1.MicroTime) bool {
+		return a.UTC() == b.UTC()
+	},
+	func(a, b metav1.Time) bool {
+		return a.UTC() == b.UTC()
+	},
+	func(a, b labels.Selector) bool {
+		return a.String() == b.String()
+	},
+	func(a, b fields.Selector) bool {
+		return a.String() == b.String()
+	},
+)
 
 func TestRoundTrip(t *testing.T) {
 	for groupKey, group := range testapi.Groups {
@@ -125,13 +176,14 @@ func TestRoundTrip(t *testing.T) {
 			if nonRoundTrippableTypes.Has(kind) {
 				continue
 			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
-			for i := 0; i < 50; i++ {
-				doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
-				if t.Failed() {
-					break
+			t.Run(fmt.Sprintf("%s %s", kind, groupKey), func(t *testing.T) {
+				for i := 0; i < 50; i++ {
+					doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
+					if t.Failed() {
+						break
+					}
 				}
-			}
+			})
 		}
 	}
 }

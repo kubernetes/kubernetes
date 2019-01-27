@@ -44,6 +44,42 @@ var simpleEquality = conversion.EqualitiesOrDie(
 	},
 )
 
+var allowedUnstructuredEquality = conversion.EqualitiesOrDie(
+	// allow floats to be converted to ints as long as they are equal
+	func(a, b []interface{}) bool {
+		if reflect.DeepEqual(a, b) {
+			return true
+		}
+		if len(a) != len(b) {
+			return false
+		}
+		for i := range a {
+			if reflect.DeepEqual(a[i], b[i]) {
+				continue
+			}
+			switch at := a[i].(type) {
+			case float64:
+				switch bt := b[i].(type) {
+				case int64:
+					return at == float64(bt)
+				default:
+					return false
+				}
+			case int64:
+				switch bt := b[i].(type) {
+				case float64:
+					return float64(at) == bt
+				default:
+					return false
+				}
+			default:
+				return false
+			}
+		}
+		return false
+	},
+)
+
 // Define a number of test types.
 type A struct {
 	A int    `json:"aa,omitempty"`
@@ -115,7 +151,7 @@ func (c *CustomPointer) MarshalJSON() ([]byte, error) {
 	return c.data, nil
 }
 
-func doRoundTrip(t *testing.T, item interface{}) {
+func doRoundTrip(t *testing.T, item interface{}, allowVariant interface{}) {
 	data, err := json.Marshal(item)
 	if err != nil {
 		t.Errorf("Error when marshaling object: %v", err)
@@ -145,7 +181,6 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 
-	// TODO: should be using mismatch detection but fails due to another error
 	newUnstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
@@ -153,21 +188,29 @@ func doRoundTrip(t *testing.T, item interface{}) {
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(newUnstr, newObj)
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
 	}
 
-	if !reflect.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+	if !allowedUnstructuredEquality.DeepEqual(item, newObj) {
+		switch {
+		case allowVariant == nil:
+			t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		case !allowedUnstructuredEquality.DeepEqual(allowVariant, newObj):
+			t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(allowVariant, newObj))
+		default:
+			t.Logf("did not match object, but variant matched")
+		}
 	}
 }
 
 func TestRoundTrip(t *testing.T) {
 	intVal := int64(42)
 	testCases := []struct {
-		obj interface{}
+		obj         interface{}
+		allowChange interface{}
 	}{
 		{
 			obj: &unstructured.UnstructuredList{
@@ -217,6 +260,14 @@ func TestRoundTrip(t *testing.T) {
 			obj: &C{
 				C: "ccc",
 			},
+			// an object C with map B.C that is not empty is allowed to initialize C to non-nil
+			allowChange: &C{
+				C: "ccc",
+				B: B{
+					C: map[string]string{},
+				},
+				E: map[string]int{},
+			},
 		},
 		{
 			// This (among others) tests empty map and slice.
@@ -225,6 +276,17 @@ func TestRoundTrip(t *testing.T) {
 				C: "ccc",
 				E: map[string]int{},
 				I: []interface{}{},
+			},
+			// an object C with map B.C that is not empty is allowed to initialize C to non-nil
+			allowChange: &C{
+				A: []A{},
+				C: "ccc",
+				E: map[string]int{},
+				I: []interface{}{},
+
+				B: B{
+					C: map[string]string{},
+				},
 			},
 		},
 		{
@@ -281,7 +343,7 @@ func TestRoundTrip(t *testing.T) {
 
 	for i := range testCases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			doRoundTrip(t, testCases[i].obj)
+			doRoundTrip(t, testCases[i].obj, testCases[i].allowChange)
 		})
 	}
 }
@@ -305,12 +367,12 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, newObj)
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
 
-	if expectedErr == nil && !reflect.DeepEqual(unmarshalledObj, newObj) {
+	if expectedErr == nil && !allowedUnstructuredEquality.DeepEqual(unmarshalledObj, newObj) {
 		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
 	}
 }
@@ -526,7 +588,7 @@ func TestFloatIntConversion(t *testing.T) {
 	unstr := map[string]interface{}{"fd": float64(3)}
 
 	var obj F
-	if err := runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, &obj); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr, &obj); err != nil {
 		t.Errorf("Unexpected error in FromUnstructured: %v", err)
 	}
 
@@ -564,7 +626,7 @@ func TestCustomToUnstructured(t *testing.T) {
 		tc := tc
 		t.Run(tc.Data, func(t *testing.T) {
 			t.Parallel()
-			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(&G{
+			result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&G{
 				CustomValue1:   CustomValue{data: []byte(tc.Data)},
 				CustomValue2:   &CustomValue{data: []byte(tc.Data)},
 				CustomPointer1: CustomPointer{data: []byte(tc.Data)},
@@ -589,7 +651,7 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 		obj := obj
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
-			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(obj)
+			result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 			require.NoError(t, err)
 			assert.Equal(t, expected, result)
 		})

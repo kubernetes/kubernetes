@@ -442,7 +442,7 @@ run_pod_tests() {
 
   ## Patch fails with type restore error and exit code 1
   output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":"invalid"}}' 2>&1)
-  kube::test::if_has_string "${output_message}" 'cannot restore map from string'
+  kube::test::if_has_string "${output_message}" 'ReadMapCB: expect { or n, but found "'
 
   ## Patch exits with error message "patched (no change)" and exit code 0 when no-op occurs
   output_message=$(kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":{"name":"valid-pod"}}}' 2>&1)
