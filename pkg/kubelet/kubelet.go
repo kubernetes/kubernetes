@@ -239,26 +239,27 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
-	Auth                    server.AuthInterface
-	CAdvisorInterface       cadvisor.Interface
-	Cloud                   cloudprovider.Interface
-	ContainerManager        cm.ContainerManager
-	DockerClientConfig      *dockershim.ClientConfig
-	EventClient             v1core.EventsGetter
-	HeartbeatClient         clientset.Interface
-	OnHeartbeatFailure      func()
-	KubeClient              clientset.Interface
-	CSIClient               csiclientset.Interface
-	DynamicKubeClient       dynamic.Interface
-	Mounter                 mount.Interface
-	OOMAdjuster             *oom.OOMAdjuster
-	OSInterface             kubecontainer.OSInterface
-	PodConfig               *config.PodConfig
-	Recorder                record.EventRecorder
-	VolumePlugins           []volume.VolumePlugin
-	DynamicPluginProber     volume.DynamicPluginProber
-	TLSOptions              *server.TLSOptions
-	KubeletConfigController *kubeletconfig.Controller
+	Auth                         server.AuthInterface
+	CAdvisorInterface            cadvisor.Interface
+	Cloud                        cloudprovider.Interface
+	ContainerManager             cm.ContainerManager
+	DockerClientConfig           *dockershim.ClientConfig
+	EventClient                  v1core.EventsGetter
+	HeartbeatClient              clientset.Interface
+	OnHeartbeatFailure           func()
+	KubeClient                   clientset.Interface
+	CSIClient                    csiclientset.Interface
+	DynamicKubeClient            dynamic.Interface
+	Mounter                      mount.Interface
+	OOMAdjuster                  *oom.OOMAdjuster
+	OSInterface                  kubecontainer.OSInterface
+	PodConfig                    *config.PodConfig
+	Recorder                     record.EventRecorder
+	VolumePlugins                []volume.VolumePlugin
+	DynamicPluginProber          volume.DynamicPluginProber
+	TLSOptions                   *server.TLSOptions
+	KubeletConfigController      *kubeletconfig.Controller
+	ExternalRuntimeHealthChecker []RuntimeHealthChecker
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -719,6 +720,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
+	for _, checker := range kubeDeps.ExternalRuntimeHealthChecker {
+		klet.runtimeState.addHealthCheck(checker.Name(), checker.Healthy)
+	}
+
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {
 		klog.Errorf("Pod CIDR update failed %v", err)
 	}
