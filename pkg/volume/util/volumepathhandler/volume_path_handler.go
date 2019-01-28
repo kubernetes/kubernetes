@@ -144,16 +144,16 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 }
 
 // IsSymlinkExist returns true if specified file exists and the type is symbolik link.
-// If file doesn't exist, or file exists but not symbolick link, return false with no error.
+// If file doesn't exist, or file exists but not symbolic link, return false with no error.
 // On other cases, return false with error from Lstat().
 func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	fi, err := os.Lstat(mapPath)
 	if err == nil {
-		// If file exits and it's symbolick link, return true and no error
+		// If file exits and it's symbolic link, return true and no error
 		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return true, nil
 		}
-		// If file exits but it's not symbolick link, return fale and no error
+		// If file exits but it's not symbolic link, return fale and no error
 		return false, nil
 	}
 	// If file doesn't exist, return false and no error
