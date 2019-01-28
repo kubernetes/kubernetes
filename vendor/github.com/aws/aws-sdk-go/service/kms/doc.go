@@ -9,7 +9,7 @@
 // Management Service Developer Guide (http://docs.aws.amazon.com/kms/latest/developerguide/).
 //
 // AWS provides SDKs that consist of libraries and sample code for various programming
-// languages and platforms (Java, Ruby, .Net, iOS, Android, etc.). The SDKs
+// languages and platforms (Java, Ruby, .Net, macOS, Android, etc.). The SDKs
 // provide a convenient way to create programmatic access to AWS KMS and other
 // AWS services. For example, the SDKs take care of tasks such as signing requests
 // (see below), managing errors, and retrying requests automatically. For more
@@ -50,8 +50,8 @@
 // For more information about credentials and request signing, see the following:
 //
 //    * AWS Security Credentials (http://docs.aws.amazon.com/general/latest/gr/aws-security-credentials.html)
-//    - This topic provides general information about the types of credentials
-//    used for accessing AWS.
+//    - This topic provides general information about the of credentials used
+//    for accessing AWS.
 //
 //    * Temporary Security Credentials (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html)
 //    - This section of the IAM User Guide describes how to create and use temporary
