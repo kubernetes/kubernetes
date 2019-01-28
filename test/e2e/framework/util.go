@@ -4894,8 +4894,10 @@ func GetNodeExternalIP(node *v1.Node) (string, error) {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
+			if a.Address != "" {
+				host = net.JoinHostPort(a.Address, sshPort)
+				break
+			}
 		}
 	}
 	if host == "" {
