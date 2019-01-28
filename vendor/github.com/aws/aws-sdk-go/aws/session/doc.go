@@ -99,7 +99,7 @@ handler logs every request and its payload made by a service client:
 
 	sess.Handlers.Send.PushFront(func(r *request.Request) {
 		// Log every request made and its payload
-		logger.Println("Request: %s/%s, Payload: %s",
+		logger.Printf("Request: %s/%s, Payload: %s",
 			r.ClientInfo.ServiceName, r.Operation, r.Params)
 	})
 
@@ -128,7 +128,7 @@ read. The Session will be created from configuration values from the shared
 credentials file (~/.aws/credentials) over those in the shared config file (~/.aws/config).
 
 Credentials are the values the SDK should use for authenticating requests with
-AWS Services. They arfrom a configuration file will need to include both
+AWS Services. They are from a configuration file will need to include both
 aws_access_key_id and aws_secret_access_key must be provided together in the
 same file to be considered valid. The values will be ignored if not a complete
 group. aws_session_token is an optional field that can be provided if both of
@@ -183,7 +183,7 @@ be returned when creating the session.
     // from assumed role.
     svc := s3.New(sess)
 
-To setup assume role outside of a session see the stscrds.AssumeRoleProvider
+To setup assume role outside of a session see the stscreds.AssumeRoleProvider
 documentation.
 
 Environment Variables
