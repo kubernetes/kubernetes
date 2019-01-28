@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
@@ -114,7 +115,10 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	manager = f.buildManagerInfo(manager)
+	manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
+	}
 
 	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
@@ -153,8 +157,13 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
+	manager, err := f.buildManagerInfo(applyManager, metav1.ManagedFieldsOperationApply)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
+	}
+
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
+	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
 			return nil, errors.NewApplyConflict(conflicts)
@@ -192,10 +201,15 @@ func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error)
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
 }
 
-func (f *FieldManager) buildManagerInfo(prefix string) string {
-	timestamp := time.Now().UTC().Format(time.RFC3339)
-	if prefix == "" {
-		prefix = "unknown"
+func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
+	managerInfo := metav1.ManagedFieldsEntry{
+		Manager:    prefix,
+		Operation:  operation,
+		APIVersion: f.groupVersion.String(),
+		Time:       time.Now().UTC().Format(time.RFC3339),
 	}
-	return fmt.Sprintf("%s-%s@%s", prefix, f.groupVersion.String(), timestamp)
+	if managerInfo.Manager == "" {
+		managerInfo.Manager = "unknown"
+	}
+	return internal.DecodeManager(&managerInfo)
 }
