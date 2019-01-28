@@ -45,18 +45,19 @@ type TestSuite interface {
 
 // TestSuiteInfo represents a set of parameters for TestSuite
 type TestSuiteInfo struct {
-	name         string                     // name of the TestSuite
-	featureTag   string                     // featureTag for the TestSuite
-	testPatterns []testpatterns.TestPattern // Slice of TestPattern for the TestSuite
+	name               string                     // name of the TestSuite
+	featureTag         string                     // featureTag for the TestSuite
+	testPatterns       []testpatterns.TestPattern // Slice of TestPattern for the TestSuite
+	supportedSizeRange framework.SizeRange        // Size range supported by the test suite
 }
 
 // TestResource represents an interface for resources that is used by TestSuite
 type TestResource interface {
 	// setupResource sets up test resources to be used for the tests with the
-	// combination of TestDriver and TestPattern
-	setupResource(TestDriver, testpatterns.TestPattern)
+	// combination of TestDriver and TestPattern and the supported size range
+	setupResource(TestDriver, testpatterns.TestPattern, framework.SizeRange)
 	// cleanupResource clean up the test resources created in SetupResource
-	cleanupResource(TestDriver, testpatterns.TestPattern)
+	cleanupResource(TestDriver, testpatterns.TestPattern, framework.SizeRange)
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
@@ -133,7 +134,7 @@ type genericVolumeTestResource struct {
 var _ TestResource = &genericVolumeTestResource{}
 
 // setupResource sets up genericVolumeTestResource
-func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
+func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern, suppSizeRange framework.SizeRange) {
 	r.driver = driver
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Config.Framework
@@ -163,7 +164,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSizeRange())
+			claimSize := getSizeRangesIntersection(suppSizeRange, dDriver.GetClaimSizeRange())
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)

@@ -53,6 +53,10 @@ func InitVolumeModeTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
+			supportedSizeRange: framework.SizeRange{
+				Min: "1Mi",
+				Max: "10Gi",
+			},
 		},
 	}
 }
@@ -123,7 +127,7 @@ func (t *volumeModeTestSuite) execTest(driver TestDriver, pattern testpatterns.T
 
 			// Setup test resource for driver and testpattern
 			resource = volumeModeTestResource{}
-			resource.setupResource(driver, pattern)
+			resource.setupResource(driver, pattern, t.getTestSuiteInfo().supportedSizeRange)
 
 			// Create test input
 			input = createVolumeModeTestInput(pattern, resource)
@@ -151,7 +155,7 @@ type volumeModeTestResource struct {
 
 var _ TestResource = &volumeModeTestResource{}
 
-func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern, suppSizeRange framework.SizeRange) {
 	s.driver = driver
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Config.Framework
@@ -195,7 +199,7 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 			}
 			s.sc.VolumeBindingMode = &volBindMode
 
-			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSizeRange())
+			claimSize := getSizeRangesIntersection(suppSizeRange, dDriver.GetClaimSizeRange())
 			s.pvc = getClaim(claimSize, ns.Name)
 			s.pvc.Spec.StorageClassName = &s.sc.Name
 			s.pvc.Spec.VolumeMode = &volMode

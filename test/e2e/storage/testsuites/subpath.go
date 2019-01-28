@@ -63,6 +63,10 @@ func InitSubPathTestSuite() TestSuite {
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
 			},
+			supportedSizeRange: framework.SizeRange{
+				Min: "1Mi",
+				Max: "10Gi",
+			},
 		},
 	}
 }
@@ -110,7 +114,7 @@ func (s *subPathTestSuite) execTest(driver TestDriver, pattern testpatterns.Test
 
 			// Setup test resource for driver and testpattern
 			resource = subPathTestResource{}
-			resource.setupResource(driver, pattern)
+			resource.setupResource(driver, pattern, s.getTestSuiteInfo().supportedSizeRange)
 
 			// Create test input
 			input = createSubPathTestInput(pattern, resource)
@@ -136,7 +140,7 @@ type subPathTestResource struct {
 
 var _ TestResource = &subPathTestResource{}
 
-func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern, suppSizeRange framework.SizeRange) {
 	s.driver = driver
 	dInfo := s.driver.GetDriverInfo()
 	f := dInfo.Config.Framework
@@ -144,7 +148,7 @@ func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatte
 	volType := pattern.VolType
 
 	// Setup generic test resource
-	s.genericVolumeTestResource.setupResource(driver, pattern)
+	s.genericVolumeTestResource.setupResource(driver, pattern, suppSizeRange)
 
 	// Setup subPath test dependent resource
 	switch volType {

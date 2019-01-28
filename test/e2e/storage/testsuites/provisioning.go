@@ -65,6 +65,10 @@ func InitProvisioningTestSuite() TestSuite {
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
 			},
+			supportedSizeRange: framework.SizeRange{
+				Min: "1Mi",
+				Max: "10Gi",
+			},
 		},
 	}
 }
@@ -76,10 +80,10 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
+func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern, suppSizeRange framework.SizeRange) (provisioningTestResource, provisioningTestInput) {
 	// Setup test resource for driver and testpattern
 	resource := provisioningTestResource{}
-	resource.setupResource(driver, pattern)
+	resource.setupResource(driver, pattern, suppSizeRange)
 
 	input := provisioningTestInput{
 		testCase: StorageClassTest{
@@ -114,7 +118,7 @@ func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns
 			needsCleanup = true
 
 			// Create test input
-			resource, input = createProvisioningTestInput(driver, pattern)
+			resource, input = createProvisioningTestInput(driver, pattern, p.getTestSuiteInfo().supportedSizeRange)
 		})
 
 		AfterEach(func() {
@@ -140,7 +144,7 @@ type provisioningTestResource struct {
 
 var _ TestResource = &provisioningTestResource{}
 
-func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern, suppSizeRange framework.SizeRange) {
 	// Setup provisioningTest resource
 	switch pattern.VolType {
 	case testpatterns.DynamicPV:
@@ -150,7 +154,7 @@ func (p *provisioningTestResource) setupResource(driver TestDriver, pattern test
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSizeRange())
+			p.claimSize = getSizeRangesIntersection(suppSizeRange, dDriver.GetClaimSizeRange())
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)

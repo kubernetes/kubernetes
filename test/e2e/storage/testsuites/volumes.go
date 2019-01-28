@@ -64,6 +64,10 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.XfsPreprovisionedPV,
 				testpatterns.XfsDynamicPV,
 			},
+			supportedSizeRange: framework.SizeRange{
+				Min: "1Mi",
+				Max: "10Gi",
+			},
 		},
 	}
 }
@@ -139,7 +143,7 @@ func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.Test
 
 			// Setup test resource for driver and testpattern
 			resource = genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
+			resource.setupResource(driver, pattern, t.getTestSuiteInfo().supportedSizeRange)
 
 			// Create test input
 			input = createVolumesTestInput(pattern, resource)
