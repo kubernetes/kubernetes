@@ -1226,8 +1226,16 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
-	runReconciler(reconciler)
+	// Start the reconciler to fill ASW.
+	stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+	go func() {
+		reconciler.Run(stopChan)
+		close(stoppedChan)
+	}()
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
+	// Stop the reconciler.
+	close(stopChan)
+	<-stoppedChan
 
 	finished := make(chan interface{})
 	fakePlugin.UnmountDeviceHook = func(mountPath string) error {
@@ -1251,6 +1259,9 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		close(finished)
 		return devicePath, nil
 	}
+
+	// Start the reconciler again.
+	go reconciler.Run(wait.NeverStop)
 
 	// 2. Delete the volume from DSW (and wait for callbacks)
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
