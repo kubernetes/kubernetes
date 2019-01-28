@@ -915,6 +915,10 @@ func (n *nodeLister) List() ([]*v1.Node, error) {
 	return n.NodeLister.List(labels.Everything())
 }
 
+func (n *nodeLister) Get(name string) (*v1.Node, error) {
+	return n.NodeLister.Get(name)
+}
+
 func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {

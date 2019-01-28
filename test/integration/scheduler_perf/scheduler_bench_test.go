@@ -221,12 +221,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	schedulerConfigFactory, finalFunc := mustSetupScheduler()
+	schedulerConfig, finalFunc, clientSet := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigFactory.GetClient()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
-		c,
+		clientSet,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},
 		"scheduler-perf-",
 	)
@@ -237,11 +236,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", numExistingPods, setupPodStrategy)
-	podCreator := testutils.NewTestPodCreator(c, config)
+	podCreator := testutils.NewTestPodCreator(clientSet, config)
 	podCreator.CreatePods()
 
 	for {
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := schedulerConfig.SchedulingQueue.PendingPods()
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -254,12 +253,12 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	b.ResetTimer()
 	config = testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", b.N, testPodStrategy)
-	podCreator = testutils.NewTestPodCreator(c, config)
+	podCreator = testutils.NewTestPodCreator(clientSet, config)
 	podCreator.CreatePods()
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := schedulerConfig.SchedulingQueue.PendingPods()
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}

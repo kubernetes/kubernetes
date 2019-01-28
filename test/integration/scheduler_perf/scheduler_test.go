@@ -101,22 +101,22 @@ func TestSchedule100Node3KPods(t *testing.T) {
 
 // testConfig contains the some input parameters needed for running test-suite
 type testConfig struct {
-	numPods                   int
-	numNodes                  int
-	mutatedNodeTemplate       *v1.Node
-	mutatedPodTemplate        *v1.Pod
-	schedulerSupportFunctions factory.Configurator
-	destroyFunc               func()
+	numPods             int
+	numNodes            int
+	mutatedNodeTemplate *v1.Node
+	mutatedPodTemplate  *v1.Pod
+	// schedulerSupportFunctions factory.Configurator
+	destroyFunc func()
 }
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
+	schedulerConfig, destroyFunc := mustSetupScheduler()
 	return &testConfig{
-		schedulerSupportFunctions: schedulerConfigFactory,
-		destroyFunc:               destroyFunc,
-		numNodes:                  nodes,
-		numPods:                   pods,
+		schedulerConfig: schedulerConfig,
+		destroyFunc:     destroyFunc,
+		numNodes:        nodes,
+		numPods:         pods,
 	}
 }
 

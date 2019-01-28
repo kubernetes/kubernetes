@@ -35,6 +35,7 @@ type NodeLister interface {
 	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
 	// performing expensive copies that are unneeded.
 	List() ([]*v1.Node, error)
+	Get(name string) (*v1.Node, error)
 }
 
 // PodFilter is a function to filter a pod. If pod passed return true else return false.

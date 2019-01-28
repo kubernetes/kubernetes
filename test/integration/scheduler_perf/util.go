@@ -32,7 +32,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (factory.Configurator, util.ShutdownFunc) {
+func mustSetupScheduler() (factory.Config, util.ShutdownFunc) {
 	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
@@ -46,5 +46,5 @@ func mustSetupScheduler() (factory.Configurator, util.ShutdownFunc) {
 		schedulerShutdown()
 		apiShutdown()
 	}
-	return schedulerConfig, shutdownFunc
+	return schedulerConfig, shutdownFunc, clientSet
 }

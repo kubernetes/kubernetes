@@ -32,12 +32,12 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
+type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister algorithm.NodeLister, c clientset.Interface)
 
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
@@ -280,7 +280,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	context := initTest(t, "unschedulable-nodes")
 	defer cleanupTest(t, context)
 
-	nodeLister := context.schedulerConfigFactory.GetNodeLister()
+	nodeLister := context.schedulerConfig.NodeLister
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
 	defer context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
@@ -326,7 +326,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	nodeModifications := []nodeStateManager{
 		// Test node.Spec.Unschedulable=true/false
 		{
-			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister algorithm.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = true
 				if _, err := c.CoreV1().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
@@ -342,7 +342,7 @@ func TestUnschedulableNodes(t *testing.T) {
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=true: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
+			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister algorithm.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = false
 				if _, err := c.CoreV1().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
@@ -357,7 +357,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		},
 		// Test node.Status.Conditions=ConditionTrue/Unknown
 		{
-			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister algorithm.NodeLister, c clientset.Interface) {
 				n.Status = v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
@@ -374,7 +374,7 @@ func TestUnschedulableNodes(t *testing.T) {
 					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
+			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister algorithm.NodeLister, c clientset.Interface) {
 				n.Status = v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),

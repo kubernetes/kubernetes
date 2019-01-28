@@ -38,6 +38,11 @@ func (f FakeNodeLister) List() ([]*v1.Node, error) {
 	return f, nil
 }
 
+// List returns nodes as a []string.
+func (f FakeNodeLister) Get(name string) (*v1.Node, error) {
+	return nil, nil
+}
+
 var _ algorithm.PodLister = &FakePodLister{}
 
 // FakePodLister implements PodLister on an []v1.Pods for test purposes.

@@ -37,7 +37,6 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -45,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -56,15 +56,14 @@ import (
 )
 
 type TestContext struct {
-	closeFn                framework.CloseFunc
-	httpServer             *httptest.Server
-	ns                     *v1.Namespace
-	clientSet              *clientset.Clientset
-	informerFactory        informers.SharedInformerFactory
-	schedulerConfigFactory factory.Configurator
-	schedulerConfig        *factory.Config
-	scheduler              *scheduler.Scheduler
-	stopCh                 chan struct{}
+	closeFn         framework.CloseFunc
+	httpServer      *httptest.Server
+	ns              *v1.Namespace
+	clientSet       *clientset.Clientset
+	informerFactory informers.SharedInformerFactory
+	schedulerConfig *factory.Config
+	scheduler       *scheduler.Scheduler
+	stopCh          chan struct{}
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default
@@ -144,32 +143,15 @@ func initTestSchedulerWithOptions(
 	}
 
 	var err error
-	if policy != nil {
-		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy)
-	} else {
-		context.schedulerConfig, err = context.schedulerConfigFactory.Create()
-	}
-
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	// set DisablePreemption option
-	context.schedulerConfig.DisablePreemption = disablePreemption
 
 	// set setPodInformer if provided.
 	if setPodInformer {
-		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
-		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
-	}
-
-	// Set pluginSet if provided. DefaultPluginSet is used if this is not specified.
-	if pluginSet != nil {
-		context.schedulerConfig.PluginSet = pluginSet
+		go podInformer.Informer().Run(context.stopCh)
+		controller.WaitForCacheSync("scheduler", context.stopCh, podInformer.Informer().HasSynced)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
+	recorder := eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.EventSource{Component: v1.DefaultSchedulerName},
 	)
@@ -177,8 +159,8 @@ func initTestSchedulerWithOptions(
 		Interface: context.clientSet.CoreV1().Events(""),
 	})
 
-	context.informerFactory.Start(context.schedulerConfig.StopEverything)
-	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
+	context.informerFactory.Start(context.stopCh)
+	context.informerFactory.WaitForCacheSync(context.stopCh)
 
 	context.scheduler, err = scheduler.New(
 		context.clientSet,
@@ -192,7 +174,7 @@ func initTestSchedulerWithOptions(
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		context.informerFactory.Storage().V1().StorageClasses(),
-		context.schedulerConfig.Recorder,
+		recorder,
 		kubeschedulerconfig.SchedulerAlgorithmSource{},
 		context.stopCh,
 		scheduler.WithName(v1.DefaultSchedulerName),
@@ -204,6 +186,7 @@ func initTestSchedulerWithOptions(
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
+	context.schedulerConfig = context.scheduler.Config()
 
 	context.scheduler.Run()
 	return context
@@ -255,7 +238,7 @@ func cleanupTest(t *testing.T, context *TestContext) {
 
 // waitForReflection waits till the passFunc confirms that the object it expects
 // to see is in the store. Used to observe reflected events.
-func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string,
+func waitForReflection(t *testing.T, nodeLister algorithm.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
 	nodes := []*v1.Node{}
 	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
