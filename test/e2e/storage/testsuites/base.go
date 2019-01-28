@@ -57,7 +57,7 @@ type TestResource interface {
 	// combination of TestDriver and TestPattern and the supported size range
 	setupResource(TestDriver, testpatterns.TestPattern, framework.SizeRange)
 	// cleanupResource clean up the test resources created in SetupResource
-	cleanupResource(TestDriver, testpatterns.TestPattern, framework.SizeRange)
+	cleanupResource(TestDriver, testpatterns.TestPattern)
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
