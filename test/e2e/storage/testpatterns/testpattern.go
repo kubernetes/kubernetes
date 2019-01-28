@@ -47,12 +47,11 @@ var (
 
 // TestPattern represents a combination of parameters to be tested in a TestSuite
 type TestPattern struct {
-	Name               string      // Name of TestPattern
-	FeatureTag         string      // featureTag for the TestSuite
-	VolType            TestVolType // Volume type of the volume
-	FsType             string      // Fstype of the volume
-	SupportedSizeRange framework.SizeRange
-	VolMode            v1.PersistentVolumeMode // PersistentVolumeMode of the volume
+	Name       string                  // Name of TestPattern
+	FeatureTag string                  // featureTag for the TestSuite
+	VolType    TestVolType             // Volume type of the volume
+	FsType     string                  // Fstype of the volume
+	VolMode    v1.PersistentVolumeMode // PersistentVolumeMode of the volume
 }
 
 var (
@@ -62,28 +61,16 @@ var (
 	DefaultFsInlineVolume = TestPattern{
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
 	DefaultFsPreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (default fs)",
 		VolType: PreprovisionedPV,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
 	DefaultFsDynamicPV = TestPattern{
 		Name:    "Dynamic PV (default fs)",
 		VolType: DynamicPV,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 
 	// Definitions for ext3
@@ -93,30 +80,18 @@ var (
 		Name:    "Inline-volume (ext3)",
 		VolType: InlineVolume,
 		FsType:  "ext3",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// Ext3PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext3)"
 	Ext3PreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (ext3)",
 		VolType: PreprovisionedPV,
 		FsType:  "ext3",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// Ext3DynamicPV is TestPattern for "Dynamic PV (ext3)"
 	Ext3DynamicPV = TestPattern{
 		Name:    "Dynamic PV (ext3)",
 		VolType: DynamicPV,
 		FsType:  "ext3",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 
 	// Definitions for ext4
@@ -126,30 +101,18 @@ var (
 		Name:    "Inline-volume (ext4)",
 		VolType: InlineVolume,
 		FsType:  "ext4",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
 	Ext4PreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (ext4)",
 		VolType: PreprovisionedPV,
 		FsType:  "ext4",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// Ext4DynamicPV is TestPattern for "Dynamic PV (ext4)"
 	Ext4DynamicPV = TestPattern{
 		Name:    "Dynamic PV (ext4)",
 		VolType: DynamicPV,
 		FsType:  "ext4",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 
 	// Definitions for xfs
@@ -159,30 +122,18 @@ var (
 		Name:    "Inline-volume (xfs)",
 		VolType: InlineVolume,
 		FsType:  "xfs",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// XfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (xfs)"
 	XfsPreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (xfs)",
 		VolType: PreprovisionedPV,
 		FsType:  "xfs",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// XfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
 	XfsDynamicPV = TestPattern{
 		Name:    "Dynamic PV (xfs)",
 		VolType: DynamicPV,
 		FsType:  "xfs",
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 
 	// Definitions for Filesystem volume mode
@@ -192,20 +143,12 @@ var (
 		Name:    "Pre-provisioned PV (filesystem volmode)",
 		VolType: PreprovisionedPV,
 		VolMode: v1.PersistentVolumeFilesystem,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// FsVolModeDynamicPV is TestPattern for "Dynamic PV (filesystem)"
 	FsVolModeDynamicPV = TestPattern{
 		Name:    "Dynamic PV (filesystem volmode)",
 		VolType: DynamicPV,
 		VolMode: v1.PersistentVolumeFilesystem,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 
 	// Definitions for block volume mode
@@ -215,19 +158,11 @@ var (
 		Name:    "Pre-provisioned PV (block volmode)",
 		VolType: PreprovisionedPV,
 		VolMode: v1.PersistentVolumeBlock,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)(immediate bind)"
 	BlockVolModeDynamicPV = TestPattern{
 		Name:    "Dynamic PV (block volmode)",
 		VolType: DynamicPV,
 		VolMode: v1.PersistentVolumeBlock,
-		SupportedSizeRange: framework.SizeRange{
-			Min: "1Mi",
-			Max: "10Gi",
-		},
 	}
 )
