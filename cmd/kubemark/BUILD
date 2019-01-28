@@ -28,6 +28,7 @@ go_library(
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
