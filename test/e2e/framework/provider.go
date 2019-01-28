@@ -45,6 +45,17 @@ func RegisterProvider(name string, factory Factory) {
 	providers[name] = factory
 }
 
+// GetProviders returns the names of all currently registered providers.
+func GetProviders() []string {
+	mutex.Lock()
+	defer mutex.Unlock()
+	var providerNames []string
+	for name := range providers {
+		providerNames = append(providerNames, name)
+	}
+	return providerNames
+}
+
 func init() {
 	// "local" or "skeleton" can always be used.
 	RegisterProvider("local", func() (ProviderInterface, error) {
