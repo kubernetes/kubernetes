@@ -27,13 +27,13 @@ run_kubectl_apply_tests() {
   kube::log::status "Testing kubectl apply"
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command: apply a pod "test-pod" (doesn't exist) should create this pod
-  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
   # Post-Condition: pod "test-pod" is created
-  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
   # Post-Condition: pod "test-pod" has configuration annotation
-  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep -q kubectl.kubernetes.io/last-applied-configuration
   # Clean up
   kubectl delete pods test-pod "${kube_flags[@]}"
 
@@ -46,18 +46,18 @@ run_kubectl_apply_tests() {
   # Post-Condition: deployment "test-deployment-retainkeys" created
   kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}{{end}}" 'test-deployment-retainkeys'
   # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxSurge)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxUnavailable)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q RollingUpdate
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q maxSurge
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q maxUnavailable
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q emptyDir
   # Command: apply a deployment "test-deployment-retainkeys" should clear
   # defaulted fields and successfully update the deployment
   [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]}")" ]]
   # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep Recreate)" ]]
-  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
-  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep hostPath)" ]]
-  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q Recreate
+  ! kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q RollingUpdate
+  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q hostPath
+  ! kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep -q emptyDir
   # Clean up
   kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]}"
 
@@ -95,7 +95,7 @@ run_kubectl_apply_tests() {
 
   ## kubectl apply dry-run on CR
   # Create CRD
-  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+  kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
   "apiVersion": "apiextensions.k8s.io/v1beta1",
