@@ -30,7 +30,7 @@ set -o pipefail
   k8s.io/code-generator/_examples/crd k8s.io/code-generator/_examples/crd/apis \
   "example:v1 example2:v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.."
-  "$(dirname "${BASH_SOURCE[0]}")"/../generate-groups.sh all \
+"$(dirname "${BASH_SOURCE[0]}")"/../generate-groups.sh all \
   k8s.io/code-generator/_examples/MixedCase k8s.io/code-generator/_examples/MixedCase/apis \
   "example:v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.."
