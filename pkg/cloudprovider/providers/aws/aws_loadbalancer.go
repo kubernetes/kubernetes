@@ -68,6 +68,9 @@ type nlbPortMapping struct {
 	HealthCheckPort     int64
 	HealthCheckPath     string
 	HealthCheckProtocol string
+
+	SslCertificateArn string
+	SslPolicy         string
 }
 
 // getLoadBalancerAdditionalTags converts the comma separated list of key-value
@@ -238,7 +241,6 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 						_, err := c.elbv2.ModifyListener(&elbv2.ModifyListenerInput{
 							ListenerArn: listener.ListenerArn,
 							Port:        aws.Int64(frontendPort),
-							Protocol:    aws.String("TCP"),
 							DefaultActions: []*elbv2.Action{{
 								TargetGroupArn: targetGroup.TargetGroupArn,
 								Type:           aws.String("forward"),
@@ -270,6 +272,47 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 							return nil, err
 						}
 					}
+
+					// SSL Certificate or SSL Policy have changed
+					{
+						var currentCert string
+						for _, cert := range listener.Certificates {
+							if cert.IsDefault != nil && *cert.IsDefault && cert.CertificateArn != nil {
+								currentCert = *cert.CertificateArn
+								break
+							}
+						}
+
+						var currentPolicy string
+						if listener.SslPolicy != nil {
+							currentPolicy = *listener.SslPolicy
+						}
+
+						// The SSL configuration needs updating
+						if mapping.SslCertificateArn != currentCert || mapping.SslPolicy != currentPolicy {
+							protocol := "TCP"
+							certificates := []*elbv2.Certificate{}
+							if mapping.SslCertificateArn != "" {
+								protocol = "TLS"
+								certificates = append(certificates, &elbv2.Certificate{CertificateArn: aws.String(mapping.SslCertificateArn)})
+							}
+							var sslPolicy *string
+							if mapping.SslPolicy != "" {
+								sslPolicy = aws.String(mapping.SslPolicy)
+							}
+
+							_, err := c.elbv2.ModifyListener(&elbv2.ModifyListenerInput{
+								ListenerArn:  listener.ListenerArn,
+								Protocol:     aws.String(protocol),
+								SslPolicy:    sslPolicy,
+								Certificates: certificates,
+							})
+							if err != nil {
+								return nil, fmt.Errorf("Error updating load balancer listener: %q", err)
+							}
+						}
+					}
+
 					dirty = true
 					continue
 				}
@@ -410,10 +453,23 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 		return nil, aws.String(""), err
 	}
 
+	protocol := "TCP"
+	certificates := []*elbv2.Certificate{}
+	if mapping.SslCertificateArn != "" {
+		protocol = "TLS"
+		certificates = append(certificates, &elbv2.Certificate{CertificateArn: aws.String(mapping.SslCertificateArn)})
+	}
+	var sslPolicy *string
+	if mapping.SslPolicy != "" {
+		sslPolicy = aws.String(mapping.SslPolicy)
+	}
+
 	createListernerInput := &elbv2.CreateListenerInput{
 		LoadBalancerArn: loadBalancerArn,
 		Port:            aws.Int64(mapping.FrontendPort),
-		Protocol:        aws.String("TCP"),
+		Protocol:        aws.String(protocol),
+		Certificates:    certificates,
+		SslPolicy:       sslPolicy,
 		DefaultActions: []*elbv2.Action{{
 			TargetGroupArn: target.TargetGroupArn,
 			Type:           aws.String(elbv2.ActionTypeEnumForward),

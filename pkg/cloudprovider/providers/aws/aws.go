@@ -3305,6 +3305,14 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 
 		if isNLB(annotations) {
+			loadBalancerPort := int64(port.Port)
+			portName := strings.ToLower(port.Name)
+			certID := annotations[ServiceAnnotationLoadBalancerCertificate]
+			sslCertificateArn := ""
+			if certID != "" && (portList == nil || portList.numbers.Has(loadBalancerPort) || portList.names.Has(portName)) {
+				sslCertificateArn = certID
+			}
+
 			v2Mappings = append(v2Mappings, nlbPortMapping{
 				FrontendPort: int64(port.Port),
 				TrafficPort:  int64(port.NodePort),
@@ -3312,6 +3320,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 				// health check later
 				HealthCheckPort:     int64(port.NodePort),
 				HealthCheckProtocol: elbv2.ProtocolEnumTcp,
+
+				SslCertificateArn: sslCertificateArn,
+				SslPolicy:         annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy],
 			})
 		}
 		listener, err := buildListener(port, annotations, portList)
