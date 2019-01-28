@@ -51,7 +51,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -118,7 +117,7 @@ type Cloud struct {
 	containerService *container.Service
 	tpuService       *tpuService
 	client           clientset.Interface
-	clientBuilder    controller.ControllerClientBuilder
+	clientBuilder    cloudprovider.ControllerClientBuilder
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
 	projectID        string
