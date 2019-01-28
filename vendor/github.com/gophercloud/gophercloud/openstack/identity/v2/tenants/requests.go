@@ -85,7 +85,7 @@ type UpdateOpts struct {
 	Name string `json:"name,omitempty"`
 
 	// Description is the description of the tenant.
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// Enabled sets the tenant status to enabled or disabled.
 	Enabled *bool `json:"enabled,omitempty"`

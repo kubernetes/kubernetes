@@ -154,10 +154,10 @@ type UpdateOptsBuilder interface {
 // operation.
 type UpdateOpts struct {
 	// Name of the pool.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// Human-readable description for the pool.
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// The algorithm used to distribute load between the members of the pool. The
 	// current specification supports LBMethodRoundRobin, LBMethodLeastConnections
@@ -274,7 +274,7 @@ type CreateMemberOpts struct {
 	// that  this member should receive from the pool. For example, a member with
 	// a weight  of 10 receives five times as much traffic as a member with a
 	// weight of 2.
-	Weight int `json:"weight,omitempty"`
+	Weight *int `json:"weight,omitempty"`
 
 	// If you omit this parameter, LBaaS uses the vip_subnet_id parameter value
 	// for the subnet UUID.
@@ -317,13 +317,13 @@ type UpdateMemberOptsBuilder interface {
 // operation.
 type UpdateMemberOpts struct {
 	// Name of the Member.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// A positive integer value that indicates the relative portion of traffic
 	// that this member should receive from the pool. For example, a member with
 	// a weight of 10 receives five times as much traffic as a member with a
 	// weight of 2.
-	Weight int `json:"weight,omitempty"`
+	Weight *int `json:"weight,omitempty"`
 
 	// The administrative state of the Pool. A valid value is true (UP)
 	// or false (DOWN).

@@ -67,5 +67,13 @@ Example to Get the Status of a Load Balancer
 	if err != nil {
 		panic(err)
 	}
+
+Example to Get the Statistics of a Load Balancer
+
+	lbID := "d67d56a6-4a86-4688-a282-f46444705c64"
+	stats, err := loadbalancers.GetStats(networkClient, LBID).Extract()
+	if err != nil {
+		panic(err)
+	}
 */
 package loadbalancers

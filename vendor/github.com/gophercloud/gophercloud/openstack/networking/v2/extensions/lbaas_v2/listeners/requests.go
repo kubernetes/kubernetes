@@ -10,9 +10,10 @@ type Protocol string
 
 // Supported attributes for create/update operations.
 const (
-	ProtocolTCP   Protocol = "TCP"
-	ProtocolHTTP  Protocol = "HTTP"
-	ProtocolHTTPS Protocol = "HTTPS"
+	ProtocolTCP             Protocol = "TCP"
+	ProtocolHTTP            Protocol = "HTTP"
+	ProtocolHTTPS           Protocol = "HTTPS"
+	ProtocolTerminatedHTTPS Protocol = "TERMINATED_HTTPS"
 )
 
 // ListOptsBuilder allows extensions to add additional parameters to the
@@ -154,10 +155,13 @@ type UpdateOptsBuilder interface {
 // UpdateOpts represents options for updating a Listener.
 type UpdateOpts struct {
 	// Human-readable name for the Listener. Does not have to be unique.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
+
+	// The ID of the default pool with which the Listener is associated.
+	DefaultPoolID *string `json:"default_pool_id,omitempty"`
 
 	// Human-readable description for the Listener.
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// The maximum number of connections allowed for the Listener.
 	ConnLimit *int `json:"connection_limit,omitempty"`
@@ -175,7 +179,16 @@ type UpdateOpts struct {
 
 // ToListenerUpdateMap builds a request body from UpdateOpts.
 func (opts UpdateOpts) ToListenerUpdateMap() (map[string]interface{}, error) {
-	return gophercloud.BuildRequestBody(opts, "listener")
+	b, err := gophercloud.BuildRequestBody(opts, "listener")
+	if err != nil {
+		return nil, err
+	}
+
+	if m := b["listener"].(map[string]interface{}); m["default_pool_id"] == "" {
+		m["default_pool_id"] = nil
+	}
+
+	return b, nil
 }
 
 // Update is an operation which modifies the attributes of the specified
