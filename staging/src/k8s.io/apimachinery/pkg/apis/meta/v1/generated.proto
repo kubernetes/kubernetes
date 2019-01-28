@@ -445,6 +445,31 @@ message ListOptions {
   optional string continue = 8;
 }
 
+// ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
+// that the fieldset applies to.
+message ManagedFieldsEntry {
+  // Manager is an identifier of the workflow managing these fields.
+  optional string manager = 1;
+
+  // Operation is the type of operation which lead to this ManagedFieldsEntry being created.
+  // The only valid values for this field are 'Apply' and 'Update'.
+  optional string operation = 2;
+
+  // APIVersion defines the version of this resource that this field set
+  // applies to. The format is "group/version" just like the top-level
+  // APIVersion field. It is necessary to track the version of a field
+  // set because it cannot be automatically converted.
+  optional string apiVersion = 3;
+
+  // Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+  // +optional
+  optional string time = 4;
+
+  // Fields identifies a set of fields.
+  // +optional
+  optional Fields fields = 5;
+}
+
 // MicroTime is version of Time with microsecond level precision.
 //
 // +protobuf.options.marshal=false
@@ -625,7 +650,7 @@ message ObjectMeta {
   // +optional
   optional string clusterName = 15;
 
-  // ManagedFields is a map of workflow-id to the set of fields
+  // ManagedFields maps workflow-id and version to the set of fields
   // that are managed by that workflow. This is mostly for internal
   // housekeeping, and users typically shouldn't need to set or
   // understand this field. A workflow can be the user's name, a
@@ -636,7 +661,7 @@ message ObjectMeta {
   // This field is alpha and can be changed or removed without notice.
   //
   // +optional
-  map<string, VersionedFields> managedFields = 17;
+  repeated ManagedFieldsEntry managedFields = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
@@ -898,19 +923,6 @@ message Verbs {
   // items, if empty, will result in an empty slice
 
   repeated string items = 1;
-}
-
-// VersionedFields is a pair of a FieldSet and the group version of the resource
-// that the fieldset applies to.
-message VersionedFields {
-  // APIVersion defines the version of this resource that this field set
-  // applies to. The format is "group/version" just like the top-level
-  // APIVersion field. It is necessary to track the version of a field
-  // set because it cannot be automatically converted.
-  optional string apiVersion = 1;
-
-  // Fields identifies a set of fields.
-  optional Fields fields = 2;
 }
 
 // Event represents a single event to a watched resource.
