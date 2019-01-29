@@ -72,7 +72,12 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer confFile.Close()
+	defer func() {
+		if err := confFile.Close(); err != nil {
+			klog.Errorf("failed to close config file: %v", err)
+		}
+	}()
+
 	cfg, err := readConfig(confFile)
 	if err != nil {
 		return nil, err

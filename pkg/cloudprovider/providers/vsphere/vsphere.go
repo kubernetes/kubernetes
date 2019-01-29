@@ -1288,7 +1288,9 @@ func (vs *VSphere) NodeAdded(obj interface{}) {
 	}
 
 	klog.V(4).Infof("Node added: %+v", node)
-	vs.nodeManager.RegisterNode(node)
+	if err := vs.nodeManager.RegisterNode(node); err != nil {
+		klog.Errorf("failed to add node %+v: %v", node, err)
+	}
 }
 
 // Notification handler when node is removed from k8s cluster.
@@ -1300,7 +1302,9 @@ func (vs *VSphere) NodeDeleted(obj interface{}) {
 	}
 
 	klog.V(4).Infof("Node deleted: %+v", node)
-	vs.nodeManager.UnRegisterNode(node)
+	if err := vs.nodeManager.UnRegisterNode(node); err != nil {
+		klog.Errorf("failed to delete node %s: %v", node.Name, err)
+	}
 }
 
 func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
@@ -1316,7 +1320,11 @@ func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f 
 	if err := c.Login(ctx, user); err != nil {
 		return err
 	}
-	defer c.Logout(ctx)
+	defer func() {
+		if err := c.Logout(ctx); err != nil {
+			klog.Errorf("failed to logout: %v", err)
+		}
+	}()
 	return f(c)
 }
 

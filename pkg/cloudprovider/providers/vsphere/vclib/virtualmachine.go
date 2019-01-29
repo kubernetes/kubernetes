@@ -127,7 +127,10 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 		RecordvSphereMetric(APIAttachVolume, requestTime, err)
 		klog.Errorf("Failed to attach the disk with storagePolicy: %q on VM: %q. err - %+v", volumeOptions.StoragePolicyID, vm.InventoryPath, err)
 		if newSCSIController != nil {
-			vm.deleteController(ctx, newSCSIController, vmDevices)
+			nestedErr := vm.deleteController(ctx, newSCSIController, vmDevices)
+			if nestedErr != nil {
+				return "", fmt.Errorf("failed to delete SCSI Controller after reconfiguration failed with err=%v: %v", err, nestedErr)
+			}
 		}
 		return "", err
 	}
@@ -136,7 +139,10 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 	if err != nil {
 		klog.Errorf("Failed to attach the disk with storagePolicy: %+q on VM: %q. err - %+v", volumeOptions.StoragePolicyID, vm.InventoryPath, err)
 		if newSCSIController != nil {
-			vm.deleteController(ctx, newSCSIController, vmDevices)
+			nestedErr := vm.deleteController(ctx, newSCSIController, vmDevices)
+			if nestedErr != nil {
+				return "", fmt.Errorf("failed to delete SCSI Controller after waiting for reconfiguration failed with err='%v': %v", err, nestedErr)
+			}
 		}
 		return "", err
 	}
@@ -145,9 +151,15 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 	diskUUID, err := vm.Datacenter.GetVirtualDiskPage83Data(ctx, vmDiskPath)
 	if err != nil {
 		klog.Errorf("Error occurred while getting Disk Info from VM: %q. err: %v", vm.InventoryPath, err)
-		vm.DetachDisk(ctx, vmDiskPath)
+		nestedErr := vm.DetachDisk(ctx, vmDiskPath)
+		if nestedErr != nil {
+			return "", fmt.Errorf("failed to detach disk after getting VM UUID failed with err='%v': %v", err, nestedErr)
+		}
 		if newSCSIController != nil {
-			vm.deleteController(ctx, newSCSIController, vmDevices)
+			nestedErr = vm.deleteController(ctx, newSCSIController, vmDevices)
+			if nestedErr != nil {
+				return "", fmt.Errorf("failed to delete SCSI Controller after getting VM UUID failed with err='%v': %v", err, nestedErr)
+			}
 		}
 		return "", err
 	}
@@ -271,7 +283,9 @@ func (vm *VirtualMachine) CreateDiskSpec(ctx context.Context, diskPath string, d
 		if scsiController == nil {
 			klog.Errorf("Cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
 			// attempt clean up of scsi controller
-			vm.deleteController(ctx, newSCSIController, vmDevices)
+			if err := vm.deleteController(ctx, newSCSIController, vmDevices); err != nil {
+				return nil, nil, fmt.Errorf("failed to delete SCSI controller after failing to find it on VM: %v", err)
+			}
 			return nil, nil, fmt.Errorf("Cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
 		}
 	}
@@ -351,7 +365,10 @@ func (vm *VirtualMachine) createAndAttachSCSIController(ctx context.Context, dis
 	if err != nil {
 		klog.V(LogLevel).Infof("Cannot add SCSI controller to VM: %q. err: %+v", vm.InventoryPath, err)
 		// attempt clean up of scsi controller
-		vm.deleteController(ctx, newSCSIController, vmDevices)
+		nestedErr := vm.deleteController(ctx, newSCSIController, vmDevices)
+		if nestedErr != nil {
+			return nil, fmt.Errorf("failed to delete SCSI controller after failing to add it to vm with err='%v': %v", err, nestedErr)
+		}
 		return nil, err
 	}
 	return newSCSIController, nil
