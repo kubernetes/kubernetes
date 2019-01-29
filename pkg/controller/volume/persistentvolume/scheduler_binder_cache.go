@@ -74,8 +74,8 @@ func NewPodBindingCache() PodBindingCache {
 }
 
 func (c *podBindingCache) GetDecisions(pod *v1.Pod) nodeDecisions {
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 	podName := getPodName(pod)
 	decisions, ok := c.bindingDecisions[podName]
 	if !ok {
