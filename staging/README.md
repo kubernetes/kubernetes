@@ -65,7 +65,7 @@ for creating the staging repository.
 
 3. Add a symlink to the staging repo in `vendor/k8s.io`.
 
-4. Update [`hack/import-restrictions.yaml`](https://github.com/kubernetes/kubernetes/blob/master/hack/import-restrictions.yaml)
+4. Update [`import-restrictions.yaml`](/staging/publishing/import-restrictions.yaml)
 to add the list of other staging repos that this new repo can import.
 
 5. Add all mandatory template files to the staging repo as mentioned in
@@ -92,7 +92,7 @@ for an example.
 3. Once the repository has been created in the Kubernetes org,
 update the publishing-bot to publish the staging repository by updating:
 
-    - [`kubernetes-rules-configmap.yaml`](https://github.com/kubernetes/publishing-bot/blob/master/configs/kubernetes-rules-configmap.yaml):
+    - [`rules.yaml`](/staging/publishing/rules.yaml):
     Make sure that the list of dependencies reflects the staging repos in the `Godeps.json` file.
 
     - [`fetch-all-latest-and-push.sh`](https://github.com/kubernetes/publishing-bot/blob/master/hack/fetch-all-latest-and-push.sh):
