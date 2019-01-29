@@ -191,8 +191,6 @@ pkg/kubelet/checkpointmanager/checksum
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client
 pkg/kubelet/cm
-pkg/kubelet/cm/devicemanager/checkpoint
-pkg/kubelet/cm/util
 pkg/kubelet/config
 pkg/kubelet/configmap
 pkg/kubelet/container
