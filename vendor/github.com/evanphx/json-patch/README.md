@@ -25,6 +25,23 @@ go get -u github.com/evanphx/json-patch
 * [Comparing JSON documents](#comparing-json-documents)
 * [Combine merge patches](#combine-merge-patches)
 
+
+# Configuration
+
+* There is a global configuration variable `jsonpatch.SupportNegativeIndices`.
+  This defaults to `true` and enables the non-standard practice of allowing
+  negative indices to mean indices starting at the end of an array. This
+  functionality can be disabled by setting `jsonpatch.SupportNegativeIndices =
+  false`.
+
+* There is a global configuration variable `jsonpatch.ArraySizeLimit`, which
+  limits the length of any array the patched object can have. It defaults to 0,
+  which means there is no limit.
+
+* There is a global configuration variable `jsonpatch.ArraySizeAdditionLimit`,
+  which limits the increase of array length caused by each operation. It
+  defaults to 0, which means there is no limit.
+
 ## Create and apply a merge patch
 Given both an original JSON document and a modified JSON document, you can create
 a [Merge Patch](https://tools.ietf.org/html/rfc7396) document. 
