@@ -17,9 +17,9 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/util/file:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/utils/path:go_default_library",
     ],
 )
 

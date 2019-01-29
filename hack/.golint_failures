@@ -355,7 +355,6 @@ pkg/util/bandwidth
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env
-pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
 pkg/util/iptables
