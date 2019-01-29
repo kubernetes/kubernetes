@@ -311,7 +311,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, p.prefixFromUserAgent()); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, prefixFromUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -373,7 +373,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, p.prefixFromUserAgent()); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, prefixFromUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -548,10 +548,6 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 		return updateObject, updateErr
 	})
 	return result, wasCreated, err
-}
-
-func (p *patcher) prefixFromUserAgent() string {
-	return strings.Split(p.userAgent, "/")[0]
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
