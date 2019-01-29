@@ -38,6 +38,15 @@ func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority 
 	return r
 }
 
+func newLocalAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {
+	r := apiregistration.APIService{}
+	r.Spec.Group = group
+	r.Spec.GroupPriorityMinimum = minGroupPriority
+	r.Spec.VersionPriority = versionPriority
+	r.Name = name
+	return r
+}
+
 func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames []string) {
 	actualNames := []string{}
 	for _, a := range actual {
@@ -66,9 +75,21 @@ func TestAPIServiceSort(t *testing.T) {
 			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3),
 			spec:       &spec.Swagger{},
 		},
+		{
+			apiService: newLocalAPIServiceForTest("FirstLocalSpec", "Group1", 15, 5),
+			spec:       &spec.Swagger{},
+		},
+		{
+			apiService: newLocalAPIServiceForTest("SecondLocalSpec", "Group2", 14, 6),
+			spec:       &spec.Swagger{},
+		},
+		{
+			apiService: newLocalAPIServiceForTest("ThirdLocalSpec", "Group3", 16, 3),
+			spec:       &spec.Swagger{},
+		},
 	}
 	sortByPriority(list)
-	assertSortedServices(t, list, []string{"FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
+	assertSortedServices(t, list, []string{"FirstLocalSpec", "SecondLocalSpec", "ThirdLocalSpec", "FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
 }
 
 type handlerTest struct {
