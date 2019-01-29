@@ -48,12 +48,16 @@ func main() {
 func handler(w http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Fatalf("could not read request body: %v", err)
+		log.Printf("could not read request body: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	el := &auditv1.EventList{}
 
 	if err := runtime.DecodeInto(decoder, body, el); err != nil {
-		log.Fatalf("failed decoding buf: %b, apiVersion: %s", body, auditv1.SchemeGroupVersion)
+		log.Printf("failed decoding buf: %b, apiVersion: %s", body, auditv1.SchemeGroupVersion)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	defer req.Body.Close()
 
@@ -61,9 +65,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	for _, event := range el.Items {
 		err := encoder.Encode(&event, os.Stdout)
 		if err != nil {
-			log.Fatalf("could not encode audit event: %v", err)
+			log.Printf("could not encode audit event: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 	}
 	w.WriteHeader(http.StatusOK)
-	return
 }
