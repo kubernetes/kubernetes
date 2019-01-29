@@ -463,7 +463,7 @@ message ManagedFieldsEntry {
 
   // Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
   // +optional
-  optional string time = 4;
+  optional Time time = 4;
 
   // Fields identifies a set of fields.
   // +optional

@@ -263,10 +263,10 @@ func TestApplyManagedFields(t *testing.T) {
 		"metadata": {
 			"name": "test-cm",
 			"namespace": "default",
-			"selfLink": "`+accessor.GetSelfLink()+`",
-			"uid": "`+string(accessor.GetUID())+`",
-			"resourceVersion": "`+accessor.GetResourceVersion()+`",
-			"creationTimestamp": "`+accessor.GetCreationTimestamp().Format(time.RFC3339)+`",
+			"selfLink": "` + accessor.GetSelfLink() + `",
+			"uid": "` + string(accessor.GetUID()) + `",
+			"resourceVersion": "` + accessor.GetResourceVersion() + `",
+			"creationTimestamp": "` + accessor.GetCreationTimestamp().Format(time.RFC3339) + `",
 			"managedFields": [
 				{
 					"manager": "apply",
@@ -284,7 +284,7 @@ func TestApplyManagedFields(t *testing.T) {
 					"manager": "go_default_test",
 					"operation": "Update",
 					"apiVersion": "v1",
-					"time": "`+accessor.GetManagedFields()[1].Time.Format(time.RFC3339)+`",
+					"time": "` + accessor.GetManagedFields()[1].Time.Format(time.RFC3339) + `",
 					"fields": {
 						"f:data": {
 							"f:key": {}
