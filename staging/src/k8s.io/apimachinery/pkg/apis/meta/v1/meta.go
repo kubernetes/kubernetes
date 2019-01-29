@@ -63,8 +63,8 @@ type Object interface {
 	SetOwnerReferences([]OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
-	GetManagedFields() map[string]VersionedFields
-	SetManagedFields(lastApplied map[string]VersionedFields)
+	GetManagedFields() []ManagedFieldsEntry
+	SetManagedFields(lastApplied []ManagedFieldsEntry)
 }
 
 // ListMetaAccessor retrieves the list interface from an object
@@ -171,13 +171,13 @@ func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 func (meta *ObjectMeta) GetClusterName() string            { return meta.ClusterName }
 func (meta *ObjectMeta) SetClusterName(clusterName string) { meta.ClusterName = clusterName }
 
-func (meta *ObjectMeta) GetManagedFields() map[string]VersionedFields {
+func (meta *ObjectMeta) GetManagedFields() []ManagedFieldsEntry {
 	return meta.ManagedFields
 }
 
-func (meta *ObjectMeta) SetManagedFields(ManagedFields map[string]VersionedFields) {
-	meta.ManagedFields = make(map[string]VersionedFields, len(ManagedFields))
-	for key, value := range ManagedFields {
-		meta.ManagedFields[key] = value
+func (meta *ObjectMeta) SetManagedFields(ManagedFields []ManagedFieldsEntry) {
+	meta.ManagedFields = make([]ManagedFieldsEntry, len(ManagedFields))
+	for i, value := range ManagedFields {
+		meta.ManagedFields[i] = value
 	}
 }
