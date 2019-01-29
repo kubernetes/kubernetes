@@ -191,7 +191,7 @@ func TestPatchApply(t *testing.T) {
 	if simpleStorage.updated.Other != "bar" {
 		t.Errorf(`Merge should have kept initial "bar" value for Other: %v`, simpleStorage.updated.Other)
 	}
-	if _, ok := simpleStorage.updated.ObjectMeta.ManagedFields["default"]; !ok {
+	if len(simpleStorage.updated.ObjectMeta.ManagedFields) == 0 {
 		t.Errorf(`Expected managedFields field to be set, but is empty`)
 	}
 }
@@ -230,11 +230,11 @@ func TestApplyAddsGVK(t *testing.T) {
 	}
 	// TODO: Need to fix this
 	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
-	if simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion != expected {
+	if simpleStorage.updated.ObjectMeta.ManagedFields[0].APIVersion != expected {
 		t.Errorf(
 			`Expected managedFields field to be %q, got %q`,
 			expected,
-			simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion,
+			simpleStorage.updated.ObjectMeta.ManagedFields[0].APIVersion,
 		)
 	}
 }
@@ -265,11 +265,11 @@ func TestApplyCreatesWithManagedFields(t *testing.T) {
 	}
 	// TODO: Need to fix this
 	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
-	if simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion != expected {
+	if simpleStorage.updated.ObjectMeta.ManagedFields[0].APIVersion != expected {
 		t.Errorf(
 			`Expected managedFields field to be %q, got %q`,
 			expected,
-			simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion,
+			simpleStorage.updated.ObjectMeta.ManagedFields[0].APIVersion,
 		)
 	}
 }
