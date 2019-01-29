@@ -150,6 +150,6 @@ func runControlPlaneSubPhase(component string) func(c workflow.RunData) error {
 		cfg := data.Cfg()
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
-		return controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component)
+		return controlplane.CreateStaticPodFiles(data.ManifestDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, component)
 	}
 }

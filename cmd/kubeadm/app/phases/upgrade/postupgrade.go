@@ -61,7 +61,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
+	if err := kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
 		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
@@ -108,21 +108,21 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Upgrade kube-dns/CoreDNS and kube-proxy
-	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
+	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
 	}
 	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client, dryRun); err != nil {
+	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
+	if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
 		errs = append(errs, err)
 	}
 	return errorsutil.NewAggregate(errs)
 }
 
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, dryRun bool) error {
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
 		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
 		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
@@ -210,7 +210,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 		// as we handle that ourselves in the markmaster phase
 		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(cfg, false, kubeletDir); err != nil {
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
 			errs = append(errs, errors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
 

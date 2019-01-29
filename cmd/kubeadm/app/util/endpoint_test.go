@@ -198,7 +198,7 @@ func TestGetMasterEndpoint(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualEndpoint, actualError := GetMasterEndpoint(rt.cfg)
+			actualEndpoint, actualError := GetMasterEndpoint(rt.cfg.ControlPlaneEndpoint, &rt.cfg.LocalAPIEndpoint)
 
 			if (actualError != nil) && !rt.expectedError {
 				t.Errorf("%s unexpected failure: %v", rt.name, actualError)

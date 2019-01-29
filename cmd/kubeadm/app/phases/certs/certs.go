@@ -60,12 +60,12 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	return CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
+func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	klog.V(1).Infoln("creating a new public/private key files for signing service account users")
 	saSigningKey, err := NewServiceAccountSigningKey()
 	if err != nil {
@@ -73,7 +73,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.InitConfiguration)
 	}
 
 	return writeKeyFilesIfNotExist(
-		cfg.CertificatesDir,
+		certsDir,
 		kubeadmconstants.ServiceAccountKeyBaseName,
 		saSigningKey,
 	)
@@ -329,7 +329,7 @@ type certKeyLocation struct {
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
 // equal across masters: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
-func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
+func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err
@@ -356,7 +356,7 @@ func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
 // when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
-func UsingExternalCA(cfg *kubeadmapi.InitConfiguration) (bool, error) {
+func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err
