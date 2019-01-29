@@ -175,7 +175,9 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf.ReadFrom(rc)
 				hostsFileContent := buf.String()
 
-				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") {
+				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") &&
+					!(strings.Contains(hostsFileContent, "123.45.67.89\tfoo") &&
+						strings.Contains(hostsFileContent, "123.45.67.89\tbar")) {
 					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
 				}
 
