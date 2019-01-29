@@ -43,11 +43,11 @@ function get-master-size {
 #   NUM_NODES
 function get-master-root-disk-size() {
   local suggested_master_root_disk_size="20GB"
-  if [[ "${NUM_NODES}" -gt "1000" ]]; then
-    suggested_master_root_disk_size="50GB"
-  fi
-  if [[ "${NUM_NODES}" -gt "2000" ]]; then
+  if [[ "${NUM_NODES}" -gt "500" ]]; then
     suggested_master_root_disk_size="100GB"
+  fi
+  if [[ "${NUM_NODES}" -gt "3000" ]]; then
+    suggested_master_root_disk_size="500GB"
   fi
   echo "${suggested_master_root_disk_size}"
 }
@@ -56,10 +56,10 @@ function get-master-root-disk-size() {
 #   NUM_NODES
 function get-master-disk-size() {
   local suggested_master_disk_size="20GB"
-  if [[ "${NUM_NODES}" -gt "1000" ]]; then
+  if [[ "${NUM_NODES}" -gt "500" ]]; then
     suggested_master_disk_size="100GB"
   fi
-  if [[ "${NUM_NODES}" -gt "2000" ]]; then
+  if [[ "${NUM_NODES}" -gt "3000" ]]; then
     suggested_master_disk_size="200GB"
   fi
   echo "${suggested_master_disk_size}"
