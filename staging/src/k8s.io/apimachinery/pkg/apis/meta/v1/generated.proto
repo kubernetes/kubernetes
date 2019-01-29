@@ -202,6 +202,13 @@ message ExportOptions {
   optional bool exact = 2;
 }
 
+// Fields stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+message Fields {
+  // Map stores a set of fields in a data structure like a Trie.
+  map<string, Fields> map = 1;
+}
+
 // GetOptions is the standard query options to the standard REST get call.
 message GetOptions {
   // When specified:
@@ -436,6 +443,31 @@ message ListOptions {
   optional string continue = 8;
 }
 
+// ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
+// that the fieldset applies to.
+message ManagedFieldsEntry {
+  // Manager is an identifier of the workflow managing these fields.
+  optional string manager = 1;
+
+  // Operation is the type of operation which lead to this ManagedFieldsEntry being created.
+  // The only valid values for this field are 'Apply' and 'Update'.
+  optional string operation = 2;
+
+  // APIVersion defines the version of this resource that this field set
+  // applies to. The format is "group/version" just like the top-level
+  // APIVersion field. It is necessary to track the version of a field
+  // set because it cannot be automatically converted.
+  optional string apiVersion = 3;
+
+  // Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+  // +optional
+  optional Time time = 4;
+
+  // Fields identifies a set of fields.
+  // +optional
+  optional Fields fields = 5;
+}
+
 // MicroTime is version of Time with microsecond level precision.
 //
 // +protobuf.options.marshal=false
@@ -617,6 +649,19 @@ message ObjectMeta {
   // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
   // +optional
   optional string clusterName = 15;
+
+  // ManagedFields maps workflow-id and version to the set of fields
+  // that are managed by that workflow. This is mostly for internal
+  // housekeeping, and users typically shouldn't need to set or
+  // understand this field. A workflow can be the user's name, a
+  // controller's name, or the name of a specific apply path like
+  // "ci-cd". The set of fields is always in the version that the
+  // workflow used when modifying the object.
+  //
+  // This field is alpha and can be changed or removed without notice.
+  //
+  // +optional
+  repeated ManagedFieldsEntry managedFields = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
@@ -654,6 +699,24 @@ message OwnerReference {
 
 // Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.
 message Patch {
+}
+
+// PatchOptions may be provided when patching an API object.
+// PatchOptions is meant to be a superset of UpdateOptions.
+message PatchOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+
+  // Force is going to "force" Apply requests. It means user will
+  // re-acquire conflicting fields owned by other people. Force
+  // flag must be unset for non-apply patch requests.
+  // +optional
+  optional bool force = 2;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -841,6 +904,7 @@ message TypeMeta {
 }
 
 // UpdateOptions may be provided when updating an API object.
+// All fields in UpdateOptions should also be present in PatchOptions.
 message UpdateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will

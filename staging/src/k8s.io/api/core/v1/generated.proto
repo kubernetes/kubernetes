@@ -4248,6 +4248,9 @@ message ServiceSpec {
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
   // +patchMergeKey=port
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=port
+  // +listMapKey=protocol
   repeated ServicePort ports = 1;
 
   // Route service traffic to pods with label keys and values matching this
