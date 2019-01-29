@@ -330,7 +330,7 @@ func (runner *runner) DelEntry(entry string, set string) error {
 // TestEntry is used to check whether the specified entry is in the set or not.
 func (runner *runner) TestEntry(entry string, set string) (bool, error) {
 	if out, err := runner.exec.Command(IPSetCmd, "test", set, entry).CombinedOutput(); err == nil {
-		reg, e := regexp.Compile("NOT")
+		reg, e := regexp.Compile("is NOT in set " + set)
 		if e == nil && reg.MatchString(string(out)) {
 			return false, nil
 		} else if e == nil {
