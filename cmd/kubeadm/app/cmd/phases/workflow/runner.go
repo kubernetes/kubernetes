@@ -309,7 +309,6 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	phaseCommand := &cobra.Command{
 		Use:   "phase",
 		Short: fmt.Sprintf("use this command to invoke single phase of the %s workflow", cmd.Name()),
-		// TODO: this logic is currently lacking verification if a suphase name is valid!
 	}
 
 	cmd.AddCommand(phaseCommand)
@@ -352,7 +351,6 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 					os.Exit(1)
 				}
 			},
-			Args: cobra.NoArgs, // this forces cobra to fail if a wrong phase name is passed
 		}
 
 		// makes the new command inherits local flags from the parent command
@@ -369,6 +367,11 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			p.LocalFlags.VisitAll(func(f *pflag.Flag) {
 				phaseCmd.Flags().AddFlag(f)
 			})
+		}
+
+		// if this phase has children (not a leaf) it doesn't accept any args
+		if len(p.Phases) > 0 {
+			phaseCmd.Args = cobra.NoArgs
 		}
 
 		// adds the command to parent

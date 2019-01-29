@@ -203,6 +203,8 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 			err = data.Run()
 			kubeadmutil.CheckErr(err)
 		},
+		// We accept the master location as an optional positional argument
+		Args: cobra.MaximumNArgs(1),
 	}
 
 	AddJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
@@ -358,11 +360,11 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
 	if err != nil {
-		return &joinData{}, err
+		return nil, err
 	}
 
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return &joinData{}, err
+		return nil, err
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal JoinConfiguration
@@ -377,7 +379,7 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 
 	cfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
 	if err != nil {
-		return &joinData{}, err
+		return nil, err
 	}
 
 	// override node name and CRI socket from the command line options
@@ -390,7 +392,7 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 
 	if cfg.ControlPlane != nil {
 		if err := configutil.VerifyAPIServerBindAddress(cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-			return &joinData{}, err
+			return nil, err
 		}
 	}
 
