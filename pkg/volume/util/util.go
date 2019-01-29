@@ -125,35 +125,6 @@ func SetReady(dir string) {
 	file.Close()
 }
 
-// UnmountPath is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// TODO: Remove this function and change callers to call mount pkg directly
-func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return mount.CleanupMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
-}
-
-// UnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-// TODO: Change callers to call mount pkg directly
-func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	return mount.CleanupMountPoint(mountPath, mounter, extensiveMountPointCheck)
-}
-
-// PathExists returns true if the specified path exists.
-// TODO: Change callers to call mount pkg directly
-func PathExists(path string) (bool, error) {
-	return mount.PathExists(path)
-}
-
-// IsCorruptedMnt return true if err is about corrupted mount point
-// TODO: Change callers to call mount pkg directly
-func IsCorruptedMnt(err error) bool {
-	return mount.IsCorruptedMnt(err)
-}
-
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
 func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)

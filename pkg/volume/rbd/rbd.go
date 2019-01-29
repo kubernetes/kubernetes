@@ -852,7 +852,7 @@ func (c *rbdUnmounter) TearDown() error {
 
 func (c *rbdUnmounter) TearDownAt(dir string) error {
 	klog.V(4).Infof("rbd: attempting to teardown at %s", dir)
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)

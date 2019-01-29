@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -172,7 +173,7 @@ func (u *azureDiskUnmounter) TearDown() error {
 }
 
 func (u *azureDiskUnmounter) TearDownAt(dir string) error {
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)

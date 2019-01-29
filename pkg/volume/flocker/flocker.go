@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	flockerapi "github.com/clusterhq/flocker-go"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -434,7 +433,7 @@ func (c *flockerVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func (p *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

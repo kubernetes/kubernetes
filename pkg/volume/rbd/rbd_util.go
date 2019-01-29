@@ -363,7 +363,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	var output []byte
 
 	globalPDPath := util.MakeGlobalPDName(*b.rbd)
-	if pathExists, pathErr := volutil.PathExists(globalPDPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(globalPDPath); pathErr != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -505,7 +505,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 // DetachBlockDisk detaches the disk from the node.
 func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
 
-	if pathExists, pathErr := volutil.PathExists(mapPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)

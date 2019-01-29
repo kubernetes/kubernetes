@@ -431,7 +431,7 @@ func (c *fcDiskUnmounter) TearDown() error {
 }
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 // Block Volumes Support

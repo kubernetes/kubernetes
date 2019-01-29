@@ -459,7 +459,7 @@ func (c *gcePersistentDiskUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *gcePersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 type gcePersistentDiskDeleter struct {
