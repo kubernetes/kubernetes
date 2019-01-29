@@ -24,6 +24,59 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 `sample-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
+## Normal Build and Deploy
+
+### Changes to the Types
+
+If you change the API object type definitions in any of the
+`pkg/apis/.../types.go` files then you will need to update the files
+generated from the type definitions.  There is no convenient script to
+do this in the context of `$GOPATH/src/k8s.io/sample-apiserver`.
+However, if you have fetched the whole `k8s.io/kubernetes` repository
+then there _is_ a convenient script that you can use.  With
+`$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/sample-apiserver` as
+your current working directory, invoke `hack/update-codegen.sh`; the
+script takes no arguments.
+
+### Build the Binary
+
+With `sample-apiserver` as your current working directory, issue the
+following command:
+
+```
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o artifacts/simple-image/kube-sample-apiserver
+```
+
+### Build the Container Image
+
+With `sample-apiserver` as your current working directory, issue the
+following commands with `MYPREFIX` and `MYTAG` replaced by something
+suitable.
+
+```
+docker build -t MYPREFIX/kube-sample-apiserver:MYTAG ./artifacts/simple-image
+docker push MYPREFIX/kube-sample-apiserver:MYTAG
+```
+
+
+### Build Binary and Container Image from Current Master Source
+
+There is a Dockerfile at
+https://github.com/kubernetes/kubernetes/blob/master/test/images/sample-apiserver/Dockerfile
+that will build the binary, and a container image with that binary,
+from the current `master` branch.
+
+
+### Deploy into a Kubernetes Cluster
+
+Edit `artifacts/example/rc.yaml`, updating the pod template's image
+reference to match what you pushed and setting the `imagePullPolicy`
+to something suitable.  Then call:
+
+```
+kubectl apply -f artifacts/example
+```
+
 ## Running it stand-alone
 
 During development it is helpful to run sample-apiserver stand-alone, i.e. without
