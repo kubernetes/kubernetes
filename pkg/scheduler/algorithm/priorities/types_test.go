@@ -25,7 +25,7 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// EmptyPriorityMetadataProducer should returns a no-op PriorityMetadataProducer type.
+// EmptyPriorityMetadataProducer should return a no-op PriorityMetadataProducer type.
 func TestEmptyPriorityMetadataProducer(t *testing.T) {
 	fakePod := new(v1.Pod)
 	fakeLabelSelector := labels.SelectorFromSet(labels.Set{"foo": "bar"})

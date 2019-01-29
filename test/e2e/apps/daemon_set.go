@@ -374,8 +374,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
-		framework.SkipUnlessNodeCountIsAtLeast(2)
+		if framework.TestContext.CloudConfig.NumNodes < 2 {
+			framework.Logf("Conformance test suite needs a cluster with at least 2 nodes.")
+		}
 
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
