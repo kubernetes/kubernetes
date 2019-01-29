@@ -172,7 +172,7 @@ func coreDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 		return err
 	}
 
-	stubDomain, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, kubeDNSConfigMap)
+	stubDomain, err := translateStubDomainOfKubeDNSToForwardCoreDNS(kubeDNSStubDomain, kubeDNSConfigMap)
 	if err != nil {
 		return err
 	}
@@ -294,9 +294,9 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 	return nil
 }
 
-// translateStubDomainOfKubeDNSToProxyCoreDNS translates StubDomain Data in kube-dns ConfigMap
+// translateStubDomainOfKubeDNSToForwardCoreDNS translates StubDomain Data in kube-dns ConfigMap
 // in the form of Proxy for the CoreDNS Corefile.
-func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+func translateStubDomainOfKubeDNSToForwardCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if kubeDNSConfigMap == nil {
 		return "", nil
 	}
@@ -316,7 +316,7 @@ func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigM
 				{"errors"},
 				{"cache", "30"},
 				{"loop"},
-				append([]string{"proxy", "."}, proxyIP...),
+				append([]string{"forward", "."}, proxyIP...),
 			}
 			proxyStanza = append(proxyStanza, pStanza)
 		}

@@ -206,28 +206,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }`,
 		},
 		{
@@ -257,28 +257,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }`,
 		},
 		{
@@ -296,7 +296,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		out, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, testCase.configMap)
+		out, err := translateStubDomainOfKubeDNSToForwardCoreDNS(kubeDNSStubDomain, testCase.configMap)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
