@@ -1055,7 +1055,7 @@ type ManagedFieldsEntry struct {
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
 	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
 	// +optional
-	Time string `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
+	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
 	// Fields identifies a set of fields.
 	// +optional
 	Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`

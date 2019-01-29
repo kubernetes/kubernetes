@@ -39,14 +39,14 @@ func TestRoundTripManagedFields(t *testing.T) {
       f:notTrue: {}
   manager: foo
   operation: Update
-  time: 1:00pm
+  time: "2001-02-03T04:05:06Z"
 - apiVersion: v1beta1
   fields:
     i:5:
       f:i: {}
   manager: foo
   operation: Update
-  time: 1:00pm
+  time: "2011-12-13T14:15:16Z"
 `,
 		`- apiVersion: v1
   fields:
@@ -165,9 +165,20 @@ fields:
   f:apiVersion: {}
 manager: foo
 operation: Update
-time: 1:00pm
+time: "2001-02-03T04:05:06Z"
 `,
-			expected: "{\"manager\":\"foo\",\"operation\":\"Update\",\"apiVersion\":\"v1\",\"time\":\"1:00pm\"}",
+			expected: "{\"manager\":\"foo\",\"operation\":\"Update\",\"apiVersion\":\"v1\",\"time\":\"2001-02-03T04:05:06Z\"}",
+		},
+		{
+			managedFieldsEntry: `
+apiVersion: v1
+fields:
+  f:apiVersion: {}
+manager: foo
+operation: Apply
+time: "2001-02-03T04:05:06Z"
+`,
+			expected: "{\"manager\":\"foo\",\"operation\":\"Apply\"}",
 		},
 	}
 

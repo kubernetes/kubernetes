@@ -206,7 +206,7 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 		Manager:    prefix,
 		Operation:  operation,
 		APIVersion: f.groupVersion.String(),
-		Time:       time.Now().UTC().Format(time.RFC3339),
+		Time:       &metav1.Time{Time: time.Now().UTC()},
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"

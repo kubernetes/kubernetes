@@ -100,7 +100,7 @@ func DecodeManager(encodedManager *metav1.ManagedFieldsEntry) (manager string, e
 	// so it will always have the same manager identifier each time it applied.
 	if encodedManager.Operation == metav1.ManagedFieldsOperationApply {
 		encodedManagerCopy.APIVersion = ""
-		encodedManagerCopy.Time = ""
+		encodedManagerCopy.Time = nil
 	}
 
 	// Use the remaining fields to build the manager identifier

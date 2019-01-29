@@ -284,7 +284,7 @@ func TestApplyManagedFields(t *testing.T) {
 					"manager": "go_default_test",
 					"operation": "Update",
 					"apiVersion": "v1",
-					"time": "`+accessor.GetManagedFields()[1].Time+`",
+					"time": "`+accessor.GetManagedFields()[1].Time.Format(time.RFC3339)+`",
 					"fields": {
 						"f:data": {
 							"f:key": {}
