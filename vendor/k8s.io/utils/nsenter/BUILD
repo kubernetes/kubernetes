@@ -3,8 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "exec.go",
-        "exec_unsupported.go",
         "nsenter.go",
         "nsenter_unsupported.go",
     ],
