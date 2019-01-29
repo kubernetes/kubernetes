@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilsstrings "k8s.io/utils/strings"
 )
 
 var _ volume.BlockVolumePlugin = &awsElasticBlockStorePlugin{}
@@ -172,5 +172,5 @@ func (ebs *awsElasticBlockStore) GetGlobalMapPath(spec *volume.Spec) (string, er
 // path: pods/{podUid}/volumeDevices/kubernetes.io~aws
 func (ebs *awsElasticBlockStore) GetPodDeviceMapPath() (string, string) {
 	name := awsElasticBlockStorePluginName
-	return ebs.plugin.host.GetPodVolumeDeviceDir(ebs.podUID, kstrings.EscapeQualifiedNameForDisk(name)), ebs.volName
+	return ebs.plugin.host.GetPodVolumeDeviceDir(ebs.podUID, utilsstrings.EscapeQualifiedName(name)), ebs.volName
 }

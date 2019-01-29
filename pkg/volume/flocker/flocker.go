@@ -27,8 +27,8 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/strings"
 
 	flockerapi "github.com/clusterhq/flocker-go"
 )
@@ -77,7 +77,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(flockerPluginName), volName)
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedName(flockerPluginName), volName)
 }
 
 func makeGlobalFlockerPath(datasetUUID string) string {

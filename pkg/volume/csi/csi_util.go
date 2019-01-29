@@ -22,13 +22,14 @@ import (
 	"os"
 	"path"
 
+	"time"
+
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"time"
+	utilsstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -116,7 +117,7 @@ func log(msg string, parts ...interface{}) string {
 // symlink for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/dev
 func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
+	sanitizedSpecVolID := utilsstrings.EscapeQualifiedName(specVolID)
 	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "dev")
 }
 
@@ -124,7 +125,7 @@ func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
 // volume data for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/data
 func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
+	sanitizedSpecVolID := utilsstrings.EscapeQualifiedName(specVolID)
 	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "data")
 }
 
