@@ -314,6 +314,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	createNode2NormalPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -323,11 +324,13 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2normalpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}
 	createNode2MirrorPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -337,6 +340,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2mirrorpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}
