@@ -17,7 +17,9 @@ limitations under the License.
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,21 +74,53 @@ func EncodeObjectManagedFields(obj runtime.Object, fields fieldpath.ManagedField
 
 // decodeManagedFields converts ManagedFields from the wire format (api format)
 // to the format used by sigs.k8s.io/structured-merge-diff
-func decodeManagedFields(encodedManagedFields map[string]metav1.VersionedFields) (managedFields fieldpath.ManagedFields, err error) {
+func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managedFields fieldpath.ManagedFields, err error) {
 	managedFields = make(map[string]*fieldpath.VersionedSet, len(encodedManagedFields))
-	for manager, encodedVersionedSet := range encodedManagedFields {
+	for _, encodedVersionedSet := range encodedManagedFields {
+		manager, err := DecodeManager(&encodedVersionedSet)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
+		}
 		managedFields[manager], err = decodeVersionedSet(&encodedVersionedSet)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding versioned set for %v: %v", manager, err)
+			return nil, fmt.Errorf("error decoding versioned set from %v: %v", encodedVersionedSet, err)
 		}
 	}
 	return managedFields, nil
 }
 
-func decodeVersionedSet(encodedVersionedSet *metav1.VersionedFields) (versionedSet *fieldpath.VersionedSet, err error) {
+// DecodeManager creates a manager identifier string from a ManagedFieldsEntry
+func DecodeManager(encodedManager *metav1.ManagedFieldsEntry) (manager string, err error) {
+	encodedManagerCopy := *encodedManager
+
+	// Never include the fields in the manager identifier
+	encodedManagerCopy.Fields = nil
+
+	// For appliers, don't include the APIVersion or Time in the manager identifier,
+	// so it will always have the same manager identifier each time it applied.
+	if encodedManager.Operation == metav1.ManagedFieldsOperationApply {
+		encodedManagerCopy.APIVersion = ""
+		encodedManagerCopy.Time = nil
+	}
+
+	// Use the remaining fields to build the manager identifier
+	b, err := json.Marshal(&encodedManagerCopy)
+	if err != nil {
+		return "", fmt.Errorf("error marshalling manager identifier: %v", err)
+	}
+
+	return string(b), nil
+}
+
+func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet *fieldpath.VersionedSet, err error) {
 	versionedSet = &fieldpath.VersionedSet{}
 	versionedSet.APIVersion = fieldpath.APIVersion(encodedVersionedSet.APIVersion)
-	set, err := FieldsToSet(encodedVersionedSet.Fields)
+
+	fields := metav1.Fields{}
+	if encodedVersionedSet.Fields != nil {
+		fields = *encodedVersionedSet.Fields
+	}
+	set, err := FieldsToSet(fields)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding set: %v", err)
 	}
@@ -96,24 +130,42 @@ func decodeVersionedSet(encodedVersionedSet *metav1.VersionedFields) (versionedS
 
 // encodeManagedFields converts ManagedFields from the the format used by
 // sigs.k8s.io/structured-merge-diff to the the wire format (api format)
-func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedFields map[string]metav1.VersionedFields, err error) {
-	encodedManagedFields = make(map[string]metav1.VersionedFields, len(managedFields))
-	for manager, versionedSet := range managedFields {
-		v, err := encodeVersionedSet(versionedSet)
+func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedFields []metav1.ManagedFieldsEntry, err error) {
+	// Sort the keys so a predictable order will be used.
+	managers := []string{}
+	for manager := range managedFields {
+		managers = append(managers, manager)
+	}
+	sort.Strings(managers)
+
+	encodedManagedFields = []metav1.ManagedFieldsEntry{}
+	for _, manager := range managers {
+		versionedSet := managedFields[manager]
+		v, err := encodeManagerVersionedSet(manager, versionedSet)
 		if err != nil {
 			return nil, fmt.Errorf("error encoding versioned set for %v: %v", manager, err)
 		}
-		encodedManagedFields[manager] = *v
+		encodedManagedFields = append(encodedManagedFields, *v)
 	}
 	return encodedManagedFields, nil
 }
 
-func encodeVersionedSet(versionedSet *fieldpath.VersionedSet) (encodedVersionedSet *metav1.VersionedFields, err error) {
-	encodedVersionedSet = &metav1.VersionedFields{}
+func encodeManagerVersionedSet(manager string, versionedSet *fieldpath.VersionedSet) (encodedVersionedSet *metav1.ManagedFieldsEntry, err error) {
+	encodedVersionedSet = &metav1.ManagedFieldsEntry{}
+
+	// Get as many fields as we can from the manager identifier
+	err = json.Unmarshal([]byte(manager), encodedVersionedSet)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling manager identifier %v: %v", manager, err)
+	}
+
+	// Get the APIVersion and Fields from the VersionedSet
 	encodedVersionedSet.APIVersion = string(versionedSet.APIVersion)
-	encodedVersionedSet.Fields, err = SetToFields(*versionedSet.Set)
+	fields, err := SetToFields(*versionedSet.Set)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)
 	}
+	encodedVersionedSet.Fields = &fields
+
 	return encodedVersionedSet, nil
 }

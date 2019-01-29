@@ -3451,6 +3451,9 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +patchMergeKey=port
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
 	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this

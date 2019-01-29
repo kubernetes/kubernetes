@@ -201,6 +201,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patchBytes,
+			userAgent:   req.UserAgent(),
 
 			trace: trace,
 		}
@@ -268,6 +269,7 @@ type patcher struct {
 	name        string
 	patchType   types.PatchType
 	patchBytes  []byte
+	userAgent   string
 
 	trace *utiltrace.Trace
 
@@ -309,7 +311,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, prefixFromUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -371,7 +373,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, "smPatcher"); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, prefixFromUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -394,6 +396,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	force := false
 	if p.options.Force != nil {
 		force = *p.options.Force
+	}
+	if p.fieldManager == nil {
+		panic("FieldManager must be installed to run apply")
 	}
 	return p.fieldManager.Apply(obj, p.patch, force)
 }

@@ -18,8 +18,10 @@ package fieldmanager
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
@@ -60,6 +62,22 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 	}, nil
 }
 
+// NewCRDFieldManager creates a new FieldManager specifically for
+// CRDs. This doesn't use openapi models (and it doesn't support the
+// validation field right now).
+func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) *FieldManager {
+	return &FieldManager{
+		typeConverter:   internal.DeducedTypeConverter{},
+		objectConverter: objectConverter,
+		objectDefaulter: objectDefaulter,
+		groupVersion:    gv,
+		hubVersion:      hub,
+		updater: merge.Updater{
+			Converter: internal.NewVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
+		},
+	}
+}
+
 // Update is used when the object has already been merged (non-apply
 // use-case), and simply updates the managed fields in the output
 // object.
@@ -97,6 +115,11 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
+	manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
+	}
+
 	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
@@ -134,8 +157,13 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
+	manager, err := f.buildManagerInfo(applyManager, metav1.ManagedFieldsOperationApply)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
+	}
+
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
+	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
 			return nil, errors.NewApplyConflict(conflicts)
@@ -171,4 +199,17 @@ func (f *FieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
 
 func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
+}
+
+func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
+	managerInfo := metav1.ManagedFieldsEntry{
+		Manager:    prefix,
+		Operation:  operation,
+		APIVersion: f.groupVersion.String(),
+		Time:       &metav1.Time{Time: time.Now().UTC()},
+	}
+	if managerInfo.Manager == "" {
+		managerInfo.Manager = "unknown"
+	}
+	return internal.DecodeManager(&managerInfo)
 }

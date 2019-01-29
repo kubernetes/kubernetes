@@ -29,29 +29,36 @@ import (
 // sigs.k8s.io/structured-merge-diff to the wire format (api format) and back
 func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
-		`foo:
-  apiVersion: v1
+		`- apiVersion: v1
   fields:
-    i:5:
-      f:i: {}
     v:3:
       f:alsoPi: {}
     v:3.1415:
       f:pi: {}
     v:false:
       f:notTrue: {}
+  manager: foo
+  operation: Update
+  time: "2001-02-03T04:05:06Z"
+- apiVersion: v1beta1
+  fields:
+    i:5:
+      f:i: {}
+  manager: foo
+  operation: Update
+  time: "2011-12-13T14:15:16Z"
 `,
-		`foo:
-  apiVersion: v1
+		`- apiVersion: v1
   fields:
     f:spec:
       f:containers:
         k:{"name":"c"}:
           f:image: {}
           f:name: {}
+  manager: foo
+  operation: Apply
 `,
-		`foo:
-  apiVersion: v1
+		`- apiVersion: v1
   fields:
     f:apiVersion: {}
     f:kind: {}
@@ -77,9 +84,10 @@ func TestRoundTripManagedFields(t *testing.T) {
               f:ports:
                 i:0:
                   f:containerPort: {}
+  manager: foo
+  operation: Update
 `,
-		`foo:
-  apiVersion: v1
+		`- apiVersion: v1
   fields:
     f:allowVolumeExpansion: {}
     f:apiVersion: {}
@@ -92,9 +100,10 @@ func TestRoundTripManagedFields(t *testing.T) {
         f:secretName: {}
         f:secretNamespace: {}
     f:provisioner: {}
+  manager: foo
+  operation: Apply
 `,
-		`foo:
-  apiVersion: v1
+		`- apiVersion: v1
   fields:
     f:apiVersion: {}
     f:kind: {}
@@ -114,12 +123,14 @@ func TestRoundTripManagedFields(t *testing.T) {
           f:name: {}
           f:served: {}
           f:storage: {}
+  manager: foo
+  operation: Update
 `,
 	}
 
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
-			var unmarshaled map[string]metav1.VersionedFields
+			var unmarshaled []metav1.ManagedFieldsEntry
 			if err := yaml.Unmarshal([]byte(test), &unmarshaled); err != nil {
 				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
 			}
@@ -137,6 +148,52 @@ func TestRoundTripManagedFields(t *testing.T) {
 			}
 			if !reflect.DeepEqual(string(marshaled), test) {
 				t.Fatalf("expected:\n%v\nbut got:\n%v", test, string(marshaled))
+			}
+		})
+	}
+}
+
+func TestDecodeManager(t *testing.T) {
+	tests := []struct {
+		managedFieldsEntry string
+		expected           string
+	}{
+		{
+			managedFieldsEntry: `
+apiVersion: v1
+fields:
+  f:apiVersion: {}
+manager: foo
+operation: Update
+time: "2001-02-03T04:05:06Z"
+`,
+			expected: "{\"manager\":\"foo\",\"operation\":\"Update\",\"apiVersion\":\"v1\",\"time\":\"2001-02-03T04:05:06Z\"}",
+		},
+		{
+			managedFieldsEntry: `
+apiVersion: v1
+fields:
+  f:apiVersion: {}
+manager: foo
+operation: Apply
+time: "2001-02-03T04:05:06Z"
+`,
+			expected: "{\"manager\":\"foo\",\"operation\":\"Apply\"}",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.managedFieldsEntry, func(t *testing.T) {
+			var unmarshaled metav1.ManagedFieldsEntry
+			if err := yaml.Unmarshal([]byte(test.managedFieldsEntry), &unmarshaled); err != nil {
+				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+			}
+			decoded, err := DecodeManager(&unmarshaled)
+			if err != nil {
+				t.Fatalf("did not expect decoding error but got: %v", err)
+			}
+			if !reflect.DeepEqual(decoded, test.expected) {
+				t.Fatalf("expected:\n%v\nbut got:\n%v", test.expected, decoded)
 			}
 		})
 	}

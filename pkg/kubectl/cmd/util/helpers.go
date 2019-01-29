@@ -400,8 +400,8 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
-	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
+	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {

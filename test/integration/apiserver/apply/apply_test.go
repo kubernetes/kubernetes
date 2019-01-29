@@ -17,10 +17,13 @@ limitations under the License.
 package apiserver
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -202,5 +205,100 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Body([]byte(obj)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to apply object with force: %v", err)
+	}
+}
+
+// TestApplyManagedFields makes sure that managedFields api does not change
+func TestApplyManagedFields(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "test-cm"
+			},
+			"data": {
+				"key": "value"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body([]byte(`{"data":{"key": "new value"}}`)).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to patch object: %v", err)
+	}
+
+	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("configmaps").Name("test-cm").Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	actual, err := json.MarshalIndent(object, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal object: %v", err)
+	}
+
+	expected := []byte(`{
+		"metadata": {
+			"name": "test-cm",
+			"namespace": "default",
+			"selfLink": "` + accessor.GetSelfLink() + `",
+			"uid": "` + string(accessor.GetUID()) + `",
+			"resourceVersion": "` + accessor.GetResourceVersion() + `",
+			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
+			"managedFields": [
+				{
+					"manager": "apply",
+					"operation": "Apply",
+					"apiVersion": "v1",
+					"fields": {
+						"f:apiVersion": {},
+						"f:kind": {},
+						"f:metadata": {
+							"f:name": {}
+						}
+					}
+				},
+				{
+					"manager": "` + accessor.GetManagedFields()[1].Manager + `",
+					"operation": "Update",
+					"apiVersion": "v1",
+					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
+					"fields": {
+						"f:data": {
+							"f:key": {}
+						}
+					}
+				}
+			]
+		},
+		"data": {
+			"key": "new value"
+		}
+	}`)
+
+	if string(expected) != string(actual) {
+		t.Fatalf("Expected:\n%v\nGot:\n%v", string(expected), string(actual))
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -140,7 +141,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 				return
 			}
 
-			obj, err = scope.FieldManager.Update(liveObj, obj, "create")
+			obj, err = scope.FieldManager.Update(liveObj, obj, prefixFromUserAgent(req.UserAgent()))
 			if err != nil {
 				scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
 				return
@@ -190,4 +191,8 @@ type namedCreaterAdapter struct {
 
 func (c *namedCreaterAdapter) Create(ctx context.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj, createValidatingAdmission, options)
+}
+
+func prefixFromUserAgent(u string) string {
+	return strings.Split(u, "/")[0]
 }
