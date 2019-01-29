@@ -136,7 +136,7 @@ func getCertReq(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) *
 					Type: certsapi.CertificateApproved,
 				},
 			},
-			Certificate: certutil.EncodeCertPEM(cert),
+			Certificate: pkiutil.EncodeCertPEM(cert),
 		},
 	}
 }

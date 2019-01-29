@@ -33,8 +33,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
@@ -189,7 +190,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 			spec.APIServer,
 			clustername,
 			spec.ClientName,
-			certutil.EncodeCertPEM(spec.CACert),
+			pkiutil.EncodeCertPEM(spec.CACert),
 			spec.TokenAuth.Token,
 		), nil
 	}
@@ -210,9 +211,9 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 		spec.APIServer,
 		clustername,
 		spec.ClientName,
-		certutil.EncodeCertPEM(spec.CACert),
+		pkiutil.EncodeCertPEM(spec.CACert),
 		certutil.EncodePrivateKeyPEM(clientKey),
-		certutil.EncodeCertPEM(clientCert),
+		pkiutil.EncodeCertPEM(clientCert),
 	), nil
 }
 

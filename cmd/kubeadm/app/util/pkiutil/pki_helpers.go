@@ -18,6 +18,7 @@ package pkiutil
 
 import (
 	"crypto"
+	"crypto/rand"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -25,6 +26,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -40,9 +43,22 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
+const (
+	// PrivateKeyBlockType is a possible value for pem.Block.Type.
+	PrivateKeyBlockType = "PRIVATE KEY"
+	// PublicKeyBlockType is a possible value for pem.Block.Type.
+	PublicKeyBlockType = "PUBLIC KEY"
+	// CertificateBlockType is a possible value for pem.Block.Type.
+	CertificateBlockType = "CERTIFICATE"
+	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
+	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
+	rsaKeySize             = 2048
+	duration365d           = time.Hour * 24 * 365
+)
+
 // NewCertificateAuthority creates new certificate and private key for the certificate authority
 func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
-	key, err := certutil.NewPrivateKey()
+	key, err := NewPrivateKey()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -57,12 +73,12 @@ func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.P
 
 // NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
 func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
-	key, err := certutil.NewPrivateKey()
+	key, err := NewPrivateKey()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
 
-	cert, err := certutil.NewSignedCert(*config, key, caCert, caKey)
+	cert, err := NewSignedCert(config, key, caCert, caKey)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to sign certificate")
 	}
@@ -72,7 +88,7 @@ func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config *cert
 
 // NewCSRAndKey generates a new key and CSR and that could be signed to create the given certificate
 func NewCSRAndKey(config *certutil.Config) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
-	key, err := certutil.NewPrivateKey()
+	key, err := NewPrivateKey()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -111,7 +127,7 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	}
 
 	certificatePath := pathForCert(pkiPath, name)
-	if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
+	if err := certutil.WriteCert(certificatePath, EncodeCertPEM(cert)); err != nil {
 		return errors.Wrapf(err, "unable to write certificate to file %s", certificatePath)
 	}
 
@@ -159,7 +175,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 		return errors.New("public key cannot be nil when writing to file")
 	}
 
-	publicKeyBytes, err := certutil.EncodePublicKeyPEM(key)
+	publicKeyBytes, err := EncodePublicKeyPEM(key)
 	if err != nil {
 		return err
 	}
@@ -503,4 +519,64 @@ func NewCSR(cfg certutil.Config, key crypto.Signer) (*x509.CertificateRequest, e
 	}
 
 	return x509.ParseCertificateRequest(csrBytes)
+}
+
+// EncodeCertPEM returns PEM-endcoded certificate data
+func EncodeCertPEM(cert *x509.Certificate) []byte {
+	block := pem.Block{
+		Type:  CertificateBlockType,
+		Bytes: cert.Raw,
+	}
+	return pem.EncodeToMemory(&block)
+}
+
+// EncodePublicKeyPEM returns PEM-encoded public data
+func EncodePublicKeyPEM(key *rsa.PublicKey) ([]byte, error) {
+	der, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return []byte{}, err
+	}
+	block := pem.Block{
+		Type:  PublicKeyBlockType,
+		Bytes: der,
+	}
+	return pem.EncodeToMemory(&block), nil
+}
+
+// NewPrivateKey creates an RSA private key
+func NewPrivateKey() (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+}
+
+// NewSignedCert creates a signed certificate using the given CA certificate and key
+func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
+	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.CommonName) == 0 {
+		return nil, errors.New("must specify a CommonName")
+	}
+	if len(cfg.Usages) == 0 {
+		return nil, errors.New("must specify at least one ExtKeyUsage")
+	}
+
+	certTmpl := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:     cfg.AltNames.DNSNames,
+		IPAddresses:  cfg.AltNames.IPs,
+		SerialNumber: serial,
+		NotBefore:    caCert.NotBefore,
+		NotAfter:     time.Now().Add(duration365d).UTC(),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  cfg.Usages,
+	}
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
 }

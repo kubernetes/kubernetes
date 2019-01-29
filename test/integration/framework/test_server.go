@@ -32,9 +32,11 @@ import (
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/cert"
+	certutil "k8s.io/client-go/util/cert"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	"k8s.io/kubernetes/pkg/master"
 )
 
@@ -52,28 +54,28 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	}()
 
 	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	proxySigningKey, err := cert.NewPrivateKey()
+	proxySigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
+	proxySigningCert, err := certutil.NewSelfSignedCACert(certutil.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile.Name(), cert.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(proxyCACertFile.Name(), pkiutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
-	clientSigningKey, err := cert.NewPrivateKey()
+	clientSigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
+	clientSigningCert, err := certutil.NewSelfSignedCACert(certutil.Config{CommonName: "client-ca"}, clientSigningKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile.Name(), cert.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(clientCACertFile.Name(), pkiutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 
