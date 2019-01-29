@@ -505,7 +505,7 @@ type Cloud struct {
 
 	instanceCache instanceCache
 
-	clientBuilder    controller.ControllerClientBuilder
+	clientBuilder    cloudprovider.ControllerClientBuilder
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
