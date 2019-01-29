@@ -33,6 +33,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/cloud-provider/node:all-srcs",
+    ],
     tags = ["automanaged"],
 )
