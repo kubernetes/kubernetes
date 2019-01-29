@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "codec_test.go",
         "local_scheme_test.go",
         "swagger_doc_generator_test.go",
     ],
