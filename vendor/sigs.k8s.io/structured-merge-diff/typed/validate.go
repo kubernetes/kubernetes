@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
-func (tv TypedValue) walker() *validatingObjectWalker {
+func (tv typedValue) walker() *validatingObjectWalker {
 	return &validatingObjectWalker{
 		value:   tv.value,
 		schema:  tv.schema,

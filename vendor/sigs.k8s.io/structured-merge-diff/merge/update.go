@@ -85,6 +85,15 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, version fieldpat
 
 	for manager, conflictSet := range conflicts {
 		managers[manager].Set = managers[manager].Set.Difference(conflictSet.Set)
+		if managers[manager].Set.Empty() {
+			delete(managers, manager)
+		}
+	}
+
+	if _, ok := managers[workflow]; !ok {
+		managers[workflow] = &fieldpath.VersionedSet{
+			Set: fieldpath.NewSet(),
+		}
 	}
 
 	return managers, nil
@@ -105,13 +114,11 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpa
 	if err != nil {
 		return fieldpath.ManagedFields{}, fmt.Errorf("failed to compare live and new objects: %v", err)
 	}
-	if _, ok := managers[manager]; !ok {
-		managers[manager] = &fieldpath.VersionedSet{
-			Set: fieldpath.NewSet(),
-		}
-	}
 	managers[manager].Set = managers[manager].Set.Union(compare.Modified).Union(compare.Added).Difference(compare.Removed)
 	managers[manager].APIVersion = version
+	if managers[manager].Set.Empty() {
+		delete(managers, manager)
+	}
 	return managers, nil
 }
 
@@ -121,22 +128,41 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpa
 func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (typed.TypedValue, fieldpath.ManagedFields, error) {
 	newObject, err := liveObject.Merge(configObject)
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
 	}
 	managers, err = s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, err
+		return nil, fieldpath.ManagedFields{}, err
 	}
-
-	// TODO: Remove unconflicting removed fields
-
+	newObject, err = s.removeDisownedItems(newObject, configObject, managers[manager])
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to remove fields: %v", err)
+	}
 	set, err := configObject.ToFieldSet()
 	if err != nil {
-		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
+		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
 	}
 	managers[manager] = &fieldpath.VersionedSet{
 		Set:        set,
 		APIVersion: version,
 	}
+	if managers[manager].Set.Empty() {
+		delete(managers, manager)
+	}
 	return newObject, managers, nil
+}
+
+func (s *Updater) removeDisownedItems(merged, applied typed.TypedValue, lastSet *fieldpath.VersionedSet) (typed.TypedValue, error) {
+	if lastSet.Set.Empty() {
+		return merged, nil
+	}
+	convertedApplied, err := s.Converter.Convert(applied, lastSet.APIVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert applied config to last applied version: %v", err)
+	}
+	appliedSet, err := convertedApplied.ToFieldSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create field set from applied config in last applied version: %v", err)
+	}
+	return merged.RemoveItems(lastSet.Set.Difference(appliedSet)), nil
 }

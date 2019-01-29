@@ -154,6 +154,16 @@ func (s *Set) iteratePrefix(prefix Path, f func(Path)) {
 	s.Children.iteratePrefix(prefix, f)
 }
 
+// WithPrefix returns the subset of paths which begin with the given prefix,
+// with the prefix not included.
+func (s *Set) WithPrefix(pe PathElement) *Set {
+	subset, ok := s.Children.Get(pe)
+	if !ok {
+		return NewSet()
+	}
+	return subset
+}
+
 // setNode is a pair of PathElement / Set, for the purpose of expressing
 // nested set membership.
 type setNode struct {

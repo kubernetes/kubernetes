@@ -129,6 +129,9 @@ func (ef errorFormatter) validateScalar(t schema.Scalar, v *value.Value, prefix 
 	if v == nil {
 		return nil
 	}
+	if v.Null {
+		return nil
+	}
 	switch t {
 	case schema.Numeric:
 		if v.FloatValue == nil && v.IntValue == nil {

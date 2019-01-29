@@ -25,44 +25,87 @@ import (
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
-// TypedValue is a value of some specific type.
-type TypedValue struct {
-	value   value.Value
-	typeRef schema.TypeRef
-	schema  *schema.Schema
+// TypedValue is a value with an associated type.
+type TypedValue interface {
+	// AsValue removes the type from the TypedValue and only keeps the value.
+	AsValue() *value.Value
+	// Validate returns an error with a list of every spec violation.
+	Validate() error
+	// ToFieldSet creates a set containing every leaf field mentioned, or
+	// validation errors, if any were encountered.
+	ToFieldSet() (*fieldpath.Set, error)
+	// Merge returns the result of merging tv and pso ("partially specified
+	// object") together. Of note:
+	//  * No fields can be removed by this operation.
+	//  * If both tv and pso specify a given leaf field, the result will keep pso's
+	//    value.
+	//  * Container typed elements will have their items ordered:
+	//    * like tv, if pso doesn't change anything in the container
+	//    * like pso, if pso does change something in the container.
+	// tv and pso must both be of the same type (their Schema and TypeRef must
+	// match), or an error will be returned. Validation errors will be returned if
+	// the objects don't conform to the schema.
+	Merge(pso TypedValue) (TypedValue, error)
+	// Compare compares the two objects. See the comments on the `Comparison`
+	// struct for details on the return value.
+	//
+	// tv and rhs must both be of the same type (their Schema and TypeRef must
+	// match), or an error will be returned. Validation errors will be returned if
+	// the objects don't conform to the schema.
+	Compare(rhs TypedValue) (c *Comparison, err error)
+	// RemoveItems removes each provided list or map item from the value.
+	RemoveItems(items *fieldpath.Set) TypedValue
 }
 
 // AsTyped accepts a value and a type and returns a TypedValue. 'v' must have
 // type 'typeName' in the schema. An error is returned if the v doesn't conform
 // to the schema.
 func AsTyped(v value.Value, s *schema.Schema, typeName string) (TypedValue, error) {
-	tv := TypedValue{
+	tv := typedValue{
 		value:   v,
 		typeRef: schema.TypeRef{NamedType: &typeName},
 		schema:  s,
 	}
 	if err := tv.Validate(); err != nil {
-		return TypedValue{}, err
+		return nil, err
 	}
 	return tv, nil
 }
 
-// AsValue removes the type from the TypedValue and only keeps the value.
-func (tv TypedValue) AsValue() *value.Value {
+// AsTypeUnvalidated is just like AsTyped, but doesn't validate that the type
+// conforms to the schema, for cases where that has already been checked or
+// where you're going to call a method that validates as a side-effect (like
+// ToFieldSet).
+func AsTypedUnvalidated(v value.Value, s *schema.Schema, typeName string) TypedValue {
+	tv := typedValue{
+		value:   v,
+		typeRef: schema.TypeRef{NamedType: &typeName},
+		schema:  s,
+	}
+	return tv
+}
+
+// typedValue is a value of some specific type.
+type typedValue struct {
+	value   value.Value
+	typeRef schema.TypeRef
+	schema  *schema.Schema
+}
+
+var _ TypedValue = typedValue{}
+
+func (tv typedValue) AsValue() *value.Value {
 	return &tv.value
 }
 
-// Validate returns an error with a list of every spec violation.
-func (tv TypedValue) Validate() error {
+func (tv typedValue) Validate() error {
 	if errs := tv.walker().validate(); len(errs) != 0 {
 		return errs
 	}
 	return nil
 }
 
-// ToFieldSet creates a set containing every leaf field mentioned in tv, or
-// validation errors, if any were encountered.
-func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
+func (tv typedValue) ToFieldSet() (*fieldpath.Set, error) {
 	s := fieldpath.NewSet()
 	w := tv.walker()
 	w.leafFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
@@ -72,19 +115,91 @@ func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
 	return s, nil
 }
 
-// Merge returns the result of merging tv and pso ("partially specified
-// object") together. Of note:
-//  * No fields can be removed by this operation.
-//  * If both tv and pso specify a given leaf field, the result will keep pso's
-//    value.
-//  * Container typed elements will have their items ordered:
-//    * like tv, if pso doesn't change anything in the container
-//    * like pso, if pso does change something in the container.
-// tv and pso must both be of the same type (their Schema and TypeRef must
-// match), or an error will be returned. Validation errors will be returned if
-// the objects don't conform to the schema.
-func (tv TypedValue) Merge(pso TypedValue) (TypedValue, error) {
-	return merge(tv, pso, ruleKeepRHS, nil)
+func (tv typedValue) Merge(pso TypedValue) (TypedValue, error) {
+	tpso, ok := pso.(typedValue)
+	if !ok {
+		return nil, errorFormatter{}.
+			errorf("can't merge typedValue with %T", pso)
+	}
+	return merge(tv, tpso, ruleKeepRHS, nil)
+}
+
+func (tv typedValue) Compare(rhs TypedValue) (c *Comparison, err error) {
+	trhs, ok := rhs.(typedValue)
+	if !ok {
+		return nil, errorFormatter{}.
+			errorf("can't compare typedValue with %T", rhs)
+	}
+	c = &Comparison{
+		Removed:  fieldpath.NewSet(),
+		Modified: fieldpath.NewSet(),
+		Added:    fieldpath.NewSet(),
+	}
+	c.Merged, err = merge(tv, trhs, func(w *mergingWalker) {
+		if w.lhs == nil {
+			c.Added.Insert(w.path)
+		} else if w.rhs == nil {
+			c.Removed.Insert(w.path)
+		} else if !reflect.DeepEqual(w.rhs, w.lhs) {
+			// TODO: reflect.DeepEqual is not sufficient for this.
+			// Need to implement equality check on the value type.
+			c.Modified.Insert(w.path)
+		}
+
+		ruleKeepRHS(w)
+	}, func(w *mergingWalker) {
+		if w.lhs == nil {
+			c.Added.Insert(w.path)
+		} else if w.rhs == nil {
+			c.Removed.Insert(w.path)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
+// RemoveItems removes each provided list or map item from the value.
+func (tv typedValue) RemoveItems(items *fieldpath.Set) TypedValue {
+	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef)
+	return tv
+}
+
+func merge(lhs, rhs typedValue, rule, postRule mergeRule) (TypedValue, error) {
+	if lhs.schema != rhs.schema {
+		return nil, errorFormatter{}.
+			errorf("expected objects with types from the same schema")
+	}
+	if !reflect.DeepEqual(lhs.typeRef, rhs.typeRef) {
+		return nil, errorFormatter{}.
+			errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
+	}
+
+	mw := mergingWalker{
+		lhs:          &lhs.value,
+		rhs:          &rhs.value,
+		schema:       lhs.schema,
+		typeRef:      lhs.typeRef,
+		rule:         rule,
+		postItemHook: postRule,
+	}
+	errs := mw.merge()
+	if len(errs) > 0 {
+		return nil, errs
+	}
+
+	out := typedValue{
+		schema:  lhs.schema,
+		typeRef: lhs.typeRef,
+	}
+	if mw.out == nil {
+		out.value = value.Value{Null: true}
+	} else {
+		out.value = *mw.out
+	}
+	return out, nil
 }
 
 // Comparison is the return value of a TypedValue.Compare() operation.
@@ -124,90 +239,4 @@ func (c *Comparison) String() string {
 		str += fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed)
 	}
 	return str
-}
-
-// Compare compares the two objects. See the comments on the `Comparison`
-// struct for details on the return value.
-//
-// tv and rhs must both be of the same type (their Schema and TypeRef must
-// match), or an error will be returned. Validation errors will be returned if
-// the objects don't conform to the schema.
-func (tv TypedValue) Compare(rhs TypedValue) (c *Comparison, err error) {
-	c = &Comparison{
-		Removed:  fieldpath.NewSet(),
-		Modified: fieldpath.NewSet(),
-		Added:    fieldpath.NewSet(),
-	}
-	c.Merged, err = merge(tv, rhs, func(w *mergingWalker) {
-		if w.lhs == nil {
-			c.Added.Insert(w.path)
-		} else if w.rhs == nil {
-			c.Removed.Insert(w.path)
-		} else if !reflect.DeepEqual(w.rhs, w.lhs) {
-			// TODO: reflect.DeepEqual is not sufficient for this.
-			// Need to implement equality check on the value type.
-			c.Modified.Insert(w.path)
-		}
-
-		ruleKeepRHS(w)
-	}, func(w *mergingWalker) {
-		if w.lhs == nil {
-			c.Added.Insert(w.path)
-		} else if w.rhs == nil {
-			c.Removed.Insert(w.path)
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-func merge(lhs, rhs TypedValue, rule, postRule mergeRule) (TypedValue, error) {
-	if lhs.schema != rhs.schema {
-		return TypedValue{}, errorFormatter{}.
-			errorf("expected objects with types from the same schema")
-	}
-	if !reflect.DeepEqual(lhs.typeRef, rhs.typeRef) {
-		return TypedValue{}, errorFormatter{}.
-			errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
-	}
-
-	mw := mergingWalker{
-		lhs:          &lhs.value,
-		rhs:          &rhs.value,
-		schema:       lhs.schema,
-		typeRef:      lhs.typeRef,
-		rule:         rule,
-		postItemHook: postRule,
-	}
-	errs := mw.merge()
-	if len(errs) > 0 {
-		return TypedValue{}, errs
-	}
-
-	out := TypedValue{
-		schema:  lhs.schema,
-		typeRef: lhs.typeRef,
-	}
-	if mw.out == nil {
-		out.value = value.Value{Null: true}
-	} else {
-		out.value = *mw.out
-	}
-	return out, nil
-}
-
-// AsTypeUnvalidated is just like WithType, but doesn't validate that the type
-// conforms to the schema, for cases where that has already been checked or
-// where you're going to call a method that validates as a side-effect (like
-// ToFieldSet).
-func AsTypedUnvalidated(v value.Value, s *schema.Schema, typeName string) TypedValue {
-	tv := TypedValue{
-		value:   v,
-		typeRef: schema.TypeRef{NamedType: &typeName},
-		schema:  s,
-	}
-	return tv
 }
