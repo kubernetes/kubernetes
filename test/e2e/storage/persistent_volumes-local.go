@@ -451,9 +451,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		BeforeEach(func() {
 			setupStorageClass(config, &waitMode)
-			for _, node := range config.nodes {
+			for i, node := range config.nodes {
 				By(fmt.Sprintf("Setting up %d local volumes on node %q", volsPerNode, node.Name))
-				allLocalVolumes[node.Name] = setupLocalVolumes(config, volType, &node, volsPerNode)
+				allLocalVolumes[node.Name] = setupLocalVolumes(config, volType, &config.nodes[i], volsPerNode)
 			}
 			By(fmt.Sprintf("Create %d PVs", volsPerNode*len(config.nodes)))
 			var err error
@@ -513,14 +513,15 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 
 		AfterEach(func() {
+			By("Stop and wait for recycle goroutine to finish")
+			close(stopCh)
+			wg.Wait()
+			By("Clean all PVs")
 			for nodeName, localVolumes := range allLocalVolumes {
 				By(fmt.Sprintf("Cleaning up %d local volumes on node %q", len(localVolumes), nodeName))
 				cleanupLocalVolumes(config, localVolumes)
 			}
 			cleanupStorageClass(config)
-			By("Wait for recycle goroutine to finish")
-			close(stopCh)
-			wg.Wait()
 		})
 
 		It("should be able to process many pods and reuse local volumes", func() {
