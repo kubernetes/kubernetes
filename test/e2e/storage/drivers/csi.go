@@ -304,6 +304,9 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 		// tests to fail.
 		framework.SkipIfMultizone(f.ClientSet)
 	}
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -312,6 +315,9 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["csi.storage.k8s.io/fstype"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
@@ -404,6 +410,9 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 }
 
 func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -412,6 +421,9 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["csi.storage.k8s.io/fstype"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }

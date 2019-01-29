@@ -401,7 +401,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple VolumeTests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
+func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, fsType string, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
 	var gracePeriod int64 = 1
 	clientPod := &v1.Pod{
@@ -475,6 +475,12 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 		By("Checking fsGroup is correct.")
 		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
 		Expect(err).NotTo(HaveOccurred(), "failed: getting the right privileges in the file %v", int(*fsGroup))
+	}
+
+	if fsType != "" {
+		By("Checking fsType is correct.")
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
+		Expect(err).NotTo(HaveOccurred(), "failed: getting the right fsType %s", fsType)
 	}
 }
 
