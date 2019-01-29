@@ -131,16 +131,16 @@ func (ef errorFormatter) validateScalar(t schema.Scalar, v *value.Value, prefix 
 	}
 	switch t {
 	case schema.Numeric:
-		if v.FloatValue == nil && v.IntValue == nil {
+		if !v.Null && v.FloatValue == nil && v.IntValue == nil {
 			// TODO: should the schema separate int and float?
 			return ef.errorf("%vexpected numeric (int or float), got %v", prefix, v)
 		}
 	case schema.String:
-		if v.StringValue == nil {
+		if !v.Null && v.StringValue == nil {
 			return ef.errorf("%vexpected string, got %v", prefix, v)
 		}
 	case schema.Boolean:
-		if v.BooleanValue == nil {
+		if !v.Null && v.BooleanValue == nil {
 			return ef.errorf("%vexpected boolean, got %v", prefix, v)
 		}
 	}
