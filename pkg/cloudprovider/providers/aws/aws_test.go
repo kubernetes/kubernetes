@@ -190,6 +190,7 @@ type ServiceDescriptor struct {
 	name                         string
 	region                       string
 	signingRegion, signingMethod string
+	signingName                  string
 }
 
 func TestOverridesActiveConfig(t *testing.T) {
@@ -376,12 +377,12 @@ func TestOverridesActiveConfig(t *testing.T) {
                  URL=https://s3.foo.bar
                  SigningRegion=sregion1
 				 SigningMethod = v4
-                 
+                 SigningName = "name"
                  `),
 			nil,
 			false, true,
 			[]ServiceDescriptor{{name: "s3", region: "region1", signingRegion: "sregion1", signingMethod: "v3"},
-				{name: "s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4"}},
+				{name: "s3", region: "region2", signingRegion: "sregion1", signingMethod: "v4", signingName: "name"}},
 		},
 	}
 
@@ -411,6 +412,7 @@ func TestOverridesActiveConfig(t *testing.T) {
 						URL           string
 						SigningRegion string
 						SigningMethod string
+						SigningName   string
 					}
 					for _, v := range cfg.ServiceOverride {
 						if v.Service == sd.name && v.Region == sd.region {
@@ -434,6 +436,10 @@ func TestOverridesActiveConfig(t *testing.T) {
 						if found.URL != targetName {
 							t.Errorf("Expected Endpoint '%s', received '%s' for case %s",
 								targetName, found.URL, test.name)
+						}
+						if found.SigningName != sd.signingName {
+							t.Errorf("Expected signing name '%s', received '%s' for case %s",
+								sd.signingName, found.SigningName, test.name)
 						}
 
 						fn := cfg.getResolver()

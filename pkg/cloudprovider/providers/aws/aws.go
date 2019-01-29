@@ -590,6 +590,7 @@ type CloudConfig struct {
 		URL           string
 		SigningRegion string
 		SigningMethod string
+		SigningName   string
 	}
 }
 
@@ -649,6 +650,7 @@ func (cfg *CloudConfig) getResolver() endpoints.ResolverFunc {
 					URL:           override.URL,
 					SigningRegion: override.SigningRegion,
 					SigningMethod: override.SigningMethod,
+					SigningName:   override.SigningName,
 				}, nil
 			}
 		}
