@@ -18,6 +18,7 @@ package serviceaccount_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -116,12 +117,18 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 const ecdsaKeyID = "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc"
 
 func getPrivateKey(data string) interface{} {
-	key, _ := keyutil.ParsePrivateKeyPEM([]byte(data))
+	key, err := keyutil.ParsePrivateKeyPEM([]byte(data))
+	if err != nil {
+		panic(fmt.Errorf("unexpected error parsing private key: %v", err))
+	}
 	return key
 }
 
 func getPublicKey(data string) interface{} {
-	keys, _ := keyutil.ParsePublicKeysPEM([]byte(data))
+	keys, err := keyutil.ParsePublicKeysPEM([]byte(data))
+	if err != nil {
+		panic(fmt.Errorf("unexpected error parsing public key: %v", err))
+	}
 	return keys[0]
 }
 

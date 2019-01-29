@@ -239,6 +239,15 @@ const (
 	// to the API server.
 	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
 
+	// owner: @mtaufen
+	// alpha: v1.18
+	//
+	// Enable OIDC discovery endpoints (issuer and JWKS URLs) for the service
+	// account issuer in the API server.
+	// Note these endpoints serve minimally-compliant discovery docs that are
+	// intended to be used for service account token verification.
+	ServiceAccountIssuerDiscovery featuregate.Feature = "ServiceAccountIssuerDiscovery"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -573,6 +582,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAccountIssuerDiscovery:  {Default: false, PreRelease: featuregate.Alpha},
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
 	CSIMigration:                   {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)

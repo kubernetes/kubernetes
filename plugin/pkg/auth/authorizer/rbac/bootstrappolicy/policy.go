@@ -458,6 +458,21 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
+		// but do not bind it explicitly. Leave the decision of who can read it up
+		// to cluster admins.
+		roles = append(roles, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/.well-known/openid-configuration",
+					"/openid/v1/jwks",
+				).RuleOrDie(),
+			},
+		})
+	}
+
 	// node-proxier role is used by kube-proxy.
 	nodeProxierRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),

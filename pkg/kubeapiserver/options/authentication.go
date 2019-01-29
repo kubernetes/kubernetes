@@ -81,6 +81,7 @@ type ServiceAccountAuthenticationOptions struct {
 	KeyFiles      []string
 	Lookup        bool
 	Issuer        string
+	JWKSURI       string
 	MaxExpiration time.Duration
 }
 
@@ -188,6 +189,22 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 
+	if s.ServiceAccounts != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+			// Validate the JWKS URI when it is explicitly set.
+			// When unset, it is later derived from ExternalHost.
+			if s.ServiceAccounts.JWKSURI != "" {
+				if u, err := url.Parse(s.ServiceAccounts.JWKSURI); err != nil {
+					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
+				} else if u.Scheme != "https" {
+					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
+				}
+			}
+		} else if len(s.ServiceAccounts.JWKSURI) > 0 {
+			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
+		}
+	}
+
 	return allErrors
 }
 
@@ -281,7 +298,20 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
-			"in \"iss\" claim of issued tokens. This value is a string or URI.")
+			"in \"iss\" claim of issued tokens. This value is a string or URI. If this option is not "+
+			"a valid URI per the OpenID Discovery 1.0 spec, the ServiceAccountIssuerDiscovery feature "+
+			"will remain disabled, even if the feature gate is set to true. It is highly recommended "+
+			"that this value comply with the OpenID spec: https://openid.net/specs/openid-connect-discovery-1_0.html. "+
+			"In practice, this means that service-account-issuer must be an https URL. It is also highly "+
+			"recommended that this URL be capable of serving OpenID discovery documents at "+
+			"`{service-account-issuer}/.well-known/openid-configuration`.")
+
+		fs.StringVar(&s.ServiceAccounts.JWKSURI, "service-account-jwks-uri", s.ServiceAccounts.JWKSURI, ""+
+			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
+			"/.well-known/openid-configuration. This flag is useful if the discovery doc"+
+			"and key set are served to relying parties from a URL other than the "+
+			"API server's external (as auto-detected or overridden with external-hostname). "+
+			"Only valid if the ServiceAccountIssuerDiscovery feature gate is enabled.")
 
 		// Deprecated in 1.13
 		fs.StringSliceVar(&s.APIAudiences, "service-account-api-audiences", s.APIAudiences, ""+
