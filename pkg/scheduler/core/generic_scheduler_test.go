@@ -449,7 +449,7 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				internalqueue.NewSchedulingQueue(),
+				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
 				algorithm.EmptyPredicateMetadataProducer,
 				test.prioritizers,
@@ -485,7 +485,7 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 	s := NewGenericScheduler(
 		cache,
 		nil,
-		internalqueue.NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(nil),
 		predicates,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
@@ -1412,7 +1412,7 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				internalqueue.NewSchedulingQueue(),
+				internalqueue.NewSchedulingQueue(nil),
 				map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 				algorithm.EmptyPredicateMetadataProducer,
 				[]algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
@@ -1543,7 +1543,7 @@ func TestCacheInvalidationRace(t *testing.T) {
 	scheduler := NewGenericScheduler(
 		mockCache,
 		eCache,
-		internalqueue.NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(nil),
 		ps,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
@@ -1626,7 +1626,7 @@ func TestCacheInvalidationRace2(t *testing.T) {
 	scheduler := NewGenericScheduler(
 		cache,
 		eCache,
-		internalqueue.NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(nil),
 		ps,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
