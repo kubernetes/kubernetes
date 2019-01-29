@@ -22,59 +22,71 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-var (
-	// The predicateName tries to be consistent as the predicate name used in DefaultAlgorithmProvider defined in
-	// defaults.go (which tend to be stable for backward compatibility)
+const (
+	// those constants are specific error types for pod predicates.
+	podAffinityRulesNotMatch              = "PodAffinityRulesNotMatch"
+	podAntiAffinityRulesNotMatch          = "PodAntiAffinityRulesNotMatch"
+	existingPodsAntiAffinityRulesNotMatch = "ExistingPodsAntiAffinityRulesNotMatch"
+	maxVolumeCount                        = "MaxVolumeCount"
+	nodeNotReady                          = "NodeNotReady"
+	nodeNetworkUnavailable                = "NodeNetworkUnavailable"
+	nodeUnknownCondition                  = "NodeUnknownCondition"
+	volumeNodeAffinityConflict            = "VolumeNodeAffinityConflict"
+	volumeBindingNoMatch                  = "VolumeBindingNoMatch"
+)
 
+var (
 	// NOTE: If you add a new predicate failure error for a predicate that can never
 	// be made to pass by removing pods, or you change an existing predicate so that
 	// it can never be made to pass by removing pods, you need to add the predicate
 	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 
 	// ErrDiskConflict is used for NoDiskConflict predicate error.
-	ErrDiskConflict = newPredicateFailureError("NoDiskConflict", "node(s) had no available disk")
+	ErrDiskConflict = newPredicateFailureError(NoDiskConflictPred, "node(s) had no available disk")
 	// ErrVolumeZoneConflict is used for NoVolumeZoneConflict predicate error.
-	ErrVolumeZoneConflict = newPredicateFailureError("NoVolumeZoneConflict", "node(s) had no available volume zone")
+	ErrVolumeZoneConflict = newPredicateFailureError(NoVolumeZoneConflictPred, "node(s) had no available volume zone")
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
-	ErrNodeSelectorNotMatch = newPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
+	ErrNodeSelectorNotMatch = newPredicateFailureError(MatchNodeSelectorPred, "node(s) didn't match node selector")
 	// ErrPodAffinityNotMatch is used for MatchInterPodAffinity predicate error.
-	ErrPodAffinityNotMatch = newPredicateFailureError("MatchInterPodAffinity", "node(s) didn't match pod affinity/anti-affinity")
-	// ErrPodAffinityRulesNotMatch is used for PodAffinityRulesNotMatch predicate error.
-	ErrPodAffinityRulesNotMatch = newPredicateFailureError("PodAffinityRulesNotMatch", "node(s) didn't match pod affinity rules")
-	// ErrPodAntiAffinityRulesNotMatch is used for PodAntiAffinityRulesNotMatch predicate error.
-	ErrPodAntiAffinityRulesNotMatch = newPredicateFailureError("PodAntiAffinityRulesNotMatch", "node(s) didn't match pod anti-affinity rules")
-	// ErrExistingPodsAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.
-	ErrExistingPodsAntiAffinityRulesNotMatch = newPredicateFailureError("ExistingPodsAntiAffinityRulesNotMatch", "node(s) didn't satisfy existing pods anti-affinity rules")
+	ErrPodAffinityNotMatch = newPredicateFailureError(MatchInterPodAffinityPred, "node(s) didn't match pod affinity/anti-affinity")
+	// ErrPodAffinityRulesNotMatch is used for MatchInterPodAffinity predicate error.
+	ErrPodAffinityRulesNotMatch = newPredicateFailureError(podAffinityRulesNotMatch, "node(s) didn't match pod affinity rules")
+	// ErrPodAntiAffinityRulesNotMatch is used for MatchInterPodAffinity predicate error.
+	ErrPodAntiAffinityRulesNotMatch = newPredicateFailureError(podAntiAffinityRulesNotMatch, "node(s) didn't match pod anti-affinity rules")
+	// ErrExistingPodsAntiAffinityRulesNotMatch is used for MatchInterPodAffinity predicate error.
+	ErrExistingPodsAntiAffinityRulesNotMatch = newPredicateFailureError(existingPodsAntiAffinityRulesNotMatch, "node(s) didn't satisfy existing pods anti-affinity rules")
 	// ErrTaintsTolerationsNotMatch is used for PodToleratesNodeTaints predicate error.
-	ErrTaintsTolerationsNotMatch = newPredicateFailureError("PodToleratesNodeTaints", "node(s) had taints that the pod didn't tolerate")
+	ErrTaintsTolerationsNotMatch = newPredicateFailureError(PodToleratesNodeTaintsPred, "node(s) had taints that the pod didn't tolerate")
 	// ErrPodNotMatchHostName is used for HostName predicate error.
-	ErrPodNotMatchHostName = newPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
+	ErrPodNotMatchHostName = newPredicateFailureError(HostNamePred, "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
-	ErrPodNotFitsHostPorts = newPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
+	ErrPodNotFitsHostPorts = newPredicateFailureError(PodFitsHostPortsPred, "node(s) didn't have free ports for the requested pod ports")
 	// ErrNodeLabelPresenceViolated is used for CheckNodeLabelPresence predicate error.
-	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence", "node(s) didn't have the requested labels")
+	ErrNodeLabelPresenceViolated = newPredicateFailureError(CheckNodeLabelPresencePred, "node(s) didn't have the requested labels")
 	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
-	ErrServiceAffinityViolated = newPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
-	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
-	ErrMaxVolumeCountExceeded = newPredicateFailureError("MaxVolumeCount", "node(s) exceed max volume count")
-	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
-	ErrNodeUnderMemoryPressure = newPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
+	ErrServiceAffinityViolated = newPredicateFailureError(CheckServiceAffinityPred, "node(s) didn't match service affinity")
+	// ErrMaxVolumeCountExceeded is used for MaxEBSVolumeCount, MaxGCEPDVolumeCount, MaxAzureDiskVolumeCount,
+	// MaxCinderVolumeCount, and MaxCSIVolumeCount predicate error.
+	ErrMaxVolumeCountExceeded = newPredicateFailureError(maxVolumeCount, "node(s) exceed max volume count")
+	// ErrNodeUnderMemoryPressure is used for CheckNodeMemoryPressure predicate error.
+	ErrNodeUnderMemoryPressure = newPredicateFailureError(CheckNodeMemoryPressurePred, "node(s) had memory pressure")
 	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.
-	ErrNodeUnderDiskPressure = newPredicateFailureError("NodeUnderDiskPressure", "node(s) had disk pressure")
-	// ErrNodeUnderPIDPressure is used for NodeUnderPIDPressure predicate error.
-	ErrNodeUnderPIDPressure = newPredicateFailureError("NodeUnderPIDPressure", "node(s) had pid pressure")
-	// ErrNodeNotReady is used for NodeNotReady predicate error.
-	ErrNodeNotReady = newPredicateFailureError("NodeNotReady", "node(s) were not ready")
-	// ErrNodeNetworkUnavailable is used for NodeNetworkUnavailable predicate error.
-	ErrNodeNetworkUnavailable = newPredicateFailureError("NodeNetworkUnavailable", "node(s) had unavailable network")
+	ErrNodeUnderDiskPressure = newPredicateFailureError(CheckNodeDiskPressurePred, "node(s) had disk pressure")
+	// ErrNodeUnderPIDPressure is used for CheckNodePIDPressure predicate error.
+	ErrNodeUnderPIDPressure = newPredicateFailureError(CheckNodePIDPressurePred, "node(s) had pid pressure")
+	// ErrNodeNotReady is used for CheckNodeCondition predicate error.
+	ErrNodeNotReady = newPredicateFailureError(nodeNotReady, "node(s) were not ready")
+	// ErrNodeNetworkUnavailable is used for CheckNodeCondition predicate error.
+	ErrNodeNetworkUnavailable = newPredicateFailureError(nodeNetworkUnavailable, "node(s) had unavailable network")
 	// ErrNodeUnschedulable is used for NodeUnschedulable predicate error.
-	ErrNodeUnschedulable = newPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
-	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
-	ErrNodeUnknownCondition = newPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
-	// ErrVolumeNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrVolumeNodeConflict = newPredicateFailureError("VolumeNodeAffinityConflict", "node(s) had volume node affinity conflict")
-	// ErrVolumeBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrVolumeBindConflict = newPredicateFailureError("VolumeBindingNoMatch", "node(s) didn't find available persistent volumes to bind")
+	ErrNodeUnschedulable = newPredicateFailureError(CheckNodeUnschedulablePred, "node(s) were unschedulable")
+	// ErrNodeUnknownCondition is used for CheckNodeCondition predicate error.
+	ErrNodeUnknownCondition = newPredicateFailureError(nodeUnknownCondition, "node(s) had unknown conditions")
+	// ErrVolumeNodeConflict is used for CheckVolumeBinding predicate error.
+	ErrVolumeNodeConflict = newPredicateFailureError(volumeNodeAffinityConflict, "node(s) had volume node affinity conflict")
+	// ErrVolumeBindConflict is used for CheckVolumeBinding predicate error.
+	ErrVolumeBindConflict = newPredicateFailureError(volumeBindingNoMatch, "node(s) didn't find available persistent volumes to bind")
+
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
