@@ -177,7 +177,7 @@ time: 1:00pm
 			if err := yaml.Unmarshal([]byte(test.managedFieldsEntry), &unmarshaled); err != nil {
 				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
 			}
-			decoded, err := decodeManager(&unmarshaled)
+			decoded, err := DecodeManager(&unmarshaled)
 			if err != nil {
 				t.Fatalf("did not expect decoding error but got: %v", err)
 			}
