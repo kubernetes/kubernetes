@@ -14,6 +14,10 @@ const (
 	eAry
 )
 
+var SupportNegativeIndices bool = true
+var ArraySizeLimit int = 0
+var ArraySizeAdditionLimit int = 0
+
 type lazyNode struct {
 	raw   *json.RawMessage
 	doc   partialDoc
@@ -59,6 +63,19 @@ func (n *lazyNode) UnmarshalJSON(data []byte) error {
 	n.raw = &dest
 	n.which = eRaw
 	return nil
+}
+
+func deepCopy(src *lazyNode) (*lazyNode, error) {
+	if src == nil {
+		return nil, nil
+	}
+	a, err := src.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	ra := make(json.RawMessage, len(a))
+	copy(ra, a)
+	return newLazyNode(&ra), nil
 }
 
 func (n *lazyNode) intoDoc() (*partialDoc, error) {
@@ -204,7 +221,7 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 }
 
 func (o operation) kind() string {
-	if obj, ok := o["op"]; ok {
+	if obj, ok := o["op"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -220,7 +237,7 @@ func (o operation) kind() string {
 }
 
 func (o operation) path() string {
-	if obj, ok := o["path"]; ok {
+	if obj, ok := o["path"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -236,7 +253,7 @@ func (o operation) path() string {
 }
 
 func (o operation) from() string {
-	if obj, ok := o["from"]; ok {
+	if obj, ok := o["from"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -354,8 +371,17 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 	}
 
 	sz := len(*d)
+
+	if diff := idx + 1 - sz; ArraySizeAdditionLimit > 0 && diff > ArraySizeAdditionLimit {
+		return fmt.Errorf("Unable to increase the array size by %d, the limit is %d", diff, ArraySizeAdditionLimit)
+	}
+
 	if idx+1 > sz {
 		sz = idx + 1
+	}
+
+	if ArraySizeLimit > 0 && sz > ArraySizeLimit {
+		return fmt.Errorf("Unable to create array of size %d, limit is %d", sz, ArraySizeLimit)
 	}
 
 	ary := make([]*lazyNode, sz)
@@ -385,21 +411,29 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 		return err
 	}
 
-	ary := make([]*lazyNode, len(*d)+1)
+	sz := len(*d) + 1
+	if ArraySizeLimit > 0 && sz > ArraySizeLimit {
+		return fmt.Errorf("Unable to create array of size %d, limit is %d", sz, ArraySizeLimit)
+	}
+
+	ary := make([]*lazyNode, sz)
 
 	cur := *d
 
-	if idx < 0 {
-		idx *= -1
-
-		if idx > len(ary) {
-			return fmt.Errorf("Unable to access invalid index: %d", idx)
-		}
-		idx = len(ary) - idx
-	}
-	if idx < 0 || idx >= len(ary) || idx > len(cur) {
+	if idx >= len(ary) {
 		return fmt.Errorf("Unable to access invalid index: %d", idx)
 	}
+
+	if SupportNegativeIndices {
+		if idx < -len(ary) {
+			return fmt.Errorf("Unable to access invalid index: %d", idx)
+		}
+
+		if idx < 0 {
+			idx += len(ary)
+		}
+	}
+
 	copy(ary[0:idx], cur[0:idx])
 	ary[idx] = val
 	copy(ary[idx+1:], cur[idx:])
@@ -431,7 +465,17 @@ func (d *partialArray) remove(key string) error {
 	cur := *d
 
 	if idx >= len(cur) {
-		return fmt.Errorf("Unable to remove invalid index: %d", idx)
+		return fmt.Errorf("Unable to access invalid index: %d", idx)
+	}
+
+	if SupportNegativeIndices {
+		if idx < -len(cur) {
+			return fmt.Errorf("Unable to access invalid index: %d", idx)
+		}
+
+		if idx < 0 {
+			idx += len(cur)
+		}
 	}
 
 	ary := make([]*lazyNode, len(cur)-1)
@@ -450,7 +494,7 @@ func (p Patch) add(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.add(key, op.value())
@@ -462,7 +506,7 @@ func (p Patch) remove(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.remove(key)
@@ -477,8 +521,8 @@ func (p Patch) replace(doc *container, op operation) error {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing path: %s", path)
 	}
 
-	val, ok := con.get(key)
-	if val == nil || ok != nil {
+	_, ok := con.get(key)
+	if ok != nil {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing key: %s", path)
 	}
 
@@ -535,6 +579,8 @@ func (p Patch) test(doc *container, op operation) error {
 			return nil
 		}
 		return fmt.Errorf("Testing value %s failed", path)
+	} else if op.value() == nil {
+		return fmt.Errorf("Testing value %s failed", path)
 	}
 
 	if val.equal(op.value()) {
@@ -566,7 +612,12 @@ func (p Patch) copy(doc *container, op operation) error {
 		return fmt.Errorf("jsonpatch copy operation does not apply: doc is missing destination path: %s", path)
 	}
 
-	return con.set(key, val)
+	valCopy, err := deepCopy(val)
+	if err != nil {
+		return err
+	}
+
+	return con.add(key, valCopy)
 }
 
 // Equal indicates if 2 JSON documents have the same structural equality.
