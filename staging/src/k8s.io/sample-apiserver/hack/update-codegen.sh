@@ -37,5 +37,12 @@ ${CODEGEN_PKG}/generate-internal-groups.sh "deepcopy,defaulter,conversion" \
   --output-base "$(dirname ${BASH_SOURCE})/../../.." \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
 
+openapi-gen --logtostderr \
+  -i k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1,k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/version,k8s.io/apimachinery/pkg/runtime \
+  -p k8s.io/kubernetes/staging/src/k8s.io/sample-apiserver/pkg/generated/openapi \
+  -h ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
+  -O zz_generated.openapi -r report
+
+
 # To use your own boilerplate text use:
 #   --go-header-file ${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt
