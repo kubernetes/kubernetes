@@ -39,6 +39,7 @@ type SelectorSpread struct {
 	controllerLister  algorithm.ControllerLister
 	replicaSetLister  algorithm.ReplicaSetLister
 	statefulSetLister algorithm.StatefulSetLister
+	podLister         algorithm.PodLister
 }
 
 // NewSelectorSpreadPriority creates a SelectorSpread.
@@ -46,12 +47,14 @@ func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
 	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (PriorityMapFunction, PriorityReduceFunction) {
+	statefulSetLister algorithm.StatefulSetLister,
+	podLister algorithm.PodLister) (PriorityMapFunction, PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
 		replicaSetLister:  replicaSetLister,
 		statefulSetLister: statefulSetLister,
+		podLister:         podLister,
 	}
 	return selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce
 }
@@ -97,28 +100,47 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
+	var selectors []labels.Selector
+	priorityMeta, ok := meta.(*priorityMetadata)
+	if ok {
+		selectors = priorityMeta.podSelectors
+	} else {
+		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
+	}
 	countsByZone := make(map[string]int64, 10)
 	maxCountByZone := int64(0)
 	maxCountByNodeName := int64(0)
+
+	if len(selectors) > 0 {
+		pods, _ := s.podLister.Search(selectors)
+		if len(pods) > 0 {
+			for _, pod := range pods {
+				if pod.Spec.NodeName == "" || nodeNameToInfo[pod.Spec.NodeName] == nil {
+					continue
+				}
+				node := nodeNameToInfo[pod.Spec.NodeName].Node()
+				if node == nil {
+					continue
+				}
+				zoneID := utilnode.GetZoneKey(node)
+				if zoneID != "" {
+					countsByZone[zoneID]++
+				}
+			}
+		}
+		for zoneID := range countsByZone {
+			if countsByZone[zoneID] > maxCountByZone {
+				maxCountByZone = countsByZone[zoneID]
+			}
+		}
+	}
+	haveZones := len(countsByZone) != 0
 
 	for i := range result {
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
-		if zoneID == "" {
-			continue
-		}
-		countsByZone[zoneID] += result[i].Score
 	}
-
-	for zoneID := range countsByZone {
-		if countsByZone[zoneID] > maxCountByZone {
-			maxCountByZone = countsByZone[zoneID]
-		}
-	}
-
-	haveZones := len(countsByZone) != 0
 
 	maxCountByNodeNameFloat64 := float64(maxCountByNodeName)
 	maxCountByZoneFloat64 := float64(maxCountByZone)

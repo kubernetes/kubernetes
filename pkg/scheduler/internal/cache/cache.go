@@ -246,6 +246,22 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
 	return cache.FilteredList(alwaysTrue, selector)
 }
 
+func (cache *schedulerCache) Search(selectors []labels.Selector) ([]*v1.Pod, error) {
+	if len(selectors) == 0 {
+		return []*v1.Pod{}, nil
+	}
+	matchAllSelctors := func(p *v1.Pod) bool {
+		for _, selector := range selectors {
+			if !selector.Matches(labels.Set(p.Labels)) {
+				return false
+			}
+		}
+		return true
+	}
+
+	return cache.FilteredList(matchAllSelctors, selectors[0])
+}
+
 func (cache *schedulerCache) FilteredList(podFilter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()

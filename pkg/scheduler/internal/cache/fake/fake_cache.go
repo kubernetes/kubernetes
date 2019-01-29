@@ -93,6 +93,9 @@ func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot)
 // List is a fake method for testing.
 func (c *Cache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
 
+// Search is a fake method for testing.
+func (c *Cache) Search(s []labels.Selector) ([]*v1.Pod, error) { return nil, nil }
+
 // FilteredList is a fake method for testing.
 func (c *Cache) FilteredList(filter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil

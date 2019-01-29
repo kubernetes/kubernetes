@@ -53,6 +53,23 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	return selected, nil
 }
 
+// Search returns pods matching all selectors
+func (f FakePodLister) Search(selectors []labels.Selector) (selected []*v1.Pod, err error) {
+	for _, pod := range f {
+		matched := true
+		for _, s := range selectors {
+			if !s.Matches(labels.Set(pod.Labels)) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			selected = append(selected, pod)
+		}
+	}
+	return selected, nil
+}
+
 // FilteredList returns pods matching a pod filter and a label selector.
 func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {

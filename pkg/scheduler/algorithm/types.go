@@ -48,6 +48,7 @@ type PodLister interface {
 	// This is similar to "List()", but the returned slice does not
 	// contain pods that don't pass `podFilter`.
 	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+	Search(selectors []labels.Selector) (ret []*v1.Pod, err error)
 }
 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.

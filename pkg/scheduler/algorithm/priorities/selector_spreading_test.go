@@ -343,6 +343,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
 				replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
 				statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
+				podLister:         schedulertesting.FakePodLister(test.pods),
 			}
 
 			metaDataProducer := NewPriorityMetadataFactory(
@@ -579,6 +580,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
 				replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
 				statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
+				podLister:         schedulertesting.FakePodLister(test.pods),
 			}
 
 			metaDataProducer := NewPriorityMetadataFactory(
