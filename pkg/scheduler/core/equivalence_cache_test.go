@@ -864,7 +864,7 @@ func TestEquivalenceCacheInvalidationRace(t *testing.T) {
 	scheduler := NewGenericScheduler(
 		mockCache,
 		eCache,
-		NewSchedulingQueue(),
+		NewSchedulingQueue(nil),
 		ps,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,

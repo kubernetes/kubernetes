@@ -31,18 +31,24 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
+
+// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
+// the pod will be moved from unschedulableQ to activeQ.
+const unschedulableQTimeInterval = 60 * time.Second
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
@@ -70,9 +76,9 @@ type SchedulingQueue interface {
 
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
 // enabled a priority queue is returned. If it is disabled, a FIFO is returned.
-func NewSchedulingQueue() SchedulingQueue {
+func NewSchedulingQueue(stop <-chan struct{}) SchedulingQueue {
 	if util.PodPriorityEnabled() {
-		return NewPriorityQueue()
+		return NewPriorityQueue(stop)
 	}
 	return NewFIFO()
 }
@@ -180,8 +186,10 @@ func NominatedNodeName(pod *v1.Pod) string {
 // pods that are already tried and are determined to be unschedulable. The latter
 // is called unschedulableQ.
 type PriorityQueue struct {
-	lock sync.RWMutex
-	cond sync.Cond
+	stop  <-chan struct{}
+	clock util.Clock
+	lock  sync.RWMutex
+	cond  sync.Cond
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -227,14 +235,22 @@ func activeQComp(pod1, pod2 interface{}) bool {
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue() *PriorityQueue {
+func NewPriorityQueue(stop <-chan struct{}) *PriorityQueue {
 	pq := &PriorityQueue{
+		clock:          util.RealClock{},
+		stop:           stop,
 		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, activeQComp),
 		unschedulableQ: newUnschedulablePodsMap(),
 		nominatedPods:  newNominatedPodMap(),
 	}
 	pq.cond.L = &pq.lock
+	pq.run()
 	return pq
+}
+
+// run starts the goroutine to pump from unschedulableQ to activeQ
+func (p *PriorityQueue) run() {
+	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, p.stop)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -305,6 +321,26 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 		p.cond.Broadcast()
 	}
 	return err
+}
+
+// flushUnschedulableQLeftover moves pod which stays in unschedulableQ longer than the durationStayUnschedulableQ
+// to activeQ.
+func (p *PriorityQueue) flushUnschedulableQLeftover() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	var podsToMove []*v1.Pod
+	currentTime := p.clock.Now()
+	for _, pod := range p.unschedulableQ.pods {
+		lastScheduleTime := podTimestamp(pod)
+		if !lastScheduleTime.IsZero() && currentTime.Sub(lastScheduleTime.Time) > unschedulableQTimeInterval {
+			podsToMove = append(podsToMove, pod)
+		}
+	}
+
+	if len(podsToMove) > 0 {
+		p.movePodsToActiveQueue(podsToMove)
+	}
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
