@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push
+.PHONY:	build
 
-PREFIX = staging-k8s.gcr.io
-IMAGE = fluentd-elasticsearch
+PREFIX = gcr.io/fluentd-elasticsearch
+IMAGE = fluentd
 TAG = v2.4.0
 
 build:
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
-
-push:
-	docker push $(PREFIX)/$(IMAGE):$(TAG)
+	gcloud builds submit --tag $(PREFIX)/$(IMAGE):$(TAG)
