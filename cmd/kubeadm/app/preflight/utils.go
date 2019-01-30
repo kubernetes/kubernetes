@@ -33,7 +33,7 @@ func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	command := execer.Command("kubelet", "--version")
 	out, err := command.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot execute 'kubelet --version'")
 	}
 
 	cleanOutput := strings.TrimSpace(string(out))
