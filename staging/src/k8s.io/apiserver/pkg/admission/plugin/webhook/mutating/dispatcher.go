@@ -40,6 +40,18 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 )
 
+func init() {
+	// Negative index is not supported in the JSON patch spec (ietf
+	// rfc6902), so we disable it.
+	jsonpatch.SupportNegativeIndices = false
+	// The apiserver limits the size of persisted object to be 1MB. Setting
+	// the upper limit of the length of any array in a single object to 1
+	// million is more than enough. On the other hand, a slice consists of
+	// 1 million empty jsonpatch.lazyNode costs 8MB memory, which is
+	// insignificant.
+	jsonpatch.ArraySizeLimit = 1024 * 1024
+}
+
 type mutatingDispatcher struct {
 	cm     *webhook.ClientManager
 	plugin *Plugin
