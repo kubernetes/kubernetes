@@ -44,10 +44,11 @@ type Watcher struct {
 	fsWatcher      *fsnotify.Watcher
 	wg             sync.WaitGroup
 
-	mutex       sync.Mutex
-	handlers    map[string]PluginHandler
-	plugins     map[string]pathInfo
-	pluginsPool map[string]map[string]*sync.Mutex // map[pluginType][pluginName]
+	mutex         sync.Mutex
+	isInitialized bool
+	handlers      map[string]PluginHandler
+	plugins       map[string]pathInfo
+	pluginsPool   map[string]map[string]*sync.Mutex // map[pluginType][pluginName]
 }
 
 type pathInfo struct {
@@ -101,6 +102,7 @@ func (w *Watcher) Start() error {
 		return fmt.Errorf("failed to start plugin fsWatcher, err: %v", err)
 	}
 	w.fsWatcher = fsWatcher
+	w.isInitialized = true
 
 	w.wg.Add(1)
 	go func(fsWatcher *fsnotify.Watcher) {
@@ -158,7 +160,10 @@ func (w *Watcher) Start() error {
 
 // Stop stops probing the creation of plugin sockets at the path
 func (w *Watcher) Stop() error {
+	w.mutex.Lock()
+	w.isInitialized = false
 	close(w.stopCh)
+	w.mutex.Unlock()
 
 	c := make(chan struct{})
 	go func() {
@@ -191,7 +196,15 @@ func (w *Watcher) init() error {
 // Goroutines started here will be waited for in Stop() before cleaning up.
 // Ignore all errors except root dir not being walkable
 func (w *Watcher) traversePluginDir(dir string) error {
+	var abortedMutex sync.Mutex
+	abortedFlag := false
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		abortedMutex.Lock()
+		if abortedFlag {
+			abortedMutex.Unlock()
+			return fmt.Errorf("plugin walker closed underneath us!")
+		}
+		abortedMutex.Unlock()
 		if err != nil {
 			if path == dir {
 				return fmt.Errorf("error accessing path: %s error: %v", path, err)
@@ -214,9 +227,17 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			w.wg.Add(1)
 			go func() {
 				defer w.wg.Done()
-				w.fsWatcher.Events <- fsnotify.Event{
-					Name: path,
-					Op:   fsnotify.Create,
+				w.mutex.Lock()
+				defer w.mutex.Unlock()
+				if w.isInitialized {
+					w.fsWatcher.Events <- fsnotify.Event{
+						Name: path,
+						Op:   fsnotify.Create,
+					}
+				} else {
+					abortedMutex.Lock()
+					defer abortedMutex.Unlock()
+					abortedFlag = true
 				}
 			}()
 		default:
