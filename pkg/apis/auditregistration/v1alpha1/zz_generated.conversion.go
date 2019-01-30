@@ -248,6 +248,7 @@ func autoConvert_v1alpha1_Webhook_To_auditregistration_Webhook(in *v1alpha1.Webh
 	if err := Convert_v1alpha1_WebhookClientConfig_To_auditregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
+	out.EventVersions = *(*[]string)(unsafe.Pointer(&in.EventVersions))
 	return nil
 }
 
@@ -261,6 +262,7 @@ func autoConvert_auditregistration_Webhook_To_v1alpha1_Webhook(in *auditregistra
 	if err := Convert_auditregistration_WebhookClientConfig_To_v1alpha1_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
+	out.EventVersions = *(*[]string)(unsafe.Pointer(&in.EventVersions))
 	return nil
 }
 

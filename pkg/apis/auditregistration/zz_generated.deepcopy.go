@@ -153,6 +153,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.ClientConfig.DeepCopyInto(&out.ClientConfig)
+	if in.EventVersions != nil {
+		in, out := &in.EventVersions, &out.EventVersions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
