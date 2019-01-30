@@ -32,7 +32,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -738,7 +738,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 				volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 				volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 				uid := string(n.name) + "-" + podName // unique UID
-				namespace, name := utilsstrings.SplitQualifiedName(podName)
+				namespace, name := utilstrings.SplitQualifiedName(podName)
 				pod := controllervolumetesting.NewPod(uid, name)
 				pod.Namespace = namespace
 				_, err := dsw.AddPod(types.UniquePodName(uid), pod, volumeSpec, n.name)

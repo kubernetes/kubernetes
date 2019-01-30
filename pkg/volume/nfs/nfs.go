@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
-	"k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -189,7 +189,7 @@ type nfs struct {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedName(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, utilstrings.EscapeQualifiedName(name), nfsVolume.volName)
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)

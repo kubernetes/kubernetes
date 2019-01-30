@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -58,7 +58,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(portworxVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(portworxVolumePluginName), volName)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {

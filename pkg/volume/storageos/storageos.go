@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -63,9 +63,9 @@ const (
 
 func getPath(uid types.UID, volNamespace string, volName string, pvName string, host volume.VolumeHost) string {
 	if len(volNamespace) != 0 && len(volName) != 0 && strings.Count(volName, ".") == 0 {
-		return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(storageosPluginName), pvName+"."+volNamespace+"."+volName)
+		return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName+"."+volNamespace+"."+volName)
 	}
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(storageosPluginName), pvName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName)
 }
 
 func (plugin *storageosPlugin) Init(host volume.VolumeHost) error {
@@ -431,7 +431,7 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, pvName, volNamespace, volName string) string {
-	return path.Join(host.GetPluginDir(utilsstrings.EscapeQualifiedName(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
+	return path.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
 }
 
 // Given the pod id and PV name, finds the volume's namespace and name from the
@@ -443,7 +443,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 		return volNamespace, volName, nil
 	}
 
-	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilsstrings.EscapeQualifiedName(storageosPluginName), pvName))
+	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
 		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)

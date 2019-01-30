@@ -29,7 +29,7 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/exec"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type flexVolumeProber struct {
@@ -139,7 +139,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		probeEvent.Plugin = plugin
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
-		driverName := utilsstrings.UnescapeQualifiedName(driverDirName)
+		driverName := utilstrings.UnescapeQualifiedName(driverDirName)
 		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
 
 	} else {

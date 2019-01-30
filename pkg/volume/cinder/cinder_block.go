@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.VolumePlugin = &cinderPlugin{}
@@ -163,5 +163,5 @@ func (cd *cinderVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // path: pods/{podUid}/volumeDevices/kubernetes.io~cinder
 func (cd *cinderVolume) GetPodDeviceMapPath() (string, string) {
 	name := cinderVolumePluginName
-	return cd.plugin.host.GetPodVolumeDeviceDir(cd.podUID, utilsstrings.EscapeQualifiedName(name)), cd.volName
+	return cd.plugin.host.GetPodVolumeDeviceDir(cd.podUID, utilstrings.EscapeQualifiedName(name)), cd.volName
 }

@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -59,7 +59,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(emptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -420,7 +420,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilsstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

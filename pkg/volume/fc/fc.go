@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -360,7 +360,7 @@ type fcDisk struct {
 
 func (fc *fcDisk) GetPath() string {
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilsstrings.EscapeQualifiedName(fcPluginName), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName), fc.volName)
 }
 
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -373,7 +373,7 @@ func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 }
 
 func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
-	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilsstrings.EscapeQualifiedName(fcPluginName)), fc.volName
+	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName)), fc.volName
 }
 
 type fcDiskMounter struct {

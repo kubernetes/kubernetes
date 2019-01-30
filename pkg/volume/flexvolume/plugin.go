@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -71,7 +71,7 @@ type pluginFactory struct{}
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
-	driverName := utilsstrings.UnescapeQualifiedName(name)
+	driverName := utilstrings.UnescapeQualifiedName(name)
 
 	flexPlugin := &flexVolumePlugin{
 		driverName:          driverName,
@@ -185,7 +185,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			pod.UID, utilsstrings.EscapeQualifiedName(sourceDriver), spec.Name()))
+			pod.UID, utilstrings.EscapeQualifiedName(sourceDriver), spec.Name()))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}
@@ -219,7 +219,7 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			podUID, utilsstrings.EscapeQualifiedName(plugin.driverName), volName))
+			podUID, utilstrings.EscapeQualifiedName(plugin.driverName), volName))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}

@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/keymutex"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -82,7 +82,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(cinderVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(cinderVolumePluginName), volName)
 }
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {

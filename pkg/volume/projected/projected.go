@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -66,7 +66,7 @@ func wrappedVolumeSpec() volume.Spec {
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(projectedPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(projectedPluginName), volName)
 }
 
 func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {

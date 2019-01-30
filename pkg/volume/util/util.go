@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -820,7 +820,7 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 
 // GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
 func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
-	return utilsstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
+	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
 }
 
 // CheckVolumeModeFilesystem checks VolumeMode.

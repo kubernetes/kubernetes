@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -116,7 +116,7 @@ var _ volume.Deleter = &azureFileDeleter{}
 
 func (f *azureFileDeleter) GetPath() string {
 	name := azureFilePluginName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilsstrings.EscapeQualifiedName(name), f.volName)
+	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedName(name), f.volName)
 }
 
 func (f *azureFileDeleter) Delete() error {

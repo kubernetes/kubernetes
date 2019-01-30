@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -48,7 +48,7 @@ type configMapPlugin struct {
 var _ volume.VolumePlugin = &configMapPlugin{}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedName(configMapPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(configMapPluginName), volName)
 }
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
@@ -142,7 +142,7 @@ type configMapVolume struct {
 var _ volume.Volume = &configMapVolume{}
 
 func (sv *configMapVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedName(configMapPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podUID, utilstrings.EscapeQualifiedName(configMapPluginName), sv.volName)
 }
 
 // configMapVolumeMounter handles retrieving secrets from the API server

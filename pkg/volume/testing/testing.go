@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -765,7 +765,7 @@ func (fv *FakeVolume) GetPath() string {
 }
 
 func (fv *FakeVolume) getPath() string {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilsstrings.EscapeQualifiedName(fv.Plugin.PluginName), fv.VolName))
+	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName), fv.VolName))
 }
 
 func (fv *FakeVolume) TearDown() error {
@@ -810,7 +810,7 @@ func (fv *FakeVolume) GetGlobalMapPath(spec *Spec) (string, error) {
 
 // Block volume support
 func (fv *FakeVolume) getGlobalMapPath() (string, error) {
-	return path.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilsstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "pluginDependentPath"), nil
+	return path.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "pluginDependentPath"), nil
 }
 
 // Block volume support
@@ -830,7 +830,7 @@ func (fv *FakeVolume) GetPodDeviceMapPath() (string, string) {
 
 // Block volume support
 func (fv *FakeVolume) getPodDeviceMapPath() (string, string) {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilsstrings.EscapeQualifiedName(fv.Plugin.PluginName))), fv.VolName
+	return path.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName))), fv.VolName
 }
 
 // Block volume support

@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -48,7 +48,7 @@ type downwardAPIPlugin struct {
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(downwardAPIPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(downwardAPIPluginName), volName)
 }
 
 func wrappedVolumeSpec() volume.Spec {
@@ -288,7 +288,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, utilsstrings.EscapeQualifiedName(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedName(downwardAPIPluginName), d.volName)
 }
 
 // downwardAPIVolumeCleaner handles cleaning up downwardAPI volumes

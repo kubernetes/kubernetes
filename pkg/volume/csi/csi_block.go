@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type csiBlockMapper struct {
@@ -62,21 +62,21 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // getStagingPath returns a staging path for a directory (on the node) that should be used on NodeStageVolume/NodeUnstageVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{pvname}
 func (m *csiBlockMapper) getStagingPath() string {
-	sanitizedSpecVolID := utilsstrings.EscapeQualifiedName(m.specName)
+	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
 	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(csiPluginName), "staging", sanitizedSpecVolID)
 }
 
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{pvname}
 func (m *csiBlockMapper) getPublishPath() string {
-	sanitizedSpecVolID := utilsstrings.EscapeQualifiedName(m.specName)
+	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
 	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(csiPluginName), "publish", sanitizedSpecVolID)
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
 // returns: pods/{podUid}/volumeDevices/kubernetes.io~csi, {pvname}
 func (m *csiBlockMapper) GetPodDeviceMapPath() (string, string) {
-	path := m.plugin.host.GetPodVolumeDeviceDir(m.podUID, utilsstrings.EscapeQualifiedName(csiPluginName))
+	path := m.plugin.host.GetPodVolumeDeviceDir(m.podUID, utilstrings.EscapeQualifiedName(csiPluginName))
 	specName := m.specName
 	klog.V(4).Infof(log("blockMapper.GetPodDeviceMapPath [path=%s; name=%s]", path, specName))
 	return path, specName

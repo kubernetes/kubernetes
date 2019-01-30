@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -60,7 +60,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilsstrings.EscapeQualifiedName(awsElasticBlockStorePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(awsElasticBlockStorePluginName), volName)
 }
 
 func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) error {

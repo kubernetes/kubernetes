@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
@@ -678,7 +678,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 					klog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
 					continue
 				}
-				unescapePluginName := utilsstrings.UnescapeQualifiedName(pluginName)
+				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
 					mountPath := path.Join(volumePluginPath, volumeName)
 					klog.V(5).Infof("podName: %v, mount path from volume plugin directory: %v, ", podName, mountPath)

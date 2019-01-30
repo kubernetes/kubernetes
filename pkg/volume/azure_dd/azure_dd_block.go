@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilsstrings "k8s.io/utils/strings"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -157,5 +157,5 @@ func (disk *dataDisk) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // path: pods/{podUid}/volumeDevices/kubernetes.io~azure
 func (disk *dataDisk) GetPodDeviceMapPath() (string, string) {
 	name := azureDataDiskPluginName
-	return disk.plugin.host.GetPodVolumeDeviceDir(disk.podUID, utilsstrings.EscapeQualifiedName(name)), disk.volumeName
+	return disk.plugin.host.GetPodVolumeDeviceDir(disk.podUID, utilstrings.EscapeQualifiedName(name)), disk.volumeName
 }
