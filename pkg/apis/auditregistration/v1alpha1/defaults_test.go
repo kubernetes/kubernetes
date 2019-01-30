@@ -45,6 +45,7 @@ func TestSetDefaultAuditSink(t *testing.T) {
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
 						},
+						EventVersions: []string{DefaultEventVersion},
 					},
 				},
 			},
@@ -58,6 +59,7 @@ func TestSetDefaultAuditSink(t *testing.T) {
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
 						},
+						EventVersions: []string{DefaultEventVersion},
 					},
 				},
 			},
@@ -75,6 +77,7 @@ func TestSetDefaultAuditSink(t *testing.T) {
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
 						},
+						EventVersions: []string{DefaultEventVersion},
 					},
 				},
 			},
@@ -91,6 +94,7 @@ func TestSetDefaultAuditSink(t *testing.T) {
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
 						},
+						EventVersions: []string{DefaultEventVersion},
 					},
 				},
 			},
@@ -104,6 +108,42 @@ func TestSetDefaultAuditSink(t *testing.T) {
 					Webhook: auditregistrationv1alpha1.Webhook{
 						Throttle: &auditregistrationv1alpha1.WebhookThrottleConfig{
 							QPS: utilpointer.Int64Ptr(1),
+						},
+						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
+							URL: &defaultURL,
+						},
+						EventVersions: []string{DefaultEventVersion},
+					},
+				},
+			},
+			expected: &auditregistrationv1alpha1.AuditSink{
+				Spec: auditregistrationv1alpha1.AuditSinkSpec{
+					Policy: auditregistrationv1alpha1.Policy{
+						Level: auditregistrationv1alpha1.LevelMetadata,
+					},
+					Webhook: auditregistrationv1alpha1.Webhook{
+						Throttle: &auditregistrationv1alpha1.WebhookThrottleConfig{
+							QPS:   utilpointer.Int64Ptr(1),
+							Burst: DefaultThrottle().Burst,
+						},
+						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
+							URL: &defaultURL,
+						},
+						EventVersions: []string{DefaultEventVersion},
+					},
+				},
+			},
+		},
+		{ // Missing Event Version
+			original: &auditregistrationv1alpha1.AuditSink{
+				Spec: auditregistrationv1alpha1.AuditSinkSpec{
+					Policy: auditregistrationv1alpha1.Policy{
+						Level: auditregistrationv1alpha1.LevelMetadata,
+					},
+					Webhook: auditregistrationv1alpha1.Webhook{
+						Throttle: &auditregistrationv1alpha1.WebhookThrottleConfig{
+							QPS:   utilpointer.Int64Ptr(1),
+							Burst: DefaultThrottle().Burst,
 						},
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
@@ -124,6 +164,7 @@ func TestSetDefaultAuditSink(t *testing.T) {
 						ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 							URL: &defaultURL,
 						},
+						EventVersions: []string{DefaultEventVersion},
 					},
 				},
 			},

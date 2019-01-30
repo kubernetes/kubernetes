@@ -133,6 +133,19 @@ func TestValidatePolicy(t *testing.T) {
 	}
 }
 
+func TestValidateEventVersion(t *testing.T) {
+	errs := ValidateEventVersion([]string{}, field.NewPath("eventVersion"))
+	require.Len(t, errs, 0)
+	errs = ValidateEventVersion([]string{"v1"}, field.NewPath("eventVersion"))
+	require.Len(t, errs, 0)
+	errs = ValidateEventVersion([]string{"unknown"}, field.NewPath("eventVersion"))
+	require.Len(t, errs, 1)
+	errs = ValidateEventVersion([]string{"v1", "unknown"}, field.NewPath("eventVersion"))
+	require.Len(t, errs, 0)
+	errs = ValidateEventVersion([]string{"unknown", "v1"}, field.NewPath("eventVersion"))
+	require.Len(t, errs, 0)
+}
+
 func strPtr(s string) *string { return &s }
 
 func TestValidateWebhookConfiguration(t *testing.T) {

@@ -27,6 +27,8 @@ const (
 	DefaultQPS = int64(10)
 	// DefaultBurst is the default burst value
 	DefaultBurst = int64(15)
+	// DefaultEventVersion is the default event version
+	DefaultEventVersion = "v1"
 )
 
 // DefaultThrottle is a default throttle config
@@ -52,5 +54,8 @@ func SetDefaults_AuditSink(obj *auditregistrationv1alpha1.AuditSink) {
 		}
 	} else {
 		obj.Spec.Webhook.Throttle = DefaultThrottle()
+	}
+	if len(obj.Spec.Webhook.EventVersions) == 0 {
+		obj.Spec.Webhook.EventVersions = []string{DefaultEventVersion}
 	}
 }

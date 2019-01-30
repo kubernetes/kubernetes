@@ -117,6 +117,16 @@ type Webhook struct {
 	// ClientConfig holds the connection parameters for the webhook
 	// required
 	ClientConfig WebhookClientConfig
+
+	// EventVersions is an ordered list of preferred Event
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If the webhook configuration has already been persisted, calls to the
+	// webhook will fail and be subject to the failure policy.
+	// This field is required and cannot be empty.
+	// default v1
+	EventVersions []string
 }
 
 // WebhookThrottleConfig holds the configuration for throttling

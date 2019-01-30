@@ -20,8 +20,11 @@ import (
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/auditregistration"
 )
@@ -48,6 +51,8 @@ func ValidateWebhook(w auditregistration.Webhook, fldPath *field.Path) field.Err
 		allErrs = append(allErrs, ValidateWebhookThrottleConfig(w.Throttle, fldPath.Child("throttle"))...)
 	}
 
+	allErrs = append(allErrs, ValidateEventVersion(w.EventVersions, fldPath.Child("eventVersion"))...)
+
 	cc := w.ClientConfig
 	switch {
 	case (cc.URL == nil) == (cc.Service == nil):
@@ -57,6 +62,30 @@ func ValidateWebhook(w auditregistration.Webhook, fldPath *field.Path) field.Err
 	case cc.Service != nil:
 		allErrs = append(allErrs, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path)...)
 	}
+	return allErrs
+}
+
+// ValidateEventVersion validates that at least one of the event versions given is supported
+func ValidateEventVersion(eventVersions []string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(eventVersions) == 0 {
+		return allErrs
+	}
+
+	var versionFound bool
+	for _, version := range eventVersions {
+		gv := schema.GroupVersion{
+			Group:   auditinternal.GroupName,
+			Version: version,
+		}
+		if audit.Scheme.IsVersionRegistered(gv) {
+			versionFound = true
+		}
+	}
+	if !versionFound {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("eventVersion"), eventVersions, "none of the event versions given are supported"))
+	}
+
 	return allErrs
 }
 
