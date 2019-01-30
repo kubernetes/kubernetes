@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	rwMask = os.FileMode(0660)
-	roMask = os.FileMode(0440)
+	rwMask   = os.FileMode(0660)
+	roMask   = os.FileMode(0440)
+	execMask = os.FileMode(0110)
 )
 
 // SetVolumeOwnership modifies the given volume to be owned by
@@ -79,6 +80,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 
 		if info.IsDir() {
 			mask |= os.ModeSetgid
+			mask |= execMask
 		}
 
 		err = os.Chmod(path, info.Mode()|mask)
