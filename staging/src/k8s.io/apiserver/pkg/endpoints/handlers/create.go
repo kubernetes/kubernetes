@@ -137,13 +137,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		if scope.FieldManager != nil {
 			liveObj, err := scope.Creater.New(scope.Kind)
 			if err != nil {
-				scope.err(fmt.Errorf("failed to create new object: %v", err), w, req)
+				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
 				return
 			}
 
 			obj, err = scope.FieldManager.Update(liveObj, obj, prefixFromUserAgent(req.UserAgent()))
 			if err != nil {
-				scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
+				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
 				return
 			}
 		}
