@@ -178,9 +178,6 @@
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
 ./staging/src/k8s.io/node-api/hack/update-codegen.sh
 ./staging/src/k8s.io/node-api/hack/verify-codegen.sh
-./staging/src/k8s.io/sample-apiserver/hack/build-image.sh
-./staging/src/k8s.io/sample-apiserver/hack/update-codegen.sh
-./staging/src/k8s.io/sample-apiserver/hack/verify-codegen.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
