@@ -57,7 +57,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	cloudnode "k8s.io/cloud-provider/node"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
@@ -1938,7 +1938,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 		Value:  "true",
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	err := cloudnode.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
+	err := nodehelpers.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
 	if err != nil {
 		klog.Errorf("Error applying taint to node %s with error %v", nodeName, err)
 		return
