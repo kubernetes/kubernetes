@@ -26,45 +26,45 @@ run_kubectl_run_tests() {
   kube::log::status "Testing kubectl run"
   ## kubectl run should create deployments, jobs or cronjob
   # Pre-Condition: no Job exists
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert jobs "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
   # Command
-  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${KUBE_FLAGS[@]}"
   # Post-Condition: Job "pi" is created
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  kube::test::get_object_assert jobs "{{range.items}}{{$ID_FIELD}}:{{end}}" 'pi:'
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
   # Clean up
-  kubectl delete jobs pi "${kube_flags[@]}"
+  kubectl delete jobs pi "${KUBE_FLAGS[@]}"
   # Post-condition: no pods exist.
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
 
   # Pre-Condition: no Deployment exists
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
   # Command
-  kubectl run nginx-extensions "--image=$IMAGE_NGINX" "${kube_flags[@]}"
+  kubectl run nginx-extensions "--image=$IMAGE_NGINX" "${KUBE_FLAGS[@]}"
   # Post-Condition: Deployment "nginx" is created
-  kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$ID_FIELD}}:{{end}}" 'nginx-extensions:'
   # new generator was used
   output_message=$(kubectl get deployment.apps/nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
   kube::test::if_has_string "${output_message}" '10'
   # Clean up
-  kubectl delete deployment nginx-extensions "${kube_flags[@]}"
+  kubectl delete deployment nginx-extensions "${KUBE_FLAGS[@]}"
   # Command
-  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1 "${kube_flags[@]}"
+  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1 "${KUBE_FLAGS[@]}"
   # Post-Condition: Deployment "nginx" is created
-  kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-apps:'
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$ID_FIELD}}:{{end}}" 'nginx-apps:'
   # and new generator was used, iow. new defaults are applied
   output_message=$(kubectl get deployment/nginx-apps -o jsonpath='{.spec.revisionHistoryLimit}')
   kube::test::if_has_string "${output_message}" '10'
   # Clean up
-  kubectl delete deployment nginx-apps "${kube_flags[@]}"
+  kubectl delete deployment nginx-apps "${KUBE_FLAGS[@]}"
 
   # Pre-Condition: no Job exists
-  kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert cronjobs "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
   # Command
-  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${KUBE_FLAGS[@]}"
   # Post-Condition: CronJob "pi" is created
-  kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  kube::test::get_object_assert cronjobs "{{range.items}}{{$ID_FIELD}}:{{end}}" 'pi:'
 
   # Pre-condition: cronjob has perl image, not custom image
   output_message=$(kubectl get cronjob/pi -o jsonpath='{..image}')
@@ -78,7 +78,7 @@ run_kubectl_run_tests() {
   kube::test::if_has_not_string "${output_message}" "${IMAGE_PERL}"
 
   # Clean up
-  kubectl delete cronjobs pi "${kube_flags[@]}"
+  kubectl delete cronjobs pi "${KUBE_FLAGS[@]}"
 
   set +o nounset
   set +o errexit
