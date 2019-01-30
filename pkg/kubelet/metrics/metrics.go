@@ -36,6 +36,7 @@ const (
 	CgroupManagerOperationsKey   = "cgroup_manager_latency_microseconds"
 	PodWorkerStartLatencyKey     = "pod_worker_start_latency_microseconds"
 	PLEGRelistLatencyKey         = "pleg_relist_latency_microseconds"
+	PLEGDiscardEventsKey         = "pleg_discard_events"
 	PLEGRelistIntervalKey        = "pleg_relist_interval_microseconds"
 	EvictionStatsAgeKey          = "eviction_stats_age_microseconds"
 	VolumeStatsCapacityBytesKey  = "volume_stats_capacity_bytes"
@@ -108,6 +109,14 @@ var (
 			Name:      PLEGRelistLatencyKey,
 			Help:      "Latency in microseconds for relisting pods in PLEG.",
 		},
+	)
+	PLEGDiscardEvents = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PLEGDiscardEventsKey,
+			Help:      "The number of discard events in PLEG.",
+		},
+		[]string{},
 	)
 	PLEGRelistInterval = prometheus.NewSummary(
 		prometheus.SummaryOpts{
@@ -214,6 +223,7 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheu
 		prometheus.MustRegister(ContainersPerPodCount)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
+		prometheus.MustRegister(PLEGDiscardEvents)
 		prometheus.MustRegister(PLEGRelistInterval)
 		prometheus.MustRegister(RuntimeOperations)
 		prometheus.MustRegister(RuntimeOperationsLatency)
