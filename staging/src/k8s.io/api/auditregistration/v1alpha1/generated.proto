@@ -57,6 +57,12 @@ message AuditSinkSpec {
   optional Webhook webhook = 2;
 }
 
+// AuthenticationInfo holds methods for authenticating the API server
+message AuthenticationInfo {
+  // KubeConfigFile is a path to a kubeconfig file accessible by the API servers
+  optional string kubeConfigFile = 1;
+}
+
 // Policy defines the configuration of how audit events are logged
 message Policy {
   // The Level that all requests are recorded at.
@@ -141,6 +147,10 @@ message WebhookClientConfig {
   // If unspecified, system trust roots on the apiserver are used.
   // +optional
   optional bytes caBundle = 3;
+
+  // Authentication holds methods for authenticating the API server.
+  // +optional
+  optional AuthenticationInfo authentication = 4;
 }
 
 // WebhookThrottleConfig holds the configuration for throttling events

@@ -78647,6 +78647,19 @@
      }
     }
    },
+   "io.k8s.api.auditregistration.v1alpha1.AuthenticationInfo": {
+    "description": "AuthenticationInfo holds methods for authenticating the API server",
+    "type": "object",
+    "required": [
+     "kubeConfigFile"
+    ],
+    "properties": {
+     "kubeConfigFile": {
+      "description": "KubeConfigFile is a path to a kubeconfig file accessible by the API servers",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.auditregistration.v1alpha1.Policy": {
     "description": "Policy defines the configuration of how audit events are logged",
     "type": "object",
@@ -78710,6 +78723,10 @@
     "description": "WebhookClientConfig contains the information to make a connection with the webhook",
     "type": "object",
     "properties": {
+     "authentication": {
+      "description": "Authentication holds methods for authenticating the API server.",
+      "$ref": "#/definitions/io.k8s.api.auditregistration.v1alpha1.AuthenticationInfo"
+     },
      "caBundle": {
       "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
       "type": "string",
