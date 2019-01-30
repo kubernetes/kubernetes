@@ -103,12 +103,13 @@ function diffGodepManifest() {
   local ret=0
   diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps/Godeps.json" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" || ret=$?
   if [[ "${ret}" != "0" && "${FAIL_ON_DIFF}" == true ]]; then
-    exit ${ret}
+    return ${ret}
   fi
 }
 
 # move into staging and save the dependencies for everything in order
 mkdir -p "${TMP_GOPATH}/src/k8s.io"
+fail=0
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
 
@@ -116,7 +117,10 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   kube::util::create-fake-git-tree "${TMP_GOPATH}/src/k8s.io/${repo}"
 
   updateGodepManifest
-  diffGodepManifest
+  if ! diffGodepManifest; then
+    fail=1
+    kube::log::error "Incorrect godeps for k8s.io/${repo}"
+  fi
 
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps/Godeps.json"
@@ -129,3 +133,8 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
     git update-index --assume-unchanged "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps/Godeps.json"
   fi
 done
+
+# if any update failed, exit
+if [[ "${fail}" != "0" ]]; then
+  exit "${fail}"
+fi
