@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -339,12 +338,6 @@ type defaultPluginHandler struct{}
 
 // Lookup implements PluginHandler
 func (h *defaultPluginHandler) Lookup(filename string) (string, error) {
-	// if on Windows, append the "exe" extension
-	// to the filename that we are looking up.
-	if runtime.GOOS == "windows" {
-		filename = filename + ".exe"
-	}
-
 	return exec.LookPath(filename)
 }
 
