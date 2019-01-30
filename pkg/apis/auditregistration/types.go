@@ -177,6 +177,15 @@ type WebhookClientConfig struct {
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte
+
+	// Authentication holds methods for authenticating the API server.
+	Authentication *AuthenticationInfo
+}
+
+// AuthenticationInfo holds methods for authenticating the API server
+type AuthenticationInfo struct {
+	// KubeConfigFile is a path to a kubeconfig file accessible by the API servers
+	KubeConfigFile string
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

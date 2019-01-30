@@ -175,6 +175,16 @@ type WebhookClientConfig struct {
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,3,opt,name=caBundle"`
+
+	// Authentication holds methods for authenticating the API server.
+	// +optional
+	Authentication *AuthenticationInfo `json:"authentication,omitempty" protobuf:"bytes,4,opt,name=authentication"`
+}
+
+// AuthenticationInfo holds methods for authenticating the API server
+type AuthenticationInfo struct {
+	// KubeConfigFile is a path to a kubeconfig file accessible by the API servers
+	KubeConfigFile string `json:"kubeConfigFile" protobuf:"bytes,1,opt,name=kubeConfigFile"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
