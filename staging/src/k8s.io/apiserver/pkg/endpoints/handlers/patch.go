@@ -538,7 +538,6 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
-		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options, err := patchToUpdateOptions(p.options)
 		if err != nil {
 			return nil, err
