@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -38,6 +37,7 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -67,17 +67,6 @@ var (
 		Run 'kubectl get nodes' on the master to see this node join the cluster.
 
 		`)
-
-	notReadyToJoinControPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
-		One or more conditions for hosting a new control plane instance is not satisfied.
-
-		{{.Error}}
-
-		Please ensure that:
-		* The cluster has a stable controlPlaneEndpoint address.
-		* The certificates that must be shared among control plane instances are provided.
-
-		`)))
 
 	joinControPlaneDoneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
 		This node has joined the cluster and a new control plane instance was created:
@@ -210,9 +199,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	AddJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
 	AddJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token)
 
-	// initialize the workflow runner with the list of phases
-	// TODO: append phases here like so:
-	//     joinRunner.AppendPhase(phases.NewPreflightMasterPhase())
+	joinRunner.AppendPhase(phases.NewPreflightJoinPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -445,14 +432,6 @@ func (j *joinData) OutputWriter() io.Writer {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *joinData) Run() error {
-	fmt.Println("[preflight] Running pre-flight checks")
-
-	// Start with general checks
-	klog.V(1).Infoln("[preflight] Running general checks")
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.cfg, j.ignorePreflightErrors); err != nil {
-		return err
-	}
-
 	// Fetch the init configuration based on the join configuration.
 	// TODO: individual phases should call these:
 	//   - phases that need initCfg should call joinData.InitCfg().
@@ -465,35 +444,7 @@ func (j *joinData) Run() error {
 	if err != nil {
 		return err
 	}
-
-	// Continue with more specific checks based on the init configuration
-	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
-	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), &initCfg.ClusterConfiguration, j.ignorePreflightErrors); err != nil {
-		return err
-	}
-
 	if j.cfg.ControlPlane != nil {
-		// Checks if the cluster configuration supports
-		// joining a new control plane instance and if all the necessary certificates are provided
-		if err := j.CheckIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration); err != nil {
-			// outputs the not ready for hosting a new control plane instance message
-			ctx := map[string]string{
-				"Error": err.Error(),
-			}
-
-			var msg bytes.Buffer
-			notReadyToJoinControPlaneTemp.Execute(&msg, ctx)
-			return errors.New(msg.String())
-		}
-
-		// run kubeadm init preflight checks for checking all the prequisites
-		fmt.Println("[join] Running pre-flight checks before initializing the new control plane instance")
-		preflight.RunInitMasterChecks(utilsexec.New(), initCfg, j.ignorePreflightErrors)
-
-		fmt.Println("[join] Pulling control-plane images")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.ignorePreflightErrors); err != nil {
-			return err
-		}
 		// Prepares the node for hosting a new control plane instance by writing necessary
 		// kubeconfig files, and static pod manifests
 		if err := j.PrepareForHostingControlPlane(initCfg); err != nil {
@@ -536,22 +487,6 @@ func (j *joinData) Run() error {
 	// otherwise, if the node joined as a worker node;
 	// outputs the join done message and exits
 	fmt.Fprintf(j.outputWriter, joinWorkerNodeDoneMsg)
-	return nil
-}
-
-// CheckIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
-// joining an additional control plane instance and if the node is ready to join
-func (j *joinData) CheckIfReadyForAdditionalControlPlane(cfg *kubeadmapi.ClusterConfiguration) error {
-	// blocks if the cluster was created without a stable control plane endpoint
-	if cfg.ControlPlaneEndpoint == "" {
-		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
-	}
-
-	// checks if the certificates that must be equal across contolplane instances are provided
-	if ret, err := certsphase.SharedCertificateExists(cfg); !ret {
-		return err
-	}
-
 	return nil
 }
 
