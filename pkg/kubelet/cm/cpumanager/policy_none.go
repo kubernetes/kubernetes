@@ -46,6 +46,6 @@ func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Cont
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(s state.State, containerID string) error {
+func (p *nonePolicy) RemoveContainer(s state.State, namespace, containerID string) error {
 	return nil
 }

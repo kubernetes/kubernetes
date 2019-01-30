@@ -116,7 +116,7 @@ type Runtime interface {
 	// "100" or "all") to tail the log.
 	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
-	DeleteContainer(containerID ContainerID) error
+	DeleteContainer(namespace string, containerID ContainerID) error
 	// ImageService provides methods to image-related methods.
 	ImageService
 	// UpdatePodCIDR sends a new podCIDR to the runtime.
@@ -129,22 +129,22 @@ type Runtime interface {
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
 // the runtime server.
 type StreamingRuntime interface {
-	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetExec(namespace string, id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetAttach(namespace string, id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
 }
 
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(namespace string, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
-	GetImageRef(image ImageSpec) (string, error)
+	GetImageRef(namespace string, image ImageSpec) (string, error)
 	// Gets all images currently on the machine.
-	ListImages() ([]Image, error)
+	ListImages(namespace string) ([]Image, error)
 	// Removes the specified image.
-	RemoveImage(image ImageSpec) error
+	RemoveImage(namespace string, image ImageSpec) error
 	// Returns Image statistics.
 	ImageStats() (*ImageStats, error)
 }
@@ -156,7 +156,7 @@ type ContainerAttacher interface {
 type ContainerCommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
 	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
-	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
+	RunInContainer(namespace string, id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
 // Pod is a group of containers.

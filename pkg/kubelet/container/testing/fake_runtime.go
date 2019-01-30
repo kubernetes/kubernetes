@@ -299,7 +299,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, namespace string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -307,7 +307,7 @@ func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSan
 	return image.Image, f.Err
 }
 
-func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
+func (f *FakeRuntime) GetImageRef(image ImageSpec, namespace string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -320,7 +320,7 @@ func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
 	return "", f.InspectErr
 }
 
-func (f *FakeRuntime) ListImages() ([]Image, error) {
+func (f *FakeRuntime) ListImages(namespace string) ([]Image, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -328,7 +328,7 @@ func (f *FakeRuntime) ListImages() ([]Image, error) {
 	return f.ImageList, f.Err
 }
 
-func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
+func (f *FakeRuntime) RemoveImage(namespace string, image ImageSpec) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -378,7 +378,7 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evi
 	return f.Err
 }
 
-func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
+func (f *FakeRuntime) DeleteContainer(namespace string, containerID ContainerID) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -430,7 +430,7 @@ type FakeContainerCommandRunner struct {
 
 var _ ContainerCommandRunner = &FakeContainerCommandRunner{}
 
-func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *FakeContainerCommandRunner) RunInContainer(namespace string, containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
 	f.Cmd = cmd

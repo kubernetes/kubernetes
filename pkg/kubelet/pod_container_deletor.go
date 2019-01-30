@@ -46,7 +46,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 	go wait.Until(func() {
 		for {
 			id := <-buffer
-			runtime.DeleteContainer(id)
+			runtime.DeleteContainer("", id)
 		}
 	}, 0, wait.NeverStop)
 

@@ -60,12 +60,15 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 }
 
 // ListImages lists available images.
-func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (r *RemoteImageService) ListImages(namespace string, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	resp, err := r.imageClient.ListImages(ctx, &runtimeapi.ListImagesRequest{
 		Filter: filter,
+		Metadata: &runtimeapi.RequestMetadata{
+			Namespace: namespace,
+		},
 	})
 	if err != nil {
 		klog.Errorf("ListImages with filter %+v from image service failed: %v", filter, err)
@@ -76,12 +79,15 @@ func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runt
 }
 
 // ImageStatus returns the status of the image.
-func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (r *RemoteImageService) ImageStatus(namespace string, image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	resp, err := r.imageClient.ImageStatus(ctx, &runtimeapi.ImageStatusRequest{
 		Image: image,
+		Metadata: &runtimeapi.RequestMetadata{
+			Namespace: namespace,
+		},
 	})
 	if err != nil {
 		klog.Errorf("ImageStatus %q from image service failed: %v", image.Image, err)
@@ -100,7 +106,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *RemoteImageService) PullImage(namespace string, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
@@ -108,6 +114,9 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 		Image:         image,
 		Auth:          auth,
 		SandboxConfig: podSandboxConfig,
+		Metadata: &runtimeapi.RequestMetadata{
+			Namespace: namespace,
+		},
 	})
 	if err != nil {
 		klog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
@@ -124,12 +133,15 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 }
 
 // RemoveImage removes the image.
-func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (r *RemoteImageService) RemoveImage(namespace string, image *runtimeapi.ImageSpec) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	_, err := r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
 		Image: image,
+		Metadata: &runtimeapi.RequestMetadata{
+			Namespace: namespace,
+		},
 	})
 	if err != nil {
 		klog.Errorf("RemoveImage %q from image service failed: %v", image.Image, err)

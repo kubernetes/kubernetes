@@ -367,6 +367,7 @@ message RunPodSandboxRequest {
     // behavior before this feature was added.
     // See https://git.k8s.io/community/keps/sig-node/0014-runtime-class.md
     string runtime_handler = 2;
+    RequestMetadata metadata = 3;
 }
 
 message RunPodSandboxResponse {
@@ -377,6 +378,7 @@ message RunPodSandboxResponse {
 message StopPodSandboxRequest {
     // ID of the PodSandbox to stop.
     string pod_sandbox_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message StopPodSandboxResponse {}
@@ -384,6 +386,7 @@ message StopPodSandboxResponse {}
 message RemovePodSandboxRequest {
     // ID of the PodSandbox to remove.
     string pod_sandbox_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message RemovePodSandboxResponse {}
@@ -393,6 +396,7 @@ message PodSandboxStatusRequest {
     string pod_sandbox_id = 1;
     // Verbose indicates whether to return extra information about the pod sandbox.
     bool verbose = 2;
+    RequestMetadata metadata = 3;
 }
 
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
@@ -473,6 +477,7 @@ message PodSandboxFilter {
 message ListPodSandboxRequest {
     // PodSandboxFilter to filter a list of PodSandboxes.
     PodSandboxFilter filter = 1;
+    RequestMetadata metadata = 2;
 }
 
 
@@ -757,6 +762,7 @@ message CreateContainerRequest {
     // here just for easy reference. The PodSandboxConfig is immutable and
     // remains the same throughout the lifetime of the pod.
     PodSandboxConfig sandbox_config = 3;
+    RequestMetadata metadata = 4;
 }
 
 message CreateContainerResponse {
@@ -767,6 +773,7 @@ message CreateContainerResponse {
 message StartContainerRequest {
     // ID of the container to start.
     string container_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message StartContainerResponse {}
@@ -777,6 +784,7 @@ message StopContainerRequest {
     // Timeout in seconds to wait for the container to stop before forcibly
     // terminating it. Default: 0 (forcibly terminate the container immediately)
     int64 timeout = 2;
+    RequestMetadata metadata = 3;
 }
 
 message StopContainerResponse {}
@@ -784,6 +792,7 @@ message StopContainerResponse {}
 message RemoveContainerRequest {
     // ID of the container to remove.
     string container_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message RemoveContainerResponse {}
@@ -818,6 +827,7 @@ message ContainerFilter {
 
 message ListContainersRequest {
     ContainerFilter filter = 1;
+    RequestMetadata metadata = 2;
 }
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -858,6 +868,7 @@ message ContainerStatusRequest {
     string container_id = 1;
     // Verbose indicates whether to return extra information about the container.
     bool verbose = 2;
+    RequestMetadata metadata = 3;
 }
 
 // ContainerStatus represents the status of a container.
@@ -914,6 +925,7 @@ message UpdateContainerResourcesRequest {
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
+    RequestMetadata metadata = 3;
 }
 
 message UpdateContainerResourcesResponse {}
@@ -925,6 +937,7 @@ message ExecSyncRequest {
     repeated string cmd = 2;
     // Timeout in seconds to stop the command. Default: 0 (run forever).
     int64 timeout = 3;
+    RequestMetadata metadata = 4;
 }
 
 message ExecSyncResponse {
@@ -955,6 +968,7 @@ message ExecRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 6;
+    RequestMetadata metadata = 7;
 }
 
 message ExecResponse {
@@ -980,6 +994,7 @@ message AttachRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 5;
+    RequestMetadata metadata = 6;
 }
 
 message AttachResponse {
@@ -992,6 +1007,7 @@ message PortForwardRequest {
     string pod_sandbox_id = 1;
     // Port to forward.
     repeated int32 port = 2;
+    RequestMetadata metadata = 3;
 }
 
 message PortForwardResponse {
@@ -1007,6 +1023,7 @@ message ImageFilter {
 message ListImagesRequest {
     // Filter to list images.
     ImageFilter filter = 1;
+    RequestMetadata metadata = 2;
 }
 
 // Basic information about a container image.
@@ -1038,6 +1055,7 @@ message ImageStatusRequest {
     ImageSpec image = 1;
     // Verbose indicates whether to return extra information about the image.
     bool verbose = 2;
+    RequestMetadata metadata = 3;
 }
 
 message ImageStatusResponse {
@@ -1070,6 +1088,7 @@ message PullImageRequest {
     AuthConfig auth = 2;
     // Config of the PodSandbox, which is used to pull image in PodSandbox context.
     PodSandboxConfig sandbox_config = 3;
+    RequestMetadata metadata = 4;
 }
 
 message PullImageResponse {
@@ -1081,6 +1100,7 @@ message PullImageResponse {
 message RemoveImageRequest {
     // Spec of the image to remove.
     ImageSpec image = 1;
+    RequestMetadata metadata = 2;
 }
 
 message RemoveImageResponse {}
@@ -1097,6 +1117,7 @@ message RuntimeConfig {
 
 message UpdateRuntimeConfigRequest {
     RuntimeConfig runtime_config = 1;
+    RequestMetadata metadata = 2;
 }
 
 message UpdateRuntimeConfigResponse {}
@@ -1134,6 +1155,7 @@ message RuntimeStatus {
 message StatusRequest {
     // Verbose indicates whether to return extra information about the runtime.
     bool verbose = 1;
+    RequestMetadata metadata = 2;
 }
 
 message StatusResponse {
@@ -1146,7 +1168,8 @@ message StatusResponse {
     map<string, string> info = 2;
 }
 
-message ImageFsInfoRequest {}
+message ImageFsInfoRequest {
+}
 
 // UInt64Value is the wrapper of uint64.
 message UInt64Value {
@@ -1184,6 +1207,7 @@ message ImageFsInfoResponse {
 message ContainerStatsRequest{
     // ID of the container for which to retrieve stats.
     string container_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message ContainerStatsResponse {
@@ -1194,6 +1218,7 @@ message ContainerStatsResponse {
 message ListContainerStatsRequest{
     // Filter for the list request.
     ContainerStatsFilter filter = 1;
+    RequestMetadata metadata = 2;
 }
 
 // ContainerStatsFilter is used to filter containers.
@@ -1260,7 +1285,12 @@ message MemoryUsage {
 message ReopenContainerLogRequest {
     // ID of the container for which to reopen the log.
     string container_id = 1;
+    RequestMetadata metadata = 2;
 }
 
 message ReopenContainerLogResponse{
+}
+
+message RequestMetadata {
+   string namespace = 1;
 }

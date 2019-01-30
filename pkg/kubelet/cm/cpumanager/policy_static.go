@@ -191,7 +191,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 	return nil
 }
 
-func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error {
+func (p *staticPolicy) RemoveContainer(s state.State, namespace, containerID string) error {
 	klog.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
 	if toRelease, ok := s.GetCPUSet(containerID); ok {
 		s.Delete(containerID)

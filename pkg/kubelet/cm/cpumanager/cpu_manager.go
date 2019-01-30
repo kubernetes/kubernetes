@@ -39,7 +39,7 @@ import (
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
+	UpdateContainerResources(namespace, id string, resources *runtimeapi.LinuxContainerResources) error
 }
 
 type policyName string
@@ -60,7 +60,7 @@ type Manager interface {
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, the CPU manager stops trying to reconcile
 	// that container and any CPUs dedicated to the container are freed.
-	RemoveContainer(containerID string) error
+	RemoveContainer(namespace, containerID string) error
 
 	// State returns a read-only interface to the internal CPU manager state.
 	State() state.Reader
@@ -178,11 +178,11 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 	m.Unlock()
 
 	if !cpus.IsEmpty() {
-		err = m.updateContainerCPUSet(containerID, cpus)
+		err = m.updateContainerCPUSet(p.Namespace, containerID, cpus)
 		if err != nil {
 			klog.Errorf("[cpumanager] AddContainer error: %v", err)
 			m.Lock()
-			err := m.policy.RemoveContainer(m.state, containerID)
+			err := m.policy.RemoveContainer(m.state, containerID, p.Namespace)
 			if err != nil {
 				klog.Errorf("[cpumanager] AddContainer rollback state error: %v", err)
 			}
@@ -194,11 +194,11 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 	return nil
 }
 
-func (m *manager) RemoveContainer(containerID string) error {
+func (m *manager) RemoveContainer(namespace, containerID string) error {
 	m.Lock()
 	defer m.Unlock()
 
-	err := m.policy.RemoveContainer(m.state, containerID)
+	err := m.policy.RemoveContainer(m.state, containerID, namespace)
 	if err != nil {
 		klog.Errorf("[cpumanager] RemoveContainer error: %v", err)
 		return err
@@ -267,7 +267,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			}
 
 			klog.V(4).Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
-			err = m.updateContainerCPUSet(containerID, cset)
+			err = m.updateContainerCPUSet(pod.Namespace, containerID, cset)
 			if err != nil {
 				klog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
@@ -293,14 +293,16 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
 }
 
-func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
+func (m *manager) updateContainerCPUSet(namespace, containerID string, cpus cpuset.CPUSet) error {
 	// TODO: Consider adding a `ResourceConfigForContainer` helper in
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
+		namespace,
 		containerID,
 		&runtimeapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),
-		})
+		},
+	)
 }

@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						Expect(err).NotTo(HaveOccurred())
-						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+						containers, err := runtime.ListContainers("", &runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},

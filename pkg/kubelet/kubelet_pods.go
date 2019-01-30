@@ -1571,7 +1571,7 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 }
 
 // RunInContainer runs a command in a container, returns the combined stdout, stderr as an array of bytes
-func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+func (kl *Kubelet) RunInContainer(namespace string, podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1580,11 +1580,11 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
 	// TODO(tallclair): Pass a proper timeout value.
-	return kl.runner.RunInContainer(container.ID, cmd, 0)
+	return kl.runner.RunInContainer(namespace, container.ID, cmd, 0)
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (kl *Kubelet) GetExec(namespace, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1592,11 +1592,11 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+	return kl.streamingRuntime.GetExec(namespace, container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (kl *Kubelet) GetAttach(namespace, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1618,7 +1618,7 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 	}
 	tty := containerSpec.TTY
 
-	return kl.streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
+	return kl.streamingRuntime.GetAttach(namespace, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.

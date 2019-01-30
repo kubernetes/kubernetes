@@ -77,83 +77,83 @@ func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) CreateContainer(namespace string, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.CreateContainer(podSandboxID, config, sandboxConfig)
+	out, err := in.service.CreateContainer(namespace, podSandboxID, config, sandboxConfig)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) StartContainer(containerID string) error {
+func (in instrumentedRuntimeService) StartContainer(namespace, containerID string) error {
 	const operation = "start_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StartContainer(containerID)
+	err := in.service.StartContainer(namespace, containerID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) StopContainer(containerID string, timeout int64) error {
+func (in instrumentedRuntimeService) StopContainer(namespace, containerID string, timeout int64) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StopContainer(containerID, timeout)
+	err := in.service.StopContainer(namespace, containerID, timeout)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
+func (in instrumentedRuntimeService) RemoveContainer(namespace, containerID string) error {
 	const operation = "remove_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.RemoveContainer(containerID)
+	err := in.service.RemoveContainer(namespace, containerID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+func (in instrumentedRuntimeService) ListContainers(namespace string, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	const operation = "list_containers"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ListContainers(filter)
+	out, err := in.service.ListContainers(namespace, filter)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
+func (in instrumentedRuntimeService) ContainerStatus(namespace, containerID string) (*runtimeapi.ContainerStatus, error) {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ContainerStatus(containerID)
+	out, err := in.service.ContainerStatus(namespace, containerID)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+func (in instrumentedRuntimeService) UpdateContainerResources(namespace, containerID string, resources *runtimeapi.LinuxContainerResources) error {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.UpdateContainerResources(containerID, resources)
+	err := in.service.UpdateContainerResources(namespace, containerID, resources)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) ReopenContainerLog(containerID string) error {
+func (in instrumentedRuntimeService) ReopenContainerLog(namespace, containerID string) error {
 	const operation = "reopen_container_log"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.ReopenContainerLog(containerID)
+	err := in.service.ReopenContainerLog(namespace, containerID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {
+func (in instrumentedRuntimeService) ExecSync(namespace, containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {
 	const operation = "exec_sync"
 	defer recordOperation(operation, time.Now())
 
-	stdout, stderr, err := in.service.ExecSync(containerID, cmd, timeout)
+	stdout, stderr, err := in.service.ExecSync(namespace, containerID, cmd, timeout)
 	recordError(operation, err)
 	return stdout, stderr, err
 }
@@ -176,65 +176,65 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(namespace string, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.RunPodSandbox(config, runtimeHandler)
+	out, err := in.service.RunPodSandbox(namespace, config, runtimeHandler)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) StopPodSandbox(podSandboxID string) error {
+func (in instrumentedRuntimeService) StopPodSandbox(namespace, podSandboxID string) error {
 	const operation = "stop_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StopPodSandbox(podSandboxID)
+	err := in.service.StopPodSandbox(namespace, podSandboxID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error {
+func (in instrumentedRuntimeService) RemovePodSandbox(namespace, podSandboxID string) error {
 	const operation = "remove_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.RemovePodSandbox(podSandboxID)
+	err := in.service.RemovePodSandbox(namespace, podSandboxID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+func (in instrumentedRuntimeService) PodSandboxStatus(namespace, podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
 	const operation = "podsandbox_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.PodSandboxStatus(podSandboxID)
+	out, err := in.service.PodSandboxStatus(namespace, podSandboxID)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+func (in instrumentedRuntimeService) ListPodSandbox(namespace string, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	const operation = "list_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ListPodSandbox(filter)
+	out, err := in.service.ListPodSandbox(namespace, filter)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ContainerStats(namespace, containerID string) (*runtimeapi.ContainerStats, error) {
 	const operation = "container_stats"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ContainerStats(containerID)
+	out, err := in.service.ContainerStats(namespace, containerID)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+func (in instrumentedRuntimeService) ListContainerStats(namespace string, filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	const operation = "list_container_stats"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ListContainerStats(filter)
+	out, err := in.service.ListContainerStats(namespace, filter)
 	recordError(operation, err)
 	return out, err
 }
@@ -257,38 +257,38 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	return err
 }
 
-func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ListImages(namespace string, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ListImages(filter)
+	out, err := in.service.ListImages(namespace, filter)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(namespace string, image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ImageStatus(image)
+	out, err := in.service.ImageStatus(namespace, image)
 	recordError(operation, err)
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(namespace string, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
-	imageRef, err := in.service.PullImage(image, auth, podSandboxConfig)
+	imageRef, err := in.service.PullImage(namespace, image, auth, podSandboxConfig)
 	recordError(operation, err)
 	return imageRef, err
 }
 
-func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (in instrumentedImageManagerService) RemoveImage(namespace string, image *runtimeapi.ImageSpec) error {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.RemoveImage(image)
+	err := in.service.RemoveImage(namespace, image)
 	recordError(operation, err)
 	return err
 }

@@ -41,7 +41,7 @@ func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, contain
 	return nil
 }
 
-func (m *fakeManager) RemoveContainer(containerID string) error {
+func (m *fakeManager) RemoveContainer(namespace, containerID string) error {
 	klog.Infof("[fake cpumanager] RemoveContainer (container id: %s)", containerID)
 	return nil
 }

@@ -102,7 +102,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	}
 
 	spec := kubecontainer.ImageSpec{Image: image}
-	imageRef, err := m.imageService.GetImageRef(spec)
+	imageRef, err := m.imageService.GetImageRef(pod.Namespace, spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
@@ -129,7 +129,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), klog.Info)
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+	m.puller.pullImage(pod.Namespace, spec, pullSecrets, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)

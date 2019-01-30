@@ -267,7 +267,7 @@ func (w *logWriter) write(msg *logMessage) error {
 // ReadLogs read the container log and redirect into stdout and stderr.
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
-func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+func ReadLogs(ctx context.Context, path, namespace, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
@@ -318,7 +318,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					}
 				}
 				// Wait until the next log change.
-				if found, err := waitLogs(ctx, containerID, watcher, runtimeService); !found {
+				if found, err := waitLogs(ctx, namespace, containerID, watcher, runtimeService); !found {
 					return err
 				}
 				continue
@@ -355,8 +355,8 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	}
 }
 
-func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
-	s, err := r.ContainerStatus(id)
+func isContainerRunning(namespace, id string, r internalapi.RuntimeService) (bool, error) {
+	s, err := r.ContainerStatus(namespace, id)
 	if err != nil {
 		return false, err
 	}
@@ -372,9 +372,9 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 
 // waitLogs wait for the next log write. It returns a boolean and an error. The boolean
 // indicates whether a new log is found; the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
+func waitLogs(ctx context.Context, namespace, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
 	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(id, runtimeService); !running {
+	if running, err := isContainerRunning(namespace, id, runtimeService); !running {
 		return false, err
 	}
 	errRetry := 5
@@ -396,7 +396,7 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			}
 			errRetry--
 		case <-time.After(stateCheckPeriod):
-			if running, err := isContainerRunning(id, runtimeService); !running {
+			if running, err := isContainerRunning(namespace, id, runtimeService); !running {
 				return false, err
 			}
 		}

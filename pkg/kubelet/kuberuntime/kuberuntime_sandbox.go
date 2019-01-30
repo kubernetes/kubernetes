@@ -62,7 +62,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 		}
 	}
 
-	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, runtimeHandler)
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(pod.Namespace, podSandboxConfig, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
 		klog.Error(message)
@@ -205,7 +205,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 		}
 	}
 
-	resp, err := m.runtimeService.ListPodSandbox(filter)
+	resp, err := m.runtimeService.ListPodSandbox("", filter)
 	if err != nil {
 		klog.Errorf("ListPodSandbox failed: %v", err)
 		return nil, err
@@ -241,7 +241,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 			State: *state,
 		}
 	}
-	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
+	sandboxes, err := m.runtimeService.ListPodSandbox("", filter)
 	if err != nil {
 		klog.Errorf("ListPodSandbox with pod UID %q failed: %v", podUID, err)
 		return nil, err

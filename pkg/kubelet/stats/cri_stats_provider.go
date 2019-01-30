@@ -84,14 +84,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
 
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := p.runtimeService.ListContainers("", &runtimeapi.ContainerFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
 	// Creates pod sandbox map.
 	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
+	podSandboxes, err := p.runtimeService.ListPodSandbox("", &runtimeapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
@@ -106,7 +106,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	resp, err := p.runtimeService.ListContainerStats("", &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
@@ -171,14 +171,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 // ListPodCPUAndMemoryStats returns the CPU and Memory stats of all the pod-managed containers.
 func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
-	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := p.runtimeService.ListContainers("", &runtimeapi.ContainerFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
 	// Creates pod sandbox map.
 	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
-	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
+	podSandboxes, err := p.runtimeService.ListPodSandbox("", &runtimeapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
@@ -189,7 +189,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	resp, err := p.runtimeService.ListContainerStats("", &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}

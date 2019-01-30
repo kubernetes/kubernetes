@@ -527,7 +527,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
-			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
+			if err := m.internalLifecycle.PostStopContainer(pod.Namespace, containerStatus.ID.ID); err != nil {
 				klog.Errorf("internal container post-stop lifecycle hook failed for container %v in pod %v with error %v",
 					container.Name, pod.Name, err)
 			}
@@ -681,7 +681,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 		klog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))
 
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(pod.Namespace, podSandboxID)
 		if err != nil {
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
@@ -822,7 +822,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	result.AddSyncResult(killSandboxResult)
 	// Stop all sandboxes belongs to same pod
 	for _, podSandbox := range runningPod.Sandboxes {
-		if err := m.runtimeService.StopPodSandbox(podSandbox.ID.ID); err != nil {
+		if err := m.runtimeService.StopPodSandbox(pod.Namespace, podSandbox.ID.ID); err != nil {
 			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
 			klog.Errorf("Failed to stop sandbox %q", podSandbox.ID)
 		}
@@ -875,7 +875,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
 	podIP := ""
 	for idx, podSandboxID := range podSandboxIDs {
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(namespace, podSandboxID)
 		if err != nil {
 			klog.Errorf("PodSandboxStatus of sandbox %q for pod %q error: %v", podSandboxID, podFullName, err)
 			return nil, err

@@ -31,7 +31,7 @@ type pullResult struct {
 }
 
 type imagePuller interface {
-	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	pullImage(string, kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -44,9 +44,9 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 	return &parallelImagePuller{imageService}
 }
 
-func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (pip *parallelImagePuller) pullImage(namespace string, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
-		imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
+		imageRef, err := pip.imageService.PullImage(namespace, spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,
@@ -73,20 +73,22 @@ type imagePullRequest struct {
 	pullSecrets      []v1.Secret
 	pullChan         chan<- pullResult
 	podSandboxConfig *runtimeapi.PodSandboxConfig
+	namespace        string
 }
 
-func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (sip *serialImagePuller) pullImage(namespace string, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:             spec,
 		pullSecrets:      pullSecrets,
 		pullChan:         pullChan,
 		podSandboxConfig: podSandboxConfig,
+		namespace:        namespace,
 	}
 }
 
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
-		imageRef, err := sip.imageService.PullImage(pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		imageRef, err := sip.imageService.PullImage(pullRequest.namespace, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
 		pullRequest.pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,

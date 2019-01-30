@@ -178,7 +178,7 @@ func (c *containerLogManager) Start() {
 
 func (c *containerLogManager) rotateLogs() error {
 	// TODO(#59998): Use kubelet pod cache.
-	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := c.runtimeService.ListContainers("", &runtimeapi.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %v", err)
 	}
@@ -191,7 +191,7 @@ func (c *containerLogManager) rotateLogs() error {
 		}
 		id := container.GetId()
 		// Note that we should not block log rotate for an error of a single container.
-		status, err := c.runtimeService.ContainerStatus(id)
+		status, err := c.runtimeService.ContainerStatus("", id)
 		if err != nil {
 			klog.Errorf("Failed to get container status for %q: %v", id, err)
 			continue
@@ -206,7 +206,7 @@ func (c *containerLogManager) rotateLogs() error {
 			// In rotateLatestLog, there are several cases that we may
 			// lose original container log after ReopenContainerLog fails.
 			// We try to recover it by reopening container log.
-			if err := c.runtimeService.ReopenContainerLog(id); err != nil {
+			if err := c.runtimeService.ReopenContainerLog("", id); err != nil {
 				klog.Errorf("Container %q log %q doesn't exist, reopen container log failed: %v", id, path, err)
 				continue
 			}
@@ -371,7 +371,7 @@ func (c *containerLogManager) rotateLatestLog(id, log string) error {
 	if err := os.Rename(log, rotated); err != nil {
 		return fmt.Errorf("failed to rotate log %q to %q: %v", log, rotated, err)
 	}
-	if err := c.runtimeService.ReopenContainerLog(id); err != nil {
+	if err := c.runtimeService.ReopenContainerLog(id, ""); err != nil {
 		// Rename the rotated log back, so that we can try rotating it again
 		// next round.
 		// If kubelet gets restarted at this point, we'll lose original log.
