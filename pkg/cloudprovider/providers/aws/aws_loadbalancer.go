@@ -138,10 +138,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		loadBalancer = createResponse.LoadBalancers[0]
 
 		// Create Target Groups
-		addTagsInput := &elbv2.AddTagsInput{
-			ResourceArns: []*string{},
-			Tags:         []*elbv2.Tag{},
-		}
+		resourceArns := make([]*string, 0, len(mappings))
 
 		for i := range mappings {
 			// It is easier to keep track of updates by having possibly
@@ -150,20 +147,28 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			if err != nil {
 				return nil, fmt.Errorf("Error creating listener: %q", err)
 			}
-			addTagsInput.ResourceArns = append(addTagsInput.ResourceArns, targetGroupArn)
+			resourceArns = append(resourceArns, targetGroupArn)
 
 		}
 
 		// Add tags to targets
+		targetGroupTags := make([]*elbv2.Tag, 0, len(tags))
+
 		for k, v := range tags {
-			addTagsInput.Tags = append(addTagsInput.Tags, &elbv2.Tag{
+			targetGroupTags = append(targetGroupTags, &elbv2.Tag{
 				Key: aws.String(k), Value: aws.String(v),
 			})
 		}
-		if len(addTagsInput.ResourceArns) > 0 && len(addTagsInput.Tags) > 0 {
-			_, err = c.elbv2.AddTags(addTagsInput)
-			if err != nil {
-				return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+		if len(resourceArns) > 0 && len(targetGroupTags) > 0 {
+			// elbv2.AddTags doesn't allow to tag multiple resources at once
+			for _, arn := range resourceArns {
+				_, err = c.elbv2.AddTags(&elbv2.AddTagsInput{
+					ResourceArns: []*string{arn},
+					Tags:         targetGroupTags,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+				}
 			}
 		}
 	} else {
