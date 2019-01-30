@@ -48,6 +48,7 @@ const (
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"
+	schedulingGroup     = "scheduling.k8s.io"
 	storageGroup        = "storage.k8s.io"
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
@@ -429,6 +430,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// things that pods use or applies to them
 				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("priorityclasses").RuleOrDie(),
 			},
 		},
 		{
