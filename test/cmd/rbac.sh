@@ -30,77 +30,77 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
 
   # test `kubectl create clusterrole`
-  kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
+  kubectl create "${KUBE_FLAGS[@]}" clusterrole pod-admin --verb=* --resource=pods
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-  kubectl create "${kube_flags[@]}" clusterrole resource-reader --verb=get,list --resource=pods,deployments.apps
+  kubectl create "${KUBE_FLAGS[@]}" clusterrole resource-reader --verb=get,list --resource=pods,deployments.apps
   kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
   kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
   kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':apps:'
-  kubectl create "${kube_flags[@]}" clusterrole resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+  kubectl create "${KUBE_FLAGS[@]}" clusterrole resourcename-reader --verb=get,list --resource=pods --resource-name=foo
   kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
   kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
   kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
   kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
-  kubectl create "${kube_flags[@]}" clusterrole url-reader --verb=get --non-resource-url=/logs/* --non-resource-url=/healthz/*
+  kubectl create "${KUBE_FLAGS[@]}" clusterrole url-reader --verb=get --non-resource-url=/logs/* --non-resource-url=/healthz/*
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '/logs/\*:/healthz/\*:'
-  kubectl create "${kube_flags[@]}" clusterrole aggregation-reader --aggregation-rule="foo1=foo2"
-  kube::test::get_object_assert clusterrole/aggregation-reader "{{$id_field}}" 'aggregation-reader'
+  kubectl create "${KUBE_FLAGS[@]}" clusterrole aggregation-reader --aggregation-rule="foo1=foo2"
+  kube::test::get_object_assert clusterrole/aggregation-reader "{{$ID_FIELD}}" 'aggregation-reader'
 
   # test `kubectl create clusterrolebinding`
   # test `kubectl set subject clusterrolebinding`
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
+  kubectl create "${KUBE_FLAGS[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
+  kubectl set subject "${KUBE_FLAGS[@]}" clusterrolebinding super-admin --user=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:'
-  kubectl create "${kube_flags[@]}" clusterrolebinding multi-users --clusterrole=admin --user=user-1 --user=user-2
+  kubectl create "${KUBE_FLAGS[@]}" clusterrolebinding multi-users --clusterrole=admin --user=user-1 --user=user-2
   kube::test::get_object_assert clusterrolebinding/multi-users "{{range.subjects}}{{.name}}:{{end}}" 'user-1:user-2:'
 
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
+  kubectl create "${KUBE_FLAGS[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding super-group --group=foo
+  kubectl set subject "${KUBE_FLAGS[@]}" clusterrolebinding super-group --group=foo
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
-  kubectl create "${kube_flags[@]}" clusterrolebinding multi-groups --clusterrole=admin --group=group-1 --group=group-2
+  kubectl create "${KUBE_FLAGS[@]}" clusterrolebinding multi-groups --clusterrole=admin --group=group-1 --group=group-2
   kube::test::get_object_assert clusterrolebinding/multi-groups "{{range.subjects}}{{.name}}:{{end}}" 'group-1:group-2:'
 
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-sa --clusterrole=admin --serviceaccount=otherns:sa-name
+  kubectl create "${KUBE_FLAGS[@]}" clusterrolebinding super-sa --clusterrole=admin --serviceaccount=otherns:sa-name
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding super-sa --serviceaccount=otherfoo:foo
+  kubectl set subject "${KUBE_FLAGS[@]}" clusterrolebinding super-sa --serviceaccount=otherfoo:foo
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
   # test `kubectl set subject clusterrolebinding --all`
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding --all --user=test-all-user
+  kubectl set subject "${KUBE_FLAGS[@]}" clusterrolebinding --all --user=test-all-user
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:test-all-user:'
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
-  kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
+  kubectl create "${KUBE_FLAGS[@]}" rolebinding admin --clusterrole=admin --user=default-admin
   kube::test::get_object_assert rolebinding/admin "{{.roleRef.kind}}" 'ClusterRole'
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:'
-  kubectl set subject "${kube_flags[@]}" rolebinding admin --user=foo
+  kubectl set subject "${KUBE_FLAGS[@]}" rolebinding admin --user=foo
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:'
 
-  kubectl create "${kube_flags[@]}" rolebinding localrole --role=localrole --group=the-group
+  kubectl create "${KUBE_FLAGS[@]}" rolebinding localrole --role=localrole --group=the-group
   kube::test::get_object_assert rolebinding/localrole "{{.roleRef.kind}}" 'Role'
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
-  kubectl set subject "${kube_flags[@]}" rolebinding localrole --group=foo
+  kubectl set subject "${KUBE_FLAGS[@]}" rolebinding localrole --group=foo
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
 
-  kubectl create "${kube_flags[@]}" rolebinding sarole --role=localrole --serviceaccount=otherns:sa-name
+  kubectl create "${KUBE_FLAGS[@]}" rolebinding sarole --role=localrole --serviceaccount=otherns:sa-name
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
-  kubectl set subject "${kube_flags[@]}" rolebinding sarole --serviceaccount=otherfoo:foo
+  kubectl set subject "${KUBE_FLAGS[@]}" rolebinding sarole --serviceaccount=otherfoo:foo
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
   # test `kubectl set subject rolebinding --all`
-  kubectl set subject "${kube_flags[@]}" rolebinding --all --user=test-all-user
+  kubectl set subject "${KUBE_FLAGS[@]}" rolebinding --all --user=test-all-user
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
@@ -117,39 +117,39 @@ run_role_tests() {
   kube::log::status "Testing role"
 
   # Create Role from command (only resource)
-  kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
+  kubectl create "${KUBE_FLAGS[@]}" role pod-admin --verb=* --resource=pods
   kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
   kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-  output_message=$(! kubectl create "${kube_flags[@]}" role invalid-pod-admin --verb=* --resource=invalid-resource 2>&1)
+  output_message=$(! kubectl create "${KUBE_FLAGS[@]}" role invalid-pod-admin --verb=* --resource=invalid-resource 2>&1)
   kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"invalid-resource\""
   # Create Role from command (resource + group)
-  kubectl create "${kube_flags[@]}" role group-reader --verb=get,list --resource=deployments.apps
+  kubectl create "${KUBE_FLAGS[@]}" role group-reader --verb=get,list --resource=deployments.apps
   kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
   kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'deployments:'
   kube::test::get_object_assert role/group-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" 'apps:'
-  output_message=$(! kubectl create "${kube_flags[@]}" role invalid-group --verb=get,list --resource=deployments.invalid-group 2>&1)
+  output_message=$(! kubectl create "${KUBE_FLAGS[@]}" role invalid-group --verb=get,list --resource=deployments.invalid-group 2>&1)
   kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"deployments\" in group \"invalid-group\""
   # Create Role from command (resource / subresource)
-  kubectl create "${kube_flags[@]}" role subresource-reader --verb=get,list --resource=pods/status
+  kubectl create "${KUBE_FLAGS[@]}" role subresource-reader --verb=get,list --resource=pods/status
   kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
   kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:'
   kube::test::get_object_assert role/subresource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
   # Create Role from command (resource + group / subresource)
-  kubectl create "${kube_flags[@]}" role group-subresource-reader --verb=get,list --resource=replicasets.apps/scale
+  kubectl create "${KUBE_FLAGS[@]}" role group-subresource-reader --verb=get,list --resource=replicasets.apps/scale
   kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
   kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'replicasets/scale:'
   kube::test::get_object_assert role/group-subresource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" 'apps:'
-  output_message=$(! kubectl create "${kube_flags[@]}" role invalid-group --verb=get,list --resource=rs.invalid-group/scale 2>&1)
+  output_message=$(! kubectl create "${KUBE_FLAGS[@]}" role invalid-group --verb=get,list --resource=rs.invalid-group/scale 2>&1)
   kube::test::if_has_string "${output_message}" "the server doesn't have a resource type \"rs\" in group \"invalid-group\""
   # Create Role from command (resource + resourcename)
-  kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+  kubectl create "${KUBE_FLAGS[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
   kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
   kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
   kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
   kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
   # Create Role from command (multi-resources)
-  kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods/status,deployments.apps
+  kubectl create "${KUBE_FLAGS[@]}" role resource-reader --verb=get,list --resource=pods/status,deployments.apps
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:deployments:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':apps:'

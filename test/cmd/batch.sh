@@ -27,16 +27,16 @@ run_job_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-jobs namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-jobs\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $ID_FIELD \"test-jobs\" }}found{{end}}{{end}}:' ':'
   # Command
   kubectl create namespace test-jobs
   # Post-condition: namespace 'test-jobs' is created.
-  kube::test::get_object_assert 'namespaces/test-jobs' "{{$id_field}}" 'test-jobs'
+  kube::test::get_object_assert 'namespaces/test-jobs' "{{$ID_FIELD}}" 'test-jobs'
 
   ### Create a cronjob in a specific namespace
-  kubectl run pi --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${KUBE_FLAGS[@]}"
   # Post-Condition: assertion object exists
-  kube::test::get_object_assert 'cronjob/pi --namespace=test-jobs' "{{$id_field}}" 'pi'
+  kube::test::get_object_assert 'cronjob/pi --namespace=test-jobs' "{{$ID_FIELD}}" 'pi'
   kubectl get cronjob/pi --namespace=test-jobs
   kubectl describe cronjob/pi --namespace=test-jobs
 
@@ -45,12 +45,12 @@ run_job_tests() {
   # Post-condition: The text 'job.batch/test-job' should be part of the output
   kube::test::if_has_string "${output_message}" 'job.batch/test-job'
   # Post-condition: The test-job wasn't created actually
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}{{end}}" ''
+  kube::test::get_object_assert jobs "{{range.items}}{{$ID_FIELD}}{{end}}" ''
 
   ### Create a job in a specific namespace
   kubectl create job test-job --from=cronjob/pi --namespace=test-jobs
   # Post-Condition: assertion object exists
-  kube::test::get_object_assert 'job/test-job --namespace=test-jobs' "{{$id_field}}" 'test-job'
+  kube::test::get_object_assert 'job/test-job --namespace=test-jobs' "{{$ID_FIELD}}" 'test-job'
   kubectl get job/test-job --namespace=test-jobs
   kubectl describe job/test-job --namespace=test-jobs
   #Clean up

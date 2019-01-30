@@ -24,10 +24,10 @@ run_cluster_management_tests() {
 
   kube::log::status "Testing cluster-management commands"
 
-  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  kube::test::get_object_assert nodes "{{range.items}}{{$ID_FIELD}}:{{end}}" '127.0.0.1:'
 
   # create test pods we can work with
-  kubectl create -f - "${kube_flags[@]}" << __EOF__
+  kubectl create -f - "${KUBE_FLAGS[@]}" << __EOF__
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -49,7 +49,7 @@ run_cluster_management_tests() {
 }
 __EOF__
 
-  kubectl create -f - "${kube_flags[@]}" << __EOF__
+  kubectl create -f - "${KUBE_FLAGS[@]}" << __EOF__
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -93,7 +93,7 @@ __EOF__
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
   kubectl drain "127.0.0.1" --dry-run
   # Post-condition: node still exists, node is still schedulable
-  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  kube::test::get_object_assert nodes "{{range.items}}{{$ID_FIELD}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
   ### kubectl drain with --pod-selector only evicts pods that match the given selector

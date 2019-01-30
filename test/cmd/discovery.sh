@@ -30,7 +30,7 @@ run_RESTMapper_evaluation_tests() {
   ### Non-existent resource type should give a recognizeable error
   # Pre-condition: None
   # Command
-  kubectl get "${kube_flags[@]}" unknownresourcetype 2>${RESTMAPPER_ERROR_FILE} || true
+  kubectl get "${KUBE_FLAGS[@]}" unknownresourcetype 2>${RESTMAPPER_ERROR_FILE} || true
   if grep -q "the server doesn't have a resource type" "${RESTMAPPER_ERROR_FILE}"; then
     kube::log::status "\"kubectl get unknownresourcetype\" returns error as expected: $(cat ${RESTMAPPER_ERROR_FILE})"
   else
@@ -79,8 +79,8 @@ run_resource_aliasing_tests() {
 
   create_and_use_new_namespace
   kube::log::status "Testing resource aliasing"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
+  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${KUBE_FLAGS[@]}"
+  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${KUBE_FLAGS[@]}"
 
   object="all -l'app=cassandra'"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
@@ -90,7 +90,7 @@ run_resource_aliasing_tests() {
   kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:' || \
   kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:'
 
-  kubectl delete all -l app=cassandra "${kube_flags[@]}"
+  kubectl delete all -l app=cassandra "${KUBE_FLAGS[@]}"
 
   set +o nounset
   set +o errexit

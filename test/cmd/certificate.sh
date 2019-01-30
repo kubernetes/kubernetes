@@ -25,38 +25,38 @@ run_certificates_tests() {
   kube::log::status "Testing certificates"
 
   # approve
-  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
-  kubectl certificate approve foo "${kube_flags[@]}"
-  kubectl get csr "${kube_flags[@]}" -o json
+  kubectl certificate approve foo "${KUBE_FLAGS[@]}"
+  kubectl get csr "${KUBE_FLAGS[@]}" -o json
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
-  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+  kubectl delete -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$ID_FIELD}}{{end}}" ''
 
-  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
-  kubectl certificate approve -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kubectl get csr "${kube_flags[@]}" -o json
+  kubectl certificate approve -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kubectl get csr "${KUBE_FLAGS[@]}" -o json
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
-  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+  kubectl delete -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$ID_FIELD}}{{end}}" ''
 
   # deny
-  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
-  kubectl certificate deny foo "${kube_flags[@]}"
-  kubectl get csr "${kube_flags[@]}" -o json
+  kubectl certificate deny foo "${KUBE_FLAGS[@]}"
+  kubectl get csr "${KUBE_FLAGS[@]}" -o json
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
-  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+  kubectl delete -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$ID_FIELD}}{{end}}" ''
 
-  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
-  kubectl certificate deny -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kubectl get csr "${kube_flags[@]}" -o json
+  kubectl certificate deny -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kubectl get csr "${KUBE_FLAGS[@]}" -o json
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
-  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+  kubectl delete -f hack/testdata/csr.yml "${KUBE_FLAGS[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$ID_FIELD}}{{end}}" ''
 
   set +o nounset
   set +o errexit
