@@ -56,7 +56,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	})
 
+	delegatePostStartHookChan := make(chan struct{})
 	delegateServer.AddPostStartHook("delegate-post-start-hook", func(context PostStartHookContext) error {
+		defer close(delegatePostStartHookChan)
 		return nil
 	})
 
@@ -82,7 +84,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
+	wrappingPostStartHookChan := make(chan struct{})
 	wrappingServer.AddPostStartHook("wrapping-post-start-hook", func(context PostStartHookContext) error {
+		defer close(wrappingPostStartHookChan)
 		return nil
 	})
 
@@ -93,6 +97,10 @@ func TestNewWithDelegate(t *testing.T) {
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
+
+	// Wait for the hooks to finish before checking the response
+	<-delegatePostStartHookChan
+	<-wrappingPostStartHookChan
 
 	checkPath(server.URL, http.StatusOK, `{
   "paths": [
