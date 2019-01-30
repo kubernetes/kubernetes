@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 

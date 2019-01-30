@@ -33,7 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 

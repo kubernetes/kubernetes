@@ -286,7 +286,7 @@
         "k8s.io/kubernetes/pkg/util/node",
         "k8s.io/kubernetes/pkg/util/reflector/prometheus",
         "k8s.io/kubernetes/pkg/util/slice",
-        "k8s.io/kubernetes/pkg/util/strings",
+        "k8s.io/kubernetes/util/strings",
         "k8s.io/kubernetes/pkg/util/system",
         "k8s.io/kubernetes/pkg/util/taints",
         "k8s.io/kubernetes/pkg/util/workqueue/prometheus",

@@ -26,7 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/util/strings"
 )
 
 // Manager is an interface that tracks pods with mount utilities for individual

@@ -32,7 +32,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	utilstrings "k8s.io/kubernetes/util/strings"
 )
 
 type flexVolumeProber struct {
