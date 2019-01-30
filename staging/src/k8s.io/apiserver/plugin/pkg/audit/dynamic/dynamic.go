@@ -7,10 +7,10 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	Unless required by applicable law or agreed to in writing, software
 limitations under the License.
 */
 
@@ -23,21 +23,24 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/klog"
-
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditinstall "k8s.io/apiserver/pkg/apis/audit/install"
-	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	"k8s.io/apiserver/pkg/audit"
 	webhook "k8s.io/apiserver/pkg/util/webhook"
 	bufferedplugin "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	auditinformer "k8s.io/client-go/informers/auditregistration/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/runtime/schema"
+	audit "k8s.io/kubernetes/staging/src/k8s.io/apiserver/pkg/apis/audit"
+)
+
+var (
+	groupVersions = []schema.GroupVersion{audit.SchemaGroupVersion}
 )
 
 // PluginName is the name reported in error metrics.
@@ -101,10 +104,12 @@ func NewBackend(c *Config) (audit.Backend, error) {
 	if c.BufferedConfig == nil {
 		c.BufferedConfig = NewDefaultWebhookBatchConfig()
 	}
-	cm, err := webhook.NewClientManager(auditv1.SchemeGroupVersion, func(s *runtime.Scheme) error {
+
+	cm, err := webhook.NewClientManager(groupVersions, func(s *runtime.Scheme) error {
 		auditinstall.Install(s)
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
