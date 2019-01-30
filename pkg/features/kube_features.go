@@ -121,6 +121,7 @@ const (
 	// owner: @bsalamat
 	// alpha: v1.8
 	// beta: v1.11
+	// GA: v1.14
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
@@ -432,7 +433,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
-	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.GA},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.14
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},

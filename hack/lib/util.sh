@@ -697,6 +697,15 @@ function kube::util::ensure-cfssl {
     return 0
   fi
 
+  host_arch=$(kube::util::host_arch)
+
+  if [[ "${host_arch}" != "amd64" ]]; then
+    echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
+    echo "Please install cfssl and cfssljson and verify they are in \$PATH."
+    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+    exit 1
+  fi
+
   # Create a temp dir for cfssl if no directory was given
   local cfssldir=${1:-}
   if [[ -z "${cfssldir}" ]]; then
