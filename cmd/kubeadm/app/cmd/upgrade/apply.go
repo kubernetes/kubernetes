@@ -158,11 +158,6 @@ func runApply(flags *applyFlags) error {
 		return err
 	}
 
-	if len(flags.criSocket) != 0 {
-		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
-		upgradeVars.cfg.NodeRegistration.CRISocket = flags.criSocket
-	}
-
 	// Validate requested and validate actual version
 	klog.V(1).Infof("[upgrade/apply] validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
