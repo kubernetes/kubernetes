@@ -474,6 +474,7 @@ filegroup(
         "//vendor/k8s.io/utils/io:all-srcs",
         "//vendor/k8s.io/utils/keymutex:all-srcs",
         "//vendor/k8s.io/utils/nsenter:all-srcs",
+        "//vendor/k8s.io/utils/path:all-srcs",
         "//vendor/k8s.io/utils/pointer:all-srcs",
         "//vendor/k8s.io/utils/strings:all-srcs",
         "//vendor/k8s.io/utils/trace:all-srcs",

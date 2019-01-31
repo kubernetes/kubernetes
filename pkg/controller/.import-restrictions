@@ -306,7 +306,6 @@
         "k8s.io/kubernetes/pkg/scheduler/api",
         "k8s.io/kubernetes/pkg/scheduler/util",
         "k8s.io/kubernetes/pkg/security/apparmor",
-        "k8s.io/kubernetes/pkg/util/file",
         "k8s.io/kubernetes/pkg/util/net/sets",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
@@ -339,6 +338,7 @@
         "k8s.io/utils/nsenter",
         "k8s.io/utils/integer",
         "k8s.io/utils/io",
+        "k8s.io/utils/path",
         "k8s.io/utils/pointer",
         "k8s.io/utils/exec",
         "k8s.io/utils/strings"

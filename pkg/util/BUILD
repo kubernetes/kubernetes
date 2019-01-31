@@ -20,7 +20,6 @@ filegroup(
         "//pkg/util/dbus:all-srcs",
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
-        "//pkg/util/file:all-srcs",
         "//pkg/util/filesystem:all-srcs",
         "//pkg/util/flag:all-srcs",
         "//pkg/util/flock:all-srcs",

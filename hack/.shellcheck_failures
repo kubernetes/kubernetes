@@ -158,11 +158,6 @@
 ./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
-./staging/src/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
-./staging/src/k8s.io/apiextensions-apiserver/examples/client-go/hack/verify-codegen.sh
-./staging/src/k8s.io/apiextensions-apiserver/hack/build-image.sh
-./staging/src/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
-./staging/src/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
 ./staging/src/k8s.io/code-generator/generate-groups.sh
 ./staging/src/k8s.io/code-generator/generate-internal-groups.sh
 ./staging/src/k8s.io/code-generator/hack/update-codegen.sh
@@ -178,9 +173,6 @@
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
 ./staging/src/k8s.io/node-api/hack/update-codegen.sh
 ./staging/src/k8s.io/node-api/hack/verify-codegen.sh
-./staging/src/k8s.io/sample-apiserver/hack/build-image.sh
-./staging/src/k8s.io/sample-apiserver/hack/update-codegen.sh
-./staging/src/k8s.io/sample-apiserver/hack/verify-codegen.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh

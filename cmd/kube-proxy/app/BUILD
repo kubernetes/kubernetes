@@ -22,6 +22,7 @@ go_library(
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/apis:go_default_library",
         "//pkg/proxy/apis/config:go_default_library",
         "//pkg/proxy/apis/config/scheme:go_default_library",
         "//pkg/proxy/apis/config/validation:go_default_library",

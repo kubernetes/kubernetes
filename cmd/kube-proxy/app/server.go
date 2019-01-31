@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
@@ -583,7 +584,7 @@ func (s *ProxyServer) Run() error {
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
-			options.LabelSelector = "!service.kubernetes.io/service-proxy-name"
+			options.LabelSelector = "!" + apis.LabelServiceProxyName
 		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)
