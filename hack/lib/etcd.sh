@@ -16,6 +16,10 @@
 
 # A set of helpers for starting/running etcd for tests
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 ETCD_VERSION=${ETCD_VERSION:-3.3.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -41,18 +45,18 @@ kube::etcd::validate() {
   fi
   if ${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}" >/dev/null 2>&1; then
     kube::log::usage "unable to start etcd as port ${ETCD_PORT} is in use. please stop the process listening on this port and retry."
-    kube::log::usage "`netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN"`"
+    kube::log::usage "$(netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN")"
     exit 1
   fi
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+  if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
    echo "${PATH}"
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
@@ -76,7 +80,7 @@ kube::etcd::start() {
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
   kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls ${KUBE_INTEGRATION_ETCD_URL} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
