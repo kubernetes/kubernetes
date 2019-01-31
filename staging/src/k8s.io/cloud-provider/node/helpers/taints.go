@@ -22,7 +22,7 @@ dependencies to k8s.io/kubernetes in all the cloud providers. Once k8s.io/kubern
 is moved to an external repository, this file should be removed and replaced with that one.
 */
 
-package node
+package helpers
 
 import (
 	"encoding/json"
