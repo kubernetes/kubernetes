@@ -23,16 +23,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
-	"k8s.io/utils/pointer"
 )
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
@@ -85,7 +88,11 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			id, _, err := m.createPodSandbox(pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
-				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
+				// When the runtime class is not found, the RunPodSandbox is not called and createPodSandbox return early.
+				// TODO: This will mitigate the flaky test for now, but the logic in this test should be reviewed properly.
+				if !errors.IsNotFound(err) {
+					assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
