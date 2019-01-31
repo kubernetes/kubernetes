@@ -17,7 +17,7 @@ include  ../../hack/make-rules/Makefile.manifest
 REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM=7
 QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.10.7
+GOLANG_VERSION=1.10.8
 export
 
 ifndef WHAT
