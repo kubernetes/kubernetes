@@ -88,7 +88,7 @@ func (s limitRangeNamespaceLister) Get(name string) (*v1.LimitRange, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("limitrange"), name)
+		return nil, errors.NewNotFound(v1.Resource("limitranges"), name)
 	}
 	return obj.(*v1.LimitRange), nil
 }

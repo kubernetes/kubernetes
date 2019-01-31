@@ -88,7 +88,7 @@ func (s testTypeNamespaceLister) Get(name string) (*v1.TestType, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("testtype"), name)
+		return nil, errors.NewNotFound(v1.Resource("testtypes"), name)
 	}
 	return obj.(*v1.TestType), nil
 }

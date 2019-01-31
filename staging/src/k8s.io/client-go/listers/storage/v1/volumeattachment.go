@@ -59,7 +59,7 @@ func (s *volumeAttachmentLister) Get(name string) (*v1.VolumeAttachment, error) 
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("volumeattachment"), name)
+		return nil, errors.NewNotFound(v1.Resource("volumeattachments"), name)
 	}
 	return obj.(*v1.VolumeAttachment), nil
 }

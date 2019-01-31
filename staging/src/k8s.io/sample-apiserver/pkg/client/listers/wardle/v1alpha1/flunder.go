@@ -88,7 +88,7 @@ func (s flunderNamespaceLister) Get(name string) (*v1alpha1.Flunder, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("flunder"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("flunders"), name)
 	}
 	return obj.(*v1alpha1.Flunder), nil
 }

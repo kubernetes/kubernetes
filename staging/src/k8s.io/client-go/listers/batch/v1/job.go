@@ -88,7 +88,7 @@ func (s jobNamespaceLister) Get(name string) (*v1.Job, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("job"), name)
+		return nil, errors.NewNotFound(v1.Resource("jobs"), name)
 	}
 	return obj.(*v1.Job), nil
 }

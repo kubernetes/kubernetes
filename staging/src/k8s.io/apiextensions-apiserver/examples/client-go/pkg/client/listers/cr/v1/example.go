@@ -88,7 +88,7 @@ func (s exampleNamespaceLister) Get(name string) (*v1.Example, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("example"), name)
+		return nil, errors.NewNotFound(v1.Resource("examples"), name)
 	}
 	return obj.(*v1.Example), nil
 }

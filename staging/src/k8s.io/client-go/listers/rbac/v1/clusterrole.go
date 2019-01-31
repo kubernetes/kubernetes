@@ -59,7 +59,7 @@ func (s *clusterRoleLister) Get(name string) (*v1.ClusterRole, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("clusterrole"), name)
+		return nil, errors.NewNotFound(v1.Resource("clusterroles"), name)
 	}
 	return obj.(*v1.ClusterRole), nil
 }

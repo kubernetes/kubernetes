@@ -59,7 +59,7 @@ func (s *auditSinkLister) Get(name string) (*v1alpha1.AuditSink, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("auditsink"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("auditsinks"), name)
 	}
 	return obj.(*v1alpha1.AuditSink), nil
 }

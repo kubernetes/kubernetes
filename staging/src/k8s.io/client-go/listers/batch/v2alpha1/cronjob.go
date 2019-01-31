@@ -88,7 +88,7 @@ func (s cronJobNamespaceLister) Get(name string) (*v2alpha1.CronJob, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v2alpha1.Resource("cronjob"), name)
+		return nil, errors.NewNotFound(v2alpha1.Resource("cronjobs"), name)
 	}
 	return obj.(*v2alpha1.CronJob), nil
 }

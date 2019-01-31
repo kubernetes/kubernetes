@@ -59,7 +59,7 @@ func (s *subjectAccessReviewLister) Get(name string) (*v1beta1.SubjectAccessRevi
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("subjectaccessreview"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("subjectaccessreviews"), name)
 	}
 	return obj.(*v1beta1.SubjectAccessReview), nil
 }

@@ -59,7 +59,7 @@ func (s *tokenReviewLister) Get(name string) (*v1.TokenReview, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("tokenreview"), name)
+		return nil, errors.NewNotFound(v1.Resource("tokenreviews"), name)
 	}
 	return obj.(*v1.TokenReview), nil
 }

@@ -88,7 +88,7 @@ func (s daemonSetNamespaceLister) Get(name string) (*v1beta2.DaemonSet, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta2.Resource("daemonset"), name)
+		return nil, errors.NewNotFound(v1beta2.Resource("daemonsets"), name)
 	}
 	return obj.(*v1beta2.DaemonSet), nil
 }

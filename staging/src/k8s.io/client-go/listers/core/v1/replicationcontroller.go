@@ -88,7 +88,7 @@ func (s replicationControllerNamespaceLister) Get(name string) (*v1.ReplicationC
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("replicationcontroller"), name)
+		return nil, errors.NewNotFound(v1.Resource("replicationcontrollers"), name)
 	}
 	return obj.(*v1.ReplicationController), nil
 }

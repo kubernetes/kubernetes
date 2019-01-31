@@ -59,7 +59,7 @@ func (s *persistentVolumeLister) Get(name string) (*v1.PersistentVolume, error) 
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("persistentvolume"), name)
+		return nil, errors.NewNotFound(v1.Resource("persistentvolumes"), name)
 	}
 	return obj.(*v1.PersistentVolume), nil
 }

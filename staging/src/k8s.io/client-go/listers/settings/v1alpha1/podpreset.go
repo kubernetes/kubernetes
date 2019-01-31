@@ -88,7 +88,7 @@ func (s podPresetNamespaceLister) Get(name string) (*v1alpha1.PodPreset, error) 
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("podpreset"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("podpresets"), name)
 	}
 	return obj.(*v1alpha1.PodPreset), nil
 }

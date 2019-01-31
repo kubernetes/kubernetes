@@ -88,7 +88,7 @@ func (s serviceNamespaceLister) Get(name string) (*v1.Service, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("service"), name)
+		return nil, errors.NewNotFound(v1.Resource("services"), name)
 	}
 	return obj.(*v1.Service), nil
 }

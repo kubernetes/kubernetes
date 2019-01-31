@@ -88,7 +88,7 @@ func (s resourceQuotaNamespaceLister) Get(name string) (*v1.ResourceQuota, error
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("resourcequota"), name)
+		return nil, errors.NewNotFound(v1.Resource("resourcequotas"), name)
 	}
 	return obj.(*v1.ResourceQuota), nil
 }

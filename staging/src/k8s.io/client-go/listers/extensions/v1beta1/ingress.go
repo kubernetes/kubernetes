@@ -88,7 +88,7 @@ func (s ingressNamespaceLister) Get(name string) (*v1beta1.Ingress, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("ingress"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("ingresses"), name)
 	}
 	return obj.(*v1beta1.Ingress), nil
 }

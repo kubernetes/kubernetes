@@ -88,7 +88,7 @@ func (s persistentVolumeClaimNamespaceLister) Get(name string) (*v1.PersistentVo
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("persistentvolumeclaim"), name)
+		return nil, errors.NewNotFound(v1.Resource("persistentvolumeclaims"), name)
 	}
 	return obj.(*v1.PersistentVolumeClaim), nil
 }

@@ -88,7 +88,7 @@ func (s podTemplateNamespaceLister) Get(name string) (*v1.PodTemplate, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("podtemplate"), name)
+		return nil, errors.NewNotFound(v1.Resource("podtemplates"), name)
 	}
 	return obj.(*v1.PodTemplate), nil
 }

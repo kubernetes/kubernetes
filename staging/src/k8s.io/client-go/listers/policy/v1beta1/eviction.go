@@ -88,7 +88,7 @@ func (s evictionNamespaceLister) Get(name string) (*v1beta1.Eviction, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("eviction"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("evictions"), name)
 	}
 	return obj.(*v1beta1.Eviction), nil
 }

@@ -59,7 +59,7 @@ func (s *clusterRoleBindingLister) Get(name string) (*v1alpha1.ClusterRoleBindin
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("clusterrolebinding"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("clusterrolebindings"), name)
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), nil
 }

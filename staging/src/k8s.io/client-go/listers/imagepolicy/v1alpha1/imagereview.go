@@ -59,7 +59,7 @@ func (s *imageReviewLister) Get(name string) (*v1alpha1.ImageReview, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("imagereview"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("imagereviews"), name)
 	}
 	return obj.(*v1alpha1.ImageReview), nil
 }

@@ -88,7 +88,7 @@ func (s secretNamespaceLister) Get(name string) (*v1.Secret, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("secret"), name)
+		return nil, errors.NewNotFound(v1.Resource("secrets"), name)
 	}
 	return obj.(*v1.Secret), nil
 }

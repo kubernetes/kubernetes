@@ -59,7 +59,7 @@ func (s *runtimeClassLister) Get(name string) (*v1alpha1.RuntimeClass, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("runtimeclass"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("runtimeclasses"), name)
 	}
 	return obj.(*v1alpha1.RuntimeClass), nil
 }

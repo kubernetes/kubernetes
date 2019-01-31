@@ -59,7 +59,7 @@ func (s *certificateSigningRequestLister) Get(name string) (*v1beta1.Certificate
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("certificatesigningrequest"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("certificatesigningrequests"), name)
 	}
 	return obj.(*v1beta1.CertificateSigningRequest), nil
 }

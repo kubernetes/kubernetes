@@ -59,7 +59,7 @@ func (s *customResourceDefinitionLister) Get(name string) (*v1beta1.CustomResour
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("customresourcedefinition"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("customresourcedefinitions"), name)
 	}
 	return obj.(*v1beta1.CustomResourceDefinition), nil
 }

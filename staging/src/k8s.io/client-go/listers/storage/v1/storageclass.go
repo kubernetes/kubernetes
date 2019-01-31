@@ -59,7 +59,7 @@ func (s *storageClassLister) Get(name string) (*v1.StorageClass, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("storageclass"), name)
+		return nil, errors.NewNotFound(v1.Resource("storageclasses"), name)
 	}
 	return obj.(*v1.StorageClass), nil
 }

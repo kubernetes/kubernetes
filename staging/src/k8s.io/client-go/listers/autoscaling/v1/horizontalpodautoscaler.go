@@ -88,7 +88,7 @@ func (s horizontalPodAutoscalerNamespaceLister) Get(name string) (*v1.Horizontal
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("horizontalpodautoscaler"), name)
+		return nil, errors.NewNotFound(v1.Resource("horizontalpodautoscalers"), name)
 	}
 	return obj.(*v1.HorizontalPodAutoscaler), nil
 }

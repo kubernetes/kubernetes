@@ -59,7 +59,7 @@ func (s *mutatingWebhookConfigurationLister) Get(name string) (*v1beta1.Mutating
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("mutatingwebhookconfiguration"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("mutatingwebhookconfigurations"), name)
 	}
 	return obj.(*v1beta1.MutatingWebhookConfiguration), nil
 }

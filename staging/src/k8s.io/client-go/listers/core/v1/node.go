@@ -59,7 +59,7 @@ func (s *nodeLister) Get(name string) (*v1.Node, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("node"), name)
+		return nil, errors.NewNotFound(v1.Resource("nodes"), name)
 	}
 	return obj.(*v1.Node), nil
 }

@@ -59,7 +59,7 @@ func (s *priorityClassLister) Get(name string) (*v1beta1.PriorityClass, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("priorityclass"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("priorityclasses"), name)
 	}
 	return obj.(*v1beta1.PriorityClass), nil
 }

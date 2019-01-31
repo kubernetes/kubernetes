@@ -59,7 +59,7 @@ func (s *clusterTestTypeLister) Get(name string) (*v1.ClusterTestType, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("clustertesttype"), name)
+		return nil, errors.NewNotFound(v1.Resource("clustertesttypes"), name)
 	}
 	return obj.(*v1.ClusterTestType), nil
 }

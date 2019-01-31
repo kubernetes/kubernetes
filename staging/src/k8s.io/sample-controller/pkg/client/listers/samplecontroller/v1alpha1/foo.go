@@ -88,7 +88,7 @@ func (s fooNamespaceLister) Get(name string) (*v1alpha1.Foo, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("foo"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("foos"), name)
 	}
 	return obj.(*v1alpha1.Foo), nil
 }

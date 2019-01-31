@@ -88,7 +88,7 @@ func (s localSubjectAccessReviewNamespaceLister) Get(name string) (*v1beta1.Loca
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("localsubjectaccessreview"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("localsubjectaccessreviews"), name)
 	}
 	return obj.(*v1beta1.LocalSubjectAccessReview), nil
 }

@@ -88,7 +88,7 @@ func (s deploymentNamespaceLister) Get(name string) (*v1beta1.Deployment, error)
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("deployment"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("deployments"), name)
 	}
 	return obj.(*v1beta1.Deployment), nil
 }

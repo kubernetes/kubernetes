@@ -59,7 +59,7 @@ func (s *aPIServiceLister) Get(name string) (*v1beta1.APIService, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("apiservice"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("apiservices"), name)
 	}
 	return obj.(*v1beta1.APIService), nil
 }

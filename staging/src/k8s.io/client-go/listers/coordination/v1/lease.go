@@ -88,7 +88,7 @@ func (s leaseNamespaceLister) Get(name string) (*v1.Lease, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("lease"), name)
+		return nil, errors.NewNotFound(v1.Resource("leases"), name)
 	}
 	return obj.(*v1.Lease), nil
 }

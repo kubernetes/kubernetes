@@ -59,7 +59,7 @@ func (s *selfSubjectRulesReviewLister) Get(name string) (*v1beta1.SelfSubjectRul
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("selfsubjectrulesreview"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("selfsubjectrulesreviews"), name)
 	}
 	return obj.(*v1beta1.SelfSubjectRulesReview), nil
 }

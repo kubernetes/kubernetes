@@ -88,7 +88,7 @@ func (s controllerRevisionNamespaceLister) Get(name string) (*v1beta1.Controller
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("controllerrevision"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("controllerrevisions"), name)
 	}
 	return obj.(*v1beta1.ControllerRevision), nil
 }

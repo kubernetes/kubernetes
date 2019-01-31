@@ -88,7 +88,7 @@ func (s roleNamespaceLister) Get(name string) (*v1.Role, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("role"), name)
+		return nil, errors.NewNotFound(v1.Resource("roles"), name)
 	}
 	return obj.(*v1.Role), nil
 }

@@ -88,7 +88,7 @@ func (s roleBindingNamespaceLister) Get(name string) (*v1.RoleBinding, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("rolebinding"), name)
+		return nil, errors.NewNotFound(v1.Resource("rolebindings"), name)
 	}
 	return obj.(*v1.RoleBinding), nil
 }

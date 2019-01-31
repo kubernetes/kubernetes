@@ -59,7 +59,7 @@ func (s *cSINodeInfoLister) Get(name string) (*v1alpha1.CSINodeInfo, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("csinodeinfo"), name)
+		return nil, errors.NewNotFound(v1alpha1.Resource("csinodeinfos"), name)
 	}
 	return obj.(*v1alpha1.CSINodeInfo), nil
 }

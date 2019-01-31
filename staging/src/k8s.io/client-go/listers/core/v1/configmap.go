@@ -88,7 +88,7 @@ func (s configMapNamespaceLister) Get(name string) (*v1.ConfigMap, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("configmap"), name)
+		return nil, errors.NewNotFound(v1.Resource("configmaps"), name)
 	}
 	return obj.(*v1.ConfigMap), nil
 }
