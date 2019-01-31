@@ -71,21 +71,36 @@ func (agg aggregate) Error() string {
 	}
 	seenerrs := sets.NewString()
 	result := ""
-	for _, err := range agg {
+	agg.visit(func(err error) {
 		msg := err.Error()
 		if seenerrs.Has(msg) {
-			continue
+			return
 		}
 		seenerrs.Insert(msg)
 		if len(seenerrs) > 1 {
 			result += ", "
 		}
 		result += msg
-	}
+	})
 	if len(seenerrs) == 1 {
 		return result
 	}
 	return "[" + result + "]"
+}
+
+func (agg aggregate) visit(f func(err error)) {
+	for _, err := range agg {
+		switch err := err.(type) {
+		case aggregate:
+			err.visit(f)
+		case Aggregate:
+			for _, nestedErr := range err.Errors() {
+				f(nestedErr)
+			}
+		default:
+			f(err)
+		}
+	}
 }
 
 // Errors is part of the Aggregate interface.

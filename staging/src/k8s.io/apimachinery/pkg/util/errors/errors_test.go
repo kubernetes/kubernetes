@@ -179,6 +179,38 @@ func TestDedupePluralAggregate(t *testing.T) {
 	}
 }
 
+func TestFlattenAndDedupeAggregate(t *testing.T) {
+	var slice []error = []error{fmt.Errorf("abc"), fmt.Errorf("abc"), NewAggregate([]error{fmt.Errorf("abc")})}
+	var agg Aggregate
+
+	agg = NewAggregate(slice)
+	if agg == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := agg.Error(); s != "abc" {
+		t.Errorf("expected 'abc', got %q", s)
+	}
+	if s := agg.Errors(); len(s) != 3 {
+		t.Errorf("expected three-elements slice, got %#v", s)
+	}
+}
+
+func TestFlattenAggregate(t *testing.T) {
+	var slice []error = []error{fmt.Errorf("abc"), fmt.Errorf("abc"), NewAggregate([]error{fmt.Errorf("abc"), fmt.Errorf("def"), NewAggregate([]error{fmt.Errorf("def"), fmt.Errorf("ghi")})})}
+	var agg Aggregate
+
+	agg = NewAggregate(slice)
+	if agg == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := agg.Error(); s != "[abc, def, ghi]" {
+		t.Errorf("expected '[abc, def, ghi]', got %q", s)
+	}
+	if s := agg.Errors(); len(s) != 3 {
+		t.Errorf("expected three-elements slice, got %#v", s)
+	}
+}
+
 func TestFilterOut(t *testing.T) {
 	testCases := []struct {
 		err      error
