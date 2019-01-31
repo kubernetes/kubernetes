@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	goflag "flag"
 	"fmt"
 	"net/http"
@@ -228,7 +229,7 @@ func getVersion(lastSeenBinaryVersion *string) error {
 	if *lastSeenBinaryVersion != "" {
 		deleted := etcdVersion.Delete(prometheus.Labels{"binary_version": *lastSeenBinaryVersion})
 		if !deleted {
-			return fmt.Errorf("failed to delete previous version's metric")
+			return errors.New("failed to delete previous version's metric")
 		}
 	}
 
