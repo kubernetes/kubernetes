@@ -19,6 +19,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // MessageCountMap contains occurrence for each error message.
@@ -67,12 +69,23 @@ func (agg aggregate) Error() string {
 	if len(agg) == 1 {
 		return agg[0].Error()
 	}
-	result := fmt.Sprintf("[%s", agg[0].Error())
-	for i := 1; i < len(agg); i++ {
-		result += fmt.Sprintf(", %s", agg[i].Error())
+	seenerrs := sets.NewString()
+	result := ""
+	for _, err := range agg {
+		msg := err.Error()
+		if seenerrs.Has(msg) {
+			continue
+		}
+		seenerrs.Insert(msg)
+		if len(seenerrs) > 1 {
+			result += ", "
+		}
+		result += msg
 	}
-	result += "]"
-	return result
+	if len(seenerrs) == 1 {
+		return result
+	}
+	return "[" + result + "]"
 }
 
 // Errors is part of the Aggregate interface.

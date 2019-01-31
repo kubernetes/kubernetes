@@ -147,6 +147,38 @@ func TestPluralAggregate(t *testing.T) {
 	}
 }
 
+func TestDedupeAggregate(t *testing.T) {
+	var slice []error = []error{fmt.Errorf("abc"), fmt.Errorf("abc")}
+	var agg Aggregate
+
+	agg = NewAggregate(slice)
+	if agg == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := agg.Error(); s != "abc" {
+		t.Errorf("expected 'abc', got %q", s)
+	}
+	if s := agg.Errors(); len(s) != 2 {
+		t.Errorf("expected two-elements slice, got %#v", s)
+	}
+}
+
+func TestDedupePluralAggregate(t *testing.T) {
+	var slice []error = []error{fmt.Errorf("abc"), fmt.Errorf("abc"), fmt.Errorf("123")}
+	var agg Aggregate
+
+	agg = NewAggregate(slice)
+	if agg == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := agg.Error(); s != "[abc, 123]" {
+		t.Errorf("expected '[abc, 123]', got %q", s)
+	}
+	if s := agg.Errors(); len(s) != 3 {
+		t.Errorf("expected three-elements slice, got %#v", s)
+	}
+}
+
 func TestFilterOut(t *testing.T) {
 	testCases := []struct {
 		err      error
