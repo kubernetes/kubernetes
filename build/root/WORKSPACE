@@ -15,9 +15,9 @@ versions.check(minimum_bazel_version = "0.18.0")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "4ce2d8576e786c8fb8bc4f7ed79f5fda543568d78c09306d16cc8d1b7d5621f0",
-    strip_prefix = "repo-infra-8a5707674e76b825bfd9a8624bae045bc6e5f24d",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/8a5707674e76b825bfd9a8624bae045bc6e5f24d.tar.gz"),
+    sha256 = "2cc74219eafebb0af1e0cf80b9c2b78aac9aa570de762bfb82b83e9164be9da2",
+    strip_prefix = "repo-infra-b461270ab6ccfb94ff2d78df96d26f669376d660",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/b461270ab6ccfb94ff2d78df96d26f669376d660.tar.gz"),
 )
 
 ETCD_VERSION = "3.3.10"
