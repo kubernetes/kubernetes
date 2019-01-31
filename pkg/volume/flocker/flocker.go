@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	flockerapi "github.com/clusterhq/flocker-go"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -106,6 +105,10 @@ func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker != nil) ||
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
+}
+
+func (p *flockerPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *flockerPlugin) RequiresRemount() bool {
@@ -430,7 +433,7 @@ func (c *flockerVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func (p *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

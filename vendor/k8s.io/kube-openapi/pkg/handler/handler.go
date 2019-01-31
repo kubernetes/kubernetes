@@ -28,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"bitbucket.org/ww/goautoneg"
-
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/NYTimes/gziphandler"
@@ -38,6 +36,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/googleapis/gnostic/compiler"
+	"github.com/munnerz/goautoneg"
 
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"

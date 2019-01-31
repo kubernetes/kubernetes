@@ -107,6 +107,10 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.RBD != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil)
 }
 
+func (plugin *rbdPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *rbdPlugin) RequiresRemount() bool {
 	return false
 }
@@ -848,7 +852,7 @@ func (c *rbdUnmounter) TearDown() error {
 
 func (c *rbdUnmounter) TearDownAt(dir string) error {
 	klog.V(4).Infof("rbd: attempting to teardown at %s", dir)
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
@@ -1077,8 +1081,8 @@ func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, e
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
 	secret, err := volutil.GetSecretForPod(pod, secretName, kubeClient)
 	if err != nil {
-		klog.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
-		return "", fmt.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
+		klog.Errorf("failed to get secret from [%q/%q]: %+v", pod.Namespace, secretName, err)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]: %+v", pod.Namespace, secretName, err)
 	}
 	return parseSecretMap(secret)
 }
@@ -1086,8 +1090,8 @@ func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interfa
 func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
 	secret, err := volutil.GetSecretForPV(namespace, secretName, rbdPluginName, kubeClient)
 	if err != nil {
-		klog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
-		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
+		klog.Errorf("failed to get secret from [%q/%q]: %+v", namespace, secretName, err)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]: %+v", namespace, secretName, err)
 	}
 	return parseSecretMap(secret)
 }

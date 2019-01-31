@@ -35,7 +35,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -93,11 +92,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 	pod := a.GetObject().(*api.Pod)
 	var finalTolerations []api.Toleration
-	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
-	if err != nil {
-		return err
-	}
-	if a.GetOperation() == admission.Create || updateUninitialized {
+	if a.GetOperation() == admission.Create {
 		ts, err := p.getNamespaceDefaultTolerations(a.GetNamespace())
 		if err != nil {
 			return err

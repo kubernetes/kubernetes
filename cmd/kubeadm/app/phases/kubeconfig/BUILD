@@ -54,6 +54,6 @@ go_test(
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
+        "//vendor/github.com/lithammer/dedent:go_default_library",
     ],
 )

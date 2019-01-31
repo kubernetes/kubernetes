@@ -18,11 +18,11 @@ package alpha
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -125,7 +125,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			phases.SetKubernetesVersion(cfg)
+			phases.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)

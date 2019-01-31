@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/api"
 )
@@ -54,22 +53,22 @@ func TestAlgorithmNameValidation(t *testing.T) {
 func TestValidatePriorityConfigOverFlow(t *testing.T) {
 	tests := []struct {
 		description string
-		configs     []algorithm.PriorityConfig
+		configs     []priorities.PriorityConfig
 		expected    bool
 	}{
 		{
 			description: "one of the weights is MaxInt",
-			configs:     []algorithm.PriorityConfig{{Weight: api.MaxInt}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxInt}, {Weight: 5}},
 			expected:    true,
 		},
 		{
 			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
-			configs:     []algorithm.PriorityConfig{{Weight: api.MaxInt/api.MaxPriority + api.MaxPriority}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxInt/api.MaxPriority + api.MaxPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
 			description: "normal weights",
-			configs:     []algorithm.PriorityConfig{{Weight: 10000}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: 10000}, {Weight: 5}},
 			expected:    false,
 		},
 	}

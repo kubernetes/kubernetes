@@ -10,8 +10,10 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = [
+        "audit_dynamic_test.go",
         "audit_test.go",
         "crd_test.go",
+        "graceful_shutdown_test.go",
         "kms_transformation_test.go",
         "kube_apiserver_test.go",
         "main_test.go",
@@ -21,12 +23,11 @@ go_test(
     embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-apiserver/app/testing:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",
-        "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -66,6 +67,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [

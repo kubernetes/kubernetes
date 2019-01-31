@@ -45,14 +45,14 @@ type BootstrapTokenOptions struct {
 // AddTokenFlag adds the --token flag to the given flagset
 func (bto *BootstrapTokenOptions) AddTokenFlag(fs *pflag.FlagSet) {
 	fs.StringVar(
-		&bto.TokenStr, "token", "",
+		&bto.TokenStr, TokenStr, "",
 		"The token to use for establishing bidirectional trust between nodes and masters. The format is [a-z0-9]{6}\\.[a-z0-9]{16} - e.g. abcdef.0123456789abcdef",
 	)
 }
 
 // AddTTLFlag adds the --token-ttl flag to the given flagset
 func (bto *BootstrapTokenOptions) AddTTLFlag(fs *pflag.FlagSet) {
-	bto.AddTTLFlagWithName(fs, "token-ttl")
+	bto.AddTTLFlagWithName(fs, TokenTTL)
 }
 
 // AddTTLFlagWithName adds the --token-ttl flag with a custom flag name given flagset
@@ -66,7 +66,7 @@ func (bto *BootstrapTokenOptions) AddTTLFlagWithName(fs *pflag.FlagSet, flagName
 // AddUsagesFlag adds the --usages flag to the given flagset
 func (bto *BootstrapTokenOptions) AddUsagesFlag(fs *pflag.FlagSet) {
 	fs.StringSliceVar(
-		&bto.Usages, "usages", bto.Usages,
+		&bto.Usages, TokenUsages, bto.Usages,
 		fmt.Sprintf("Describes the ways in which this token can be used. You can pass --usages multiple times or provide a comma separated list of options. Valid options: [%s]", strings.Join(kubeadmconstants.DefaultTokenUsages, ",")),
 	)
 }
@@ -74,7 +74,7 @@ func (bto *BootstrapTokenOptions) AddUsagesFlag(fs *pflag.FlagSet) {
 // AddGroupsFlag adds the --groups flag to the given flagset
 func (bto *BootstrapTokenOptions) AddGroupsFlag(fs *pflag.FlagSet) {
 	fs.StringSliceVar(
-		&bto.Groups, "groups", bto.Groups,
+		&bto.Groups, TokenGroups, bto.Groups,
 		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q", bootstrapapi.BootstrapGroupPattern),
 	)
 }
@@ -82,7 +82,7 @@ func (bto *BootstrapTokenOptions) AddGroupsFlag(fs *pflag.FlagSet) {
 // AddDescriptionFlag adds the --description flag to the given flagset
 func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 	fs.StringVar(
-		&bto.Description, "description", bto.Description,
+		&bto.Description, TokenDescription, bto.Description,
 		"A human friendly description of how this token is used.",
 	)
 }

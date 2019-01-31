@@ -75,10 +75,11 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		pod.Spec.SecurityContext.RunAsUser = &userID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", userID),
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 
@@ -103,10 +104,11 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", overrideUserID),
+			fmt.Sprintf("uid=%v", overrideUserID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 

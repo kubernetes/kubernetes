@@ -86,6 +86,8 @@ type ProviderInterface interface {
 	GetGroupNodes(group string) ([]string, error)
 	GroupSize(group string) (int, error)
 
+	DeleteNode(node *v1.Node) error
+
 	CreatePD(zone string) (string, error)
 	DeletePD(pdName string) error
 	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
@@ -113,6 +115,10 @@ func (n NullProvider) GetGroupNodes(group string) ([]string, error) {
 }
 func (n NullProvider) GroupSize(group string) (int, error) {
 	return -1, fmt.Errorf("provider does not support InstanceGroups")
+}
+
+func (n NullProvider) DeleteNode(node *v1.Node) error {
+	return fmt.Errorf("provider does not support DeleteNode")
 }
 
 func (n NullProvider) CreatePD(zone string) (string, error) {

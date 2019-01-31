@@ -40,6 +40,8 @@ const (
 	Reason = "Evicted"
 	// nodeLowMessageFmt is the message for evictions due to resource pressure.
 	nodeLowMessageFmt = "The node was low on resource: %v. "
+	// nodeConditionMessageFmt is the message for evictions due to resource pressure.
+	nodeConditionMessageFmt = "The node had condition: %v. "
 	// containerMessageFmt provides additional information for containers exceeding requests
 	containerMessageFmt = "Container %s was using %s, which exceeds its request of %s. "
 	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
@@ -50,6 +52,8 @@ const (
 	emptyDirMessageFmt = "Usage of EmptyDir volume %q exceeds the limit %q. "
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
 	resourceInodes v1.ResourceName = "inodes"
+	// resourcePids, number. internal to this module, used to account for local pid consumption.
+	resourcePids v1.ResourceName = "pids"
 	// OffendingContainersKey is the key in eviction event annotations for the list of container names which exceeded their requests
 	OffendingContainersKey = "offending_containers"
 	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
@@ -84,6 +88,7 @@ func init() {
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = v1.ResourceEphemeralStorage
 	signalToResource[evictionapi.SignalNodeFsInodesFree] = resourceInodes
+	signalToResource[evictionapi.SignalPIDAvailable] = resourcePids
 }
 
 // validSignal returns true if the signal is supported.
@@ -674,6 +679,11 @@ func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
 	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
 }
 
+// rankPIDPressure orders the input pods by priority in response to PID pressure.
+func rankPIDPressure(pods []*v1.Pod, stats statsFunc) {
+	orderedBy(priority).Sort(pods)
+}
+
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
 func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) rankFunc {
 	return func(pods []*v1.Pod, stats statsFunc) {
@@ -987,6 +997,7 @@ func buildSignalToRankFunc(withImageFs bool) map[evictionapi.Signal]rankFunc {
 	signalToRankFunc := map[evictionapi.Signal]rankFunc{
 		evictionapi.SignalMemoryAvailable:            rankMemoryPressure,
 		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressure,
+		evictionapi.SignalPIDAvailable:               rankPIDPressure,
 	}
 	// usage of an imagefs is optional
 	if withImageFs {

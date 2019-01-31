@@ -23,8 +23,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"k8s.io/klog"
@@ -185,6 +185,9 @@ func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
 		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{placeholderToken},
+		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
+		},
 	})
 }
 
@@ -205,6 +208,9 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
+		},
+		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	})
 	if err != nil {
@@ -382,7 +388,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1beta1.InitConfiguration) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	phaseutil.SetKubernetesVersion(defaultcfg)
+	phaseutil.SetKubernetesVersion(&defaultcfg.ClusterConfiguration)
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
@@ -430,7 +436,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 		},
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
-	AddImagesPullFlags(cmd.PersistentFlags(), externalcfg)
+	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalcfg.NodeRegistration.CRISocket)
 
 	return cmd
 }
@@ -524,11 +530,4 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.In
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
-}
-
-// AddImagesPullFlags adds flags related to the `kubeadm config images pull` command
-func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration) {
-	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket, "Specify the CRI socket to connect to.")
-	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket-path", cfg.NodeRegistration.CRISocket, "Path to the CRI socket.")
-	flagSet.MarkDeprecated("cri-socket-path", "Please, use --cri-socket instead")
 }

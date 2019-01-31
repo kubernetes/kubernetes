@@ -296,16 +296,23 @@ $(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter
 
 
 # Conversion generation
+
+# Any package that wants conversion functions generated into it must
+# include one or more comment-tags in its `doc.go` file, of the form:
+#     // +k8s:conversion-gen=<INTERNAL_TYPES_DIR>
 #
-# Any package that wants conversion functions generated must include one or
-# more comment-tags in any .go file, in column 0, of the form:
-#     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
+# The INTERNAL_TYPES_DIR is a project-local path to another directory
+# which should be considered when evaluating peer types for
+# conversions.  An optional additional comment of the form
+#     // +k8s:conversion-gen-external-types=<EXTERNAL_TYPES_DIR>
 #
-# The CONVERSION_TARGET_DIR is a project-local path to another directory which
-# should be considered when evaluating peer types for conversions.  Types which
-# are found in the source package (where conversions are being generated)
-# but do not have a peer in one of the target directories will not have
-# conversions generated.
+# identifies where to find the external types; if there is no such
+# comment then the external types are sought in the package where the
+# `k8s:conversion` tag is found.
+#
+# Conversions, in both directions, are generated for every type name
+# that is defined in both an internal types package and the external
+# types package.
 #
 # TODO: it might be better in the long term to make peer-types explicit in the
 # IDL.

@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -248,11 +247,11 @@ __custom_func() {
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs | kubectl_attach)
+        kubectl_logs)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
             __kubectl_get_resource_pod
             return
             ;;
@@ -339,12 +338,6 @@ type defaultPluginHandler struct{}
 
 // Lookup implements PluginHandler
 func (h *defaultPluginHandler) Lookup(filename string) (string, error) {
-	// if on Windows, append the "exe" extension
-	// to the filename that we are looking up.
-	if runtime.GOOS == "windows" {
-		filename = filename + ".exe"
-	}
-
 	return exec.LookPath(filename)
 }
 
@@ -423,7 +416,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	addProfilingFlags(flags)
 
-	kubeConfigFlags := genericclioptions.NewConfigFlags()
+	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())

@@ -86,6 +86,11 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
+func (plugin *awsElasticBlockStorePlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+}
+
 func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
 	return false
 }
@@ -485,7 +490,7 @@ func (c *awsElasticBlockStoreUnmounter) TearDown() error {
 
 // Unmounts the bind mount
 func (c *awsElasticBlockStoreUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 type awsElasticBlockStoreDeleter struct {
@@ -576,12 +581,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
-		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
-	}
+	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
 
 	return pv, nil
 }

@@ -6,6 +6,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = [
+        "etcd_cross_group_test.go",
         "etcd_storage_path_test.go",
         "main_test.go",
     ],
@@ -15,6 +16,7 @@ go_test(
         "integration",
     ],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -23,6 +25,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",

@@ -93,11 +93,11 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later.", owner.identity, err)
+			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", owner.identity, err)
 		}
 		accessor, err := meta.Accessor(ownerObject)
 		if err != nil {
-			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later.", ownerObject, err)
+			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later", ownerObject, err)
 		}
 		finalizers := accessor.GetFinalizers()
 		var newFinalizers []string
@@ -119,7 +119,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		return err
 	})
 	if errors.IsConflict(err) {
-		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retry.DefaultBackoff.Steps, owner.identity)
+		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v", retry.DefaultBackoff.Steps, owner.identity)
 	}
 	return err
 }

@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
@@ -81,11 +81,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 		obj.LeaderElection.LockObjectName = kubescedulerconfigv1alpha1.SchedulerDefaultLockObjectName
 	}
 
-	if obj.PercentageOfNodesToScore == 0 {
-		// by default, stop finding feasible nodes once the number of feasible nodes is 50% of the cluster.
-		obj.PercentageOfNodesToScore = 50
-	}
-
 	if len(obj.FailureDomains) == 0 {
 		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
@@ -102,7 +97,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 	}
 
 	// Use the default LeaderElectionConfiguration options
-	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
+	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
 
 	if obj.BindTimeoutSeconds == nil {
 		defaultBindTimeoutSeconds := int64(600)

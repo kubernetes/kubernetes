@@ -11,7 +11,6 @@ go_library(
         "admissionregistration_client.go",
         "doc.go",
         "generated_expansion.go",
-        "initializerconfiguration.go",
         "mutatingwebhookconfiguration.go",
         "validatingwebhookconfiguration.go",
     ],

@@ -15,7 +15,7 @@ spec:
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: gcr.io/gke-release/csi-driver-registrar:v1.0.1-gke.0
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.1
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -33,7 +33,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.0.0
+          image: quay.io/k8scsi/hostpathplugin:v1.0.1
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"

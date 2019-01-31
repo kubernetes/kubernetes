@@ -80,6 +80,10 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
+func (plugin *secretPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
@@ -281,7 +285,7 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 				if optional {
 					continue
 				}
-				errMsg := "references non-existent secret key"
+				errMsg := fmt.Sprintf("references non-existent secret key: %s", ktp.Key)
 				klog.Errorf(errMsg)
 				return nil, fmt.Errorf(errMsg)
 			}

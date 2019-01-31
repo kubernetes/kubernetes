@@ -84,6 +84,10 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
+func (plugin *nfsPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *nfsPlugin) RequiresRemount() bool {
 	return false
 }
@@ -294,7 +298,7 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.
-	return util.UnmountMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
+	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {

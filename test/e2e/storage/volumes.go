@@ -106,7 +106,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			framework.TestVolumeClient(cs, config, nil, tests)
+			framework.TestVolumeClient(cs, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

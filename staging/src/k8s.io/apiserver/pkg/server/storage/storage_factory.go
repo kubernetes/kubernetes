@@ -121,7 +121,7 @@ type groupResourceOverrides struct {
 // Apply overrides the provided config and options if the override has a value in that position
 func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) {
 	if len(o.etcdLocation) > 0 {
-		config.ServerList = o.etcdLocation
+		config.Transport.ServerList = o.etcdLocation
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -290,7 +290,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []Backend {
-	servers := sets.NewString(s.StorageConfig.ServerList...)
+	servers := sets.NewString(s.StorageConfig.Transport.ServerList...)
 
 	for _, overrides := range s.Overrides {
 		servers.Insert(overrides.etcdLocation...)
@@ -299,16 +299,16 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	if len(s.StorageConfig.CertFile) > 0 && len(s.StorageConfig.KeyFile) > 0 {
-		cert, err := tls.LoadX509KeyPair(s.StorageConfig.CertFile, s.StorageConfig.KeyFile)
+	if len(s.StorageConfig.Transport.CertFile) > 0 && len(s.StorageConfig.Transport.KeyFile) > 0 {
+		cert, err := tls.LoadX509KeyPair(s.StorageConfig.Transport.CertFile, s.StorageConfig.Transport.KeyFile)
 		if err != nil {
 			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.CAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.CAFile); err != nil {
+	if len(s.StorageConfig.Transport.CAFile) > 0 {
+		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.CAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()

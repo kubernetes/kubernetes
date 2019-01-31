@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "base.go",
         "csi.go",
         "csi_objects.go",
         "in_tree.go",
@@ -24,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
+        "//test/e2e/storage/testsuites:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/e2e/storage/vsphere:go_default_library",
         "//test/utils/image:go_default_library",

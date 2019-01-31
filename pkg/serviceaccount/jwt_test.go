@@ -19,6 +19,7 @@ package serviceaccount_test
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -26,6 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -277,7 +280,18 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	for k, tc := range testCases {
 		auds := authenticator.Audiences{"api"}
-		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
+		getter := serviceaccountcontroller.NewGetterFromClient(
+			tc.Client,
+			v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+			})),
+			v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+			})),
+			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+			})),
+		)
 		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
@@ -315,4 +329,24 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
+	return &fakeIndexer{get: get}
+}
+
+type fakeIndexer struct {
+	cache.Indexer
+	get func(namespace, name string) (interface{}, error)
+}
+
+func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
+	parts := strings.SplitN(key, "/", 2)
+	namespace := parts[0]
+	name := ""
+	if len(parts) == 2 {
+		name = parts[1]
+	}
+	obj, err := f.get(namespace, name)
+	return obj, err == nil, err
 }

@@ -313,6 +313,64 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			}
 		}
 
+		desiredLoadBalancerAttributes := map[string]string{}
+		// Default values to ensured a remove annotation reverts back to the default
+		desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "false"
+
+		// Determine if cross zone load balancing enabled/disabled has been specified
+		crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
+		if crossZoneLoadBalancingEnabledAnnotation != "" {
+			crossZoneEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+					ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
+					crossZoneLoadBalancingEnabledAnnotation,
+				)
+			}
+
+			if crossZoneEnabled {
+				desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "true"
+			}
+		}
+
+		// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+		// that cannot be specified at the time of creation and can only be modified after the fact,
+		// e.g. idle connection timeout.
+		describeAttributesRequest := &elbv2.DescribeLoadBalancerAttributesInput{
+			LoadBalancerArn: loadBalancer.LoadBalancerArn,
+		}
+		describeAttributesOutput, err := c.elbv2.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve load balancer attributes during attribute sync: %q", err)
+		}
+
+		changedAttributes := []*elbv2.LoadBalancerAttribute{}
+
+		// Identify to be changed attributes
+		for _, foundAttribute := range describeAttributesOutput.Attributes {
+			if targetValue, ok := desiredLoadBalancerAttributes[*foundAttribute.Key]; ok {
+				if targetValue != *foundAttribute.Value {
+					changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+						Key:   foundAttribute.Key,
+						Value: aws.String(targetValue),
+					})
+				}
+			}
+		}
+
+		// Update attributes requiring changes
+		if len(changedAttributes) > 0 {
+			klog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
+
+			_, err = c.elbv2.ModifyLoadBalancerAttributes(&elbv2.ModifyLoadBalancerAttributesInput{
+				LoadBalancerArn: loadBalancer.LoadBalancerArn,
+				Attributes:      changedAttributes,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
+			}
+		}
+
 		// Subnets cannot be modified on NLBs
 		if dirty {
 			loadBalancers, err := c.elbv2.DescribeLoadBalancers(
@@ -805,7 +863,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 }
 
 // Add SG rules for a given NLB
-func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[awsInstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
+func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[InstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
@@ -1322,7 +1380,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
-func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[awsInstanceID]*ec2.Instance) error {
+func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[InstanceID]*ec2.Instance) error {
 	expected := sets.NewString()
 	for id := range instanceIDs {
 		expected.Insert(string(id))
@@ -1499,7 +1557,7 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 // findInstancesForELB gets the EC2 instances corresponding to the Nodes, for setting up an ELB
 // We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
 // and we ignore instances which are not found
-func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[awsInstanceID]*ec2.Instance, error) {
+func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[InstanceID]*ec2.Instance, error) {
 	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
 	instanceIDs := mapToAWSInstanceIDsTolerant(nodes)
 

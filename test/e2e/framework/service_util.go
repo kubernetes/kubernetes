@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,6 +107,14 @@ type ServiceTestJig struct {
 	Name   string
 	Client clientset.Interface
 	Labels map[string]string
+}
+
+// PodNode is a pod-node pair indicating which node a given pod is running on
+type PodNode struct {
+	// Pod represents pod name
+	Pod string
+	// Node represents node name
+	Node string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
@@ -346,6 +354,25 @@ func PickNodeIP(c clientset.Interface) string {
 	}
 	ip := publicIps[0]
 	return ip
+}
+
+// PodNodePairs return PodNode pairs for all pods in a namespace
+func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
+	var result []PodNode
+
+	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return result, err
+	}
+
+	for _, pod := range podList.Items {
+		result = append(result, PodNode{
+			Pod:  pod.Name,
+			Node: pod.Spec.NodeName,
+		})
+	}
+
+	return result, nil
 }
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the

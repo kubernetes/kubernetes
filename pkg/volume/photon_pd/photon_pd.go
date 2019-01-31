@@ -74,6 +74,10 @@ func (plugin *photonPersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PhotonPersistentDisk != nil)
 }
 
+func (plugin *photonPersistentDiskPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *photonPersistentDiskPlugin) RequiresRemount() bool {
 	return false
 }
@@ -277,7 +281,7 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {

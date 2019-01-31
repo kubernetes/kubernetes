@@ -91,6 +91,10 @@ func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
 }
 
+func (plugin *storageosPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *storageosPlugin) RequiresRemount() bool {
 	return false
 }
@@ -529,7 +533,7 @@ func (b *storageosUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDownAt(dir string) error {
-	if err := util.UnmountPath(dir, b.mounter); err != nil {
+	if err := mount.CleanupMountPoint(dir, b.mounter, false); err != nil {
 		klog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}
 	if err := b.manager.UnmountVolume(b); err != nil {

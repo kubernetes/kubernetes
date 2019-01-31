@@ -82,6 +82,10 @@ func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
 }
 
+func (plugin *localVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *localVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -367,7 +371,7 @@ func (dm *deviceMounter) UnmountDevice(deviceMountPath string) error {
 	// has base mount path: /var/lib/kubelet/plugins/kubernetes.io/local-volume/mounts
 	basemountPath := dm.plugin.generateBlockDeviceBaseGlobalPath()
 	if mount.PathWithinBase(deviceMountPath, basemountPath) {
-		return util.UnmountPath(deviceMountPath, dm.mounter)
+		return mount.CleanupMountPoint(deviceMountPath, dm.mounter, false)
 	}
 
 	return nil
@@ -542,7 +546,7 @@ func (u *localVolumeUnmounter) TearDown() error {
 // TearDownAt unmounts the bind mount
 func (u *localVolumeUnmounter) TearDownAt(dir string) error {
 	klog.V(4).Infof("Unmounting volume %q at path %q\n", u.volName, dir)
-	return util.UnmountMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
+	return mount.CleanupMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
 }
 
 // localVolumeMapper implements the BlockVolumeMapper interface for local volumes.

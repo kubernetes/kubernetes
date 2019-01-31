@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
+	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -96,7 +97,6 @@ func TestAddFlags(t *testing.T) {
 		"--contention-profiling=true",
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
-		"--enable-swagger-ui=true",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -141,12 +141,14 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-				Type:                  "etcd3",
-				ServerList:            nil,
+				Type: "etcd3",
+				Transport: storagebackend.TransportConfig{
+					ServerList: nil,
+					KeyFile:    "/var/run/kubernetes/etcd.key",
+					CAFile:     "/var/run/kubernetes/etcdca.crt",
+					CertFile:   "/var/run/kubernetes/etcdce.crt",
+				},
 				Prefix:                "/registry",
-				KeyFile:               "/var/run/kubernetes/etcd.key",
-				CAFile:                "/var/run/kubernetes/etcdca.crt",
-				CertFile:              "/var/run/kubernetes/etcdce.crt",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,
 			},
@@ -240,10 +242,12 @@ func TestAddFlags(t *testing.T) {
 				InitialBackoff:     2 * time.Second,
 				GroupVersionString: "audit.k8s.io/v1alpha1",
 			},
+			DynamicOptions: apiserveroptions.AuditDynamicOptions{
+				BatchConfig: auditdynamic.NewDefaultWebhookBatchConfig(),
+			},
 			PolicyFile: "/policy",
 		},
 		Features: &apiserveroptions.FeatureOptions{
-			EnableSwaggerUI:           true,
 			EnableProfiling:           true,
 			EnableContentionProfiling: true,
 		},

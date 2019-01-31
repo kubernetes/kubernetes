@@ -31,6 +31,8 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -41,6 +43,7 @@ go_test(
     srcs = [
         "credentialmanager_test.go",
         "vsphere_test.go",
+        "vsphere_util_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -55,6 +58,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/lookup/simulator:go_default_library",
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",

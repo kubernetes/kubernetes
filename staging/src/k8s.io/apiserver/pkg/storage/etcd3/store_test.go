@@ -314,9 +314,9 @@ func TestGetToList(t *testing.T) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
 		expectedOut: nil,
@@ -819,9 +819,9 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
-		return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+		return nil, fields.Set{"metadata.name": pod.Name}, nil
 	}
 
 	tests := []struct {
@@ -1124,9 +1124,9 @@ func TestListContinuation(t *testing.T) {
 			Continue: continueValue,
 			Label:    labels.Everything(),
 			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		}
 	}
@@ -1233,9 +1233,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 			Continue: continueValue,
 			Label:    labels.Everything(),
 			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		}
 	}

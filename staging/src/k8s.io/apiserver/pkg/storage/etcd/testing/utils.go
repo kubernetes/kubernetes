@@ -293,10 +293,12 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 	}
 	server.V3Client = server.v3Cluster.RandClient()
 	config := &storagebackend.Config{
-		Type:       "etcd3",
-		Prefix:     etcdtest.PathPrefix(),
-		ServerList: server.V3Client.Endpoints(),
-		Paging:     true,
+		Type:   "etcd3",
+		Prefix: etcdtest.PathPrefix(),
+		Transport: storagebackend.TransportConfig{
+			ServerList: server.V3Client.Endpoints(),
+		},
+		Paging: true,
 	}
 	return server, config
 }

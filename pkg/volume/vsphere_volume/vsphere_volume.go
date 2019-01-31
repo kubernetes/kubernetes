@@ -81,6 +81,10 @@ func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
 }
 
+func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -285,7 +289,7 @@ func (v *vsphereVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, v.mounter)
+	return mount.CleanupMountPoint(dir, v.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {

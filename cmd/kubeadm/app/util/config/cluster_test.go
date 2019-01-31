@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-var k8sVersionString = "v1.12.0"
+var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
 var k8sVersion = version.MustParseGeneric(k8sVersionString)
 var nodeName = "mynode"
 var cfgFiles = map[string][]byte{

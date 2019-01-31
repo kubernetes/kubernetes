@@ -17,11 +17,12 @@ limitations under the License.
 package converter
 
 import (
-	"bitbucket.org/ww/goautoneg"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/munnerz/goautoneg"
 
 	"k8s.io/klog"
 

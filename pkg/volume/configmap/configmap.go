@@ -77,6 +77,10 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
+func (plugin *configMapPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *configMapPlugin) RequiresRemount() bool {
 	return true
 }

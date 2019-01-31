@@ -43,7 +43,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 var (
@@ -884,7 +884,6 @@ func TestFinishRequest(t *testing.T) {
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
-				return nil, nil
 			},
 			expectedObj:   nil,
 			expectedErr:   nil,
@@ -895,7 +894,6 @@ func TestFinishRequest(t *testing.T) {
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
-				return nil, nil
 			},
 			expectedObj:   nil,
 			expectedErr:   nil,

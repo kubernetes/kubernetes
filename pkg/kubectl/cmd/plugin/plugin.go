@@ -69,6 +69,8 @@ type PluginListOptions struct {
 	Verifier PathVerifier
 	NameOnly bool
 
+	PluginPaths []string
+
 	genericclioptions.IOStreams
 }
 
@@ -97,20 +99,18 @@ func (o *PluginListOptions) Complete(cmd *cobra.Command) error {
 		root:        cmd.Root(),
 		seenPlugins: make(map[string]string, 0),
 	}
+
+	o.PluginPaths = filepath.SplitList(os.Getenv("PATH"))
 	return nil
 }
 
 func (o *PluginListOptions) Run() error {
-	path := "PATH"
-	if runtime.GOOS == "windows" {
-		path = "path"
-	}
-
 	pluginsFound := false
 	isFirstFile := true
 	pluginErrors := []error{}
 	pluginWarnings := 0
-	for _, dir := range filepath.SplitList(os.Getenv(path)) {
+
+	for _, dir := range uniquePathsList(o.PluginPaths) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to read directory %q in your PATH: %v", dir, err))
@@ -226,7 +226,10 @@ func isExecutable(fullPath string) (bool, error) {
 	}
 
 	if runtime.GOOS == "windows" {
-		if strings.HasSuffix(info.Name(), ".exe") {
+		fileExt := strings.ToLower(filepath.Ext(fullPath))
+
+		switch fileExt {
+		case ".bat", ".cmd", ".com", ".exe":
 			return true, nil
 		}
 		return false, nil
@@ -237,4 +240,19 @@ func isExecutable(fullPath string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// uniquePathsList deduplicates a given slice of strings without
+// sorting or otherwise altering its order in any way.
+func uniquePathsList(paths []string) []string {
+	seen := map[string]bool{}
+	newPaths := []string{}
+	for _, p := range paths {
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		newPaths = append(newPaths, p)
+	}
+	return newPaths
 }

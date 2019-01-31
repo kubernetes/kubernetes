@@ -26,20 +26,20 @@ var _ = Describe("Merging fields with the retainkeys strategy", func() {
 	Context("where some fields are only defined remotely", func() {
 		It("should drop those fields ", func() {
 			recorded := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
 `)
 			local := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
     type: Recreate
 `)
 			remote := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
@@ -49,7 +49,7 @@ spec:
       maxSurge: 1
 `)
 			expected := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
@@ -62,13 +62,13 @@ spec:
 	Context("where some fields are defined both locally and remotely", func() {
 		It("should merge those fields", func() {
 			recorded := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
 `)
 			local := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
@@ -77,7 +77,7 @@ spec:
       maxUnavailable: 2
 `)
 			remote := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
@@ -86,7 +86,7 @@ spec:
       maxSurge: 1
 `)
 			expected := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   strategy:
@@ -102,14 +102,14 @@ spec:
 	Context("where the elements are in a list and some fields are only defined remotely", func() {
 		It("should drop those fields ", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
     spec:
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -119,7 +119,7 @@ spec:
         emptyDir:
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -130,7 +130,7 @@ spec:
           path: /tmp/cache-volume
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -146,14 +146,14 @@ spec:
 	Context("where the elements are in a list", func() {
 		It("the fields defined both locally and remotely should be merged", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
     spec:
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -165,7 +165,7 @@ spec:
         emptyDir:
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -177,7 +177,7 @@ spec:
           type: Directory
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:

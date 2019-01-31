@@ -39,7 +39,6 @@ source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
-source "${KUBE_ROOT}/test/cmd/initializers.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/old-print.sh"
@@ -473,6 +472,7 @@ runTests() {
   # Kubectl diff #
   ################
   record_command run_kubectl_diff_tests
+  record_command run_kubectl_diff_same_names
 
   ###############
   # Kubectl get #
@@ -522,7 +522,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_recursive_resources_tests
+    run_recursive_resources_tests
   fi
 
 

@@ -92,6 +92,16 @@ message APIResource {
 
   // categories is a list of the grouped resources this resource belongs to (e.g. 'all')
   repeated string categories = 7;
+
+  // The hash value of the storage version, the version this resource is
+  // converted to when written to the data store. Value must be treated
+  // as opaque by clients. Only equality comparison on the value is valid.
+  // This is an alpha feature and may change or be removed in the future.
+  // The field is populated by the apiserver only if the
+  // StorageVersionHash feature gate is enabled.
+  // This field will remain optional even if it graduates.
+  // +optional
+  optional string storageVersionHash = 10;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the
@@ -133,10 +143,6 @@ message CreateOptions {
   // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
-
-  // If IncludeUninitialized is specified, the object may be
-  // returned without completing initialization.
-  optional bool includeUninitialized = 2;
 }
 
 // DeleteOptions may be provided when deleting an API object.
@@ -203,10 +209,6 @@ message GetOptions {
   // - if it's 0, then we simply return what we currently have in cache, no guarantee;
   // - if set to non zero, then the result is at least as fresh as given rv.
   optional string resourceVersion = 1;
-
-  // If true, partially initialized resources are included in the response.
-  // +optional
-  optional bool includeUninitialized = 2;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -379,10 +381,6 @@ message ListOptions {
   // Defaults to everything.
   // +optional
   optional string fieldSelector = 2;
-
-  // If true, partially initialized resources are included in the response.
-  // +optional
-  optional bool includeUninitialized = 6;
 
   // Watch for changes to the described resources and return them as a stream of
   // add, update, and remove notifications. Specify resourceVersion.
@@ -602,6 +600,8 @@ message ObjectMeta {
   // When an object is created, the system will populate this list with the current set of initializers.
   // Only privileged users may set or modify this list. Once it is empty, it may not be modified further
   // by any user.
+  //
+  // DEPRECATED - initializers are an alpha field and will be removed in v1.15.
   optional Initializers initializers = 16;
 
   // Must be empty before the object is deleted from the registry. Each entry

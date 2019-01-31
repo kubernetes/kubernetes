@@ -211,10 +211,18 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1
+		gvr("coordination.k8s.io", "v1", "leases"): {
+			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1",
+			ExpectedGVK:      gvkP("coordination.k8s.io", "v1beta1", "Lease"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
 		gvr("coordination.k8s.io", "v1beta1", "leases"): {
-			Stub:             `{"metadata": {"name": "lease1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
-			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/lease1",
+			Stub:             `{"metadata": {"name": "leasev1beta1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1beta1",
 		},
 		// --
 
@@ -386,11 +394,6 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
-		gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"): {
-			Stub:             `{"metadata":{"name":"ic1"},"initializers":[{"name":"initializer.k8s.io","rules":[{"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
-			ExpectedEtcdPath: "/registry/initializerconfigurations/ic1",
-		},
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,

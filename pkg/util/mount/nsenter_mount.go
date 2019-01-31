@@ -27,8 +27,8 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -145,7 +145,7 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 }
 
 func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(m, dir)
+	return isNotMountPoint(m, dir)
 }
 
 func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
@@ -291,7 +291,7 @@ func (mounter *NsenterMounter) ExistsPath(pathname string) (bool, error) {
 		return false, err
 	}
 	kubeletpath := mounter.ne.KubeletPath(hostPath)
-	return utilfile.FileExists(kubeletpath)
+	return utilpath.Exists(utilpath.CheckFollowSymlink, kubeletpath)
 }
 
 func (mounter *NsenterMounter) EvalHostSymlinks(pathname string) (string, error) {

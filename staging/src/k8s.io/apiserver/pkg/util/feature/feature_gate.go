@@ -63,7 +63,11 @@ var (
 )
 
 type FeatureSpec struct {
-	Default    bool
+	// Default is the default enablement state for the feature
+	Default bool
+	// LockToDefault indicates that the feature is locked to its default and cannot be changed
+	LockToDefault bool
+	// PreRelease indicates the maturity level of the feature
 	PreRelease prerelease
 }
 
@@ -198,6 +202,9 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 		featureSpec, ok := known[k]
 		if !ok {
 			return fmt.Errorf("unrecognized feature gate: %s", k)
+		}
+		if featureSpec.LockToDefault && featureSpec.Default != v {
+			return fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", k, v, featureSpec.Default)
 		}
 		enabled[k] = v
 		// Handle "special" features like "all alpha gates"

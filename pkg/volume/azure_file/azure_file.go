@@ -80,6 +80,10 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
 
+func (plugin *azureFilePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *azureFilePlugin) RequiresRemount() bool {
 	return false
 }
@@ -321,7 +325,7 @@ func (c *azureFileUnmounter) TearDown() error {
 }
 
 func (c *azureFileUnmounter) TearDownAt(dir string) error {
-	return volutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func getVolumeSource(spec *volume.Spec) (string, bool, error) {

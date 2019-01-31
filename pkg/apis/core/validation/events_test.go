@@ -84,7 +84,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: core.ObjectReference{
-					APIVersion: "extensions/v1beta1",
+					APIVersion: "apps/v1",
 					Kind:       "NoKind",
 					Namespace:  metav1.NamespaceDefault,
 				},
@@ -97,7 +97,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: core.ObjectReference{
-					APIVersion: "extensions/v1beta1",
+					APIVersion: "batch/v1",
 					Kind:       "Job",
 					Namespace:  "foo",
 				},
@@ -110,7 +110,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: core.ObjectReference{
-					APIVersion: "extensions/v1beta1",
+					APIVersion: "batch/v1",
 					Kind:       "Job",
 					Namespace:  metav1.NamespaceDefault,
 				},
@@ -149,7 +149,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace: metav1.NamespaceDefault,
 				},
 				InvolvedObject: core.ObjectReference{
-					APIVersion: "extensions",
+					APIVersion: "batch",
 					Kind:       "Job",
 					Namespace:  "foo",
 				},
@@ -162,8 +162,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace: "foo",
 				},
 				InvolvedObject: core.ObjectReference{
-					// must register in v1beta1 to be true
-					APIVersion: "extensions/v1beta1",
+					APIVersion: "batch/v1",
 					Kind:       "Job",
 					Namespace:  "foo",
 				},

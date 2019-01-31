@@ -52,8 +52,7 @@ func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAcce
 		Long:    currentContextLong,
 		Example: currentContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCurrentContext(out, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(RunCurrentContext(out, options))
 		},
 	}
 

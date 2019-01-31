@@ -27,7 +27,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
@@ -164,205 +163,6 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 
 }
 
-func TestNodeShutdown(t *testing.T) {
-
-	testCases := []struct {
-		testName           string
-		node               *v1.Node
-		existsByProviderID bool
-		shutdown           bool
-	}{
-		{
-			testName:           "node shutdowned add taint",
-			existsByProviderID: true,
-			shutdown:           true,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		{
-			testName:           "node started after shutdown remove taint",
-			existsByProviderID: true,
-			shutdown:           false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-					Taints: []v1.Taint{
-						{
-							Key:    schedulerapi.TaintNodeShutdown,
-							Effect: v1.TaintEffectNoSchedule,
-						},
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
-			fc := &fakecloud.FakeCloud{
-				ExistsByProviderID: tc.existsByProviderID,
-				NodeShutdown:       tc.shutdown,
-			}
-			fnh := &testutil.FakeNodeHandler{
-				Existing:      []*v1.Node{tc.node},
-				Clientset:     fake.NewSimpleClientset(),
-				PatchWaitChan: make(chan struct{}),
-			}
-
-			factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
-
-			eventBroadcaster := record.NewBroadcaster()
-			cloudNodeController := &CloudNodeController{
-				kubeClient:                fnh,
-				nodeInformer:              factory.Core().V1().Nodes(),
-				cloud:                     fc,
-				nodeMonitorPeriod:         1 * time.Second,
-				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
-				nodeStatusUpdateFrequency: 1 * time.Second,
-			}
-			eventBroadcaster.StartLogging(klog.Infof)
-
-			cloudNodeController.Run(wait.NeverStop)
-
-			select {
-			case <-fnh.PatchWaitChan:
-			case <-time.After(1 * time.Second):
-				t.Errorf("Timed out waiting %v for node to be updated", wait.ForeverTestTimeout)
-			}
-
-			assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
-			if tc.shutdown {
-				assert.Equal(t, 1, len(fnh.UpdatedNodes[0].Spec.Taints), "Node Taint was not added")
-				assert.Equal(t, "node.cloudprovider.kubernetes.io/shutdown", fnh.UpdatedNodes[0].Spec.Taints[0].Key, "Node Taint key is not correct")
-			} else {
-				assert.Equal(t, 0, len(fnh.UpdatedNodes[0].Spec.Taints), "Node Taint was not removed after node is back in ready state")
-			}
-
-		})
-	}
-
-}
-
-// This test checks that the node is deleted when kubelet stops reporting
-// and cloud provider says node is gone
-func TestNodeDeleted(t *testing.T) {
-	pod0 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pod0",
-		},
-		Spec: v1.PodSpec{
-			NodeName: "node0",
-		},
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{
-				{
-					Type:   v1.PodReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-		},
-	}
-
-	pod1 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pod1",
-		},
-		Spec: v1.PodSpec{
-			NodeName: "node0",
-		},
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{
-				{
-					Type:   v1.PodReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-		},
-	}
-
-	fnh := &testutil.FakeNodeHandler{
-		Existing: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*pod0, *pod1}}),
-		DeleteWaitChan: make(chan struct{}),
-	}
-
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
-
-	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
-		kubeClient:   fnh,
-		nodeInformer: factory.Core().V1().Nodes(),
-		cloud: &fakecloud.FakeCloud{
-			ExistsByProviderID: false,
-			Err:                nil,
-		},
-		nodeMonitorPeriod:         1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
-		nodeStatusUpdateFrequency: 1 * time.Second,
-	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
-	cloudNodeController.Run(wait.NeverStop)
-
-	select {
-	case <-fnh.DeleteWaitChan:
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
-	}
-
-	assert.Equal(t, 1, len(fnh.DeletedNodes), "Node was not deleted")
-	assert.Equal(t, "node0", fnh.DeletedNodes[0].Name, "Node was not deleted")
-}
-
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized
 func TestNodeInitialized(t *testing.T) {
 	fnh := &testutil.FakeNodeHandler{
@@ -425,7 +225,6 @@ func TestNodeInitialized(t *testing.T) {
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		nodeMonitorPeriod:         1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
@@ -488,11 +287,10 @@ func TestNodeIgnored(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:        fnh,
-		nodeInformer:      factory.Core().V1().Nodes(),
-		cloud:             fakeCloud,
-		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:   fnh,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -562,11 +360,10 @@ func TestGCECondition(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:        fnh,
-		nodeInformer:      factory.Core().V1().Nodes(),
-		cloud:             fakeCloud,
-		nodeMonitorPeriod: 1 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:   fnh,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -652,11 +449,10 @@ func TestZoneInitialized(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
-		kubeClient:        fnh,
-		nodeInformer:      factory.Core().V1().Nodes(),
-		cloud:             fakeCloud,
-		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		kubeClient:   fnh,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
@@ -745,7 +541,6 @@ func TestNodeAddresses(t *testing.T) {
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
@@ -768,9 +563,7 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 
-	cloudNodeController.Run(wait.NeverStop)
-
-	<-time.After(2 * time.Second)
+	cloudNodeController.UpdateNodeStatus()
 
 	updatedNodes := fnh.GetUpdatedNodesCopy()
 
@@ -860,7 +653,6 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
@@ -872,9 +664,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
 	assert.Equal(t, 3, len(fnh.UpdatedNodes[0].Status.Addresses), "Node status unexpectedly updated")
 
-	cloudNodeController.Run(wait.NeverStop)
-
-	<-time.After(2 * time.Second)
+	cloudNodeController.UpdateNodeStatus()
 
 	updatedNodes := fnh.GetUpdatedNodesCopy()
 
@@ -1152,7 +942,6 @@ func TestNodeProviderID(t *testing.T) {
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
@@ -1236,7 +1025,6 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}

@@ -18,7 +18,8 @@ package system
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/errors"
+
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Validator is the interface for all validators.
@@ -46,7 +47,7 @@ func Validate(spec SysSpec, validators []Validator) (error, error) {
 		errs = append(errs, err)
 		warns = append(warns, warn)
 	}
-	return errors.NewAggregate(warns), errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(warns), errorsutil.NewAggregate(errs)
 }
 
 // ValidateSpec uses all default validators to validate the system and writes to stdout.

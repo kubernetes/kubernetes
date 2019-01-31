@@ -27,7 +27,7 @@ go_test(
     name = "go_default_test",
     srcs = ["suite_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
     ],
     embed = [":go_default_library"],
     deps = [

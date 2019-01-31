@@ -111,10 +111,11 @@ func newCertSubPhases() []workflow.Phase {
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
 	saPhase := workflow.Phase{
-		Name:  "sa",
-		Short: "Generates a private key for signing service account tokens along with its public key",
-		Long:  saKeyLongDesc,
-		Run:   runCertsSa,
+		Name:         "sa",
+		Short:        "Generates a private key for signing service account tokens along with its public key",
+		Long:         saKeyLongDesc,
+		Run:          runCertsSa,
+		InheritFlags: []string{options.CertificatesDir},
 	}
 
 	subPhases = append(subPhases, saPhase)
@@ -203,13 +204,8 @@ func runCertsSa(c workflow.RunData) error {
 		return nil
 	}
 
-	// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)
-	cfg := data.Cfg()
-	cfg.CertificatesDir = data.CertificateWriteDir()
-	defer func() { cfg.CertificatesDir = data.CertificateDir() }()
-
 	// create the new service account key (or use existing)
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir())
 }
 
 func runCerts(c workflow.RunData) error {

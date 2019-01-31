@@ -3,6 +3,7 @@ approvers:
 - dims
 - wlan0
 - andrewsykim
+- cheftako
 reviewers:
 - thockin
 - lavalamp

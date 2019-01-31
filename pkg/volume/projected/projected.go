@@ -96,6 +96,10 @@ func (plugin *projectedPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Projected != nil
 }
 
+func (plugin *projectedPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *projectedPlugin) RequiresRemount() bool {
 	return true
 }

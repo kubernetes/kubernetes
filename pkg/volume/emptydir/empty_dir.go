@@ -89,6 +89,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *emptyDirPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *emptyDirPlugin) RequiresRemount() bool {
 	return false
 }
@@ -367,7 +371,7 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
-	if pathExists, pathErr := volumeutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)

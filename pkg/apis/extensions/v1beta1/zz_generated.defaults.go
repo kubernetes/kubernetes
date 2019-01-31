@@ -138,6 +138,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -179,6 +182,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -285,6 +291,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -326,6 +335,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -454,6 +466,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -495,6 +510,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }

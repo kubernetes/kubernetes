@@ -106,7 +106,7 @@ func TestReservePlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "reserve-plugin", nil),
-		false, nil, testPluginSet, false, true, time.Second)
+		false, nil, testPluginSet, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -157,7 +157,7 @@ func TestPrebindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prebind-plugin", nil),
-		false, nil, testPluginSet, false, true, time.Second)
+		false, nil, testPluginSet, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -239,7 +239,7 @@ func TestContextCleanup(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "plugin-context-cleanup", nil),
-		false, nil, testPluginSet, false, true, time.Second)
+		false, nil, testPluginSet, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
