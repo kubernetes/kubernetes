@@ -274,7 +274,7 @@ func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightEr
 		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
 	flagSet.BoolVar(
-		controlPlane, "experimental-control-plane", *controlPlane,
+		controlPlane, "control-plane", *controlPlane,
 		"Create a new control plane instance on this node")
 	flagSet.StringVar(
 		advertiseAddress, "apiserver-advertise-address", *advertiseAddress,
