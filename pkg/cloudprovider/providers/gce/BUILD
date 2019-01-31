@@ -49,7 +49,6 @@ go_library(
         "//pkg/api/v1/service:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/master/ports:go_default_library",
         "//pkg/util/net/sets:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
