@@ -615,12 +615,13 @@ function start-kubemaster-component() {
 			local audit_policy_config_mount=""
 			local audit_policy_config_volume=""
 			if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
-				read -d '' audit_policy_config_mount << EOF
+				# FIXME: This is failing
+				read -r -d '' audit_policy_config_mount << EOF
 - name: auditpolicyconfigmount
   mountPath: ${audit_policy_file}
   readOnly: true
 EOF
-				read -d '' audit_policy_config_volume << EOF
+				read -r -d '' audit_policy_config_volume << EOF
 - name: auditpolicyconfigmount
   hostPath:
     path: ${audit_policy_file}
