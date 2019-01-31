@@ -173,7 +173,7 @@ func TestBufferedBackendShutdownWaitsForDelegatedCalls(t *testing.T) {
 
 	// Run backend, process events, wait for them to be batched and for delegated call to start.
 	stopCh := make(chan struct{})
-	backend.Run(stopCh)
+	go backend.Run(stopCh)
 	backend.ProcessEvents(newEvents(config.MaxBatchSize)...)
 	<-delegatedCallStartCh
 
