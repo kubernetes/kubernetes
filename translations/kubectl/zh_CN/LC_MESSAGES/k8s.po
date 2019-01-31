@@ -27,7 +27,7 @@ msgid ""
 "\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1"
 msgstr ""
 "\n"
-"\t\t  # 使用 cluster-admin ClusterRole 为 user1, user2, and group1 创建一个 ClusterRoleBinding\n"
+"\t\t  # 使用 cluster-admin ClusterRole 为 user1、user2 和 group1 创建一个 ClusterRoleBinding\n"
 "\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1"
 
 #: pkg/kubectl/cmd/create_rolebinding.go:35
@@ -37,7 +37,7 @@ msgid ""
 "\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1"
 msgstr ""
 "\n"
-"\t\t  # 使用 admin ClusterRole 为 user1, user2, and group1 创建一个 RoleBinding\n"
+"\t\t  # 使用 admin ClusterRole 为 user1、user2 和 group1 创建一个 RoleBinding\n"
 "\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1"
 
 #: pkg/kubectl/cmd/create_configmap.go:44
@@ -53,13 +53,13 @@ msgid ""
 "\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2"
 msgstr ""
 "\n"
-"\t\t  # 通过文件夹 bar 创建一个名称为 my-config 的 configmap\n"
+"\t\t  # 基于文件夹 bar 创建一个名称为 my-config 的 configmap\n"
 "\t\t  kubectl create configmap my-config --from-file=path/to/bar\n"
 "\n"
-"\t\t  # 创建一个名称为 my-config 的 configmap 并指定 keys 而不是使用磁盘上所在的文件名\n"
+"\t\t  # 创建一个名称为 my-config 的 configmap 并指定 keys，而不是使用磁盘上的文件名\n"
 "\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt\n"
 "\n"
-"\t\t  # 创建一个名称为 my-config 的 configmap 且 key1=config1 和 key2=config2\n"
+"\t\t  # 创建一个名称为 my-config 的 configmap 且设置 key1=config1、key2=config2\n"
 "\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2"
 
 #: pkg/kubectl/cmd/create_secret.go:135
@@ -69,7 +69,7 @@ msgid ""
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 msgstr ""
 "\n"
-"\t\t  # 如果你还没有一个 .dockercfg 文件, 你可以直接使用下面的命令创建一个 dockercfg 的 secret:\n"
+"\t\t  # 如果你还没有一个 .dockercfg 文件，你可以直接使用下面的命令创建一个 dockercfg 的 secret:\n"
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 
 #: pkg/kubectl/cmd/top_node.go:65
@@ -105,17 +105,17 @@ msgid ""
 "\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap"
 msgstr ""
 "\n"
-"\t\t# 将 pod.json 上的配置应用于 pod.\n"
+"\t\t# 将 pod.json 上的配置应用于 pod。\n"
 "\t\tkubectl apply -f ./pod.json\n"
 "\n"
-"\t\t# 将传入 stdin 的 JSON 应用到一个 pod.\n"
+"\t\t# 将传入 stdin 的 JSON 应用到 pod。\n"
 "\t\tcat pod.json | kubectl apply -f -\n"
 "\n"
-"\t\t# Note: --prune 仍然在 Alpha\n"
-"\t\t# 应用在 manifest.yaml 中匹配标签 app=nginx 的资源配置并删除所有不在这个文件中并匹配标签app=nginx 的资源\n"
+"\t\t# 注意：--prune 参数仍然处于 Alpha 阶段\n"
+"\t\t# 应用在 manifest.yaml 中匹配标签 app=nginx 的资源配置并删除所有不在这个文件中并匹配标签 app=nginx 的资源\n"
 "\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n"
 "\n"
-"\t\t# 应用 manifest.yaml 的配置并删除所有不在这个文件中的 configmaps.\n"
+"\t\t# 应用 manifest.yaml 的配置并删除所有不在这个文件中的 configmaps。\n"
 "\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap"
 
 #: pkg/kubectl/cmd/autoscale.go:40
@@ -129,10 +129,10 @@ msgid ""
 "\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
 msgstr ""
 "\n"
-"\t\t# 自动弹性伸缩 deployment \"foo\", pods 的数量在 2 和 10 之间, 目标 CPU 指定为默认的弹性伸缩策略:\n"
+"\t\t# 自动弹性伸缩 deployment \"foo\"，pods 的数量在 2 和 10 之间，目标 CPU 指定为默认的弹性伸缩策略：\n"
 "\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
 "\n"
-"\t\t# 自动弹性伸缩 replication controller \"foo\", pods 的数量在 1 和 5 之间, 目标 CPU 利用率为 80%:\n"
+"\t\t# 自动弹性伸缩 replication controller \"foo\"，pods 的数量在 1 和 5 之间，目标 CPU 利用率为 80%：\n"
 "\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
 
 #: pkg/kubectl/cmd/convert.go:49
@@ -149,14 +149,14 @@ msgid ""
 "\t\tkubectl convert -f . | kubectl create -f -"
 msgstr ""
 "\n"
-"\t\t# 将’pod.yaml' 转换为最新版本并打印到 stdout.\n"
+"\t\t# 将’pod.yaml' 转换为最新版本并打印到 stdout。\n"
 "\t\tkubectl convert -f pod.yaml\n"
 "\n"
 "\t\t# 将 ‘pod.yaml' 指定的资源的实时状态转换为最新版本\n"
 "\t\t# 并以 json 格式打印到 stdout.\n"
 "\t\tkubectl convert -f pod.yaml --local -o json\n"
 "\n"
-"\t\t# 将当前目录下的所以文件转换为最新版本并创建它们.\n"
+"\t\t# 将当前目录下的所有文件转换为最新版本并创建它们。\n"
 "\t\tkubectl convert -f . | kubectl create -f -"
 
 #: pkg/kubectl/cmd/create_role.go:41
@@ -169,10 +169,10 @@ msgid ""
 "\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod"
 msgstr ""
 "\n"
-"\t\t# 创建一个名为 \"pod-reader\" 的 ClusterRole, 允许用户在 pods 上执行 “get\", \"watch\" 和 \"list\"\n"
+"\t\t# 创建一个名为 \"pod-reader\" 的 ClusterRole，允许用户在 pods 上执行 "get\"、\"watch\" 和 \"list\"\n"
 "\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods\n"
 "\n"
-"\t\t# 创建一个名为 \"pod-reader\" ClusterRole, 其中指定了 ResourceName\n"
+"\t\t# 创建一个名为 \"pod-reader\" 的 ClusterRole，其中指定了 ResourceName\n"
 "\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod"
 
 #: pkg/kubectl/cmd/create_quota.go:35
@@ -204,12 +204,12 @@ msgid ""
 "\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
 msgstr ""
 "\n"
-"\t\t# 创建一个名称为 my-pdb 的 pod disruption budget 并将会选择所有 app=rails 标签的 pods\n"
+"\t\t# 创建一个名称为 my-pdb 的 pod 终端预算，并将会选择所有 app=rails 标签的 pods\n"
 "\t\t# 并要求他们在同一时间中最少有一个可用. \n"
 "\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-available=1\n"
 "\n"
-"\t\t# 创建一个名称为 my-pdb 的 pod disruption budget 并将会选择所有 app=rails 标签的 pods\n"
-"\t\t# 并要求他们在同一时间中最少有一半可用.\n"
+"\t\t# 创建一个名称为 my-pdb 的 pod 终端预算并将会选择所有 app=rails 标签的 pods\n"
+"\t\t# 并要求他们在同一时间中最少有一半可用。\n"
 "\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
 
 #: pkg/kubectl/cmd/create.go:47
@@ -225,13 +225,13 @@ msgid ""
 "\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json"
 msgstr ""
 "\n"
-"\t\t# 使用在 pod.json 的 数据创建一个 pod.\n"
+"\t\t# 使用 pod.json 中的数据创建一个 pod。\n"
 "\t\tkubectl create -f ./pod.json\n"
 "\n"
-"\t\t# 根据传入 stdin 的 JSON 创建一个 pod.\n"
+"\t\t# 根据传入 stdin 的 JSON 创建一个 pod。\n"
 "\t\tcat pod.json | kubectl create -f -\n"
 "\n"
-"\t\t# 使用 v1 API 格式在 JSON 中编辑在 docker-registry.yaml 中的数据然后使用被编辑后的数据创建资源.\n"
+"\t\t# 使用 v1 API 格式在 JSON 中编辑在 docker-registry.yaml 中的数据然后使用被编辑后的数据创建资源。\n"
 "\t\tkubectl create -f docker-registry.yaml --edit --output-version=v1 -o json"
 
 #: pkg/kubectl/cmd/expose.go:53
@@ -259,25 +259,25 @@ msgid ""
 "\t\tkubectl expose deployment nginx --port=80 --target-port=8000"
 msgstr ""
 "\n"
-"\t\t# 为一个 replicated nginx 创建一个 service, 服务在端口 80 并连接到 containers 的8000端口.\n"
+"\t\t# 为一个 nginx 副本创建一个 service，服务在端口 80 并连接到 containers 的8000端口。\n"
 "\t\tkubectl expose rc nginx --port=80 --target-port=8000\n"
 "\n"
-"\t\t# 使用在 \"nginx-controller.yaml\\ 中指定的 type 和 name 为一个replication controller 创建一个 service, 服务在端口 80 并连接到 containers 的8000端口.\n"
+"\t\t# 使用在 \"nginx-controller.yaml\\ 中指定的类型和名称为一个 replication controller 创建一个 service，服务在端口 80 并连接到 containers 的 8000 端口。\n"
 "\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n"
 "\n"
-"\t\t# 为名为 valid-pod 的 pod 创建一个 service, 服务在端口 444 并命名为 \"frontend\" \n"
+"\t\t# 为名为 valid-pod 的 pod 创建一个 service，服务在端口 444 并命名为 \"frontend\" \n"
 "\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n"
 "\n"
-"\t\t# 基于上面的 service 创建第二个 service, 暴露容器端口 8443 并命名为 \"nginx-https\" 端口为 443 \n"
+"\t\t# 基于上面的 service 创建第二个 service，暴露容器端口 8443 并命名为 \"nginx-https\" 端口为 443 \n"
 "\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https\n"
 "\n"
-"\t\t# 为一个名称为 streaming 的应用创建一个 service 暴露端口 4100, 协议为 UDP 名称为 'video-stream'.\n"
+"\t\t# 为一个名称为 streaming 的应用创建一个 service 暴露端口 4100，协议为 UDP 名称为 'video-stream'。\n"
 "\t\tkubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream\n"
 "\n"
-"\t\t# 为一个名称为 nginx 的 replica set 创建一个 service, 服务在 端口 80 且连接到容器端口 8000.\n"
+"\t\t# 为一个名称为 nginx 的 replica set 创建一个 service，服务在 端口 80 且连接到容器端口 8000。\n"
 "\t\tkubectl expose rs nginx --port=80 --target-port=8000\n"
 "\n"
-"\t\t# 为一个名称为 nginx 的 deployment 创建一个 service, 服务在端口 80 且 连接到 containers 的 8000 端口.\n"
+"\t\t# 为一个名称为 nginx 的 deployment 创建一个 service，服务在端口 80 且 连接到 containers 的 8000 端口。\n"
 "\t\tkubectl expose deployment nginx --port=80 --target-port=8000"
 
 #: pkg/kubectl/cmd/delete.go:68
@@ -305,16 +305,16 @@ msgid ""
 "\t\tkubectl delete pods --all"
 msgstr ""
 "\n"
-"\t\t# 使用 pod.json 中的类型和名称删除一个 pod.\n"
+"\t\t# 使用 pod.json 中的类型和名称删除一个 pod。\n"
 "\t\tkubectl delete -f ./pod.json\n"
 "\n"
-"\t\t# 基于重定向到 stdin 中的 JSON 的类型和名称删除一个 pod.\n"
+"\t\t# 基于重定向到 stdin 中的 JSON 的类型和名称删除一个 pod。\n"
 "\t\tcat pod.json | kubectl delete -f -\n"
 "\n"
 "\t\t# 删除名为 \"baz\" 和 \"foo\" 的 pod 和 service\n"
 "\t\tkubectl delete pod,service baz foo\n"
 "\n"
-"\t\t# 删除标签为 name=myLabel 的 pods 和 services.\n"
+"\t\t# 删除标签为 name=myLabel 的 pods 和 services。\n"
 "\t\tkubectl delete pods,services -l name=myLabel\n"
 "\n"
 "\t\t# 删除最小延迟的 pod\n"
@@ -355,7 +355,7 @@ msgstr ""
 "\t\t# 描述一个 pod\n"
 "\t\tkubectl describe pods/nginx\n"
 "\n"
-"\t\t# 描述一个被 \"pod.json\" 中的类型和名称标识的 pod\n"
+"\t\t# 描述一个被 \"pod.json\" 中的类型和名称所标识的 pod\n"
 "\t\tkubectl describe -f pod.json\n"
 "\n"
 "\t\t# 描述所有 pods\n"
@@ -378,10 +378,10 @@ msgid ""
 "\t\t$ kubectl drain foo --grace-period=900"
 msgstr ""
 "\n"
-"\t\t# 驱逐节点 \"foo\", 即使很多 pods 没有被一个在 node 上的 ReplicationController, ReplicaSet, Job, DaemonSet 或者 StatefulSet 管理.\n"
+"\t\t# 驱逐节点 \"foo\"，即使多个 pods 没有被 node 上的 ReplicationController、ReplicaSet、Job、DaemonSet 或者 StatefulSet 所管理。\n"
 "\t\t$ kubectl drain foo --force\n"
 "\n"
-"\t\t# 同上, 如果存在 pods 没有被一个 ReplicationController, ReplicaSet, Job, DaemonSet 或者 StatefulSet 管理超过 15 分钟则退出.\n"
+"\t\t# 同上，如果存在 pods 没有被一个 ReplicationController、ReplicaSet、Job、DaemonSet 或者 StatefulSet 管理超过 15 分钟则退出。\n"
 "\t\t$ kubectl drain foo --grace-period=900"
 
 #: pkg/kubectl/cmd/edit.go:80
@@ -400,16 +400,16 @@ msgid ""
 "\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
 msgstr ""
 "\n"
-"\t\t# 编辑名为 'docker-registry' 的 service:\n"
+"\t\t# 编辑名为 'docker-registry' 的 service：\n"
 "\t\tkubectl edit svc/docker-registry\n"
 "\n"
 "\t\t# 使用一个可选择的编辑器\n"
 "\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
 "\n"
-"\t\t# 使用 v1 API 格式的 JSON 编辑名为 'myjob' 的 job:\n"
+"\t\t# 使用 v1 API 格式的 JSON 编辑名为 'myjob' 的 job：\n"
 "\t\tkubectl edit job.v1.batch/myjob -o json\n"
 "\n"
-"\t\t# 在 YAML 中编辑名为 'mydeployment' 的 deployment 并在它的注解中保存修改后的配置:\n"
+"\t\t# 在 YAML 中编辑名为 'mydeployment' 的 deployment 并在它的注解中保存修改后的配置：\n"
 "\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
 
 #: pkg/kubectl/cmd/exec.go:41
@@ -426,13 +426,13 @@ msgid ""
 "\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il"
 msgstr ""
 "\n"
-"\t\t# 从运行中pod 123456-7890 获取执行 'date' 的输出, 默认使用第一个容器\n"
+"\t\t# 从运行中 pod 123456-7890 获取执行 'date' 的输出，默认使用第一个容器\n"
 "\t\tkubectl exec 123456-7890 date\n"
 "\n"
 "\t\t# 从 pod 123456-7890 的容器 ruby-container 获取执行 'date' 的输出\n"
 "\t\tkubectl exec 123456-7890 -c ruby-container date\n"
 "\n"
-"\t\t# 切换到 terminal 模式, 发送 stdin 到运行在 pod 123456-7890 的容器 ruby-container 'bash' \n"
+"\t\t# 切换到 terminal 模式，发送 stdin 到运行在 pod 123456-7890 的容器 ruby-container 'bash' \n"
 "\t\t# 并从 'bash' 发送 stdout/stderr 返回到 client\n"
 "\t\tkubectl exec 123456-7890 -c ruby-container -i -t -- bash -il"
 
@@ -454,13 +454,13 @@ msgid ""
 "\t\t"
 msgstr ""
 "\n"
-"\t\t# 从运行中pod 123456-7890 获取执行 'date' 的输出, 默认使用第一个容器\n"
+"\t\t# 从运行中 pod 123456-7890 获取执行 'date' 的输出，默认使用第一个容器\n"
 "\t\tkubectl attach 123456-7890\n"
 "\n"
 "\t\t# 从 pod 123456-7890 的容器 ruby-container 获取输出\n"
 "\t\tkubectl attach 123456-7890 -c ruby-container\n"
 "\n"
-"\t\t# 切换到 terminal 模式, 发送 stdin 到运行在 pod 123456-7890 的容器 ruby-container 'bash' \n"
+"\t\t# 切换到 terminal 模式，发送 stdin 到运行在 pod 123456-7890 的容器 ruby-container 'bash' \n"
 "\t\t# 并从 'bash' 发送 stdout/stderr 返回到 client\n"
 "\t\tkubectl attach 123456-7890 -c ruby-container -i -t\n"
 "\n"
@@ -510,7 +510,7 @@ msgid ""
 "\t\tsource <(kubectl completion zsh)"
 msgstr ""
 "\n"
-"\t\t# 在一个 Mac 中使用 homebrew 安装 bash 补全\n"
+"\t\t# 在一个 Mac 中通过 homebrew 安装 bash 补全\n"
 "\t\tbrew install bash-completion\n"
 "\t\tprintf \"\n"
 "# Bash 补全支持\n"
@@ -563,31 +563,31 @@ msgid ""
 "\t\tkubectl get all"
 msgstr ""
 "\n"
-"\t\t# 以 ps 输出格式列出所有 pod.\n"
+"\t\t# 以 ps 输出格式列出所有 pod。\n"
 "\t\tkubectl get pods\n"
 "\n"
-"\t\t# 以 ps 输出格式列出所有 pod(如节点名称).\n"
+"\t\t# 以 ps 输出格式列出所有 pod(如节点名称)。\n"
 "\t\tkubectl get pods -o wide\n"
 "\n"
-"\t\t# 获取名称为 web 的 replicationcontroller.\n"
+"\t\t# 获取名称为 web 的 replicationcontroller。\n"
 "\t\tkubectl get replicationcontroller web\n"
 "\n"
-"\t\t# 使用 JSON 格式化输出显示一个单独的 pod.\n"
+"\t\t# 使用 JSON 格式化输出显示一个单独的 pod。\n"
 "\t\tkubectl get -o json pod web-pod-13je7\n"
 "\n"
-"\t\t# 显示一个被 \"pod.yaml\" 中的 type 和 name 标识的 pod 并使用 JSON 格式化输出.\n"
+"\t\t# 显示一个被 \"pod.yaml\" 中的 type 和 name 标识的 pod 并使用 JSON 格式化输出。\n"
 "\t\tkubectl get -f pod.yaml -o json\n"
 "\n"
-"\t\t# 只返回被指定 pod 中 phase 的值.\n"
+"\t\t# 只返回被指定 pod 中 phase 的值。\n"
 "\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n"
 "\n"
-"\t\t# 显示所有的 replication controllers 和 services 并格式化输出.\n"
+"\t\t# 显示所有的 replication controllers 和 services 并格式化输出。\n"
 "\t\tkubectl get rc,services\n"
 "\n"
-"\t\t# 显示一个或者更多 resources 通过它们的 type 和 names.\n"
+"\t\t# 显示一个或者更多 resources 通过它们的 type 和 names。\n"
 "\t\tkubectl get rc/web service/frontend pods/web-pod-13je7\n"
 "\n"
-"\t\t# 使用不同的 types 显示所有 resources.\n"
+"\t\t# 使用不同的 types 显示所有 resources。\n"
 "\t\tkubectl get all"
 
 #: pkg/kubectl/cmd/portforward.go:53
@@ -606,16 +606,16 @@ msgid ""
 "\t\tkubectl port-forward mypod 0:5000"
 msgstr ""
 "\n"
-"\t\t# 在本地监听端口 5000 和 6000 , forwarding 数据 to/from 在 pod 5000 和 6000 端口\n"
+"\t\t# 在本地监听端口 5000 和 6000，forwarding 数据 to/from 在 pod 5000 和 6000 端口\n"
 "\t\tkubectl port-forward mypod 5000 6000\n"
 "\n"
-"\t\t# 在本地监听端口 8888 , forwarding 到 pod 的 5000端口\n"
+"\t\t# 在本地监听端口 8888，forwarding 到 pod 的 5000端口\n"
 "\t\tkubectl port-forward mypod 8888:5000\n"
 "\n"
-"\t\t# 在本地随机监听一个端口 , forwarding 到 pod 的 5000端口\n"
+"\t\t# 在本地随机监听一个端口，forwarding 到 pod 的 5000端口\n"
 "\t\tkubectl port-forward mypod :5000\n"
 "\n"
-"\t\t# 在本地随机监听一个端口 , forwarding 到 pod 的 5000端口\n"
+"\t\t# 在本地随机监听一个端口，forwarding 到 pod 的 5000端口\n"
 "\t\tkubectl port-forward mypod 0:5000"
 
 #: pkg/kubectl/cmd/drain.go:118
@@ -625,7 +625,7 @@ msgid ""
 "\t\t$ kubectl uncordon foo"
 msgstr ""
 "\n"
-"\t\t# 标记 node \"foo\" 为 schedulable.\n"
+"\t\t# 标记 node \"foo\" 为 schedulable。\n"
 "\t\t$ kubectl uncordon foo"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
@@ -636,7 +636,7 @@ msgid ""
 "\t\tkubectl cordon foo"
 msgstr ""
 "\n"
-"\t\t# 标记 node \"foo\" 为 unschedulable.\n"
+"\t\t# 标记 node \"foo\" 为 unschedulable。\n"
 "\t\tkubectl cordon foo"
 
 #: pkg/kubectl/cmd/patch.go:66
@@ -658,10 +658,10 @@ msgstr ""
 "\t\t# 使用 strategic merge patch 部分更新一个 node\n"
 "\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n"
 "\n"
-"\t\t# 使用 strategic merge patch 部分更新一个被 \"node.json\" 的 type 和 name 标示  的 node.\n"
+"\t\t# 使用 strategic merge patch 部分更新一个被 \"node.json\" 的 type 和 name 标示  的 node。\n"
 "\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n"
 "\n"
-"\t\t# 更新一个 container 的 image; spec.containers[*].name 是必须的 因为它是一个 merge key\n"
+"\t\t# 更新一个 container 的 image; spec.containers[*].name 是必须的，因为它是一个 merge key\n"
 "\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n"
 "\n"
 "\t\t#  使用一个 json patch 更新一个指定坐标的 container 的 image \n"
@@ -725,16 +725,16 @@ msgid ""
 "\t\tkubectl replace --force -f ./pod.json"
 msgstr ""
 "\n"
-"\t\t# 使用在 pod.json 中的数据替换一个 pod.\n"
+"\t\t# 使用在 pod.json 中的数据替换一个 pod。\n"
 "\t\tkubectl replace -f ./pod.json\n"
 "\n"
-"\t\t# 基于被重定向到 stdin 中的 JSON 替换一个 pod.\n"
+"\t\t# 基于被重定向到 stdin 中的 JSON 替换一个 pod。\n"
 "\t\tcat pod.json | kubectl replace -f -\n"
 "\n"
 "\t\t# 更新一个单独容器的 pod 的 image 版本 (tag) 到 v4\n"
 "\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' | kubectl replace -f -\n"
 "\n"
-"\t\t# 强制替换, 删除然后重新创建这个 resource\n"
+"\t\t# 强制替换，删除然后重新创建这个 resource\n"
 "\t\tkubectl replace --force -f ./pod.json"
 
 #: pkg/kubectl/cmd/logs.go:40
@@ -765,28 +765,28 @@ msgid ""
 "\t\tkubectl logs deployment/nginx -c nginx-1"
 msgstr ""
 "\n"
-"\t\t# 返回仅有一个容器 pod 名称为 nginx 的 snapshot 日志\n"
+"\t\t# 返回仅有一个容器且 pod 名称为 nginx 的快照日志\n"
 "\t\tkubectl logs nginx\n"
 "\n"
-"\t\t# 返回 label 为 app=nginx 的 pods 的 snapshot 日志\n"
+"\t\t# 返回 label 为 app=nginx 的 pods 的快照日志\n"
 "\t\tkubectl logs -lapp=nginx\n"
 "\n"
-"\t\t# Return snapshot of previous terminated ruby container logs from pod web-1\n"
+"\t\t# 返回之前从 web-1 pod 中停止的 ruby 容器快照日志\n"
 "\t\tkubectl logs -p -c ruby web-1\n"
 "\n"
-"\t\t# Begin streaming the logs of the ruby container in pod web-1\n"
+"\t\t# 开始在 pod web-1 中传输 Ruby 容器的日志\n"
 "\t\tkubectl logs -f -c ruby web-1\n"
 "\n"
-"\t\t# Display only the most recent 20 lines of output in pod nginx\n"
+"\t\t# 仅显示 pod nginx 中最近 20 行的输出\n"
 "\t\tkubectl logs --tail=20 nginx\n"
 "\n"
-"\t\t# Show all logs from pod nginx written in the last hour\n"
+"\t\t# 显示最近一小时内从 pod nginx 写入的所有日志\n"
 "\t\tkubectl logs --since=1h nginx\n"
 "\n"
-"\t\t# Return snapshot logs from first container of a job named hello\n"
+"\t\t# 从名为 hello 的作业的第一个容器返回快照日志\n"
 "\t\tkubectl logs job/hello\n"
 "\n"
-"\t\t# Return snapshot logs from container nginx-1 of a deployment named nginx\n"
+"\t\t# 从名为nginx的 deployment 的容器 nginx-1 返回快照日志\n"
 "\t\tkubectl logs deployment/nginx -c nginx-1"
 
 #: pkg/kubectl/cmd/proxy.go:53
@@ -804,15 +804,15 @@ msgid ""
 "\t\tkubectl proxy --api-prefix=/k8s-api"
 msgstr ""
 "\n"
-"\t\t# 运行 proxy 到 kubernetes apiserver 的 8011 端口上, 服务静态内容路径为 ./local/www/\n"
+"\t\t# 运行 proxy 到 kubernetes apiserver 的 8011 端口上，服务静态内容路径为 ./local/www/\n"
 "\t\tkubectl proxy --port=8011 --www=./local/www/\n"
 "\n"
-"\t\t# 在任意的本地端口上运行一个 proxy 到 kubernetes apiserver.\n"
-"\t\t# 为这个 server 挑选的端口将会被输出到 stdout.\n"
+"\t\t# 在任意的本地端口上运行一个 proxy 到 kubernetes apiserver。\n"
+"\t\t# 为这个 server 挑选的端口将会被输出到 stdout。\n"
 "\t\tkubectl proxy --port=0\n"
 "\n"
-"\t\t# 运行一个 proxy 到 kubernetes apiserver, 修改 api prefix 为 k8s-api\n"
-"\t\t# 这会使 e.g. 这个 pods 的有效 api 为 localhost:8001/k8s-api/v1/pods/\n"
+"\t\t# 运行一个 proxy 到 kubernetes apiserver，修改 api prefix 为 k8s-api\n"
+"\t\t# 这会使这个 pods 的有效 api 为 localhost:8001/k8s-api/v1/pods/\n"
 "\t\tkubectl proxy --api-prefix=/k8s-api"
 
 #: pkg/kubectl/cmd/scale.go:43
@@ -834,19 +834,19 @@ msgid ""
 "\t\tkubectl scale --replicas=3 job/cron"
 msgstr ""
 "\n"
-"\t\t# Scale 一个名称为 ‘foo’ 的 replicaset 服本数为 3.\n"
+"\t\t# 扩展一个名称为 ‘foo’ 的 replicaset 服本数为 3。\n"
 "\t\tkubectl scale --replicas=3 rs/foo\n"
 "\n"
-"\t\t# Scale 指定的 \"foo.yaml\" 的 type 和 name 标识的 resource 副本数量为 3.\n"
+"\t\t# 扩展 \"foo.yaml\" 所指定 type 和 name 标识的 resource 副本数量为 3。\n"
 "\t\tkubectl scale --replicas=3 -f foo.yaml\n"
 "\n"
-"\t\t# 如果名称为 mysql 的 deployment 当前副本数量为 2, scale mysql 到 3.\n"
+"\t\t# 如果名称为 mysql 的 deployment 当前副本数量为 2，扩展 mysql 副本数到 3。\n"
 "\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n"
 "\n"
-"\t\t# Scale 多个 replication controllers.\n"
+"\t\t# 扩展多个 replication controllers。\n"
 "\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n"
 "\n"
-"\t\t# Scale 名称为 ’cron’ 的 job 副本数量为 3.\n"
+"\t\t# 扩展名称为 ’cron’ 的 job 副本数量为 3。\n"
 "\t\tkubectl scale --replicas=3 job/cron"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:67
@@ -863,13 +863,13 @@ msgid ""
 "\t\t"
 msgstr ""
 "\n"
-"\t\t# 设置一个资源的 last-applied-configuration 去匹配一个文件的内容.\n"
+"\t\t# 设置一个资源的 last-applied-configuration 去匹配一个文件的内容。\n"
 "\t\tkubectl apply set-last-applied -f deploy.yaml\n"
 "\n"
-"\t\t# Execute set-last-applied against each configuration file in a directory.\n"
+"\t\t# 对目录中的每个配置文件执行上次应用的设置。\n"
 "\t\tkubectl apply set-last-applied -f path/\n"
 "\n"
-"\t\t# 设置一个资源的 last-applied-configuration 去匹配一个文件的内容, 如果不存在将会创建一个 annotation.\n"
+"\t\t# 设置一个资源的上次应用的设置去匹配一个文件的内容，如果不存在将会创建一个 annotation。\n"
 "\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n"
 "\t\t"
 
@@ -917,16 +917,16 @@ msgid ""
 "\t\tkubectl stop -f path/to/resources"
 msgstr ""
 "\n"
-"\t\t# Shut down foo.\n"
+"\t\t# 关闭 foo。\n"
 "\t\tkubectl stop replicationcontroller foo\n"
 "\n"
-"\t\t# Stop pods and services with label name=myLabel.\n"
+"\t\t# 停止带有标签 name=myLabel 的 pods and services。\n"
 "\t\tkubectl stop pods,services -l name=myLabel\n"
 "\n"
-"\t\t# Shut down the service defined in service.json\n"
+"\t\t# 停止 service.json 中定义的 service。\n"
 "\t\tkubectl stop -f service.json\n"
 "\n"
-"\t\t# Shut down all resources in the path/to/resources directory\n"
+"\t\t# 停止 /to/resources 路径下所有的资源。\n"
 "\t\tkubectl stop -f path/to/resources"
 
 #: pkg/kubectl/cmd/run.go:57
@@ -966,37 +966,37 @@ msgid ""
 "\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'"
 msgstr ""
 "\n"
-"\t\t# Start a single instance of nginx.\n"
+"\t\t# 启动 nginx 的单个实例。\n"
 "\t\tkubectl run nginx --image=nginx\n"
 "\n"
-"\t\t# Start a single instance of hazelcast and let the container expose port 5701 .\n"
+"\t\t# 启动 hazelcast 的单个实例并让容器暴露端口 5701。\n"
 "\t\tkubectl run hazelcast --image=hazelcast --port=5701\n"
 "\n"
-"\t\t# Start a single instance of hazelcast and set environment variables \"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container.\n"
+"\t\t# 启动 hazelcast 的单个实例并设置容器中的环境变量 \"DNS_DOMAIN=cluster\" 和 \"POD_NAMESPACE=default\"。\n"
 "\t\tkubectl run hazelcast --image=hazelcast --env=\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n"
 "\n"
-"\t\t# Start a replicated instance of nginx.\n"
+"\t\t# 启动 nginx 的副本实例。\n"
 "\t\tkubectl run nginx --image=nginx --replicas=5\n"
 "\n"
-"\t\t# Dry run. Print the corresponding API objects without creating them.\n"
+"\t\t# 演练。打印相应的 API 对象但并不创建它们。\n"
 "\t\tkubectl run nginx --image=nginx --dry-run\n"
 "\n"
-"\t\t# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.\n"
+"\t\t# 启动 nginx 的单个实例，并用从 JSON 中解析的部分数值覆盖 deployment 的 spec。\n"
 "\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", \"spec\": { ... } }'\n"
 "\n"
-"\t\t# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.\n"
+"\t\t# 启动一个 busybox pod 并将其保留在前台，如果它退出，不要重新启动它。\n"
 "\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n"
 "\n"
-"\t\t# Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.\n"
+"\t\t# 通过默认命令启动 nginx 容器，但命令中使用定制参数 (arg1 .. argN)。\n"
 "\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n"
 "\n"
-"\t\t# Start the nginx container using a different command and custom arguments.\n"
+"\t\t# 使用不同的命令和定制化参数启动 nginx 容器。\n"
 "\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>\n"
 "\n"
-"\t\t# Start the perl container to compute π to 2000 places and print it out.\n"
+"\t\t# 启动 perl 容器来计算 π 的前 2000 位并打印出来。\n"
 "\t\tkubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'\n"
 "\n"
-"\t\t# Start the cron job to compute π to 2000 places and print it out every 5 minutes.\n"
+"\t\t# 启动 cron job 每5分钟计算一次 π 的前 2000 位并打印出来。\n"
 "\t\tkubectl run pi --schedule=\"0/5 * * * ?\" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'"
 
 #: pkg/kubectl/cmd/taint.go:67
@@ -1013,14 +1013,14 @@ msgid ""
 "\t\tkubectl taint nodes foo dedicated-"
 msgstr ""
 "\n"
-"\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.\n"
-"\t\t# If a taint with that key and effect already exists, its value is replaced as specified.\n"
+"\t\t# 更新节点 'foo' 的 taint，key 为 'dedicated'，value 为 'special-user'，effect 为 'NoSchedule'。\n"
+"\t\t# 如果 taint 的 key 和 effect 已经存在，它的值将被指定值替换。\n"
 "\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n"
 "\n"
-"\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect 'NoSchedule' if one exists.\n"
+"\t\t# 从节点 'foo' 中删除键为 'dedicated' 的污点，如果存在则影响 “noschedule”。\n"
 "\t\tkubectl taint nodes foo dedicated:NoSchedule-\n"
 "\n"
-"\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n"
+"\t\t# 从节点 'foo' 中删除带有 'dedicated' key 的所有污点\n"
 "\t\tkubectl taint nodes foo dedicated-"
 
 #: pkg/kubectl/cmd/label.go:77
@@ -1046,23 +1046,23 @@ msgid ""
 "\t\tkubectl label pods foo bar-"
 msgstr ""
 "\n"
-"\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'.\n"
+"\t\t# 用标签 'unhealthy' 和值 'true' 更新 pod 'foo'。\n"
 "\t\tkubectl label pods foo unhealthy=true\n"
 "\n"
-"\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.\n"
+"\t\t# 用标签 'status' 和值 'unhealthy' 更新 pod 'foo'，覆盖任何现有值。\n"
 "\t\tkubectl label --overwrite pods foo status=unhealthy\n"
 "\n"
-"\t\t# Update all pods in the namespace\n"
+"\t\t# 更新命名空间中的所有 pod。\n"
 "\t\tkubectl label pods --all status=unhealthy\n"
 "\n"
-"\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
+"\t\t# 更新p\"pod.json\" 中由类型和名称标识的 pod\n"
 "\t\tkubectl label -f pod.json status=unhealthy\n"
 "\n"
-"\t\t# Update pod 'foo' only if the resource is unchanged from version 1.\n"
+"\t\t# 仅当资源与版本 1 保持不变时才更新 pod 'foo'。\n"
 "\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
 "\n"
-"\t\t# Update pod 'foo' by removing a label named 'bar' if it exists.\n"
-"\t\t# Does not require the --overwrite flag.\n"
+"\t\t# 通过删除名为 'bar' 的标签（如果存在）来更新 pod 'foo'。\n"
+"\t\t# 不需要 --overwrite 参数。\n"
 "\t\tkubectl label pods foo bar-"
 
 #: pkg/kubectl/cmd/rollingupdate.go:54
@@ -1085,20 +1085,19 @@ msgid ""
 "\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback"
 msgstr ""
 "\n"
-"\t\t# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.\n"
+"\t\t# 使用frontend-v2.json中的新复制控制器数据更新frontend-v1的pods。\n"
 "\t\tkubectl rolling-update frontend-v1 -f frontend-v2.json\n"
 "\n"
-"\t\t# Update pods of frontend-v1 using JSON data passed into stdin.\n"
+"\t\t# 使用传递到stdin的JSON数据更新frontend-v1的pods。\n"
 "\t\tcat frontend-v2.json | kubectl rolling-update frontend-v1 -f -\n"
 "\n"
-"\t\t# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the\n"
-"\t\t# name of the replication controller.\n"
+"\t\t# 只需更改镜像并切换复制控制器的名称，即可将前端v1的pods更新为前端v2。\n"
 "\t\tkubectl rolling-update frontend-v1 frontend-v2 --image=image:v2\n"
 "\n"
-"\t\t# Update the pods of frontend by just changing the image, and keeping the old name.\n"
+"\t\t# 只需更改镜像并保留旧名称，即可更新前端的 pods。\n"
 "\t\tkubectl rolling-update frontend --image=image:v2\n"
 "\n"
-"\t\t# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).\n"
+"\t\t# 中止并反转正在进行的现有卷展栏（从 frontend-v1 到 frontend-v2）。\n"
 "\t\tkubectl rolling-update frontend-v1 frontend-v2 --rollback"
 
 #: pkg/kubectl/cmd/apply_view_last_applied.go:52
@@ -1111,10 +1110,10 @@ msgid ""
 "\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
 msgstr ""
 "\n"
-"\t\t# View the last-applied-configuration annotations by type/name in YAML.\n"
+"\t\t# 通过 YAML 中的 type/name 查看 last-applied-configuration 注解。\n"
 "\t\tkubectl apply view-last-applied deployment/nginx\n"
 "\n"
-"\t\t# View the last-applied-configuration annotations by file in JSON\n"
+"\t\t# 通过JSON 文件查看last-applied-configuration 注解。\n"
 "\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
 
 #: pkg/kubectl/cmd/apply.go:75
@@ -1129,13 +1128,13 @@ msgid ""
 "\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274."
 msgstr ""
 "\n"
-"\t\t通过文件名或标准输入流(stdin)对资源进行配置.\n"
-"\t\tThis resource will be created if it doesn't exist yet.\n"
-"\t\tTo use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.\n"
+"\t\t通过文件名或标准输入流(stdin)对资源进行配置。\n"
+"\t\t如果此资源尚不存在，将创建它。\n"
+"\t\t若要使用 'apply'，通常首先使用 'apply' 或 'create--save config' 创建资源。\n"
 "\n"
-"\t\tJSON and YAML formats are accepted.\n"
+"\t\tJSON 和 YAML 格式都被接受。\n"
 "\n"
-"\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274."
+"\t\tAlpha 免责声明： --prune 功能尚未完成。除非您知道当前状态，否则不要使用。请参考 https://issues.k8s.io/34274"
 
 #: pkg/kubectl/cmd/convert.go:38
 msgid ""
@@ -1151,15 +1150,15 @@ msgid ""
 "\t\tto change to output destination."
 msgstr ""
 "\n"
-"\t\t在不同的 API versions 转换配置文件. 接受 YAML\n"
-"\t\t和 JSON 格式.\n"
+"\t\t在不同的 API 版本间转换配置文件。接受 YAML 格式\n"
+"\t\t和 JSON 格式。\n"
 "\n"
-"\t\t这个命令以 filename, directory, 或者 URL 作为输入, 并通过 —output-version flag\n"
-"\t\t 转换到指定版本的格式. 如果目标版本没有被指定或者\n"
-"\t\t不支持, 转换到最后的版本.\n"
+"\t\t这个命令以 filename、directory 或者 URL 作为输入，并通过 —output-version 参数\n"
+"\t\t 转换到指定版本的格式。如果目标版本没有被指定或者\n"
+"\t\t不支持，转换到最后的版本。\n"
 "\n"
-"\t\t默认以 YAML 格式输出到 stdout. 可以使用 -o option\n"
-"\t\t修改目标输出的格式."
+"\t\t默认以 YAML 格式输出到 stdout。可以使用 -o 选项\n"
+"\t\t修改目标输出的格式。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
 #: pkg/kubectl/cmd/create_clusterrole.go:31
@@ -1177,7 +1176,7 @@ msgid ""
 "\t\tCreate a ClusterRoleBinding for a particular ClusterRole."
 msgstr ""
 "\n"
-"\t\t 为指定的 ClusterRole 创建一个 ClusterRoleBinding."
+"\t\t 为指定的 ClusterRole 创建一个 ClusterRoleBinding。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
 #: pkg/kubectl/cmd/create_rolebinding.go:32
@@ -1186,7 +1185,7 @@ msgid ""
 "\t\tCreate a RoleBinding for a particular Role or ClusterRole."
 msgstr ""
 "\n"
-"\t\t为指定的 Role 或者 ClusterRole 创建一个 RoleBinding."
+"\t\t为指定的 Role 或者 ClusterRole 创建一个 RoleBinding。"
 
 #: pkg/kubectl/cmd/create_secret.go:200
 msgid ""
@@ -1196,9 +1195,9 @@ msgid ""
 "\t\tThe public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key."
 msgstr ""
 "\n"
-"\t\t为指定的 public/private key pair 创建一个 TLS secret.\n"
+"\t\t为指定的 public/private key pair 创建一个 TLS secret。\n"
 "\n"
-"\t\tpublic/private key pair 必须在传递前存在. public key certificate 必须以 .PEM 被编码且匹配指定的 private key."
+"\t\tpublic/private key pair 必须在传递前存在。public key certificate 必须以 .PEM 被编码且匹配指定的 private key."
 
 #: pkg/kubectl/cmd/create_configmap.go:32
 msgid ""
@@ -1215,16 +1214,13 @@ msgid ""
 "\t\tsymlinks, devices, pipes, etc)."
 msgstr ""
 "\n"
-"\t\tCreate a configmap based on a file, directory, or specified literal value.\n"
+"\t\t基于文件、目录或指定的文字值创建configmap。\n"
 "\n"
-"\t\tA single configmap may package one or more key/value pairs.\n"
+"\t\t单个configmap可以打包一个或多个键/值对。\n"
 "\n"
-"\t\tWhen creating a configmap based on a file, the key will default to the basename of the file, and the value will\n"
-"\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n"
+"\t\t在基于文件创建configmap时，该键将默认为文件的basename，该值将默认为文件内容。如果basename是无效的键，则可以指定备用键。\n"
 "\n"
-"\t\tWhen creating a configmap based on a directory, each file whose basename is a valid key in the directory will be\n"
-"\t\tpackaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,\n"
-"\t\tsymlinks, devices, pipes, etc)."
+"\t\t当基于目录创建configmap时，其basename是目录中有效密钥的每个文件都将打包到configmap中。除常规文件以外的任何目录项都将被忽略（例如子目录、符号链接、设备、管道等）。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: pkg/kubectl/cmd/create_namespace.go:32
@@ -1254,20 +1250,20 @@ msgid ""
 "\t\tby creating a dockercfg secret and attaching it to your service account."
 msgstr ""
 "\n"
-"\t\tCreate a new secret for use with Docker registries.\n"
+"\t\t创建用于 Docker registry 的新 secret。\n"
 "\n"
-"\t\tDockercfg secrets are used to authenticate against Docker registries.\n"
+"\t\tDockercfg secrets 用于 Docker registries 认证。\n"
 "\n"
-"\t\tWhen using the Docker command line to push images, you can authenticate to a given registry by running\n"
+"\t\t使用 docker 命令行推送镜像时，可以通过运行\n"
 "\n"
 "\t\t    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n"
 "\n"
-"    That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to\n"
-"\t\tauthenticate to the registry. The email address is optional.\n"
+"    那会生成 ~/.dockercfg 文件，被 'docker push' and 'docker pull' 命令用来\n"
+"\t\t在镜像仓库的认证。email 地址是可选的。\n"
 "\n"
-"\t\tWhen creating applications, you may have a Docker registry that requires authentication.  In order for the\n"
-"\t\tnodes to pull images on your behalf, they have to have the credentials.  You can provide this information\n"
-"\t\tby creating a dockercfg secret and attaching it to your service account."
+"\t\t创建应用时，您可能有一个需要身份验证的 Docker registry。为了\n"
+"\t\t节点拉取镜像，该registry 必须进行认证。您可以通过下面的方式提供该信息，\n"
+"\t\t创建 dockercfg secret 并关联到你的 service account。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
 #: pkg/kubectl/cmd/create_pdb.go:32
@@ -1276,7 +1272,7 @@ msgid ""
 "\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods"
 msgstr ""
 "\n"
-"\t\tCreate a pod disruption budget with the specified name, selector, and desired minimum available pods"
+"\t\t使用指定的名称、选择器和所需的最小可用 pod 创建 pod 中断预算"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #: pkg/kubectl/cmd/create.go:42
@@ -1287,7 +1283,7 @@ msgid ""
 "\t\tJSON and YAML formats are accepted."
 msgstr ""
 "\n"
-"\t\t通过文件名或者标准输入流(stdin)创建一个资源.\n"
+"\t\t通过文件名或者标准输入流(stdin)创建一个资源。\n"
 "\n"
 "\t\tJSON and YAML formats are accepted."
 
@@ -1298,7 +1294,7 @@ msgid ""
 "\t\tCreate a resourcequota with the specified name, hard limits and optional scopes"
 msgstr ""
 "\n"
-"\t\tCreate a resourcequota with the specified name, hard limits and optional scopes"
+"\t\t使用指定的名称、硬限制和可选范围创建 ResourceQuota"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: pkg/kubectl/cmd/create_role.go:38
@@ -1307,7 +1303,7 @@ msgid ""
 "\t\tCreate a role with single rule."
 msgstr ""
 "\n"
-"\t\t创建单一 rule 的 role."
+"\t\t创建单一 rule 的 role。"
 
 #: pkg/kubectl/cmd/create_secret.go:47
 msgid ""
@@ -1324,16 +1320,16 @@ msgid ""
 "\t\tsymlinks, devices, pipes, etc)."
 msgstr ""
 "\n"
-"\t\tCreate a secret based on a file, directory, or specified literal value.\n"
+"\t\t基于文件、目录或指定的文字值创建 secret。\n"
 "\n"
-"\t\tA single secret may package one or more key/value pairs.\n"
+"\t\t单个机密可以打包一个或多个密钥/值对。\n"
 "\n"
-"\t\tWhen creating a secret based on a file, the key will default to the basename of the file, and the value will\n"
-"\t\tdefault to the file content.  If the basename is an invalid key, you may specify an alternate key.\n"
+"\t\t基于文件创建 secret 时，该密钥将默认为文件的基名称，并且该值将\n"
+"\t\t默认为文件内容。如果文件的 basename 是非法的 key，你就需要制定一个其他的 key。\n"
 "\n"
-"\t\tWhen creating a secret based on a directory, each file whose basename is a valid key in the directory will be\n"
-"\t\tpackaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,\n"
-"\t\tsymlinks, devices, pipes, etc)."
+"\t\t当基于目录创建 secret 时，其 basename 是目录中有效密钥的每个文件都将\n"
+"\t\t打包到 secret。除常规文件以外的所有目录项都将被忽略 (例如：subdirectories、\n"
+"\t\tsymlinks、devices、pipes、等)。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_serviceaccount.go:32
@@ -1352,9 +1348,9 @@ msgid ""
 "\t\tCreates a deployment or job to manage the created container(s)."
 msgstr ""
 "\n"
-"\t\tCreate and run a particular image, possibly replicated.\n"
+"\t\t创建并运行特定的镜像，可能是复制的。\n"
 "\n"
-"\t\tCreates a deployment or job to manage the created container(s)."
+"\t\t创建 deployment 或 job 来管理创建的容器。"
 
 #: pkg/kubectl/cmd/autoscale.go:34
 msgid ""
@@ -1365,10 +1361,10 @@ msgid ""
 "\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed."
 msgstr ""
 "\n"
-"\t\tCreates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.\n"
+"\t\t创建自动缩放器，自动选择并设置在 Kubernetes 群集中运行的 pod 数量。\n"
 "\n"
-"\t\tLooks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.\n"
-"\t\tAn autoscaler can automatically increase or decrease number of pods deployed within the system as needed."
+"\t\t按名称查找 Deployment、ReplicaSet 或 ReplicationController，并创建使用给定资源作为引用的自动缩放器。\n"
+"\t\t自动伸缩器可以根据需要自动增加或减少部署在系统中的 pod 数量。"
 
 #: pkg/kubectl/cmd/delete.go:40
 msgid ""
@@ -1401,32 +1397,22 @@ msgid ""
 "\t\twill be lost along with the rest of the resource."
 msgstr ""
 "\n"
-"\t\tDelete resources by filenames, stdin, resources and names, or by resources and label selector.\n"
+"\t\t按文件名、stdin、资源和名称或按资源和标签选择器删除资源。\n"
 "\n"
-"\t\tJSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,\n"
-"\t\tresources and names, or resources and label selector.\n"
+"\t\t接受 JSON 和 YAML 格式。 只能指定一种类型的参数：文件名、\n"
+"\t\t资源和名称 或者 资源与标签选择器。\n"
 "\n"
-"\t\tSome resources, such as pods, support graceful deletion. These resources define a default period\n"
-"\t\tbefore they are forcibly terminated (the grace period) but you may override that value with\n"
-"\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. Because these resources often\n"
-"\t\trepresent entities in the cluster, deletion may not be acknowledged immediately. If the node\n"
-"\t\thosting a pod is down or cannot reach the API server, termination may take significantly longer\n"
-"\t\tthan the grace period. To force delete a resource,\tyou must pass a grace\tperiod of 0 and specify\n"
-"\t\tthe --force flag.\n"
+"\t\t某些资源（如pods）支持优雅删除。这些资源在强制终止之前定义了一个默认周期（宽限期），但您可以使用--grace period标志\n"
+"\t\t或pass--now覆盖该值，以设置宽限期1。因为这些资源通常表示集群中的实体，所以可能不会立即确认删除。如果连接POD的节点\n"
+"\t\t关闭或无法连接到API服务器，则终止可能需要比宽限期更长的时间。要强制删除资源，必须通过0的宽限期并指定--force标志。\n"
 "\n"
-"\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been\n"
-"\t\tterminated, which can leave those processes running until the node detects the deletion and\n"
-"\t\tcompletes graceful deletion. If your processes use shared storage or talk to a remote API and\n"
-"\t\tdepend on the name of the pod to identify themselves, force deleting those pods may result in\n"
-"\t\tmultiple processes running on different machines using the same identification which may lead\n"
-"\t\tto data corruption or inconsistency. Only force delete pods when you are sure the pod is\n"
-"\t\tterminated, or if your application can tolerate multiple copies of the same pod running at once.\n"
-"\t\tAlso, if you force delete pods the scheduler may place new pods on those nodes before the node\n"
-"\t\thas released those resources and causing those pods to be evicted immediately.\n"
+"\t\t重要提示：强制删除 pod 不会等待 pod 进程已终止的确认，这样可以使这些进程一直运行，直到节点检测到删除并完成优雅删除。\n"
+"\t\t如果您的进程使用共享存储或与远程API对话，并且依赖 pod 的名称来标识自己，则强制删除这些 pod 可能会导致多个进程在不同的计\n"
+"\t\t算机上使用相同的标识运行，这可能会导致数据损坏或不一致。只有在您确定 pod 已终止，或者应用程序可以同时运行同一 pod 的多个\n"
+"\t\t副本时，才强制删除 pod。此外，如果强制删除pod，调度程序可能会在节点释放这些资源并导致立即收回这些 pods 之前，在这\n"
+"\t\t些节点上放置新的 pods。\n"
 "\n"
-"\t\tNote that the delete command does NOT do resource version checks, so if someone\n"
-"\t\tsubmits an update to a resource right when you submit a delete, their update\n"
-"\t\twill be lost along with the rest of the resource."
+"\t\t请注意，“删除”命令不执行资源版本检查，因此，如果在您提交删除时有人向某个资源提交更新，则其更新将与其他资源一起丢失。"
 
 #: pkg/kubectl/cmd/stop.go:31
 msgid ""
@@ -1440,13 +1426,13 @@ msgid ""
 "\t\tIf the resource is scalable it will be scaled to 0 before deletion."
 msgstr ""
 "\n"
-"\t\tDeprecated: Gracefully shut down a resource by name or filename.\n"
+"\t\t丢弃：按名称或文件名优雅地关闭资源。\n"
 "\n"
-"\t\tThe stop command is deprecated, all its functionalities are covered by delete command.\n"
-"\t\tSee 'kubectl delete --help' for more details.\n"
+"\t\tstop命令已弃用，所有功能都由delete命令覆盖。\n"
+"\t\t请参考 'kubectl delete --help' 了解详情。\n"
 "\n"
-"\t\tAttempts to shut down and delete a resource that supports graceful termination.\n"
-"\t\tIf the resource is scalable it will be scaled to 0 before deletion."
+"\t\t尝试关闭并删除支持正常终止的资源。\n"
+"\t\t如果资源是可伸缩的，则在删除之前它将被缩放到0。"
 
 #: pkg/kubectl/cmd/top_node.go:60
 msgid ""
@@ -1456,9 +1442,9 @@ msgid ""
 "\t\tThe top-node command allows you to see the resource consumption of nodes."
 msgstr ""
 "\n"
-"\t\t显示 node 的资源(CPU/Memory/Storage)使用.\n"
+"\t\t显示 node 的资源(CPU/Memory/Storage)使用情况\n"
 "\n"
-"\t\tThe top-node command allows you to see the resource consumption of nodes."
+"\t\ttop-node command allows you to see the resource consumption of nodes."
 
 #: pkg/kubectl/cmd/top_pod.go:53
 msgid ""
@@ -1471,12 +1457,11 @@ msgid ""
 "\t\tsince pod creation."
 msgstr ""
 "\n"
-"\t\t显示 pods 资源(CPU/Memory/Storage)使用.\n"
+"\t\t显示 pods 的资源(CPU/Memory/Storage)使用情况\n"
 "\n"
-"\t\tThe 'top pod' command allows you to see the resource consumption of pods.\n"
+"\t\t'top pod' 命令允许您查看 pods 的资源消耗。\n"
 "\n"
-"\t\tDue to the metrics pipeline delay, they may be unavailable for a few minutes\n"
-"\t\tsince pod creation."
+"\t\t由于度量管道延迟，它们可能在创建pod后的几分钟内不可用。"
 
 #: pkg/kubectl/cmd/top.go:33
 msgid ""
@@ -1488,11 +1473,11 @@ msgid ""
 "\t\tThis command requires Heapster to be correctly configured and working on the server. "
 msgstr ""
 "\n"
-"\t\t显示资源(CPU/Memory/Storage)使用.\n"
+"\t\t显示资源 (CPU/Memory/Storage) 使用情况。\n"
 "\n"
-"\t\tThe top command allows you to see the resource consumption for nodes or pods.\n"
+"\t\ttop 命令允许您查看 pods 或node 的资源消耗。\n"
 "\n"
-"\t\tThis command requires Heapster to be correctly configured and working on the server. "
+"\t\t此命令需要服务器上的 Heapster 正确配置并运行正常。 "
 
 #: pkg/kubectl/cmd/drain.go:140
 msgid ""
@@ -1522,27 +1507,21 @@ msgid ""
 "\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)"
 msgstr ""
 "\n"
-"\t\t清理节点为节点维护做准备.\n"
+"\t\t清理节点为节点维护做准备。\n"
 "\n"
-"\t\tThe given node will be marked unschedulable to prevent new pods from arriving.\n"
-"\t\t'drain' evicts the pods if the APIServer supports eviction\n"
-"\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE\n"
-"\t\tto delete the pods.\n"
-"\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through\n"
-"\t\tthe API server).  If there are DaemonSet-managed pods, drain will not proceed\n"
-"\t\twithout --ignore-daemonsets, and regardless it will not delete any\n"
-"\t\tDaemonSet-managed pods, because those pods would be immediately replaced by the\n"
-"\t\tDaemonSet controller, which ignores unschedulable markings.  If there are any\n"
-"\t\tpods that are neither mirror pods nor managed by ReplicationController,\n"
-"\t\tReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you\n"
-"\t\tuse --force.  --force will also allow deletion to proceed if the managing resource of one\n"
-"\t\tor more pods is missing.\n"
+"\t\t指定 node 将被标记为不可调度，以阻止新的 pod 被调度到该 node。\n"
+"\t\t如果 apiserver 支持收回，则 'drain' 将收回 pod。\n"
+"\t\t(http://kubernetes.io/docs/admin/disruptions/)。否则，它将使用普通的 DELETE\n"
+"\t\t命令来删除 pod。\n"
+"\t\t'drain' 收回或删除除镜像槽（不能通过 API 服务器删除）之外的所有槽。如果存在守护进程管理的pods，\n"
+"\t\t'则在没有--ignore守护进程的情况下将无法继续排出，而且无论如何，它也不会删除任何守护进程管理的pods，\n"
+"\t\t'因为这些pods将立即由守护进程控制器替换，而守护进程控制器忽略不可分辨的标记。如果有任何数据包既不是\n"
+"\t\t'镜像数据包，也不是由复制控制器、复制集、守护进程集、状态集或作业管理的，那么除非使用--force，否则\n"
+"\t\t'drain 不会删除任何数据包。如果缺少一个或多个 pods 的管理资源，--force 还允许继续删除。\n"
 "\n"
-"\t\t'drain' waits for graceful termination. You should not operate on the machine until\n"
-"\t\tthe command completes.\n"
+"\t\t'drain' 等待优雅终止。 在命令结束前你不应该在机器上操作。\n"
 "\n"
-"\t\tWhen you are ready to put the node back into service, use kubectl uncordon, which\n"
-"\t\twill make the node schedulable again.\n"
+"\t\t当您准备好将节点重新投入使用时，请使用 kubectl uncordon，这将使节点再次可调度。\n"
 "\n"
 "\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)"
 
@@ -1573,28 +1552,28 @@ msgid ""
 "\t\tsaved copy to include the latest resource version."
 msgstr ""
 "\n"
-"\t\t使用默认的编辑器修改资源.\n"
+"\t\t使用默认的编辑器修改资源。\n"
 "\n"
-"\t\tedit 命令允许你通过命令行直接修改 API 资源.\n"
-"\t\t它会打开你在 KUBE_EDITOR 或者EDITOR 环境变量中定义的编辑器\n"
-"\t\t或者回滚到 Linux vi 编辑器或者 Windows notepad.\n"
-"\t\t你可以修改多个对象, 虽然每次只能修改一次. 这个命令\n"
-"\t\t同时也接受文件名作为命令行参数, 尽管这些文件你指出必须是\n"
-"\t\t你之前保存的资源版本.\n"
+"\t\tedit 命令允许你通过命令行直接修改 API 资源。\n"
+"\t\t它会打开你在 KUBE_EDITOR 或者 EDITOR 环境变量中定义的编辑器\n"
+"\t\t或者回滚到 Linux vi 编辑器或者 Windows notepad。\n"
+"\t\t你可以修改多个对象，虽然每次只能修改一次。这个命令\n"
+"\t\t同时也接受文件名作为命令行参数，尽管这些文件你指出必须是\n"
+"\t\t你之前保存的资源版本。\n"
 "\n"
-"\t\tEditing 是通过用于获取资源的API版本完成的.\n"
-"\t\t为了能通过指定的 API 版本修改, 请完全限定 resource, version 和 group.\n"
+"\t\tEditing 是通过用于获取资源的 API 版本完成的。\n"
+"\t\t为了能通过指定的 API 版本修改，请完全限定 resource、version 和 group。\n"
 "\n"
-"\t\t默认是 YAML 格式. 想在 JSON 中修改, 指定 \"-o json\".\n"
+"\t\t默认是 YAML 格式。想在 JSON 中修改，指定 \"-o json\"。\n"
 "\n"
-"\t\t--windows-line-endings 命令行参数可以用来强制使用 Windows line endings,\n"
-"\t\t否则会使用你操作系统的默认值.\n"
+"\t\t--windows-line-endings 命令行参数可以用来强制使用 Windows line endings，\n"
+"\t\t否则会使用你操作系统的默认值。\n"
 "\n"
 "\t\t如果更新时发生错误，将在磁盘上创建一个临时文件\n"
-"\t\t里面包含您未应用的更改. 更新资源时最常见的错误\n"
-"\t\t是另一个编辑器也在服务器中修改这个资源. 当发生这种情况时, 你将\n"
-"\t\t需要应用你的修改到资源的最新版本, 或者更新你被保存的临时文件\n"
-"\t\t复制它并使用最新的版本."
+"\t\t里面包含您未应用的更改。更新资源时最常见的错误\n"
+"\t\t是另一个编辑器也在服务器中修改这个资源。当发生这种情况时，你将\n"
+"\t\t需要应用你的修改到资源的最新版本，或者更新你被保存的临时文件\n"
+"\t\t复制它并使用最新的版本。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L127
 #: pkg/kubectl/cmd/drain.go:115
@@ -1603,7 +1582,7 @@ msgid ""
 "\t\tMark node as schedulable."
 msgstr ""
 "\n"
-"\t\t标记 node 为 schedulable."
+"\t\t标记 node 为 schedulable。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L102
 #: pkg/kubectl/cmd/drain.go:90
@@ -1612,7 +1591,7 @@ msgid ""
 "\t\tMark node as unschedulable."
 msgstr ""
 "\n"
-"\t\t标记 node 为 unschedulable."
+"\t\t标记 node 为 unschedulable。"
 
 #: pkg/kubectl/cmd/completion.go:47
 msgid ""
@@ -1635,22 +1614,18 @@ msgid ""
 "\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2"
 msgstr ""
 "\n"
-"\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
-"\t\tThe shell code must be evaluated to provide interactive\n"
-"\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n"
-"\t\tthe .bash_profile.\n"
+"\t\t为指定的 shell（bash 或 zsh）输出 shell 完成代码。必须对 shell 代码进行评估，以提供 kubectl 命令的交互式完成。\n"
+"\t\t这可以通过从 .bash_ 概要文件中获取它来完成。\n"
 "\n"
-"\t\tNote: this requires the bash-completion framework, which is not installed\n"
-"\t\tby default on Mac.  This can be installed by using homebrew:\n"
+"\t\t注意：这需要 bash 完成框架，默认情况下在 mac 上不安装该框架。这可以通过使用 homebrew 来安装：\n"
 "\n"
 "\t\t    $ brew install bash-completion\n"
 "\n"
-"\t\tOnce installed, bash_completion must be evaluated.  This can be done by adding the\n"
-"\t\tfollowing line to the .bash_profile\n"
+"\t\t安装后，必须评估bash_completion。这可以通过在 .bash_profile 中添加以下行来完成。\n"
 "\n"
 "\t\t    $ source $(brew --prefix)/etc/bash_completion\n"
 "\n"
-"\t\tNote for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2"
+"\t\t注：对于 zsh 用户[1]zsh 完成仅在 zsh>=5.2 版本中受支持。"
 
 #: pkg/kubectl/cmd/rollingupdate.go:45
 msgid ""
@@ -1666,9 +1641,8 @@ msgstr ""
 "\n"
 "\t\t完成指定的 ReplicationController 的滚动升级.\n"
 "\n"
-"\t\tReplaces the specified replication controller with a new replication controller by updating one pod at a time to use the\n"
-"\t\tnew PodTemplate. The new-controller.json must specify the same namespace as the\n"
-"\t\texisting replication controller and overwrite at least one (common) label in its replicaSelector.\n"
+"\t\t通过一次更新一个 pod 以使用新的 pod 模板，将指定的复制控制器替换为新的复制控制器。new-controller.json 必须指定与现有复制控制器相同的命名空间，\n"
+"\t\t并在其 replicasector 中覆盖至少一个（common）标签。\n"
 "\n"
 "\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)"
 
@@ -1685,14 +1659,13 @@ msgid ""
 "\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable."
 msgstr ""
 "\n"
-"\t\tReplace a resource by filename or stdin.\n"
+"\t\t通过 filename 或 stdin 替换资源。\n"
 "\n"
-"\t\tJSON and YAML formats are accepted. If replacing an existing resource, the\n"
-"\t\tcomplete resource spec must be provided. This can be obtained by\n"
+"\t\tJSON 和 YAML 格式被接受。 如果替换现有资源，必须提供完整的资源规范。这可以通过\n"
 "\n"
 "\t\t    $ kubectl get TYPE NAME -o yaml\n"
 "\n"
-"\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable."
+"\t\t请参考 https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html 中的模块来检查一个字段是否可变。"
 
 #: pkg/kubectl/cmd/scale.go:34
 msgid ""
@@ -1706,13 +1679,11 @@ msgid ""
 "\t\tscale is sent to the server."
 msgstr ""
 "\n"
-"\t\tSet a new size for a Deployment, ReplicaSet, Replication Controller, or Job.\n"
+"\t\t设置 Deployment、ReplicaSet、Replication Controller 或 Job 的新大小。\n"
 "\n"
-"\t\tScale also allows users to specify one or more preconditions for the scale action.\n"
+"\t\tscale 还允许用户为 scale 操作指定一个或多个前提条件。\n"
 "\n"
-"\t\tIf --current-replicas or --resource-version is specified, it is validated before the\n"
-"\t\tscale is attempted, and it is guaranteed that the precondition holds true when the\n"
-"\t\tscale is sent to the server."
+"\t\t如果制定了 --current-replicas 或 --resource-version 参数，在尝试缩放前进行验证，并确保将缩放发送到服务器时前提条件为真。"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:62
 msgid ""
@@ -1722,9 +1693,8 @@ msgid ""
 "\t\twithout updating any other parts of the object."
 msgstr ""
 "\n"
-"\t\tSet the latest last-applied-configuration annotations by setting it to match the contents of a file.\n"
-"\t\tThis results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,\n"
-"\t\twithout updating any other parts of the object."
+"\t\t通过将其设置为与文件内容匹配，来设置最新应用的配置注解。这将导致最后应用的配置被更新，就像运行了 'kubectl apply -f <file>'，\n"
+"\t\t而不更新对象的任何其他部分。"
 
 #: pkg/kubectl/cmd/proxy.go:36
 msgid ""
@@ -1746,21 +1716,21 @@ msgid ""
 "\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'"
 msgstr ""
 "\n"
-"\t\tTo proxy all of the kubernetes api and nothing else, use:\n"
+"\t\t要代理所有Kubernetes API，而不代理其他任何API，请使用：\n"
 "\n"
 "\t\t    $ kubectl proxy --api-prefix=/\n"
 "\n"
-"\t\tTo proxy only part of the kubernetes api and also some static files:\n"
+"\t\t要仅代理Kubernetes API的一部分以及某些静态文件，请执行以下操作：\n"
 "\n"
 "\t\t    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/\n"
 "\n"
-"\t\tThe above lets you 'curl localhost:8001/api/v1/pods'.\n"
+"\t\t上面的命令让您 'curl localhost:8001/api/v1/pods'。\n"
 "\n"
-"\t\tTo proxy the entire kubernetes api at a different root, use:\n"
+"\t\t要在不同的根目录下代理整个Kubernetes API，请使用：\n"
 "\n"
 "\t\t    $ kubectl proxy --api-prefix=/custom/\n"
 "\n"
-"\t\tThe above lets you 'curl localhost:8001/custom/api/v1/pods'"
+"\t\t上面的命令让您 'curl localhost:8001/custom/api/v1/pods'"
 
 #: pkg/kubectl/cmd/patch.go:59
 msgid ""
@@ -1772,11 +1742,11 @@ msgid ""
 "\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable."
 msgstr ""
 "\n"
-"\t\tUpdate field(s) of a resource using strategic merge patch\n"
+"\t\t使用战略合并补丁程序来更新资源的字段\n"
 "\n"
-"\t\tJSON and YAML formats are accepted.\n"
+"\t\t接受JSON 和 YAML 格式。\n"
 "\n"
-"\t\tPlease refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable."
+"\t\t请参考 https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html 中的模块来检查字段是否可变。"
 
 #: pkg/kubectl/cmd/label.go:70
 #, c-format
@@ -1789,11 +1759,11 @@ msgid ""
 "\t\t* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used."
 msgstr ""
 "\n"
-"\t\tUpdate the labels on a resource.\n"
+"\t\t更新资源标签\n"
 "\n"
-"\t\t* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n"
-"\t\t* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.\n"
-"\t\t* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used."
+"\t\t* 标签必须以字母或数字开头，可以包含字母、数字、连字符、点和下划线，最多可包含%[1]d个字符。\n"
+"\t\t* 如果 --overwrite 为 true，则可以覆盖现有标签，否则尝试覆盖标签将导致错误。\n"
+"\t\t* 如果指定了 --resource-version 参数，则更新将使用此资源版本，否则将使用现有资源版本。"
 
 #: pkg/kubectl/cmd/taint.go:58
 #, c-format
@@ -1810,11 +1780,11 @@ msgstr ""
 "\n"
 "\t\t更新一个或者多个 node 上的 taints.\n"
 "\n"
-"\t\t* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.\n"
-"\t\t* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.\n"
-"\t\t* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.\n"
-"\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n"
-"\t\t* Currently taint can only apply to node."
+"\t\t* taint 由 key、value 和 effect 组成。作为这里的参数，它表示为 key=value:effect。\n"
+"\t\t* key 必须以字母或数字开头，可以包含字母、数字、连字符、点和下划线，最多可包含%[1]d个字符。\n"
+"\t\t* value 必须以字母或数字开头，可以包含字母、数字、连字符、点和下划线，最多可包含%[2]d个字符。\n"
+"\t\t* effect 必须是 noschedule、prefernosschedule 或 noexecute。\n"
+"\t\t* 当前 taint 只能应用到 node 上。"
 
 #: pkg/kubectl/cmd/apply_view_last_applied.go:46
 msgid ""
@@ -1825,10 +1795,9 @@ msgid ""
 "\t\tto change output format."
 msgstr ""
 "\n"
-"\t\tView the latest last-applied-configuration annotations by type/name or file.\n"
+"\t\t按类型/名称或文件查看最近应用的配置注释。\n"
 "\n"
-"\t\tThe default output will be printed to stdout in YAML format. One can use -o option\n"
-"\t\tto change output format."
+"\t\t默认输出将以yaml格式打印到stdout。可以使用-o选项更改输出格式。"
 
 #: pkg/kubectl/cmd/cp.go:37
 msgid ""
@@ -1852,7 +1821,7 @@ msgstr ""
 "\n"
 "\t    # !!!注意!!!\n"
 "\t    # 要求容器中有 'tar' 命令\n"
-"\t    # image.  If 'tar' is not present, 'kubectl cp' will fail.\n"
+"\t    # image。如果 'tar' 不存在，'kubectl cp' 将会失败。\n"
 "\n"
 "\t    # 复制本地目录 /tmp/foo_dir 到 default namespace 下的远程 pod 的 /tmp/bar_dir 路径 \n"
 "\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n"
@@ -1899,13 +1868,13 @@ msgid ""
 "\t  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret"
 msgstr ""
 "\n"
-"\t  # Create a new secret named my-secret with keys for each file in folder bar\n"
+"\t  # 为文件夹栏中的每个文件创建一个名为 my-secret 的新secret"
 "\t  kubectl create secret generic my-secret --from-file=path/to/bar\n"
 "\n"
-"\t  # Create a new secret named my-secret with specified keys instead of names on disk\n"
+"\t  # 用指定的 key 而不是磁盘上的名称创建名为 my-secret 的新 secret\n"
 "\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub\n"
 "\n"
-"\t  # Create a new secret named my-secret with key1=supersecret and key2=topsecret\n"
+"\t  # 用 key1=supersecret 和 key2=topsecret 创建一个名为 my-secret 的新secret\n"
 "\t  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret"
 
 #: pkg/kubectl/cmd/create_serviceaccount.go:35
@@ -1915,17 +1884,17 @@ msgid ""
 "\t  kubectl create serviceaccount my-service-account"
 msgstr ""
 "\n"
-"\t  # Create a new service account named my-service-account\n"
+"\t  # 新创建名为 my-service-account 的 service account\n"
 "\t  kubectl create serviceaccount my-service-account"
 
 #: pkg/kubectl/cmd/create_service.go:232
 msgid ""
 "\n"
-"\t# Create a new ExternalName service named my-ns \n"
+"\t# 新创建一个名为 my-ns 的 ExternalName service\n"
 "\tkubectl create service externalname my-ns --external-name bar.com"
 msgstr ""
 "\n"
-"\t# Create a new ExternalName service named my-ns \n"
+"\t# 新创建一个名为 my-ns 的 ExternalName service\n"
 "\tkubectl create service externalname my-ns --external-name bar.com"
 
 #: pkg/kubectl/cmd/create_service.go:225
@@ -1938,11 +1907,9 @@ msgid ""
 "\tthat exist off platform, on other clusters, or locally."
 msgstr ""
 "\n"
-"\tCreate an ExternalName service with the specified name.\n"
+"\t用指定名称创建一个 ExternalName service。\n"
 "\n"
-"\tExternalName service references to an external DNS address instead of\n"
-"\tonly pods, which will allow application authors to reference services\n"
-"\tthat exist off platform, on other clusters, or locally."
+"\tExternalName service 引用外部 DNS 地址而不是 pods，这将允许应用程序作者引用平台外、其他集群上或本地存在的服务。"
 
 #: pkg/kubectl/cmd/help.go:30
 msgid ""
@@ -1951,8 +1918,8 @@ msgid ""
 "\tSimply type kubectl help [path to command] for full details."
 msgstr ""
 "\n"
-"\tHelp provides help for any command in the application.\n"
-"\tSimply type kubectl help [path to command] for full details."
+"\tHelp 为应用中的任何命令提供帮助信息。\n"
+"\t简单输入 kubectl help [path to command] 获取完整信息。"
 
 #: pkg/kubectl/cmd/create_service.go:173
 msgid ""
@@ -2019,7 +1986,7 @@ msgstr ""
 "    # 导出当前的集群状态信息到 stdout\n"
 "    kubectl cluster-info dump\n"
 "\n"
-"    # 导出当前的集群状态 /path/to/cluster-state\n"
+"    # 导出当前的集群状态到 /path/to/cluster-state\n"
 "    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n"
 "\n"
 "    # 导出所有分区到 stdout\n"
@@ -2052,24 +2019,24 @@ msgid ""
 "    kubectl annotate pods foo description-"
 msgstr ""
 "\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.\n"
-"    # If the same annotation is set multiple times, only the last value will be applied\n"
+"    # 更新 pod 'foo' 为它设置注解 'description' 的值为 'my frontend'。\n"
+"    # 如果相同的注解设置了多次，只有最后一次设置的值有效。\n"
 "    kubectl annotate pods foo description='my frontend'\n"
 "\n"
-"    # Update a pod identified by type and name in \"pod.json\"\n"
+"    # 在 \"pod.json\" 中更新由类型和名称标识的 pod\n"
 "    kubectl annotate -f pod.json description='my frontend'\n"
 "\n"
-"    # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.\n"
+"    # 用注释 'description' 和值 'my frontend running nginx' 更新 pod 'foo'，覆盖任何现有值。\n"
 "    kubectl annotate --overwrite pods foo description='my frontend running nginx'\n"
 "\n"
-"    # Update all pods in the namespace\n"
+"    # 更新命名空间中的所有 pod\n"
 "    kubectl annotate pods --all description='my frontend running nginx'\n"
 "\n"
-"    # Update pod 'foo' only if the resource is unchanged from version 1.\n"
+"    # 仅当资源与版本 1 保持不变时才更新 pod 'foo'。\n"
 "    kubectl annotate pods foo description='my frontend running nginx' --resource-version=1\n"
 "\n"
-"    # 更新名称为 'foo' 的 pod, 删除一个名称为 'description' 的 annotation 如果它存在. \n"
-"    # 不要求使用 --overwrite flag.\n"
+"    # 更新名称为 'foo' 的 pod，如果名称为 'description' 的 annotation 存在，则删除它。\n"
+"    # 不要求使用 --overwrite 参数。\n"
 "    kubectl annotate pods foo description-"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
@@ -2079,7 +2046,7 @@ msgid ""
 "    Create a LoadBalancer service with the specified name."
 msgstr ""
 "\n"
-"    使用一个指定的名称创建一个 LoadBalancer service."
+"    用指定的名称创建一个 LoadBalancer service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_service.go:50
@@ -2088,7 +2055,7 @@ msgid ""
 "    Create a clusterIP service with the specified name."
 msgstr ""
 "\n"
-"    使用一个指定的名称创建一个 clusterIP service."
+"    用指定的名称创建一个 clusterIP service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_deployment.go:33
@@ -2097,7 +2064,7 @@ msgid ""
 "    Create a deployment with the specified name."
 msgstr ""
 "\n"
-"    使用一个指定的名称创建一个 deployment."
+"    用指定的名称创建一个 deployment。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_service.go:113
@@ -2106,7 +2073,7 @@ msgid ""
 "    Create a nodeport service with the specified name."
 msgstr ""
 "\n"
-"    使用一个指定的名称创建一个 nodeport service."
+"    用指定的名称创建一个 nodeport service。"
 
 #: pkg/kubectl/cmd/clusterinfo_dump.go:53
 msgid ""
@@ -2120,13 +2087,13 @@ msgid ""
 "    based on namespace and pod name."
 msgstr ""
 "\n"
-"    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to\n"
-"    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will\n"
-"    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can\n"
-"    switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.\n"
+"    导出集群信息适用于调试和诊断集群问题。默认情况下，会到处任何信息到\n"
+"    stdout. 您可以通过 --output-directory 来选择指定一个目录。如果您指定了目录，kubernetes\n"
+"    将会在该目录下创建一组文件。默认情况下，只导出 'kube-system' 命名空间的内容，但您可以\n"
+"    通过 --namespaces 参数切换到不同的命名空间，或通过 --all-namespaces 参数导出所有命名空间。\n"
 "\n"
-"    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories\n"
-"    based on namespace and pod name."
+"    该命令还导出集群中所有 pods 的日志，这些日志被转储到不同的目录中\n"
+"    基于命名空间和 pod 名称。"
 
 #: pkg/kubectl/cmd/clusterinfo.go:37
 msgid ""
@@ -2135,52 +2102,52 @@ msgid ""
 "  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'."
 msgstr ""
 "\n"
-"  Display addresses of the master and services with label kubernetes.io/cluster-service=true\n"
-"  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'."
+"  显示主节点地址和带有标签 kubernetes.io/cluster-service=true 的 services。\n"
+"  要进一步定位和诊断集群问题，请使用 'kubectl cluster-info dump'。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L61
 #: pkg/kubectl/cmd/create_quota.go:62
 msgid "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
-msgstr "A comma-delimited set of quota scopes that must all match each object tracked by the quota."
+msgstr "一组以逗号分隔的配额范围，必须全部与配额跟踪的每个对象匹配。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L60
 #: pkg/kubectl/cmd/create_quota.go:61
 msgid "A comma-delimited set of resource=quantity pairs that define a hard limit."
-msgstr "A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgstr "一组逗号分隔的 resource=quantity 对定义了硬限制。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L63
 #: pkg/kubectl/cmd/create_pdb.go:64
 msgid "A label selector to use for this budget. Only equality-based selector requirements are supported."
-msgstr "A label selector to use for this budget. Only equality-based selector requirements are supported."
+msgstr "用于此预算的标签选择器，仅支持基于相等的选择器要求。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L106
 #: pkg/kubectl/cmd/expose.go:104
 msgid "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"
-msgstr "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"
+msgstr "用于此服务的标签选择器，仅支持基于相等的选择器要求。如果为空（默认值），则从复本控制器或副本集推断选择器。)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L136
 #: pkg/kubectl/cmd/run.go:139
 msgid "A schedule in the Cron format the job should be run with."
-msgstr "A schedule in the Cron format the job should be run with."
+msgstr "以 Cron 格式运行作业的计划。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L111
 #: pkg/kubectl/cmd/expose.go:109
 msgid "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
-msgstr "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."
+msgstr "额外的外部 IP 地址（不由 kubernetes 管理）接受服务。如果此 IP 路由到一个节点，则除了生成的服务 IP 外，此 IP 还可以访问该服务。."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L119
 #: pkg/kubectl/cmd/expose.go:110 pkg/kubectl/cmd/run.go:122
 msgid "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
-msgstr "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."
+msgstr "生成的对象的内联 JSON 重写。如果不是空的，则用于重写生成的对象。要求对象提供有效的 apiVersion 字段。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L134
 #: pkg/kubectl/cmd/run.go:137
 msgid "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
-msgstr "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."
+msgstr "生成的服务对象的内联JSON重写。如果不是空的，则用于重写生成的对象。要求对象提供有效的apiVersion字段。仅在 --expose 为 true 时使用。"
 
 #: pkg/kubectl/cmd/apply.go:104
 msgid "Apply a configuration to a resource by filename or stdin"
-msgstr "通过文件名或标准输入流(stdin)对资源进行配置"
+msgstr "通过文件名或标准输入流 (stdin) 对资源进行配置"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L71
 #: pkg/kubectl/cmd/certificates.go:72
@@ -2190,7 +2157,7 @@ msgstr "同意一个自签证书请求"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L81
 #: pkg/kubectl/cmd/create_service.go:82
 msgid "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
-msgstr "Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."
+msgstr "为 'headless' service (无 loadbalancing) 指定你自己的 ClusterIP 或 设置为 'None'。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/attach.go#L64
 #: pkg/kubectl/cmd/attach.go:70
@@ -2200,12 +2167,12 @@ msgstr "Attach 到一个运行中的 container"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L55
 #: pkg/kubectl/cmd/autoscale.go:56
 msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
-msgstr "自动调整一个 Deployment, ReplicaSet, 或者 ReplicationController 的副本数量"
+msgstr "自动调整一个 Deployment、ReplicaSet、或者 ReplicationController 的副本数量"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L115
 #: pkg/kubectl/cmd/expose.go:113
 msgid "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
-msgstr "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."
+msgstr "为 service 指定的 ClusterIP。 对于 auto-allocate 情况可以保持为空，或设置为 'None' 来创建一个 headless service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:56
@@ -2220,7 +2187,7 @@ msgstr "RoleBinding 应该指定 ClusterRole"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L101
 #: pkg/kubectl/cmd/rollingupdate.go:102
 msgid "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
-msgstr "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"
+msgstr "将升级其镜像的容器名称。仅当指定 --image 参数时相关，否则忽略。在包含多个容器的 pod 上使用 --image 参数时需要。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
 #: pkg/kubectl/cmd/convert.go:68
@@ -2230,27 +2197,27 @@ msgstr "在不同的 API versions 转换配置文件"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cp.go#L64
 #: pkg/kubectl/cmd/cp.go:65
 msgid "Copy files and directories to and from containers."
-msgstr "复制 files 和 directories 到 containers 和从容器中复制 files 和 directories."
+msgstr "复制文件和目录到容器以及从容器中复制文件和目录。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L43
 #: pkg/kubectl/cmd/create_clusterrolebinding.go:44
 msgid "Create a ClusterRoleBinding for a particular ClusterRole"
-msgstr "为一个指定的 ClusterRole 创建一个 ClusterRoleBinding"
+msgstr "为指定的 ClusterRole 创建一个 ClusterRoleBinding"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L181
 #: pkg/kubectl/cmd/create_service.go:182
 msgid "Create a LoadBalancer service."
-msgstr "创建一个 LoadBalancer service."
+msgstr "创建一个 LoadBalancer service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L124
 #: pkg/kubectl/cmd/create_service.go:125
 msgid "Create a NodePort service."
-msgstr "创建一个 NodePort service."
+msgstr "创建一个 NodePort service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L43
 #: pkg/kubectl/cmd/create_rolebinding.go:44
 msgid "Create a RoleBinding for a particular Role or ClusterRole"
-msgstr "为一个指定的 Role 或者 ClusterRole创建一个 RoleBinding"
+msgstr "为一个指定的 Role 或者 ClusterRole 创建一个 RoleBinding"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: pkg/kubectl/cmd/create_secret.go:214
@@ -2260,17 +2227,17 @@ msgstr "创建一个 TLS secret"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L68
 #: pkg/kubectl/cmd/create_service.go:69
 msgid "Create a clusterIP service."
-msgstr "创建一个 clusterIP service."
+msgstr "创建一个 clusterIP service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_configmap.go#L59
 #: pkg/kubectl/cmd/create_configmap.go:60
 msgid "Create a configmap from a local file, directory or literal value"
-msgstr "从本地 file, directory 或者 literal value 创建一个 configmap"
+msgstr "从本地文件，目录或者文字值创建一个 configmap"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_deployment.go#L44
 #: pkg/kubectl/cmd/create_deployment.go:46
 msgid "Create a deployment with the specified name."
-msgstr "创建一个指定名称的 deployment."
+msgstr "创建一个指定名称的 deployment。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: pkg/kubectl/cmd/create_namespace.go:45
@@ -2280,17 +2247,17 @@ msgstr "创建一个指定名称的 namespace"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L49
 #: pkg/kubectl/cmd/create_pdb.go:50
 msgid "Create a pod disruption budget with the specified name."
-msgstr "创建一个指定名称的 pod disruption budget."
+msgstr "创建一个指定名称的 pod 中断预算。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_quota.go#L47
 #: pkg/kubectl/cmd/create_quota.go:48
 msgid "Create a quota with the specified name."
-msgstr "创建一个指定名称的 quota."
+msgstr "创建一个指定名称的 quota。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create.go#L56
 #: pkg/kubectl/cmd/create.go:63
 msgid "Create a resource by filename or stdin"
-msgstr "通过文件名或者标准输入流(stdin)创建一个资源"
+msgstr "通过文件名或者标准输入流 (stdin) 创建一个资源"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: pkg/kubectl/cmd/create_secret.go:144
@@ -2300,12 +2267,12 @@ msgstr "创建一个给 Docker registry 使用的 secret"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L73
 #: pkg/kubectl/cmd/create_secret.go:74
 msgid "Create a secret from a local file, directory or literal value"
-msgstr "从本地 file, directory 或者 literal value 创建一个 secret"
+msgstr "从本地文件、目录或者文字值创建一个 secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: pkg/kubectl/cmd/create_secret.go:35
 msgid "Create a secret using specified subcommand"
-msgstr "使用指定的 subcommand 创建一个 secret"
+msgstr "使用指定的子命令创建一个 secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_serviceaccount.go#L44
 #: pkg/kubectl/cmd/create_serviceaccount.go:45
@@ -2315,17 +2282,17 @@ msgstr "创建一个指定名称的 service account"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L36
 #: pkg/kubectl/cmd/create_service.go:37
 msgid "Create a service using specified subcommand."
-msgstr "使用指定的 subcommand 创建一个 service."
+msgstr "使用指定的 subcommand 创建一个 service。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L240
 #: pkg/kubectl/cmd/create_service.go:241
 msgid "Create an ExternalName service."
-msgstr "Create an ExternalName service."
+msgstr "创建一个 ExternalName service."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/delete.go#L130
 #: pkg/kubectl/cmd/delete.go:132
 msgid "Delete resources by filenames, stdin, resources and names, or by resources and label selector"
-msgstr "Delete resources by filenames, stdin, resources and names, or by resources and label selector"
+msgstr "根据文件名称、stdin、资源和名称，或资源和标签选择器删除资源"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: pkg/kubectl/cmd/config/delete_cluster.go:39
@@ -2345,27 +2312,27 @@ msgstr "拒绝一个自签证书请求"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/stop.go#L58
 #: pkg/kubectl/cmd/stop.go:59
 msgid "Deprecated: Gracefully shut down a resource by name or filename"
-msgstr "Deprecated: Gracefully shut down a resource by name or filename"
+msgstr "已弃用：按名称或文件名优雅地关闭资源"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
 #: pkg/kubectl/cmd/config/get_contexts.go:64
 msgid "Describe one or many contexts"
-msgstr "描述一个或多个 contexts"
+msgstr "描述一个或多个上下文"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
 #: pkg/kubectl/cmd/top_node.go:78
 msgid "Display Resource (CPU/Memory) usage of nodes"
-msgstr "显示 nodes 的 Resource (CPU/Memory) 使用"
+msgstr "显示 nodes 的 Resource (CPU/Memory) 使用率"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
 #: pkg/kubectl/cmd/top_pod.go:80
 msgid "Display Resource (CPU/Memory) usage of pods"
-msgstr "显示 pods 的 Resource (CPU/Memory) 使用"
+msgstr "显示 pods 的 Resource (CPU/Memory) 使用率"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
 #: pkg/kubectl/cmd/top.go:44
 msgid "Display Resource (CPU/Memory) usage."
-msgstr "显示 Resource (CPU/Memory) 使用."
+msgstr "显示 Resource (CPU/Memory) 的使用率。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
 #: pkg/kubectl/cmd/clusterinfo.go:51
@@ -2400,12 +2367,12 @@ msgstr "查看资源的文档"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
 #: pkg/kubectl/cmd/drain.go:178
 msgid "Drain node in preparation for maintenance"
-msgstr "Drain node in preparation for maintenance"
+msgstr "排空节点为维护做准备"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
 #: pkg/kubectl/cmd/clusterinfo_dump.go:39
 msgid "Dump lots of relevant info for debugging and diagnosis"
-msgstr "Dump lots of relevant info for debugging and diagnosis"
+msgstr "导出大量相关信息进行调试和诊断"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
 #: pkg/kubectl/cmd/edit.go:110
@@ -2415,52 +2382,52 @@ msgstr "在服务器上编辑一个资源"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
 #: pkg/kubectl/cmd/create_secret.go:160
 msgid "Email for Docker registry"
-msgstr "Email for Docker registry"
+msgstr "用于 Docker registry 的 Email"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
 #: pkg/kubectl/cmd/exec.go:69
 msgid "Execute a command in a container"
-msgstr "在一个 container 中执行一个命令"
+msgstr "在一个容器中执行一个命令"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L102
 #: pkg/kubectl/cmd/rollingupdate.go:103
 msgid "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
-msgstr "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."
+msgstr "用于何时提取容器镜像的显式策略。当 --image 与现有镜像相同时需要，否则忽略。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
 #: pkg/kubectl/cmd/portforward.go:76
 msgid "Forward one or more local ports to a pod"
-msgstr "Forward one or more local ports to a pod"
+msgstr "转发一个或多个本地端口到 pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
 #: pkg/kubectl/cmd/help.go:37
 msgid "Help about any command"
-msgstr "Help about any command"
+msgstr "所有命令的帮助信息"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L105
 #: pkg/kubectl/cmd/expose.go:103
 msgid "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
-msgstr "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgstr "分配给负载平衡器的 IP。如果为空，将创建和使用临时IP（特定于云提供商）。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L114
 #: pkg/kubectl/cmd/expose.go:112
 msgid "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
-msgstr "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"
+msgstr "如果非空，则将服务的会话关联设置为此；合法值：'None'、'clientip'"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/annotate.go#L135
 #: pkg/kubectl/cmd/annotate.go:136
 msgid "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
-msgstr "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "如果不为空，则只有当这是对象的当前资源版本时，注释更新才会成功。仅在指定单个资源时有效。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L132
 #: pkg/kubectl/cmd/label.go:134
 msgid "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
-msgstr "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."
+msgstr "如果不为空，则只有当这是对象的当前资源版本时，标签更新才会成功。仅在指定单个资源时有效。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L98
 #: pkg/kubectl/cmd/rollingupdate.go:99
 msgid "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
-msgstr "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"
+msgstr "用于升级复本控制器的镜像。必须与现有镜像（新镜像或新镜像标记）不同。不能与 --filename/-f 参数一起使用"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout.go#L46
 #: pkg/kubectl/cmd/rollout/rollout.go:47
@@ -2485,7 +2452,7 @@ msgstr "标记提供的 resource 为中止状态"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/certificates.go#L35
 #: pkg/kubectl/cmd/certificates.go:36
 msgid "Modify certificate resources."
-msgstr "修改 certificate 资源."
+msgstr "修改 certificate 资源。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 #: pkg/kubectl/cmd/config/config.go:40
@@ -2495,37 +2462,37 @@ msgstr "修改 kubeconfig 文件"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
 #: pkg/kubectl/cmd/expose.go:108
 msgid "Name or number for the port on the container that the service should direct traffic to. Optional."
-msgstr "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgstr "容器上的端口的名称或编号，服务应将流量定向到该端口。可选的。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
 #: pkg/kubectl/cmd/logs.go:113
 msgid "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
-msgstr "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgstr "仅返回特定日期之后的日志 (RFC3339)。默认为所有日志。只能使用 since time/since 中的一个。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
 #: pkg/kubectl/cmd/completion.go:104
 msgid "Output shell completion code for the specified shell (bash or zsh)"
-msgstr "Output shell completion code for the specified shell (bash or zsh)"
+msgstr "指定 shell 程序的输出 shell 完成代码 (bash 或 zsh)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L115
 #: pkg/kubectl/cmd/convert.go:85
 msgid "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"
-msgstr "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"
+msgstr "使用给定的组版本输出格式化对象 (例如: 'extensions/v1beta1')。)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
 #: pkg/kubectl/cmd/create_secret.go:158
 msgid "Password for Docker registry authentication"
-msgstr "Password for Docker registry authentication"
+msgstr "Docker registry 的认证密码"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
 #: pkg/kubectl/cmd/create_secret.go:226
 msgid "Path to PEM encoded public key certificate."
-msgstr "Path to PEM encoded public key certificate."
+msgstr "PEM编码的公钥证书的路径。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
 #: pkg/kubectl/cmd/create_secret.go:227
 msgid "Path to private key associated with given certificate."
-msgstr "Path to private key associated with given certificate."
+msgstr "与给定证书关联的私钥的路径。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L84
 #: pkg/kubectl/cmd/rollingupdate.go:85
@@ -2535,7 +2502,7 @@ msgstr "完成指定的 ReplicationController 的滚动升级"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L82
 #: pkg/kubectl/cmd/scale.go:83
 msgid "Precondition for resource version. Requires that the current resource version match this value in order to scale."
-msgstr "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgstr "资源版本的前提条件。要求当前资源版本与此值匹配才能缩放。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
 #: pkg/kubectl/cmd/version.go:40
@@ -2580,7 +2547,7 @@ msgstr "运行一个 proxy 到 Kubernetes API server"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
 #: pkg/kubectl/cmd/create_secret.go:161
 msgid "Server location for Docker registry"
-msgstr "Server location for Docker registry"
+msgstr "用于 Docker registry 的服务器位置"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
 #: pkg/kubectl/cmd/scale.go:71
@@ -2594,7 +2561,7 @@ msgstr "为 objects 设置一个指定的特征"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:83
 msgid "Set the last-applied-configuration annotation on a live object to match the contents of a file."
-msgstr "Set the last-applied-configuration annotation on a live object to match the contents of a file."
+msgstr "设置 last-applied-configuration 注解到活跃的对象，以匹配文件内容。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
 #: pkg/kubectl/cmd/set/set_selector.go:82
@@ -2639,92 +2606,92 @@ msgstr "显示 rollout 的状态"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
 #: pkg/kubectl/cmd/expose.go:106
 msgid "Synonym for --target-port"
-msgstr "Synonym for --target-port"
+msgstr "--target-port 的同义词"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
 #: pkg/kubectl/cmd/expose.go:88
 msgid "Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"
-msgstr "使用 replication controller, service, deployment 或者 pod 并暴露它作为一个 新的 Kubernetes Service"
+msgstr "使用 replication controller, service, deployment 或者 pod 并暴露它作为一个新的 Kubernetes Service"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L114
 #: pkg/kubectl/cmd/run.go:117
 msgid "The image for the container to run."
-msgstr "指定容器要运行的镜像."
+msgstr "指定容器要运行的镜像。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L116
 #: pkg/kubectl/cmd/run.go:119
 msgid "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"
-msgstr "容器的镜像拉取策略. 如果为空, 这个值将不会 被 client 指定且使用 server 端的默认值"
+msgstr "容器的镜像拉取策略。如果为空，这个值将不会被 client 指定且使用 server 端的默认值"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L100
 #: pkg/kubectl/cmd/rollingupdate.go:101
 msgid "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"
-msgstr "这个 key 使用有区别在两个不同的 controllers, 默认 'deployment'. 只有当 --image 指定值, 否则忽略"
+msgstr "用来区别两个不同 controllers 的 key，默认为 'deployment'。只有当 --image 参数被指定时有效，否则将被忽略"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
 #: pkg/kubectl/cmd/create_pdb.go:63
 msgid "The minimum number or percentage of available pods this budget requires."
-msgstr "最小数量百分比可用的 pods 作为 budget 要求."
+msgstr "这个预算需要的可用 pods 的最小数量百分比。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L113
 #: pkg/kubectl/cmd/expose.go:111
 msgid "The name for the newly created object."
-msgstr "名称为最新创建的对象."
+msgstr "新创建的对象的名称"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L71
 #: pkg/kubectl/cmd/autoscale.go:72
 msgid "The name for the newly created object. If not specified, the name of the input resource will be used."
-msgstr "名称为最新创建的对象. 如果没有指定, 输入资源的 名称即将被使用."
+msgstr "名称为最新创建的对象，如果没有指定，将使用输入资源的名称。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L113
 #: pkg/kubectl/cmd/run.go:116
 msgid "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."
-msgstr "使用 API generator 的名字, 在 http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators 查看列表."
+msgstr "使用 API generator 的名称，在 http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators 查看列表。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/autoscale.go#L66
 #: pkg/kubectl/cmd/autoscale.go:67
 msgid "The name of the API generator to use. Currently there is only 1 generator."
-msgstr "使用 API generator 的名字. 目前只有 1 个 generator."
+msgstr "使用的 API generator 的名字。目前只有 1 个 generator。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L98
 #: pkg/kubectl/cmd/expose.go:99
 msgid "The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
-msgstr "使用 generator 的名称. 这里有 2 个 generators: 'service/v1' 和 'service/v2'. 为一个不同地方是服务端口在 v1 的情况下叫 'default', 如果在 v2 中没有指定名称. 默认的名称是 'service/v2'."
+msgstr "使用的 API generator 的名称。这里有 2 个 generators: 'service/v1' 和 'service/v2'。两者唯一不同的地方是服务端口在 v1 的情况下叫 'default'，在 v2 中没有指定名称。 默认的名称是 'service/v2'。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L133
 #: pkg/kubectl/cmd/run.go:136
 msgid "The name of the generator to use for creating a service.  Only used if --expose is true"
-msgstr "使用 gnerator 的名称创建一个 service.  只有在 --expose 为 true 的时候使用"
+msgstr "创建一个 service 所使用的 generator 的名称。只有在 --expose 为 true 的时候使用"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
 #: pkg/kubectl/cmd/expose.go:100
 msgid "The network protocol for the service to be created. Default is 'TCP'."
-msgstr "创建 service 的时候伴随着一个网络协议被创建. 默认是 'TCP'."
+msgstr "创建的 service 所使用的网络协议。默认是 'TCP'。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L100
 #: pkg/kubectl/cmd/expose.go:101
 msgid "The port that the service should serve on. Copied from the resource being exposed, if unspecified"
-msgstr "服务的端口应该被指定. 如果没有指定, 从被创建的资源中复制"
+msgstr "服务的端口应该被指定。如果没有指定，从被创建的资源中复制"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
 #: pkg/kubectl/cmd/run.go:124
 msgid "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
-msgstr "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgstr "这个容器暴露的端口。如果 --expose 为 true，这个端口也是创建的 service 所使用的端口。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
 #: pkg/kubectl/cmd/run.go:134
 msgid "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
-msgstr "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgstr "容器的资源需求限制。例如，'cpu=200m,memory=512Mi'。服务器侧的组件可以根据服务器的配置制定资源限制，例如限制范围。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
 #: pkg/kubectl/cmd/run.go:133
 msgid "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."
-msgstr "资源为 container 请求 requests . 例如, 'cpu=100m,memory=256Mi'. 注意服务端组件也许会赋予 requests, 这决定于服务器端配置, 比如 limit ranges."
+msgstr "资源为 container 请求 requests。例如，'cpu=100m,memory=256Mi'。注意服务端组件也许会赋予 requests，这决定于服务器端配置，比如 limit ranges。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L128
 #: pkg/kubectl/cmd/run.go:131
 msgid "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."
-msgstr "这个 Pod 的 restart policy.  Legal values [Always, OnFailure, Never]. 如果设置为 'Always' 一个 deployment 被创建, 如果设置为 ’OnFailure' 一个 job 被创建, 如果设置为 'Never', 一个普通的 pod 被创建. 对于后面两个 --replicas 必须为 1.  默认 'Always', 为 CronJobs 设置为 `Never`."
+msgstr "这个 Pod 的 重启策略。合法值包括 [Always, OnFailure, Never]。如果设置为 'Always' 则一个 deployment 被创建，如果设置为 ’OnFailure' 则一个 job 被创建，如果设置为 'Never'，则一个普通的 pod 被创建。对于后面两个选项 --replicas 参数必须为 1。  默认值为 'Always'，对于 CronJobs 设置为 `Never`。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: pkg/kubectl/cmd/create_secret.go:88
@@ -2734,7 +2701,7 @@ msgstr "创建 secret 类型资源"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L101
 #: pkg/kubectl/cmd/expose.go:102
 msgid "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."
-msgstr "对于服务的类型: ClusterIP, NodePort, 或者 LoadBalancer. 默认是 'ClusterIP’."
+msgstr "对于服务的类型: ClusterIP、NodePort、或者 LoadBalancer。默认值为 'ClusterIP’。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
 #: pkg/kubectl/cmd/rollout/rollout_undo.go:72
@@ -2749,7 +2716,7 @@ msgstr "取消设置 kubeconfig 文件中的一个单个值"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/patch.go#L91
 #: pkg/kubectl/cmd/patch.go:96
 msgid "Update field(s) of a resource using strategic merge patch"
-msgstr "使用 strategic merge patch 更新一个资源的 field(s)"
+msgstr "使用 strategic merge patch 更新一个资源的字段"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_image.go#L94
 #: pkg/kubectl/cmd/set/set_image.go:95
@@ -2768,7 +2735,7 @@ msgstr "更新一个资源的注解"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
 #: pkg/kubectl/cmd/label.go:114
 msgid "Update the labels on a resource"
-msgstr "更新在这个资源上的 labels"
+msgstr "更新一个资源的标签"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/taint.go#L88
 #: pkg/kubectl/cmd/taint.go:87
@@ -2778,7 +2745,7 @@ msgstr "更新一个或者多个 node 上的 taints"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L155
 #: pkg/kubectl/cmd/create_secret.go:156
 msgid "Username for Docker registry authentication"
-msgstr "Username 为 Docker registry authentication"
+msgstr "用于 Docker registry 认证的 Username"
 
 #: pkg/kubectl/cmd/apply_view_last_applied.go:64
 msgid "View latest last-applied-configuration annotations of a resource/object"
@@ -2792,11 +2759,11 @@ msgstr "显示 rollout 历史"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L45
 #: pkg/kubectl/cmd/clusterinfo_dump.go:46
 msgid "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"
-msgstr "输出到 files.  如果是 empty or '-' 使用 stdout, 否则创建一个 目录层级在那个目录"
+msgstr "输出文件的位置。如果是空或者 '-' 则使用 stdout，否则在那个目录中创建一个目录层级"
 
 #: pkg/kubectl/cmd/run_test.go:85
 msgid "dummy restart flag)"
-msgstr "dummy restart flag)"
+msgstr "dummy 重启标志)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_service.go#L253
 #: pkg/kubectl/cmd/create_service.go:254
@@ -2806,7 +2773,7 @@ msgstr "服务的外部名称"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/cmd.go#L217
 #: pkg/kubectl/cmd/cmd.go:227
 msgid "kubectl controls the Kubernetes cluster manager"
-msgstr "kubectl 控制 Kubernetes cluster 管理"
+msgstr "kubectl 控制 Kubernetes 集群管理器"
 
 #~ msgid "watch is only supported on individual resources and resource collections - %d resources were found"
 #~ msgid_plural "watch is only supported on individual resources and resource collections - %d resources were found"
