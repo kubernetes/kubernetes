@@ -266,7 +266,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
-	flag.StringVar(&TestContext.Provider, "provider", "skeleton", "The name of the Kubernetes provider (gce, gke, local, skeleton (the default), etc.)")
+	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
 	flag.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
@@ -403,6 +403,13 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
 	// TODO: whether and how long this code is needed is getting discussed
 	// in https://github.com/kubernetes/kubernetes/issues/70194.
+	if TestContext.Provider == "" {
+		// Some users of the e2e.test binary pass --provider=.
+		// We need to support that, changing it would break those usages.
+		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
+		TestContext.Provider = "skeleton"
+	}
+
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
 	if err != nil {
