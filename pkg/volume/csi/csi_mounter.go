@@ -31,8 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	utilstrings "k8s.io/utils/strings"
 )
 
 //TODO (vladimirvivien) move this in a central loc later
@@ -79,8 +79,8 @@ func (c *csiMountMgr) GetPath() string {
 }
 
 func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) string {
-	specVolID := kstrings.EscapeQualifiedNameForDisk(specVolumeID)
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(csiPluginName), specVolID)
+	specVolID := utilstrings.EscapeQualifiedName(specVolumeID)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(csiPluginName), specVolID)
 }
 
 // volume.Mounter methods

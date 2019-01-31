@@ -30,9 +30,9 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -54,7 +54,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(vsphereVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(vsphereVolumePluginName), volName)
 }
 
 // vSphere Volume Plugin
@@ -298,7 +298,7 @@ func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
 
 func (vv *vsphereVolume) GetPath() string {
 	name := vsphereVolumePluginName
-	return vv.plugin.host.GetPodVolumeDir(vv.podUID, utilstrings.EscapeQualifiedNameForDisk(name), vv.volName)
+	return vv.plugin.host.GetPodVolumeDir(vv.podUID, utilstrings.EscapeQualifiedName(name), vv.volName)
 }
 
 // vSphere Persistent Volume Plugin

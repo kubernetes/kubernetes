@@ -18,17 +18,23 @@ package util
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,19 +44,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"reflect"
-
-	"hash/fnv"
-	"math/rand"
-	"strconv"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (

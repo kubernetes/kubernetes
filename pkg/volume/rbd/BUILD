@@ -20,7 +20,6 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 

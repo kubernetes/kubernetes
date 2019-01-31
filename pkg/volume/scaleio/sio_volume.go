@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type sioVolume struct {
@@ -61,7 +61,7 @@ var _ volume.Volume = &sioVolume{}
 func (v *sioVolume) GetPath() string {
 	return v.plugin.host.GetPodVolumeDir(
 		v.podUID,
-		kstrings.EscapeQualifiedNameForDisk(sioPluginName),
+		utilstrings.EscapeQualifiedName(sioPluginName),
 		v.volSpecName)
 }
 

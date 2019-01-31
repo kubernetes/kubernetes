@@ -31,11 +31,11 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/keymutex"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -82,7 +82,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(cinderVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(cinderVolumePluginName), volName)
 }
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {

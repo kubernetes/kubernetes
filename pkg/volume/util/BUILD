@@ -26,7 +26,6 @@ go_library(
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/resizefs:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -43,6 +42,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 

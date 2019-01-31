@@ -4113,6 +4113,10 @@
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
+			"ImportPath": "k8s.io/utils/keymutex",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
 			"ImportPath": "k8s.io/utils/nsenter",
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
@@ -4122,6 +4126,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/strings",
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
