@@ -1522,9 +1522,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${NUM_NODES:-}" ]]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
-    if [[ "${NUM_NODES}" -ge 3000 ]]; then
+    if [[ "${NUM_NODES}" -gt 3000 ]]; then
       params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
-    elif [[ "${NUM_NODES}" -ge 1000 ]]; then
+    elif [[ "${NUM_NODES}" -gt 500 ]]; then
       params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
     fi
     # Set amount of memory available for apiserver based on number of nodes.
