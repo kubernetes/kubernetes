@@ -20,6 +20,7 @@ package kuberuntime
 
 import (
 	"fmt"
+
 	"github.com/docker/docker/pkg/sysinfo"
 
 	"k8s.io/api/core/v1"
@@ -91,7 +92,10 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if effectiveSc.RunAsUser != nil {
 		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
 	}
-	if username != "" {
+
+	if *effectiveSc.WindowsOptions.RunAsUserName != "" {
+		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
+	} else if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
 
