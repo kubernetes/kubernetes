@@ -30,10 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"github.com/prometheus/client_golang/prometheus"
-	"net"
-	"net/http"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -169,24 +165,6 @@ func TestRelisting(t *testing.T) {
 
 // TestEventChannelFull test when channel is full, the events will be discard.
 func TestEventChannelFull(t *testing.T) {
-	prometheus.MustRegister(metrics.PLEGDiscardEvents)
-
-	temporalServer := "127.0.0.1:1234"
-	l, err := net.Listen("tcp", temporalServer)
-	assert.NoError(t, err)
-	defer l.Close()
-
-	prometheusUrl := "http://" + temporalServer + "/metrics"
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", prometheus.Handler())
-	server := &http.Server{
-		Addr:    temporalServer,
-		Handler: mux,
-	}
-	go func() {
-		server.Serve(l)
-	}()
-
 	testPleg := newTestGenericPLEG(4)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
@@ -242,12 +220,6 @@ func TestEventChannelFull(t *testing.T) {
 	}
 	actual = getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
-
-	plegEventsDiscardCounterExpected := "pleg_discard_events 1"
-
-	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mux.ServeHTTP(w, r)
-	}), "GET", prometheusUrl, nil, plegEventsDiscardCounterExpected)
 }
 
 func TestDetectingContainerDeaths(t *testing.T) {
