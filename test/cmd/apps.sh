@@ -36,7 +36,7 @@ run_daemonset_tests() {
   # Template Generation should stay 1
   kube::test::get_object_assert 'daemonsets bind' "{{${TEMPLATE_GENERATION_FIELD}}}" '1'
   # Test set commands
-  kubectl set image daemonsets/bind "${KUBE_FLAGS[@]}" *=k8s.gcr.io/pause:test-cmd
+  kubectl set image daemonsets/bind "${KUBE_FLAGS[@]}" "*=k8s.gcr.io/pause:test-cmd"
   kube::test::get_object_assert 'daemonsets bind' "{{${TEMPLATE_GENERATION_FIELD}}}" '2'
   kubectl set env daemonsets/bind "${KUBE_FLAGS[@]}" foo=bar
   kube::test::get_object_assert 'daemonsets bind' "{{${TEMPLATE_GENERATION_FIELD}}}" '3'
@@ -260,8 +260,8 @@ run_deployment_tests() {
   kube::test::get_object_assert rs "{{range.items}}{{$RS_REPLICAS_FIELD}}{{end}}" '1'
   # Cleanup
   # Find the name of the rs to be deleted.
-  output_message=$(kubectl get rs "${KUBE_FLAGS[@]}" -o template --template={{range.items}}{{$ID_FIELD}}{{end}})
-  kubectl delete rs ${output_message} "${KUBE_FLAGS[@]}"
+  output_message=$(kubectl get rs "${KUBE_FLAGS[@]}" -o template --template="{{range.items}}{{$ID_FIELD}}{{end}}")
+  kubectl delete rs "${output_message}" "${KUBE_FLAGS[@]}"
 
   ### Auto scale deployment
   # Pre-condition: no deployment exists
@@ -318,7 +318,7 @@ run_deployment_tests() {
   kubectl get rs "${newrs}" -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
-  cat hack/testdata/deployment-revision1.yaml | ${SED} "s/name: nginx$/name: nginx2/" | kubectl create -f - "${KUBE_FLAGS[@]}"
+  ${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${KUBE_FLAGS[@]}"
   # Deletion of both deployments should not be blocked
   kubectl delete deployment nginx2 "${KUBE_FLAGS[@]}"
   # Clean up
@@ -351,11 +351,11 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD0}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD1}}:{{end}}" "${IMAGE_PERL}:"
   # Set image of all containers of the deployment
-  kubectl set image deployment nginx-deployment "*"="${IMAGE_DEPLOYMENT_R1}" "${KUBE_FLAGS[@]}"
+  kubectl set image deployment nginx-deployment "*=${IMAGE_DEPLOYMENT_R1}" "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD1}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Set image of all containners of the deployment again when image not change
-  kubectl set image deployment nginx-deployment "*"="${IMAGE_DEPLOYMENT_R1}" "${KUBE_FLAGS[@]}"
+  kubectl set image deployment nginx-deployment "*=${IMAGE_DEPLOYMENT_R1}" "${KUBE_FLAGS[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD1}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Clean up
@@ -599,7 +599,7 @@ run_rs_tests() {
   # Test set commands
   # Pre-condition: frontend replica set exists at generation 1
   kube::test::get_object_assert 'rs frontend' "{{${GENERATION_FIELD}}}" '1'
-  kubectl set image rs/frontend "${KUBE_FLAGS[@]}" *=k8s.gcr.io/pause:test-cmd
+  kubectl set image rs/frontend "${KUBE_FLAGS[@]}" "*=k8s.gcr.io/pause:test-cmd"
   kube::test::get_object_assert 'rs frontend' "{{${GENERATION_FIELD}}}" '2'
   kubectl set env rs/frontend "${KUBE_FLAGS[@]}" foo=bar
   kube::test::get_object_assert 'rs frontend' "{{${GENERATION_FIELD}}}" '3'

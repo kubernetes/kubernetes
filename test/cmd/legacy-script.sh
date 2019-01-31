@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -23,7 +24,7 @@ set -o pipefail
 # Set locale to ensure english responses from kubectl commands
 export LANG=C
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # Expects the following has already been done by whatever sources this script
 # source "${KUBE_ROOT}/hack/lib/init.sh"
 # source "${KUBE_ROOT}/hack/lib/test.sh"
@@ -130,9 +131,8 @@ function record_command() {
     local name="$1"
     local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
     echo "Recording: ${name}"
-    echo "Running command: $@"
-    juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
-    if [[ $? -ne 0 ]]; then
+    echo "Running command: $*"
+    if ! juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"; then
       echo "Error when running ${name}"
       foundError="${foundError}""${name}"", "
     fi
@@ -146,7 +146,7 @@ function stop-proxy()
 {
   [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
   [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
-  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f ${PROXY_PORT_FILE}
+  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f "${PROXY_PORT_FILE}"
   PROXY_PID=
   PROXY_PORT=
   PROXY_PORT_FILE=
@@ -162,22 +162,22 @@ function start-proxy()
 
 
   if [ $# -eq 0 ]; then
-    kubectl proxy --port=0 --www=. 1>${PROXY_PORT_FILE} 2>&1 &
+    kubectl proxy --port=0 --www=. 1>"${PROXY_PORT_FILE}" 2>&1 &
   else
-    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>${PROXY_PORT_FILE} 2>&1 &
+    kubectl proxy --port=0 --www=. --api-prefix="$1" 1>"${PROXY_PORT_FILE}" 2>&1 &
   fi
   PROXY_PID=$!
   PROXY_PORT=
 
   local attempts=0
   while [[ -z ${PROXY_PORT} ]]; do
-    if (( ${attempts} > 9 )); then
+    if (( attempts > 9 )); then
       kill "${PROXY_PID}"
-      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat ${PROXY_PORT_FILE})"
+      kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat "${PROXY_PORT_FILE}")"
     fi
     sleep .5
     kube::log::status "Attempt ${attempts} to read ${PROXY_PORT_FILE}..."
-    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< ${PROXY_PORT_FILE})
+    PROXY_PORT=$(sed 's/.*Starting to serve on 127.0.0.1:\([0-9]*\)$/\1/'< "${PROXY_PORT_FILE}")
     attempts=$((attempts+1))
   done
 
@@ -203,7 +203,7 @@ function cleanup()
   rm -rf "${KUBE_TEMP}"
 
   local junit_dir="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
-  echo "junit report dir:" ${junit_dir}
+  echo "junit report dir:" "${junit_dir}"
 
   kube::log::status "Clean up complete"
 }
@@ -230,9 +230,9 @@ function kubectl-with-retry()
   ERROR_FILE="${KUBE_TEMP}/kubectl-error"
   preserve_err_file=${PRESERVE_ERR_FILE-false}
   for count in {0..3}; do
-    kubectl "$@" 2> ${ERROR_FILE} || true
+    kubectl "$@" 2> "${ERROR_FILE}" || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
-      kube::log::status "retry $1, error: $(cat ${ERROR_FILE})"
+      kube::log::status "retry $1, error: $(cat "${ERROR_FILE}")"
       rm "${ERROR_FILE}"
       sleep $((2**count))
     else
@@ -254,12 +254,12 @@ function wait-for-pods-with-label()
 {
   local i
   for i in $(seq 1 10); do
-    kubeout=`kubectl get po -l $1 --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${KUBE_FLAGS[@]}"`
-    if [[ $kubeout = $2 ]]; then
+    kubeout=$(kubectl get po -l "$1" --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${KUBE_FLAGS[@]}")
+    if [[ $kubeout = "$2" ]]; then
         return
     fi
-    echo Waiting for pods: $2, found $kubeout
-    sleep $i
+    echo Waiting for pods: "$2", found "$kubeout"
+    sleep "$i"
   done
   kube::log::error_exit "Timeout waiting for pods with label $1"
 }
@@ -323,7 +323,7 @@ runTests() {
 
   # token defined in hack/testdata/auth-tokens.csv
   KUBE_FLAGS_WITH_TOKEN=(
-    -s "https://127.0.0.1:${SECURE_API_PORT}" --token=admin-token --insecure-skip-tls-verify=true
+    -s "https://127.0.0.1:${SECURE_API_PORT}" "--token=admin-token" "--insecure-skip-tls-verify=true"
   )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
@@ -371,7 +371,7 @@ runTests() {
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${NAMESPACES}" ; then
     output_message=$(kubectl get "${KUBE_FLAGS[@]}" namespaces)
-    if [[ ! $(echo "${output_message}" | grep "default") ]]; then
+    if ! echo "${output_message}" | grep -q "default"; then
       # Create default namespace
       kubectl create "${KUBE_FLAGS[@]}" ns default
     fi

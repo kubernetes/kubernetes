@@ -27,7 +27,7 @@ run_job_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-jobs namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $ID_FIELD \"test-jobs\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $ID_FIELD \"test-jobs\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-jobs
   # Post-condition: namespace 'test-jobs' is created.

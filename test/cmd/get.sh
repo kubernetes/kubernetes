@@ -98,7 +98,7 @@ run_kubectl_get_tests() {
   # Post-condition: make sure we don't display an empty List
   if kube::test::if_has_string "${output_message}" 'List'; then
     echo 'Unexpected List output'
-    echo "${LINENO} $(basename $0)"
+    echo "${LINENO} $(basename "$0")"
     exit 1
   fi
 
@@ -131,9 +131,9 @@ run_kubectl_get_tests() {
 
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
   # Pre-condition: ConfigMap one two tree does not exist
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $ID_FIELD \"one\" }}found{{end}}{{end}}:' ':'
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $ID_FIELD \"two\" }}found{{end}}{{end}}:' ':'
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $ID_FIELD \"three\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $ID_FIELD \"one\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $ID_FIELD \"two\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $ID_FIELD \"three\" }}found{{end}}{{end}}:" ':'
 
   # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
   kubectl create cm one "${KUBE_FLAGS[@]}"

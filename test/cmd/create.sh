@@ -57,17 +57,17 @@ run_kubectl_create_error_tests() {
   kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${KUBE_FLAGS[@]}" 2> "${ERROR_FILE}" || true
   # Post-condition: should get an error reporting the empty string
   if grep -q "unknown object type \"nil\" in ReplicationController" "${ERROR_FILE}"; then
-    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat ${ERROR_FILE})"
+    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat "${ERROR_FILE}")"
   else
-    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat ${ERROR_FILE})"
+    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat "${ERROR_FILE}")"
     exit 1
   fi
   rm "${ERROR_FILE}"
 
   # Posting a pod to namespaces should fail.  Also tests --raw forcing the post location
-  [ "$( kubectl convert -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json | kubectl create "${KUBE_FLAGS[@]}" --raw /api/v1/namespaces -f - --v=8 2>&1 | grep 'cannot be handled as a Namespace: converting (v1.Pod)')" ]
+  kubectl convert -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json | kubectl create "${KUBE_FLAGS[@]}" --raw /api/v1/namespaces -f - --v=8 2>&1 | grep -q 'cannot be handled as a Namespace: converting (v1.Pod)'
 
-  [ "$( kubectl create "${KUBE_FLAGS[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit 2>&1 | grep 'raw and --edit are mutually exclusive')" ]
+  kubectl create "${KUBE_FLAGS[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit 2>&1 | grep -q 'raw and --edit are mutually exclusive'
 
   set +o nounset
   set +o errexit
@@ -89,7 +89,7 @@ run_create_job_tests() {
 
     # Test kubectl create job with command
     kubectl create job test-job-pi "--image=$IMAGE_PERL" -- perl -Mbignum=bpi -wle 'print bpi(20)'
-    kube::test::get_object_assert 'job test-job-pi' "{{$IMAGE_FIELD0}}" $IMAGE_PERL
+    kube::test::get_object_assert 'job test-job-pi' "{{$IMAGE_FIELD0}}" "$IMAGE_PERL"
     # Clean up
     kubectl delete job test-job-pi
 

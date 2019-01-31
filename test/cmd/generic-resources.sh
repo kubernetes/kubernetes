@@ -33,7 +33,7 @@ run_multi_resources_tests() {
   YAML=".yaml"
   JSON=".json"
   for file in $FILES; do
-    if [ -f $file$YAML ]
+    if [ -f "$file$YAML" ]
     then
       file=$file$YAML
       replace_file="${file%.yaml}-modify.yaml"
@@ -84,13 +84,13 @@ run_multi_resources_tests() {
     kubectl get -f "${file}" "${KUBE_FLAGS[@]}"
     # Command: watching multiple resources should return "not supported" error
     WATCH_ERROR_FILE="${KUBE_TEMP}/kubectl-watch-error"
-    kubectl get -f "${file}" "${KUBE_FLAGS[@]}" "--watch" 2> ${WATCH_ERROR_FILE} || true
+    kubectl get -f "${file}" "${KUBE_FLAGS[@]}" "--watch" 2> "${WATCH_ERROR_FILE}" || true
     if ! grep -q "watch is only supported on individual resources and resource collections" "${WATCH_ERROR_FILE}"; then
-      kube::log::error_exit "kubectl watch multiple resource returns unexpected error or non-error: $(cat ${WATCH_ERROR_FILE})" "1"
+      kube::log::error_exit "kubectl watch multiple resource returns unexpected error or non-error: $(cat "${WATCH_ERROR_FILE}")" "1"
     fi
     kubectl describe -f "${file}" "${KUBE_FLAGS[@]}"
     # Command
-    kubectl replace -f $replace_file --force --cascade "${KUBE_FLAGS[@]}"
+    kubectl replace -f "$replace_file" --force --cascade "${KUBE_FLAGS[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${LABELS_FIELD}.status}}" 'replaced'
@@ -128,7 +128,7 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing labels.
-    kubectl-with-retry label -f $file labeled=true --overwrite "${KUBE_FLAGS[@]}"
+    kubectl-with-retry label -f "$file" labeled=true --overwrite "${KUBE_FLAGS[@]}"
     # Post-condition: mock service and mock rc (and mock2) are labeled
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${LABELS_FIELD}.labeled}}" 'true'
@@ -147,7 +147,7 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing annotations.
-    kubectl-with-retry annotate -f $file annotated=true --overwrite "${KUBE_FLAGS[@]}"
+    kubectl-with-retry annotate -f "$file" annotated=true --overwrite "${KUBE_FLAGS[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${ANNOTATIONS_FIELD}.annotated}}" 'true'
@@ -210,7 +210,7 @@ run_recursive_resources_tests() {
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$ID_FIELD}}:{{end}}" 'busybox0:busybox1:'
   # Command
-  echo -e '#!/usr/bin/env bash\nsed -i "s/image: busybox/image: prom\/busybox/g" $1' > /tmp/tmp-editor.sh
+  echo -e "#!/usr/bin/env bash\nsed -i 's/image: busybox/image: prom\/busybox/g' $1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   output_message=$(! EDITOR=/tmp/tmp-editor.sh kubectl edit -f hack/testdata/recursive/pod --recursive 2>&1 "${KUBE_FLAGS[@]}")
   # Post-condition: busybox0 & busybox1 PODs are not edited, and since busybox2 is malformed, it should error
@@ -298,7 +298,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$ID_FIELD}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl label -f hack/testdata/recursive/pod mylabel='myvalue' --recursive 2>&1 "${KUBE_FLAGS[@]}")
-  echo $output_message
+  echo "$output_message"
   # Post-condition: busybox0 & busybox1 PODs are labeled, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{${LABELS_FIELD}.mylabel}}:{{end}}" 'myvalue:myvalue:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -308,7 +308,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$ID_FIELD}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl patch -f hack/testdata/recursive/pod -p='{"spec":{"containers":[{"name":"busybox","image":"prom/busybox"}]}}' --recursive 2>&1 "${KUBE_FLAGS[@]}")
-  echo $output_message
+  echo "$output_message"
   # Post-condition: busybox0 & busybox1 PODs are patched, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{$IMAGE_FIELD}}:{{end}}" 'prom/busybox:prom/busybox:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -395,15 +395,16 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$IMAGE_FIELD0}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Pause the deployments recursively
+  # shellcheck disable=SC2034
   PRESERVE_ERR_FILE=true
   kubectl-with-retry rollout pause -f hack/testdata/recursive/deployment --recursive "${KUBE_FLAGS[@]}"
-  output_message=$(cat ${ERROR_FILE})
+  output_message=$(cat "${ERROR_FILE}")
   # Post-condition: nginx0 & nginx1 should both have paused set to true, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "true:true:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Resume the deployments recursively
   kubectl-with-retry rollout resume -f hack/testdata/recursive/deployment --recursive "${KUBE_FLAGS[@]}"
-  output_message=$(cat ${ERROR_FILE})
+  output_message=$(cat "${ERROR_FILE}")
   # Post-condition: nginx0 & nginx1 should both have paused set to nothing, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"

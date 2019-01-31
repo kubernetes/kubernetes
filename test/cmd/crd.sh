@@ -148,8 +148,7 @@ kube::util::non_native_resources() {
   local failed
   times=30
   wait=10
-  local i
-  for i in $(seq 1 $times); do
+  for _ in $(seq 1 $times); do
     failed=""
     kubectl "${KUBE_FLAGS[@]}" get --raw '/apis/company.com/v1' || failed=true
     kubectl "${KUBE_FLAGS[@]}" get --raw '/apis/company.com/v1/foos' || failed=true
@@ -246,9 +245,9 @@ run_non_native_resource_tests() {
   CRD_PATCH_ERROR_FILE="${KUBE_TEMP}/crd-foos-test-error"
   ! kubectl "${KUBE_FLAGS[@]}" patch --local -f "${CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${CRD_PATCH_ERROR_FILE}"
   if grep -q "try --type merge" "${CRD_PATCH_ERROR_FILE}"; then
-    kube::log::status "\"kubectl patch --local\" returns error as expected for CustomResource: $(cat ${CRD_PATCH_ERROR_FILE})"
+    kube::log::status "\"kubectl patch --local\" returns error as expected for CustomResource: $(cat "${CRD_PATCH_ERROR_FILE}")"
   else
-    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${CRD_PATCH_ERROR_FILE})"
+    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat "${CRD_PATCH_ERROR_FILE}")"
     exit 1
   fi
   # can apply merge patch locally
@@ -294,7 +293,7 @@ run_non_native_resource_tests() {
   kube::log::status "Testing CustomResource watching"
   exec 3< <(kubectl "${KUBE_FLAGS[@]}" get bars --request-timeout=1m --watch-only -o name & echo $! ; wait)
   local watch_pid
-  read <&3 watch_pid
+  read -r <&3 watch_pid
 
   # We can't be sure when the watch gets established,
   # so keep triggering events (in the background) until something comes through.
@@ -308,10 +307,10 @@ run_non_native_resource_tests() {
 
   # Wait up to 30s for a complete line of output.
   local watch_output
-  read <&3 -t 30 watch_output
+  read -r <&3 -t 30 watch_output
   # Stop the watcher and the patch loop.
-  kill -9 ${watch_pid}
-  kill -9 ${patch_pid}
+  kill -9 "${watch_pid}"
+  kill -9 "${patch_pid}"
   kube::test::if_has_string "${watch_output}" 'bar.company.com/test'
 
   # Delete the resource without cascade.
