@@ -486,7 +486,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 
 			ctx := context.Background()
@@ -497,7 +497,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			serv.response = tt.serverResponse
 			resp, authenticated, err := wh.AuthenticateToken(ctx, token)
 			if err != nil {
-				t.Fatalf("authentication failed: %v", err)
+				t.Errorf("authentication failed: %v", err)
 			}
 			if serv.lastRequest.Spec.Token != token {
 				t.Errorf("Server did not see correct token. Got %q, expected %q.",

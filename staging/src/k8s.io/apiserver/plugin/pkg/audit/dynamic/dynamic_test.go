@@ -279,12 +279,12 @@ func buildTestHandler(t *testing.T, a *atomic.Value) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			t.Fatalf("could not read request body: %v", err)
+			t.Errorf("could not read request body: %v", err)
 		}
 		el := auditinternal.EventList{}
 		decoder := audit.Codecs.UniversalDecoder(auditv1.SchemeGroupVersion)
 		if err := runtime.DecodeInto(decoder, body, &el); err != nil {
-			t.Fatalf("failed decoding buf: %b, apiVersion: %s", body, auditv1.SchemeGroupVersion)
+			t.Errorf("failed decoding buf: %b, apiVersion: %s", body, auditv1.SchemeGroupVersion)
 		}
 		defer r.Body.Close()
 		a.Store(el)
