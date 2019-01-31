@@ -63,34 +63,3 @@ roleRef:
   # change the name also here if the ClusterRole gets renamed
   name: external-snapshotter-runner
   apiGroup: rbac.authorization.k8s.io
-
----
-# napshotter must be able to work with config map in currenSt namespace
-# if (and only if) leadership election is enabled
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  # replace with non-default namespace name
-  namespace: default
-  name: external-snapshotter-cfg
-rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "watch", "list", "delete", "update", "create"]
-
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-snapshotter-role-cfg
-  # replace with non-default namespace name
-  namespace: default
-subjects:
-- kind: ServiceAccount
-  name: csi-snapshotter
-  # replace with non-default namespace name
-  namespace: default
-roleRef:
-  kind: Role
-  name: external-snapshotter-cfg
-  apiGroup: rbac.authorization.k8s.io

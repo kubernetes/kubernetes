@@ -162,8 +162,8 @@ func (p *provisioningTestResource) setupResource(driver TestDriver, pattern test
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
-			if dDriver, ok := driver.(SnapshottableTestDriver); ok {
-				p.vsc = dDriver.GetSnapshotClass()
+			if sDriver, ok := driver.(SnapshottableTestDriver); ok {
+				p.vsc = sDriver.GetSnapshotClass()
 			}
 		}
 	default:
@@ -213,14 +213,10 @@ func testProvisioning(input *provisioningTestInput) {
 		if !input.dInfo.Capabilities[CapDataSource] {
 			framework.Skipf("Driver %q does not support populate data from snapshot - skipping", input.dInfo.Name)
 		}
-		if input.dInfo.Name == "csi-hostpath-v0" {
-			framework.Skipf("Driver %q does not support populate data from snapshot - skipping", input.dInfo.Name)
-		}
 
 		input.testCase.SkipWriteReadCheck = true
 		dataSource, cleanupFunc := prepareDataSourceForProvisioning(input.testCase, input.cs, input.dc, input.pvc, input.sc, input.vsc)
 		defer cleanupFunc()
-		framework.Logf("volume snapshot dataSource %v", dataSource)
 
 		input.pvc.Spec.DataSource = dataSource
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
@@ -233,6 +229,8 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 	if class != nil {
 		By("creating a StorageClass " + class.Name)
 		_, err = client.StorageV1().StorageClasses().Create(class)
+		// The "should provision storage with snapshot data source" test already has created the class.
+		// TODO: make class creation optional and remove the IsAlreadyExists exception
 		Expect(err == nil || apierrs.IsAlreadyExists(err)).To(Equal(true))
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -297,10 +295,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	By(fmt.Sprintf("xxxxxxx dataSource %v", claim.Spec.DataSource))
 	if claim.Spec.DataSource != nil {
-		framework.Logf("check datasource %q/%q", claim.Namespace, claim.Name)
-
 		By("checking the created volume whether has the pre-populated data")
 		command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
 		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)

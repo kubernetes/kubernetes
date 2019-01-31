@@ -162,8 +162,8 @@ func (s *snapshottableTestResource) setupResource(driver TestDriver, pattern tes
 			s.pvc.Spec.StorageClassName = &s.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", s.sc, s.pvc)
 
-			if dDriver, ok := driver.(SnapshottableTestDriver); ok {
-				s.vsc = dDriver.GetSnapshotClass()
+			if sDriver, ok := driver.(SnapshottableTestDriver); ok {
+				s.vsc = sDriver.GetSnapshotClass()
 			}
 		}
 
@@ -189,7 +189,7 @@ type snapshottableTestInput struct {
 func testSnapshot(input *snapshottableTestInput) {
 	It("should create snapshot with defaults", func() {
 		if input.dInfo.Name == "csi-hostpath-v0" {
-			framework.Skipf("Driver %q does not support create snapshot - skipping", input.dInfo.Name)
+			framework.Skipf("skip test when using driver csi-hostpath-v0 - skipping")
 		}
 		TestCreateSnapshot(input.testCase, input.cs, input.dc, input.pvc, input.sc, input.vsc)
 	})

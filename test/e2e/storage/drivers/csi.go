@@ -61,7 +61,7 @@ type hostpathCSIDriver struct {
 	manifests  []string
 }
 
-func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests ...string) testsuites.TestDriver {
+func initHostPathCSIDriver(name string, config testsuites.TestConfig, capabilities map[testsuites.Capability]bool, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        name,
@@ -70,12 +70,8 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: true,
-				testsuites.CapDataSource:  true,
-			},
-
-			Config: config,
+			Capabilities: capabilities,
+			Config:       config,
 		},
 		manifests: manifests,
 	}
@@ -88,6 +84,7 @@ var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath", config,
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapDataSource: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -262,6 +259,7 @@ func (m *mockCSIDriver) CleanupDriver() {
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0", config,
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
