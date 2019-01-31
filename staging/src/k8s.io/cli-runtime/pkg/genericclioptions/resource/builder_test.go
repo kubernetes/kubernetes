@@ -282,6 +282,30 @@ func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
+type errorRestMapper struct {
+	meta.RESTMapper
+	err error
+}
+
+func (l *errorRestMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, l.err
+}
+
+func newDefaultBuilderWithMapperError(fakeClientFn FakeClientFunc, err error) *Builder {
+	return NewFakeBuilder(
+		fakeClientFn,
+		func() (meta.RESTMapper, error) {
+			return &errorRestMapper{
+				RESTMapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+				err:        err,
+			}, nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
+}
+
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../artifacts/kitten-rc.yaml"}})
@@ -631,6 +655,49 @@ func TestResourceByName(t *testing.T) {
 	}
 	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
+
+func TestRestMappingErrors(t *testing.T) {
+	pods, _ := testData()
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+	})).NamespaceParam("test")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	b.ResourceTypeOrNameArgs(true, "foo", "bar")
+
+	// ensure that requesting a resource we _know_ not to exist results in an expected *meta.NoKindMatchError
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil {
+		if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\"") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	expectedErr := fmt.Errorf("expected error")
+	b = newDefaultBuilderWithMapperError(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+	}), expectedErr).NamespaceParam("test")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	// ensure we request a resource we know not to exist. This way, we
+	// end up taking the codepath we want to test in the resource builder
+	b.ResourceTypeOrNameArgs(true, "foo", "bar")
+
+	// ensure that receiving an error for any reason other than a non-existent resource is returned as-is
+	err = b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil && !strings.Contains(err.Error(), expectedErr.Error()) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
