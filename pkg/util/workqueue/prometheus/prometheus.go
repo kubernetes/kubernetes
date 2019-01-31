@@ -18,6 +18,7 @@ package prometheus
 
 import (
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -133,7 +134,9 @@ func (prometheusMetricsProvider) NewDeprecatedDepthMetric(name string) workqueue
 		Name:      "depth",
 		Help:      "(Deprecated) Current depth of workqueue: " + name,
 	})
-	prometheus.Register(depth)
+	if err := prometheus.Register(depth); err != nil {
+		klog.Errorf("failed to register depth metric %v: %v", name, err)
+	}
 	return depth
 }
 
@@ -143,7 +146,9 @@ func (prometheusMetricsProvider) NewDeprecatedAddsMetric(name string) workqueue.
 		Name:      "adds",
 		Help:      "(Deprecated) Total number of adds handled by workqueue: " + name,
 	})
-	prometheus.Register(adds)
+	if err := prometheus.Register(adds); err != nil {
+		klog.Errorf("failed to register adds metric %v: %v", name, err)
+	}
 	return adds
 }
 
@@ -153,7 +158,9 @@ func (prometheusMetricsProvider) NewDeprecatedLatencyMetric(name string) workque
 		Name:      "queue_latency",
 		Help:      "(Deprecated) How long an item stays in workqueue" + name + " before being requested.",
 	})
-	prometheus.Register(latency)
+	if err := prometheus.Register(latency); err != nil {
+		klog.Errorf("failed to register latency metric %v: %v", name, err)
+	}
 	return latency
 }
 
@@ -163,7 +170,9 @@ func (prometheusMetricsProvider) NewDeprecatedWorkDurationMetric(name string) wo
 		Name:      "work_duration",
 		Help:      "(Deprecated) How long processing an item from workqueue" + name + " takes.",
 	})
-	prometheus.Register(workDuration)
+	if err := prometheus.Register(workDuration); err != nil {
+		klog.Errorf("failed to register work_duration metric %v: %v", name, err)
+	}
 	return workDuration
 }
 
@@ -176,7 +185,9 @@ func (prometheusMetricsProvider) NewDeprecatedUnfinishedWorkSecondsMetric(name s
 			"values indicate stuck threads. One can deduce the number of stuck " +
 			"threads by observing the rate at which this increases.",
 	})
-	prometheus.Register(unfinished)
+	if err := prometheus.Register(unfinished); err != nil {
+		klog.Errorf("failed to register unfinished_work_seconds metric %v: %v", name, err)
+	}
 	return unfinished
 }
 
@@ -187,7 +198,9 @@ func (prometheusMetricsProvider) NewDeprecatedLongestRunningProcessorMicrosecond
 		Help: "(Deprecated) How many microseconds has the longest running " +
 			"processor for " + name + " been running.",
 	})
-	prometheus.Register(unfinished)
+	if err := prometheus.Register(unfinished); err != nil {
+		klog.Errorf("failed to register longest_running_processor_microseconds metric %v: %v", name, err)
+	}
 	return unfinished
 }
 
@@ -197,6 +210,8 @@ func (prometheusMetricsProvider) NewDeprecatedRetriesMetric(name string) workque
 		Name:      "retries",
 		Help:      "(Deprecated) Total number of retries handled by workqueue: " + name,
 	})
-	prometheus.Register(retries)
+	if err := prometheus.Register(retries); err != nil {
+		klog.Errorf("failed to register retries metric %v: %v", name, err)
+	}
 	return retries
 }
