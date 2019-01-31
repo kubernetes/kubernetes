@@ -5360,9 +5360,37 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 // maxGMSACredentialSpecLength is the max length, in bytes, for the actual contents
 // of a GMSA cred spec. In general, those shouldn't be more than a few hundred bytes,
 // so we want to give plenty of room here while still providing an upper bound.
+// The runAsUserName field will be used to execute the given container's entrypoint, and
+// it can be formatted as "DOMAIN/USER", where the DOMAIN is optional, maxRunAsUserNameDomainLength
+// is the max character length for the user's DOMAIN, and maxRunAsUserNameUserLength
+// is the max character length for the USER itself. Both the DOMAIN and USER have their
+// own restrictions, and more information about them can be found here:
+// https://support.microsoft.com/en-us/help/909264/naming-conventions-in-active-directory-for-computers-domains-sites-and
+// https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/new-localuser?view=powershell-5.1
 const (
 	maxGMSACredentialSpecLengthInKiB = 64
 	maxGMSACredentialSpecLength      = maxGMSACredentialSpecLengthInKiB * 1024
+	maxRunAsUserNameDomainLength     = 256
+	maxRunAsUserNameUserLength       = 21
+)
+
+var (
+	// control characters are not permitted in the runAsUserName field.
+	ctrlRegex = regexp.MustCompile(`[[:cntrl:]]+`)
+
+	// a valid NetBios Domain name cannot start with a dot, has at least 1 character,
+	// at most 15 characters, and it cannot the characters: \ / : * ? " < > |
+	validNetBiosRegex = regexp.MustCompile(`^[^\\/:\*\?"<>|\.][^\\/:\*\?"<>|]{0,14}$`)
+
+	// a valid DNS name contains only alphanumeric characters, dots, and dashes.
+	dnsLabelFormat                 = `[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?`
+	dnsSubdomainFormat             = fmt.Sprintf(`^%s(?:\.%s)*$`, dnsLabelFormat, dnsLabelFormat)
+	validWindowsUserDomainDNSRegex = regexp.MustCompile(dnsSubdomainFormat)
+
+	// a username is invalid if it contains the characters: " / \ [ ] : ; | = , + * ? < > @
+	// or it contains only dots or spaces.
+	invalidUserNameCharsRegex      = regexp.MustCompile(`["/\\:;|=,\+\*\?<>@\[\]]`)
+	invalidUserNameDotsSpacesRegex = regexp.MustCompile(`^[\. ]+$`)
 )
 
 func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityContextOptions, fieldPath *field.Path) field.ErrorList {
@@ -5385,6 +5413,59 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 		} else if l > maxGMSACredentialSpecLength {
 			errMsg := fmt.Sprintf("gmsaCredentialSpec size must be under %d KiB", maxGMSACredentialSpecLengthInKiB)
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("gmsaCredentialSpec"), windowsOptions.GMSACredentialSpec, errMsg))
+		}
+	}
+
+	if windowsOptions.RunAsUserName != nil {
+		if l := len(*windowsOptions.RunAsUserName); l == 0 {
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, "runAsUserName cannot be an empty string"))
+		} else if ctrlRegex.MatchString(*windowsOptions.RunAsUserName) {
+			errMsg := fmt.Sprintf("runAsUserName cannot contain control characters")
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+		} else if parts := strings.Split(*windowsOptions.RunAsUserName, "\\"); len(parts) > 2 {
+			errMsg := fmt.Sprintf("runAsUserName cannot contain more than one backslash")
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+		} else {
+			var (
+				hasDomain = false
+				domain    = ""
+				user      string
+			)
+			if len(parts) == 1 {
+				user = parts[0]
+			} else {
+				hasDomain = true
+				domain = parts[0]
+				user = parts[1]
+			}
+
+			if len(domain) >= maxRunAsUserNameDomainLength {
+				errMsg := fmt.Sprintf("runAsUserName's Domain length must be under %d characters", maxRunAsUserNameDomainLength)
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			}
+
+			if hasDomain && !(validNetBiosRegex.MatchString(domain) || validWindowsUserDomainDNSRegex.MatchString(domain)) {
+				errMsg := "runAsUserName's Domain doesn't match the NetBios nor the DNS format"
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			}
+
+			if l := len(user); l == 0 {
+				errMsg := fmt.Sprintf("runAsUserName's User cannot be empty")
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			} else if l >= maxRunAsUserNameUserLength {
+				errMsg := fmt.Sprintf("runAsUserName's User length must be under %d characters", maxRunAsUserNameUserLength)
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			}
+
+			if invalidUserNameDotsSpacesRegex.MatchString(user) {
+				errMsg := `runAsUserName's User cannot contain only periods or spaces`
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			}
+
+			if invalidUserNameCharsRegex.MatchString(user) {
+				errMsg := `runAsUserName's User cannot contain the following characters: "/\:;|=,+*?<>@[]`
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
+			}
 		}
 	}
 
