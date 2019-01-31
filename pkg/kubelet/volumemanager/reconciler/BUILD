@@ -28,8 +28,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/utils/strings:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 
