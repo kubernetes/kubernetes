@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load(":code_generation_test.bzl", "code_generation_test_suite")
 
 code_generation_test_suite(
@@ -71,7 +71,6 @@ DOCKERIZED_BINARIES = {
     images = {
         "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
     },
-    stamp = True,
 ) for binary in DOCKERIZED_BINARIES.keys()]
 
 [genrule(

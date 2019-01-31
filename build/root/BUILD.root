@@ -13,7 +13,7 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
+load("@io_k8s_repo_infra//defs:build.bzl", "gcs_upload")
 
 filegroup(
     name = "_binary-artifacts-and-hashes",

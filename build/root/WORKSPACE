@@ -3,23 +3,21 @@ load("//build:workspace_mirror.bzl", "mirror")
 load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 http_archive(
-    name = "io_bazel_rules_go",
-    sha256 = "ade51a315fa17347e5c31201fdc55aa5ffb913377aa315dceb56ee9725e620ee",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.6/rules_go-0.16.6.tar.gz"),
-)
-
-http_archive(
-    name = "io_kubernetes_build",
-    sha256 = "21160531ea8a9a4001610223ad815622bf60671d308988c7057168a495a7e2e8",
-    strip_prefix = "repo-infra-b4bc4f1552c7fc1d4654753ca9b0e5e13883429f",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/b4bc4f1552c7fc1d4654753ca9b0e5e13883429f.tar.gz"),
-)
-
-http_archive(
     name = "bazel_skylib",
-    sha256 = "bbccf674aa441c266df9894182d80de104cabd19be98be002f6d478aaa31574d",
-    strip_prefix = "bazel-skylib-2169ae1c374aab4a09aa90e65efe1a3aad4e279b",
-    urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"),
+    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
+    strip_prefix = "bazel-skylib-0.6.0",
+    urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"),
+)
+
+load("@bazel_skylib//lib:versions.bzl", "versions")
+
+versions.check(minimum_bazel_version = "0.18.0")
+
+http_archive(
+    name = "io_k8s_repo_infra",
+    sha256 = "4ce2d8576e786c8fb8bc4f7ed79f5fda543568d78c09306d16cc8d1b7d5621f0",
+    strip_prefix = "repo-infra-8a5707674e76b825bfd9a8624bae045bc6e5f24d",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/8a5707674e76b825bfd9a8624bae045bc6e5f24d.tar.gz"),
 )
 
 ETCD_VERSION = "3.3.10"
@@ -33,18 +31,12 @@ http_archive(
 )
 
 http_archive(
-    name = "io_bazel_rules_docker",
-    sha256 = "29d109605e0d6f9c892584f07275b8c9260803bf0c6fcb7de2623b2bedc910bd",
-    strip_prefix = "rules_docker-0.5.1",
-    urls = mirror("https://github.com/bazelbuild/rules_docker/archive/v0.5.1.tar.gz"),
+    name = "io_bazel_rules_go",
+    sha256 = "492c3ac68ed9dcf527a07e6a1b2dcbf199c6bf8b35517951467ac32e421c06c1",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.17.0/rules_go-0.17.0.tar.gz"),
 )
 
-load("@bazel_skylib//:lib.bzl", "versions")
-
-versions.check(minimum_bazel_version = "0.17.2")
-
-load("@io_bazel_rules_go//go:def.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_repositories")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
 go_rules_dependencies()
 
@@ -52,7 +44,21 @@ go_register_toolchains(
     go_version = "1.11.5",
 )
 
-docker_repositories()
+http_archive(
+    name = "io_bazel_rules_docker",
+    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
+    strip_prefix = "rules_docker-0.7.0",
+    urls = mirror("https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"),
+)
+
+load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+
+container_repositories()
+
+load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 http_file(
     name = "kubernetes_cni",
@@ -68,7 +74,7 @@ http_file(
     urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-amd64.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION)),
 )
 
-docker_pull(
+container_pull(
     name = "debian-base-amd64",
     digest = "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
     registry = "k8s.gcr.io",
@@ -76,7 +82,7 @@ docker_pull(
     tag = "0.4.1",  # ignored, but kept here for documentation
 )
 
-docker_pull(
+container_pull(
     name = "debian-iptables-amd64",
     digest = "sha256:9c41b4c326304b94eb96fdd2e181aa6e9995cc4642fcdfb570cedd73a419ba39",
     registry = "k8s.gcr.io",
@@ -84,7 +90,7 @@ docker_pull(
     tag = "v11.0.1",  # ignored, but kept here for documentation
 )
 
-docker_pull(
+container_pull(
     name = "debian-hyperkube-base-amd64",
     digest = "sha256:5d4ea2fb5fbe9a9a9da74f67cf2faefc881968bc39f2ac5d62d9167e575812a1",
     registry = "k8s.gcr.io",
@@ -92,7 +98,7 @@ docker_pull(
     tag = "0.12.1",  # ignored, but kept here for documentation
 )
 
-docker_pull(
+container_pull(
     name = "official_busybox",
     digest = "sha256:cb63aa0641a885f54de20f61d152187419e8f6b159ed11a251a09d115fdff9bd",
     registry = "index.docker.io",
