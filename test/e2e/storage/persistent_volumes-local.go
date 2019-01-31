@@ -583,7 +583,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			}()
 
 			By("Waiting for all pods to complete successfully")
-			err := wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
+			err := wait.PollImmediate(time.Second, 30*time.Minute, func() (done bool, err error) {
 				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
 				if err != nil {
 					return false, err
