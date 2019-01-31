@@ -151,8 +151,6 @@ type PodPreemptor interface {
 type Configurator interface {
 	// Exposed for testing
 	GetHardPodAffinitySymmetricWeight() int32
-	// Exposed for testing
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error)
 
 	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
 	GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error)
@@ -884,7 +882,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
 		NextPod:         internalqueue.MakeNextPodFunc(c.podQueue),
-		Error:           c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
+		Error:           MakeDefaultErrorFunc(c.client, podBackoff, c.podQueue, c.schedulerCache, c.StopEverything),
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
 		SchedulingQueue: c.podQueue,
@@ -1062,7 +1060,8 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 	}
 }
 
-func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
+// MakeDefaultErrorFunc construct a function to handle pod scheduler error
+func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache schedulerinternalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -1074,10 +1073,10 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					nodeName := errStatus.Status().Details.Name
 					// when node is not found, We do not remove the node right away. Trying again to get
 					// the node and if the node is still not found, then remove it from the scheduler cache.
-					_, err := c.client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+					_, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 					if err != nil && errors.IsNotFound(err) {
 						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-						c.schedulerCache.RemoveNode(&node)
+						schedulerCache.RemoveNode(&node)
 					}
 				}
 			} else {
@@ -1086,6 +1085,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 		}
 
 		backoff.Gc()
+		podSchedulingCycle := podQueue.SchedulingCycle()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
@@ -1100,7 +1100,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 			// to run on a node, scheduler takes the pod into account when running
 			// predicates for the node.
 			if !util.PodPriorityEnabled() {
-				if !backoff.TryBackoffAndWait(podID, c.StopEverything) {
+				if !backoff.TryBackoffAndWait(podID, stopEverything) {
 					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
 					return
 				}
@@ -1108,10 +1108,10 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
-				pod, err := c.client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
+				pod, err := client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
-						podQueue.AddUnschedulableIfNotPresent(pod)
+						podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle)
 					}
 					break
 				}

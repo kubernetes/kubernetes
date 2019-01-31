@@ -138,14 +138,12 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if o.Local {

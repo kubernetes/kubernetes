@@ -48,9 +48,8 @@ import (
 )
 
 const (
-	ApplyAnnotationsFlag     = "save-config"
-	DefaultErrorExitCode     = 1
-	IncludeUninitializedFlag = "include-uninitialized"
+	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
 )
 
 type debugError interface {
@@ -402,7 +401,8 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool(IncludeUninitializedFlag, false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -592,28 +592,6 @@ func ManualStrip(file []byte) []byte {
 		}
 	}
 	return stripped
-}
-
-// ShouldIncludeUninitialized identifies whether to include uninitialized objects.
-// includeUninitialized is the default value.
-// Assume we can parse `all` and `selector` from cmd.
-func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) bool {
-	shouldIncludeUninitialized := includeUninitialized
-	if cmd.Flags().Lookup("all") != nil && GetFlagBool(cmd, "all") {
-		// include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=false
-		shouldIncludeUninitialized = true
-	}
-	if cmd.Flags().Lookup("selector") != nil && GetFlagString(cmd, "selector") != "" {
-		// does not include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=true
-		shouldIncludeUninitialized = false
-	}
-	if cmd.Flags().Changed(IncludeUninitializedFlag) {
-		// get explicit value
-		shouldIncludeUninitialized = GetFlagBool(cmd, IncludeUninitializedFlag)
-	}
-	return shouldIncludeUninitialized
 }
 
 // ScaleClientFunc provides a ScalesGetter

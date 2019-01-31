@@ -126,7 +126,7 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	}
 
 	klog.V(1).Infof("[upload-config] Uploading the kubelet component config to a ConfigMap")
-	if err = kubeletphase.CreateConfigMap(cfg, client); err != nil {
+	if err = kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 

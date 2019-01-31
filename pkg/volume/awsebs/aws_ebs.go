@@ -490,7 +490,7 @@ func (c *awsElasticBlockStoreUnmounter) TearDown() error {
 
 // Unmounts the bind mount
 func (c *awsElasticBlockStoreUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 type awsElasticBlockStoreDeleter struct {

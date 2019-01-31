@@ -295,7 +295,7 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Cleanup upon failure.
-	volutil.UnmountPath(dir, b.mounter)
+	mount.CleanupMountPoint(dir, b.mounter, false)
 	return err
 }
 
@@ -315,7 +315,7 @@ func (c *glusterfsUnmounter) TearDown() error {
 }
 
 func (c *glusterfsUnmounter) TearDownAt(dir string) error {
-	return volutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func (b *glusterfsMounter) setUpAtInternal(dir string) error {

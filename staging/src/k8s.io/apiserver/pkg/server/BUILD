@@ -73,7 +73,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:go_default_library",

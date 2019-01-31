@@ -162,7 +162,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		o.GracePeriod = 1
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := f.NewBuilder().
 		Unstructured().
 		ContinueOnError().
@@ -170,7 +169,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
-		IncludeUninitialized(includeUninitialized).
 		SelectAllParam(o.DeleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().

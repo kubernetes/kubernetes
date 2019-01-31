@@ -95,7 +95,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	return dnsaddon.EnsureDNSAddon(cfg, client)
+	return dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client)
 }
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
@@ -104,7 +104,7 @@ func runKubeProxyAddon(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	return proxyaddon.EnsureProxyAddon(cfg, client)
+	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client)
 }
 
 func getAddonPhaseFlags(name string) []string {

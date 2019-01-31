@@ -40,6 +40,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -94,6 +95,14 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
 	if masterTaint && cfg.Taints == nil {
 		cfg.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
+
+	if cfg.CRISocket == "" {
+		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()
+		if err != nil {
+			return err
+		}
+		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
 	}
 
 	return nil

@@ -216,8 +216,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 func (nm *NodeManager) RegisterNode(node *v1.Node) error {
 	nm.addNode(node)
-	nm.DiscoverNode(node)
-	return nil
+	return nm.DiscoverNode(node)
 }
 
 func (nm *NodeManager) UnRegisterNode(node *v1.Node) error {

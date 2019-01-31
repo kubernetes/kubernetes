@@ -292,7 +292,7 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 }
 
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
 func setNodeVolume(

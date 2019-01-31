@@ -170,7 +170,7 @@ func makeSymlinks(targetName string, commandFns []func() *cobra.Command) error {
 	}
 
 	if errs {
-		return errors.New("Error creating one or more symlinks.")
+		return errors.New("Error creating one or more symlinks")
 	}
 	return nil
 }

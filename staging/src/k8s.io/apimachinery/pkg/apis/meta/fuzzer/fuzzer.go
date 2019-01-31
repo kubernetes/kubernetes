@@ -216,10 +216,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 		},
 		func(j *metav1.Initializers, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
-			if len(j.Pending) == 0 {
-				j.Pending = nil
-			}
+			j = nil
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)

@@ -54,12 +54,11 @@ spec:
     - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
     - --advertise-address=192.168.1.115
     - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-    - --insecure-port=0
     - --experimental-bootstrap-token-auth=true
     - --requestheader-username-headers=X-Remote-User
     - --requestheader-extra-headers-prefix=X-Remote-Extra-
     - --requestheader-allowed-names=front-proxy-client
-    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
     - --allow-privileged=true
     - --client-ca-file=/etc/kubernetes/pki/ca.crt
     - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
@@ -136,12 +135,11 @@ spec:
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
         - --advertise-address=$(HOST_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-        - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
         - --requestheader-username-headers=X-Remote-User
         - --requestheader-extra-headers-prefix=X-Remote-Extra-
         - --requestheader-allowed-names=front-proxy-client
-        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
         - --allow-privileged=true
         - --client-ca-file=/etc/kubernetes/pki/ca.crt
         - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key

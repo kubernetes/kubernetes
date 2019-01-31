@@ -59,7 +59,14 @@ const unschedulableQTimeInterval = 60 * time.Second
 type SchedulingQueue interface {
 	Add(pod *v1.Pod) error
 	AddIfNotPresent(pod *v1.Pod) error
-	AddUnschedulableIfNotPresent(pod *v1.Pod) error
+	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
+	// The podSchedulingCycle represents the current scheduling cycle number which can be
+	// returned by calling SchedulingCycle().
+	AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error
+	// SchedulingCycle returns the current number of scheduling cycle which is
+	// cached by scheduling queue. Normally, incrementing this number whenever
+	// a pod is popped (e.g. called Pop()) is enough.
+	SchedulingCycle() int64
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop() (*v1.Pod, error)
@@ -111,8 +118,13 @@ func (f *FIFO) AddIfNotPresent(pod *v1.Pod) error {
 
 // AddUnschedulableIfNotPresent adds an unschedulable pod back to the queue. In
 // FIFO it is added to the end of the queue.
-func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
+func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
 	return f.FIFO.AddIfNotPresent(pod)
+}
+
+// SchedulingCycle implements SchedulingQueue.SchedulingCycle interface.
+func (f *FIFO) SchedulingCycle() int64 {
+	return 0
 }
 
 // Update updates a pod in the FIFO.
@@ -218,12 +230,14 @@ type PriorityQueue struct {
 	// nominatedPods is a structures that stores pods which are nominated to run
 	// on nodes.
 	nominatedPods *nominatedPodMap
-	// receivedMoveRequest is set to true whenever we receive a request to move a
-	// pod from the unschedulableQ to the activeQ, and is set to false, when we pop
-	// a pod from the activeQ. It indicates if we received a move request when a
-	// pod was in flight (we were trying to schedule it). In such a case, we put
-	// the pod back into the activeQ if it is determined unschedulable.
-	receivedMoveRequest bool
+	// schedulingCycle represents sequence number of scheduling cycle and is incremented
+	// when a pod is popped.
+	schedulingCycle int64
+	// moveRequestCycle caches the sequence number of scheduling cycle when we
+	// received a move request. Unscheduable pods in and before this scheduling
+	// cycle will be put back to activeQueue if we were trying to schedule them
+	// when we received move request.
+	moveRequestCycle int64
 
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
@@ -265,12 +279,13 @@ func NewPriorityQueue(stop <-chan struct{}) *PriorityQueue {
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
 func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *PriorityQueue {
 	pq := &PriorityQueue{
-		clock:          clock,
-		stop:           stop,
-		podBackoff:     util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
-		activeQ:        util.NewHeap(cache.MetaNamespaceKeyFunc, activeQComp),
-		unschedulableQ: newUnschedulablePodsMap(),
-		nominatedPods:  newNominatedPodMap(),
+		clock:            clock,
+		stop:             stop,
+		podBackoff:       util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
+		activeQ:          util.NewHeap(cache.MetaNamespaceKeyFunc, activeQComp),
+		unschedulableQ:   newUnschedulablePodsMap(),
+		nominatedPods:    newNominatedPodMap(),
+		moveRequestCycle: -1,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = util.NewHeap(cache.MetaNamespaceKeyFunc, pq.podsCompareBackoffCompleted)
@@ -372,12 +387,19 @@ func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
 	}
 }
 
+// SchedulingCycle returns current scheduling cycle.
+func (p *PriorityQueue) SchedulingCycle() int64 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	return p.schedulingCycle
+}
+
 // AddUnschedulableIfNotPresent does nothing if the pod is present in any
 // queue. If pod is unschedulable, it adds pod to unschedulable queue if
-// p.receivedMoveRequest is false or to backoff queue if p.receivedMoveRequest
-// is true but pod is subject to backoff. In other cases, it adds pod to active
-// queue.
-func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
+// p.moveRequestCycle > podSchedulingCycle or to backoff queue if p.moveRequestCycle
+// <= podSchedulingCycle but pod is subject to backoff. In other cases, it adds pod to
+// active queue.
+func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	if p.unschedulableQ.get(pod) != nil {
@@ -389,7 +411,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	if _, exists, _ := p.podBackoffQ.Get(pod); exists {
 		return fmt.Errorf("pod is already present in the backoffQ")
 	}
-	if !p.receivedMoveRequest && isPodUnschedulable(pod) {
+	if podSchedulingCycle > p.moveRequestCycle && isPodUnschedulable(pod) {
 		p.backoffPod(pod)
 		p.unschedulableQ.addOrUpdate(pod)
 		p.nominatedPods.add(pod, "")
@@ -469,8 +491,8 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
-// activeQ is empty and waits until a new item is added to the queue. It also
-// clears receivedMoveRequest to mark the beginning of a new scheduling cycle.
+// activeQ is empty and waits until a new item is added to the queue. It
+// increments scheduling cycle when a pod is popped.
 func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -488,7 +510,7 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 		return nil, err
 	}
 	pod := obj.(*v1.Pod)
-	p.receivedMoveRequest = false
+	p.schedulingCycle++
 	return pod, err
 }
 
@@ -609,7 +631,7 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 		}
 	}
 	p.unschedulableQ.clear()
-	p.receivedMoveRequest = true
+	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
 
@@ -627,7 +649,7 @@ func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
 		}
 		p.unschedulableQ.delete(pod)
 	}
-	p.receivedMoveRequest = true
+	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
 

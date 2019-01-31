@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -76,8 +77,8 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 		},
 		{ // cert exists, but it is not a ca > err
 			setupFunc: func(pkiDir string) error {
-				cert, key := certstestutil.CreateTestCert(t, setupCert, setupKey)
-				return writeCertificateFilesIfNotExist(pkiDir, "dummy", setupCert, cert, key)
+				cert, key, config := certstestutil.CreateTestCert(t, setupCert, setupKey, certutil.AltNames{})
+				return writeCertificateFilesIfNotExist(pkiDir, "dummy", setupCert, cert, key, config)
 			},
 			expectedError: true,
 		},
@@ -125,10 +126,16 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 }
 
 func TestWriteCertificateFilesIfNotExist(t *testing.T) {
+	altNames := certutil.AltNames{
+		DNSNames: []string{"example.com"},
+		IPs: []net.IP{
+			net.IPv4(0, 0, 0, 0),
+		},
+	}
 
 	caCert, caKey := certstestutil.CreateCACert(t)
-	setupCert, setupKey := certstestutil.CreateTestCert(t, caCert, caKey)
-	cert, key := certstestutil.CreateTestCert(t, caCert, caKey)
+	setupCert, setupKey, _ := certstestutil.CreateTestCert(t, caCert, caKey, altNames)
+	cert, key, config := certstestutil.CreateTestCert(t, caCert, caKey, altNames)
 
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
@@ -138,9 +145,29 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		{ // cert does not exists > cert written
 			expectedCert: cert,
 		},
-		{ // cert exists, is signed by the same ca > existing cert used
+		{ // cert exists, is signed by the same ca, missing SANs (dns name) > err
 			setupFunc: func(pkiDir string) error {
-				return writeCertificateFilesIfNotExist(pkiDir, "dummy", caCert, setupCert, setupKey)
+				setupCert, setupKey, setupConfig := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{
+					IPs: []net.IP{
+						net.IPv4(0, 0, 0, 0),
+					},
+				})
+				return writeCertificateFilesIfNotExist(pkiDir, "dummy", caCert, setupCert, setupKey, setupConfig)
+			},
+			expectedError: true,
+		},
+		{ // cert exists, is signed by the same ca, missing SANs (IP address) > err
+			setupFunc: func(pkiDir string) error {
+				setupCert, setupKey, setupConfig := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{
+					DNSNames: []string{"example.com"},
+				})
+				return writeCertificateFilesIfNotExist(pkiDir, "dummy", caCert, setupCert, setupKey, setupConfig)
+			},
+			expectedError: true,
+		},
+		{ // cert exists, is signed by the same ca, all SANs present > existing cert used
+			setupFunc: func(pkiDir string) error {
+				return writeCertificateFilesIfNotExist(pkiDir, "dummy", caCert, setupCert, setupKey, config)
 			},
 			expectedCert: setupCert,
 		},
@@ -154,9 +181,9 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		{ // cert exists, is signed by another ca > err
 			setupFunc: func(pkiDir string) error {
 				anotherCaCert, anotherCaKey := certstestutil.CreateCACert(t)
-				anotherCert, anotherKey := certstestutil.CreateTestCert(t, anotherCaCert, anotherCaKey)
+				anotherCert, anotherKey, config := certstestutil.CreateTestCert(t, anotherCaCert, anotherCaKey, certutil.AltNames{})
 
-				return writeCertificateFilesIfNotExist(pkiDir, "dummy", anotherCaCert, anotherCert, anotherKey)
+				return writeCertificateFilesIfNotExist(pkiDir, "dummy", anotherCaCert, anotherCert, anotherKey, config)
 			},
 			expectedError: true,
 		},
@@ -176,13 +203,13 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		}
 
 		// executes create func
-		err := writeCertificateFilesIfNotExist(tmpdir, "dummy", caCert, cert, key)
+		err := writeCertificateFilesIfNotExist(tmpdir, "dummy", caCert, cert, key, config)
 
 		if !test.expectedError && err != nil {
 			t.Errorf("error writeCertificateFilesIfNotExist failed when not expected to fail: %v", err)
 			continue
 		} else if test.expectedError && err == nil {
-			t.Error("error writeCertificateFilesIfNotExist didn't failed when expected")
+			t.Error("error writeCertificateFilesIfNotExist didn't fail when expected")
 			continue
 		} else if test.expectedError {
 			continue
@@ -355,7 +382,7 @@ func TestNewCACertAndKey(t *testing.T) {
 
 func TestSharedCertificateExists(t *testing.T) {
 	caCert, caKey := certstestutil.CreateCACert(t)
-	_, key := certstestutil.CreateTestCert(t, caCert, caKey)
+	_, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
 	publicKey := &key.PublicKey
 
 	var tests = []struct {
@@ -436,10 +463,8 @@ func TestSharedCertificateExists(t *testing.T) {
 			os.MkdirAll(tmpdir+"/etcd", os.ModePerm)
 			defer os.RemoveAll(tmpdir)
 
-			cfg := &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					CertificatesDir: tmpdir,
-				},
+			cfg := &kubeadmapi.ClusterConfiguration{
+				CertificatesDir: tmpdir,
 			}
 
 			// created expected keys
@@ -527,7 +552,7 @@ func TestUsingExternalCA(t *testing.T) {
 			}
 		}
 
-		if val, _ := UsingExternalCA(cfg); val != test.expected {
+		if val, _ := UsingExternalCA(&cfg.ClusterConfiguration); val != test.expected {
 			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
 		}
 	}
@@ -536,7 +561,7 @@ func TestUsingExternalCA(t *testing.T) {
 func TestValidateMethods(t *testing.T) {
 
 	caCert, caKey := certstestutil.CreateCACert(t)
-	cert, key := certstestutil.CreateTestCert(t, caCert, caKey)
+	cert, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
 
 	tests := []struct {
 		name            string

@@ -64,6 +64,7 @@ go_test(
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
+        "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/fake:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",

@@ -1555,8 +1555,8 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Comment": "v4.0.0-3-g36442dbdb58521",
-			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
+			"Comment": "v4.1.0-11-gd4020504c68b6b",
+			"Rev": "d4020504c68b6bfa818032bedfb48e33e9638506"
 		},
 		{
 			"ImportPath": "github.com/exponent-io/jsonpath",
@@ -2432,6 +2432,11 @@
 			"Rev": "89fcab3d43de07060e4fd4c1547430ed57e87f24"
 		},
 		{
+			"ImportPath": "github.com/lithammer/dedent",
+			"Comment": "v1.1.0",
+			"Rev": "8478954c3bc893cf36c5ee7c822266b993a3b3ee"
+		},
+		{
 			"ImportPath": "github.com/magiconair/properties",
 			"Comment": "v1.7.0-4-g61b492c03cf472",
 			"Rev": "61b492c03cf472e0c6419be5899b8e0dc28b1b88"
@@ -2996,11 +3001,6 @@
 			"ImportPath": "github.com/rancher/go-rancher/client",
 			"Comment": "v0.1.0-196-g09693a8743ba5e",
 			"Rev": "09693a8743ba5ee58c58c1b1e8a4abd17af00d45"
-		},
-		{
-			"ImportPath": "github.com/renstrom/dedent",
-			"Comment": "v1.0.0-3-g020d11c3b9c0c7",
-			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
@@ -4089,20 +4089,44 @@
 			"Rev": "00fe14e3d1a3f9a73c4cea62d9c33b29c1e03ac4"
 		},
 		{
+			"ImportPath": "k8s.io/utils/buffer",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/integer",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/io",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/nsenter",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/path",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/trace",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

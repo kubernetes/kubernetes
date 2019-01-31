@@ -24,8 +24,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -212,7 +212,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	phaseutil.SetKubernetesVersion(cfg)
+	phaseutil.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")

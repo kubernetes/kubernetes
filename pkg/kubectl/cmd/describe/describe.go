@@ -79,9 +79,8 @@ type DescribeOptions struct {
 
 	BuilderArgs []string
 
-	EnforceNamespace     bool
-	AllNamespaces        bool
-	IncludeUninitialized bool
+	EnforceNamespace bool
+	AllNamespaces    bool
 
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
@@ -144,9 +143,6 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.NewBuilder = f.NewBuilder
 
-	// include the uninitialized objects by default
-	// unless user explicitly set --include-uninitialized=false
-	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, true)
 	return nil
 }
 
@@ -161,7 +157,6 @@ func (o *DescribeOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		Flatten().
 		Do()

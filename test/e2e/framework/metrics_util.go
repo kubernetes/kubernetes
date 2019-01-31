@@ -137,7 +137,9 @@ var SchedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubs
 
 var InterestingApiServerMetrics = []string{
 	"apiserver_request_total",
-	"apiserver_request_latency_seconds_summary",
+	// TODO(krzysied): apiserver_request_latencies_summary is a deprecated metric.
+	// It should be replaced with new metric.
+	"apiserver_request_latencies_summary",
 	"etcd_helper_cache_entry_total",
 	"etcd_helper_cache_hit_total",
 	"etcd_helper_cache_miss_total",
@@ -293,8 +295,8 @@ func NewEtcdMetricsCollector() *EtcdMetricsCollector {
 
 func getEtcdMetrics() ([]*model.Sample, error) {
 	// Etcd is only exposed on localhost level. We are using ssh method
-	if TestContext.Provider == "gke" {
-		Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+	if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+		Logf("Not grabbing etcd metrics through master SSH: unsupported for %s", TestContext.Provider)
 		return nil, nil
 	}
 
@@ -475,9 +477,9 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 
 	for _, sample := range samples {
 		// Example line:
-		// apiserver_request_latency_seconds_summary{resource="namespaces",verb="LIST",quantile="0.99"} 0.000908
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
 		// apiserver_request_total{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latency_seconds_summary" &&
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
 			sample.Metric[model.MetricNameLabel] != "apiserver_request_total" {
 			continue
 		}
@@ -491,13 +493,13 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		}
 
 		switch sample.Metric[model.MetricNameLabel] {
-		case "apiserver_request_latency_seconds_summary":
+		case "apiserver_request_latencies_summary":
 			latency := sample.Value
 			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
 			if err != nil {
 				return nil, err
 			}
-			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Second)
+			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Microsecond)
 		case "apiserver_request_total":
 			count := sample.Value
 			a.addMetricRequestCount(resource, subresource, verb, scope, int(count))
@@ -620,8 +622,8 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		responseText = string(body)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
-		if TestContext.Provider == "gke" {
-			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+		if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+			Logf("Not grabbing scheduler metrics through master SSH: unsupported for %s", TestContext.Provider)
 			return "", nil
 		}
 

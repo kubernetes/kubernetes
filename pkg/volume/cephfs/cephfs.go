@@ -264,7 +264,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
 		// cleanup upon failure.
-		util.UnmountPath(dir, cephfsVolume.mounter)
+		mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 		return err
 	}
 	return nil
@@ -283,7 +283,7 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, cephfsVolume.mounter)
+	return mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 }
 
 // GetPath creates global mount path

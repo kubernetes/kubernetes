@@ -90,7 +90,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 		// Add etcd static pod spec only if external etcd is not configured
 		if cfg.Etcd.External == nil {
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
-			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), cfg); err != nil {
+			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {

@@ -54,7 +54,7 @@ import (
 )
 
 // StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
-func StartRealMasterOrDie(t *testing.T) *Master {
+func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *Master {
 	certDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -79,11 +79,12 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
 	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	kubeAPIServerOptions.APIEnablement.RuntimeConfig["api/all"] = "true"
+	for _, f := range configFuncs {
+		f(kubeAPIServerOptions)
+	}
 	completedOptions, err := app.Complete(kubeAPIServerOptions)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := completedOptions.APIEnablement.RuntimeConfig.Set("api/all=true"); err != nil {
 		t.Fatal(err)
 	}
 

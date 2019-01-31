@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -518,7 +517,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
-		admissionregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

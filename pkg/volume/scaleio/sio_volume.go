@@ -193,7 +193,7 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	}
 
 	klog.V(4).Info(log("attempting to unmount %s", dir))
-	if err := util.UnmountPath(dir, mounter); err != nil {
+	if err := mount.CleanupMountPoint(dir, mounter, false); err != nil {
 		klog.Error(log("teardown failed while unmounting dir %s: %v ", dir, err))
 		return err
 	}

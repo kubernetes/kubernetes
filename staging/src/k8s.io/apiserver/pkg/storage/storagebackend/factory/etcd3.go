@@ -19,6 +19,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -72,10 +73,12 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		client := clientValue.Load().(*clientv3.Client)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		if _, err := client.Cluster.MemberList(ctx); err != nil {
-			return fmt.Errorf("error listing etcd members: %v", err)
+		// See https://github.com/etcd-io/etcd/blob/master/etcdctl/ctlv3/command/ep_command.go#L118
+		_, err := client.Get(ctx, path.Join(c.Prefix, "health"))
+		if err == nil {
+			return nil
 		}
-		return nil
+		return fmt.Errorf("error getting data from etcd: %v", err)
 	}, nil
 }
 

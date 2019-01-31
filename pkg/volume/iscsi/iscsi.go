@@ -359,7 +359,7 @@ func (c *iscsiDiskUnmounter) TearDown() error {
 }
 
 func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
-	return ioutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 // Block Volumes Support

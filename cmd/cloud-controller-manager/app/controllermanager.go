@@ -183,6 +183,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		"kube-system",
 		"cloud-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
+		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: c.EventRecorder,
@@ -211,13 +212,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 // startControllers starts the cloud specific controller loops.
 func startControllers(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, cloud cloudprovider.Interface, controllers map[string]initFunc) error {
-	if cloud != nil {
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(c.ClientBuilder, stopCh)
-		// Set the informer on the user cloud object
-		if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-			informerUserCloud.SetInformers(c.SharedInformers)
-		}
+	// Initialize the cloud provider with a reference to the clientBuilder
+	cloud.Initialize(c.ClientBuilder, stopCh)
+	// Set the informer on the user cloud object
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(c.SharedInformers)
 	}
 
 	for controllerName, initFn := range controllers {

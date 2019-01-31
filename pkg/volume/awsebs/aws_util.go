@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -120,8 +121,10 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 	}
 
 	fstype := ""
-	if v, ok := c.options.Parameters[volume.VolumeParameterFSType]; ok {
-		fstype = v
+	for k, v := range c.options.Parameters {
+		if strings.ToLower(k) == volume.VolumeParameterFSType {
+			fstype = v
+		}
 	}
 
 	return name, volumeOptions.CapacityGB, labels, fstype, nil
@@ -187,7 +190,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 // Returns the first path that exists, or empty string if none exist.
 func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
+		if pathExists, err := mount.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
@@ -201,7 +204,7 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 	allPathsRemoved := true
 	for _, path := range devicePaths {
-		exists, err := volumeutil.PathExists(path)
+		exists, err := mount.PathExists(path)
 		if err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		}

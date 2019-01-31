@@ -24,8 +24,6 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
-	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
-	fakeadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	fakeadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -134,11 +132,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 var _ clientset.Interface = &Clientset{}
-
-// AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
-func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
-	return &fakeadmissionregistrationv1alpha1.FakeAdmissionregistrationV1alpha1{Fake: &c.Fake}
-}
 
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {

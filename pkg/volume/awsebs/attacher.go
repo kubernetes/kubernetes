@@ -274,7 +274,7 @@ func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName
 }
 
 func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
 func setNodeDisk(

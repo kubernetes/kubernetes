@@ -18,6 +18,7 @@ package network
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -1748,6 +1749,62 @@ var _ = SIGDescribe("Services", func() {
 		By("verifying service-disabled is still not up")
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
 	})
+
+	It("should be rejected when no endpoints exist", func() {
+		namespace := f.Namespace.Name
+		serviceName := "no-pods"
+		jig := framework.NewServiceTestJig(cs, serviceName)
+		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
+		labels := map[string]string{
+			"nopods": "nopods",
+		}
+		port := 80
+		ports := []v1.ServicePort{{
+			Port:       int32(port),
+			TargetPort: intstr.FromInt(80),
+		}}
+
+		By("creating a service with no endpoints")
+		_, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
+		if err != nil {
+			framework.Failf("Failed to create service: %v", err)
+		}
+
+		nodeName := nodes.Items[0].Name
+		podName := "execpod-noendpoints"
+
+		By(fmt.Sprintf("creating %v on node %v", podName, nodeName))
+		execPodName := framework.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
+			pod.Spec.NodeName = nodeName
+		})
+		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
+		framework.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
+		cmd := fmt.Sprintf(`wget -T 3 -qO- %v`, serviceAddress)
+
+		By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
+		expectedErr := "connection refused"
+		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyEndpointLagTimeout, func() (bool, error) {
+			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), expectedErr) {
+					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
+					return true, nil
+				} else {
+					framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
+					return false, nil
+				}
+			} else {
+				return true, errors.New("expected wget call to fail")
+			}
+		}); pollErr != nil {
+			Expect(pollErr).NotTo(HaveOccurred())
+		}
+	})
+
 })
 
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.

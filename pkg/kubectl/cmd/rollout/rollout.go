@@ -17,7 +17,7 @@ limitations under the License.
 package rollout
 
 import (
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -33,7 +33,7 @@ var (
 	rolloutExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
-		
+
 		# Check the rollout status of a daemonset
 		kubectl rollout status daemonset/foo`)
 

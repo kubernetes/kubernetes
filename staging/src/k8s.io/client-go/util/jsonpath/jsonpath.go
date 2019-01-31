@@ -273,12 +273,16 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			return result, nil
 		}
 
-		if !params[2].Known {
-			value = value.Slice(params[0].Value, params[1].Value)
-		} else {
-			value = value.Slice3(params[0].Value, params[1].Value, params[2].Value)
+		value = value.Slice(params[0].Value, params[1].Value)
+
+		step := 1
+		if params[2].Known {
+			if params[2].Value <= 0 {
+				return input, fmt.Errorf("step must be > 0")
+			}
+			step = params[2].Value
 		}
-		for i := 0; i < value.Len(); i++ {
+		for i := 0; i < value.Len(); i += step {
 			result = append(result, value.Index(i))
 		}
 	}

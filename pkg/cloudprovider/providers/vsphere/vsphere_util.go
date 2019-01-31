@@ -23,12 +23,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -72,7 +73,12 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer confFile.Close()
+	defer func() {
+		if err := confFile.Close(); err != nil {
+			klog.Errorf("failed to close config file: %v", err)
+		}
+	}()
+
 	cfg, err := readConfig(confFile)
 	if err != nil {
 		return nil, err
@@ -325,10 +331,9 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 			// Querying a non-existent dummy disk on the datastore folder.
 			// It would fail and return an folder ID in the error message.
 			_, err := dc.GetVirtualDiskPage83Data(ctx, dummyDiskVolPath)
+			canonicalVolumePath, err = getPathFromFileNotFound(err)
 			if err != nil {
-				re := regexp.MustCompile("File (.*?) was not found")
-				match := re.FindStringSubmatch(err.Error())
-				canonicalVolumePath = match[1]
+				return "", fmt.Errorf("failed to get path from dummy request: %v", err)
 			}
 		}
 		diskPath := vclib.GetPathFromVMDiskPath(canonicalVolumePath)
@@ -340,6 +345,19 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 	}
 	canonicalVolumePath = strings.Replace(volumePath, dsFolder, folderID, 1)
 	return canonicalVolumePath, nil
+}
+
+// getPathFromFileNotFound returns the path from a fileNotFound error
+func getPathFromFileNotFound(err error) (string, error) {
+	if soap.IsSoapFault(err) {
+		fault := soap.ToSoapFault(err)
+		f, ok := fault.VimFault().(types.FileNotFound)
+		if !ok {
+			return "", fmt.Errorf("%v is not a FileNotFound error", err)
+		}
+		return f.File, nil
+	}
+	return "", fmt.Errorf("%v is not a soap fault", err)
 }
 
 func setdatastoreFolderIDMap(
