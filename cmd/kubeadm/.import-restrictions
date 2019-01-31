@@ -41,6 +41,7 @@
 			"AllowedPrefixes": [
 				"k8s.io/utils/exec",
 				"k8s.io/utils/integer",
+				"k8s.io/utils/path",
 				"k8s.io/utils/pointer"
 			]
 		},
@@ -77,7 +78,6 @@
 				"k8s.io/kubernetes/pkg/scheduler/util",
 				"k8s.io/kubernetes/pkg/security/apparmor",
 				"k8s.io/kubernetes/pkg/serviceaccount",
-				"k8s.io/kubernetes/pkg/util/file",
 				"k8s.io/kubernetes/pkg/util/hash",
 				"k8s.io/kubernetes/pkg/util/initsystem",
 				"k8s.io/kubernetes/pkg/util/ipvs",

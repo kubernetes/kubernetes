@@ -4090,39 +4090,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/io",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/nsenter",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "k8s.io/utils/path",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
