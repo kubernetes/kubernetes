@@ -44,16 +44,7 @@ func NameSystems() namer.NameSystems {
 		"raw":                namer.NewRawNamer("", nil),
 		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
 		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
-		"lowercaseSingular":  &lowercaseSingularNamer{},
 	}
-}
-
-// lowercaseSingularNamer implements Namer
-type lowercaseSingularNamer struct{}
-
-// Name returns t's name in all lowercase.
-func (n *lowercaseSingularNamer) Name(t *types.Type) string {
-	return strings.ToLower(t.Name.Name)
 }
 
 // DefaultNameSystem returns the default name system for ordering the types to be
@@ -320,7 +311,7 @@ func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
     return nil, err
   }
   if !exists {
-    return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
+    return nil, errors.NewNotFound($.Resource|raw$("$.type|allLowercasePlural$"), name)
   }
   return obj.(*$.type|raw$), nil
 }
@@ -364,7 +355,7 @@ func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
+		return nil, errors.NewNotFound($.Resource|raw$("$.type|allLowercasePlural$"), name)
 	}
 	return obj.(*$.type|raw$), nil
 }
