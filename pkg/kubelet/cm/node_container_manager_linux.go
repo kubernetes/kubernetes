@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -40,7 +41,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
 		Name: cm.cgroupRoot,
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
-		ResourceParameters: getCgroupConfig(cm.capacity),
+		ResourceParameters: getCgroupConfig(cm.internalCapacity),
 	}
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
@@ -58,10 +59,10 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 	// We need to update limits on node allocatable cgroup no matter what because
 	// default cpu shares on cgroups are low and can cause cpu starvation.
-	nodeAllocatable := cm.capacity
+	nodeAllocatable := cm.internalCapacity
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
 	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(kubetypes.NodeAllocatableEnforcementKey) {
-		nodeAllocatable = cm.getNodeAllocatableAbsolute()
+		nodeAllocatable = cm.getNodeAllocatableInternalAbsolute()
 	}
 
 	klog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
@@ -130,7 +131,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 	if cgroupConfig.ResourceParameters == nil {
 		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
 	}
-	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares and %d bytes of memory", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
+	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, and %d processes", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit)
 	if !cgroupManager.Exists(cgroupConfig.Name) {
 		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
 	}
@@ -157,6 +158,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		val := MilliCPUToShares(q.MilliValue())
 		rc.CpuShares = &val
 	}
+	if q, exists := rl[pidlimit.PIDs]; exists {
+		val := q.Value()
+		rc.PidsLimit = &val
+	}
 	rc.HugePageLimit = HugePageLimits(rl)
 
 	return &rc
@@ -166,8 +171,12 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 // Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
 func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
+	return cm.getNodeAllocatableAbsoluteImpl(cm.capacity)
+}
+
+func (cm *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.ResourceList) v1.ResourceList {
 	result := make(v1.ResourceList)
-	for k, v := range cm.capacity {
+	for k, v := range capacity {
 		value := *(v.Copy())
 		if cm.NodeConfig.SystemReserved != nil {
 			value.Sub(cm.NodeConfig.SystemReserved[k])
@@ -182,7 +191,13 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 		result[k] = value
 	}
 	return result
+}
 
+// getNodeAllocatableInternalAbsolute is similar to getNodeAllocatableAbsolute except that
+// it also includes internal resources (currently process IDs).  It is intended for setting
+// up top level cgroups only.
+func (cm *containerManagerImpl) getNodeAllocatableInternalAbsolute() v1.ResourceList {
+	return cm.getNodeAllocatableAbsoluteImpl(cm.internalCapacity)
 }
 
 // GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.

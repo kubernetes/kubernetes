@@ -68,6 +68,7 @@ go_library(
         "//pkg/kubelet/kubeletconfig/configfiles:go_default_library",
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
+        "//pkg/kubelet/stats/pidlimit:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/filesystem:go_default_library",
