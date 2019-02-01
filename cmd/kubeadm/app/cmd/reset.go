@@ -62,10 +62,8 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
-				client, err = getClientset(kubeConfigFile, false)
-				kubeadmutil.CheckErr(err)
-			}
+			client, err = getClientset(kubeConfigFile, false)
+			kubeadmutil.CheckErr(err)
 
 			if criSocketPath == "" {
 				criSocketPath, err = resetDetectCRISocket(client)
