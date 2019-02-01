@@ -544,6 +544,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
 	}
 
+	// Set the noop metrics provider for all reflectors that will be created
+	// after this point, so that watch-based managers (if used) will not
+	// blow the Kubelet memory usage if there are huge churn of secrets and/or
+	// configmaps attached to pods running on this node.
+	cache.SetReflectorMetricsProvider(manager.NoopMetricsProvider{})
+
 	var secretManager secret.Manager
 	var configMapManager configmap.Manager
 	switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {

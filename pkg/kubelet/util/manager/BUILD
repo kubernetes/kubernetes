@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "cache_based_manager.go",
         "manager.go",
+        "noop_reflector_metrics.go",
         "watch_based_manager.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util/manager",
