@@ -557,8 +557,6 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
 	}
 
-	klog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
-
 	// Run internal pre-stop lifecycle hook
 	if err := m.internalLifecycle.PreStopContainer(containerID.ID); err != nil {
 		return err
@@ -576,6 +574,8 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		gracePeriod = *gracePeriodOverride
 		klog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
 	}
+
+	klog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
 	if err != nil {
