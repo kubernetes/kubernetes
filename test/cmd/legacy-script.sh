@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -15,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034
+# https://github.com/koalaman/shellcheck/wiki/SC2034
 # This contains util code for testing kubectl.
 
 set -o errexit
