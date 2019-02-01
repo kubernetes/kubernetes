@@ -30,6 +30,7 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
@@ -482,40 +483,40 @@ func TestRBAC(t *testing.T) {
 				{"limitrange-updater", "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
 			},
 		},
-		// {
-		// 	bootstrapRoles: bootstrapRoles{
-		// 		clusterRoles: []rbacapi.ClusterRole{
-		// 			{
-		// 				ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-		// 				Rules:      []rbacapi.PolicyRule{ruleAllowAll},
-		// 			},
-		// 			{
-		// 				ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-		// 				Rules: []rbacapi.PolicyRule{
-		// 					rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
-		// 				},
-		// 			},
-		// 		},
-		// 		clusterRoleBindings: []rbacapi.ClusterRoleBinding{
-		// 			{
-		// 				ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-		// 				Subjects: []rbacapi.Subject{
-		// 					{Kind: "User", Name: "limitrange-patcher"},
-		// 				},
-		// 				RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
-		// 			},
-		// 		},
-		// 	},
-		// 	requests: []request{
-		// 		// Create the namespace used later in the test
-		// 		{superUser, "POST", "", "namespaces", "", "", limitRangeNamespace, http.StatusCreated},
+		{
+			bootstrapRoles: bootstrapRoles{
+				clusterRoles: []rbacapi.ClusterRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
+						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Rules: []rbacapi.PolicyRule{
+							rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
+						},
+					},
+				},
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Subjects: []rbacapi.Subject{
+							{Kind: "User", Name: "limitrange-patcher"},
+						},
+						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
+					},
+				},
+			},
+			requests: []request{
+				// Create the namespace used later in the test
+				{superUser, "POST", "", "namespaces", "", "", limitRangeNamespace, http.StatusCreated},
 
-		// 		{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusForbidden},
-		// 		{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusCreated},
-		// 		{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
-		// 		{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
-		// 	},
-		// },
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusForbidden},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusCreated},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+			},
+		},
 	}
 
 	for i, tc := range tests {
@@ -535,6 +536,7 @@ func TestRBAC(t *testing.T) {
 			"limitrange-patcher":               {Name: "limitrange-patcher"},
 			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 		}))
+		masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()
 
@@ -569,11 +571,10 @@ func TestRBAC(t *testing.T) {
 			}
 
 			req, err := http.NewRequest(r.verb, s.URL+path, body)
-			// TODO: Un-comment this when Apply works again
-			// if r.verb == "PATCH" {
-			// 	// For patch operations, use the apply content type
-			// 	req.Header.Add("Content-Type", string(types.ApplyPatchType))
-			// }
+			if r.verb == "PATCH" {
+				// For patch operations, use the apply content type
+				req.Header.Add("Content-Type", string(types.ApplyPatchType))
+			}
 
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

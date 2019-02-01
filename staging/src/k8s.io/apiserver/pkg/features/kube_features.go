@@ -84,7 +84,7 @@ const (
 	DryRun utilfeature.Feature = "DryRun"
 
 	// owner: @apelisse, @lavalamp
-	// alpha: v1.11
+	// alpha: v1.14
 	//
 	// Server-side apply. Merging happens on the server.
 	ServerSideApply utilfeature.Feature = "ServerSideApply"

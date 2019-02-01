@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -82,9 +83,19 @@ func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter
 // use-case), and simply updates the managed fields in the output
 // object.
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
+	// If the object doesn't have metadata, we should just return without trying to
+	// set the managedFields at all, so creates/updates/patches will work normally.
+	if _, err := meta.Accessor(newObj); err != nil {
+		return newObj, nil
+	}
+
+	// First try to decode the managed fields provided in the update,
+	// This is necessary to allow directly updating managed fields.
 	managed, err := internal.DecodeObjectManagedFields(newObj)
+
 	// If the managed field is empty or we failed to decode it,
-	// let's try the live object
+	// let's try the live object. This is to prevent clients who
+	// don't understand managedFields from deleting it accidentally.
 	if err != nil || len(managed) == 0 {
 		managed, err = internal.DecodeObjectManagedFields(liveObj)
 		if err != nil {
@@ -99,13 +110,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}
-	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
-	if err := internal.RemoveObjectManagedFields(newObjVersioned); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
-	}
-
+	internal.RemoveObjectManagedFields(liveObjVersioned)
+	internal.RemoveObjectManagedFields(newObjVersioned)
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed new object: %v", err)
@@ -135,19 +141,23 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
 func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (runtime.Object, error) {
+	// If the object doesn't have metadata, apply isn't allowed.
+	if _, err := meta.Accessor(liveObj); err != nil {
+		return nil, fmt.Errorf("couldn't get accessor: %v", err)
+	}
+
 	managed, err := internal.DecodeObjectManagedFields(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 	// We can assume that patchObj is already on the proper version:
 	// it shouldn't have to be converted so that it's not defaulted.
+	// TODO (jennybuckley): Explicitly checkt that patchObj is in the proper version.
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}
-	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
+	internal.RemoveObjectManagedFields(liveObjVersioned)
 
 	patchObjTyped, err := f.typeConverter.YAMLToTyped(patch)
 	if err != nil {
@@ -211,5 +221,5 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"
 	}
-	return internal.DecodeManager(&managerInfo)
+	return internal.BuildManagerIdentifier(&managerInfo)
 }

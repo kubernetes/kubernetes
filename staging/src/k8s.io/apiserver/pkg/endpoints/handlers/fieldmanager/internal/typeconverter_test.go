@@ -17,8 +17,10 @@ limitations under the License.
 package internal_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -30,7 +32,7 @@ import (
 
 var fakeSchema = prototesting.Fake{
 	Path: filepath.Join(
-		"..", "..", "..", "..", "..", "..", "..", "..", "..",
+		strings.Repeat(".."+string(filepath.Separator), 9),
 		"api", "openapi-spec", "swagger.json"),
 }
 
@@ -49,7 +51,15 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
 
-	y := `
+	dtc := internal.DeducedTypeConverter{}
+
+	testCases := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "apps/v1.Deployment",
+			yaml: `
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -69,8 +79,61 @@ spec:
       containers:
       - name: nginx
         image: nginx:1.15.4
-`
+`,
+		}, {
+			name: "extensions/v1beta1.Deployment",
+			yaml: `
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.15.4
+`,
+		}, {
+			name: "v1.Pod",
+			yaml: `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  labels:
+    app: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.15.4
+`,
+		},
+	}
 
+	for _, testCase := range testCases {
+		t.Run(fmt.Sprintf("%v ObjectToTyped with TypeConverter", testCase.name), func(t *testing.T) {
+			testObjectToTyped(t, tc, testCase.yaml)
+		})
+		t.Run(fmt.Sprintf("%v YAMLToTyped with TypeConverter", testCase.name), func(t *testing.T) {
+			testYAMLToTyped(t, tc, testCase.yaml)
+		})
+		t.Run(fmt.Sprintf("%v ObjectToTyped with DeducedTypeConverter", testCase.name), func(t *testing.T) {
+			testObjectToTyped(t, dtc, testCase.yaml)
+		})
+	}
+}
+
+func testObjectToTyped(t *testing.T, tc internal.TypeConverter, y string) {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
 		t.Fatalf("Failed to parse yaml object: %v", err)
@@ -90,12 +153,18 @@ Original object:
 Final object:
 %#v`, obj, newObj)
 	}
+}
 
+func testYAMLToTyped(t *testing.T, tc internal.TypeConverter, y string) {
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
+		t.Fatalf("Failed to parse yaml object: %v", err)
+	}
 	yamlTyped, err := tc.YAMLToTyped([]byte(y))
 	if err != nil {
 		t.Fatalf("Failed to convert yaml to typed: %v", err)
 	}
-	newObj, err = tc.TypedToObject(yamlTyped)
+	newObj, err := tc.TypedToObject(yamlTyped)
 	if err != nil {
 		t.Fatalf("Failed to convert typed to object: %v", err)
 	}

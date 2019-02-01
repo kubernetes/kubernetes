@@ -20,20 +20,20 @@ import "testing"
 
 func TestPathElementRoundTrip(t *testing.T) {
 	tests := []string{
-		"i:0",
-		"i:1234",
-		"f:",
-		"f:spec",
-		"f:more-complicated-string",
-		"k:{\"name\":\"my-container\"}",
-		"k:{\"port\":\"8080\",\"protocol\":\"TCP\"}",
-		"k:{\"optionalField\":null}",
-		"k:{\"jsonField\":{\"A\":1,\"B\":null,\"C\":\"D\",\"E\":{\"F\":\"G\"}}}",
-		"k:{\"listField\":[\"1\",\"2\",\"3\"]}",
-		"v:null",
-		"v:\"some-string\"",
-		"v:1234",
-		"v:{\"some\":\"json\"}",
+		`i:0`,
+		`i:1234`,
+		`f:`,
+		`f:spec`,
+		`f:more-complicated-string`,
+		`k:{"name":"my-container"}`,
+		`k:{"port":"8080","protocol":"TCP"}`,
+		`k:{"optionalField":null}`,
+		`k:{"jsonField":{"A":1,"B":null,"C":"D","E":{"F":"G"}}}`,
+		`k:{"listField":["1","2","3"]}`,
+		`v:null`,
+		`v:"some-string"`,
+		`v:1234`,
+		`v:{"some":"json"}`,
 	}
 
 	for _, test := range tests {
@@ -62,15 +62,15 @@ func TestPathElementIgnoreUnknown(t *testing.T) {
 
 func TestNewPathElementError(t *testing.T) {
 	tests := []string{
-		"",
-		"no-colon",
-		"i:index is not a number",
-		"i:1.23",
-		"i:",
-		"v:invalid json",
-		"v:",
-		"k:invalid json",
-		"k:{\"name\":invalid}",
+		``,
+		`no-colon`,
+		`i:index is not a number`,
+		`i:1.23`,
+		`i:`,
+		`v:invalid json`,
+		`v:`,
+		`k:invalid json`,
+		`k:{"name":invalid}`,
 	}
 
 	for _, test := range tests {

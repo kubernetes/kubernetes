@@ -25,8 +25,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// TestRoundTripManagedFields will roundtrip ManagedFields from the format used by
-// sigs.k8s.io/structured-merge-diff to the wire format (api format) and back
+// TestRoundTripManagedFields will roundtrip ManagedFields from the wire format
+// (api format) to the format used by sigs.k8s.io/structured-merge-diff and back
 func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
 		`- apiVersion: v1
@@ -153,7 +153,7 @@ func TestRoundTripManagedFields(t *testing.T) {
 	}
 }
 
-func TestDecodeManager(t *testing.T) {
+func TestBuildManagerIdentifier(t *testing.T) {
 	tests := []struct {
 		managedFieldsEntry string
 		expected           string
@@ -188,7 +188,7 @@ time: "2001-02-03T04:05:06Z"
 			if err := yaml.Unmarshal([]byte(test.managedFieldsEntry), &unmarshaled); err != nil {
 				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
 			}
-			decoded, err := DecodeManager(&unmarshaled)
+			decoded, err := BuildManagerIdentifier(&unmarshaled)
 			if err != nil {
 				t.Fatalf("did not expect decoding error but got: %v", err)
 			}

@@ -43,6 +43,7 @@ type TypeConverter interface {
 //
 // Note that this is not going to be sufficient for converting to/from
 // CRDs that have a schema defined (we don't support that schema yet).
+// TODO(jennybuckley): Use the schema provided by a CRD if it exists.
 type DeducedTypeConverter struct{}
 
 var _ TypeConverter = DeducedTypeConverter{}

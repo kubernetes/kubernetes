@@ -247,6 +247,8 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	case reflect.Ptr:
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
+		// ObjectMeta should not have any field with the word "secret" in it;
+		// it contains cycles so it's easiest to just skip it.
 		if name == "ObjectMeta" {
 			break
 		}

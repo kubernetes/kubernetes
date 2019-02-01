@@ -49,6 +49,7 @@ func TestDefaulting(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "ConfigMap"}:                                             {},
 		{Group: "", Version: "v1", Kind: "ConfigMapList"}:                                         {},
 		{Group: "", Version: "v1", Kind: "Endpoints"}:                                             {},
+		{Group: "", Version: "v1", Kind: "EndpointsList"}:                                         {},
 		{Group: "", Version: "v1", Kind: "Namespace"}:                                             {},
 		{Group: "", Version: "v1", Kind: "NamespaceList"}:                                         {},
 		{Group: "", Version: "v1", Kind: "Node"}:                                                  {},

@@ -795,9 +795,6 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc.Run(t)
 }
 
-// TODO: Add test case for "apply with existing uid" verify it gives a conflict error,
-// not a creation or an authz creation forbidden message
-
 func TestHasUID(t *testing.T) {
 	testcases := []struct {
 		obj    runtime.Object

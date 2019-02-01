@@ -30,13 +30,12 @@ import (
 // RemoveObjectManagedFields removes the ManagedFields from the object
 // before we merge so that it doesn't appear in the ManagedFields
 // recursively.
-func RemoveObjectManagedFields(obj runtime.Object) error {
+func RemoveObjectManagedFields(obj runtime.Object) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't get accessor: %v", err)
+		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
 	accessor.SetManagedFields(nil)
-	return nil
 }
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
@@ -46,7 +45,7 @@ func DecodeObjectManagedFields(from runtime.Object) (fieldpath.ManagedFields, er
 	}
 	accessor, err := meta.Accessor(from)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get accessor: %v", err)
+		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
 
 	managed, err := decodeManagedFields(accessor.GetManagedFields())
@@ -60,7 +59,7 @@ func DecodeObjectManagedFields(from runtime.Object) (fieldpath.ManagedFields, er
 func EncodeObjectManagedFields(obj runtime.Object, fields fieldpath.ManagedFields) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't get accessor: %v", err)
+		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
 
 	managed, err := encodeManagedFields(fields)
@@ -77,7 +76,7 @@ func EncodeObjectManagedFields(obj runtime.Object, fields fieldpath.ManagedField
 func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managedFields fieldpath.ManagedFields, err error) {
 	managedFields = make(map[string]*fieldpath.VersionedSet, len(encodedManagedFields))
 	for _, encodedVersionedSet := range encodedManagedFields {
-		manager, err := DecodeManager(&encodedVersionedSet)
+		manager, err := BuildManagerIdentifier(&encodedVersionedSet)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
 		}
@@ -89,8 +88,8 @@ func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (mana
 	return managedFields, nil
 }
 
-// DecodeManager creates a manager identifier string from a ManagedFieldsEntry
-func DecodeManager(encodedManager *metav1.ManagedFieldsEntry) (manager string, err error) {
+// BuildManagerIdentifier creates a manager identifier string from a ManagedFieldsEntry
+func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager string, err error) {
 	encodedManagerCopy := *encodedManager
 
 	// Never include the fields in the manager identifier
