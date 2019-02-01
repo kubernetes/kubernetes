@@ -85,63 +85,6 @@ func TestIsStandardContainerResource(t *testing.T) {
 	}
 }
 
-func TestAddToNodeAddresses(t *testing.T) {
-	testCases := []struct {
-		existing []core.NodeAddress
-		toAdd    []core.NodeAddress
-		expected []core.NodeAddress
-	}{
-		{
-			existing: []core.NodeAddress{},
-			toAdd:    []core.NodeAddress{},
-			expected: []core.NodeAddress{},
-		},
-		{
-			existing: []core.NodeAddress{},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-		},
-		{
-			existing: []core.NodeAddress{},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-			},
-		},
-		{
-			existing: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
-			},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
-		}
-	}
-}
-
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
 	if !containsAccessMode(modes, core.ReadOnlyMany) {
