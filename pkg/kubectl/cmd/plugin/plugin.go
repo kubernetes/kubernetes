@@ -235,7 +235,7 @@ func isExecutable(fullPath string) (bool, error) {
 		fileExt := strings.ToLower(filepath.Ext(fullPath))
 
 		switch fileExt {
-		case ".bat", ".cmd", ".com", ".exe":
+		case ".bat", ".cmd", ".com", ".exe", ".ps1":
 			return true, nil
 		}
 		return false, nil
