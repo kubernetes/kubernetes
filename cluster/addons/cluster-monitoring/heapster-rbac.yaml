@@ -3,7 +3,6 @@ kind: ClusterRoleBinding
 metadata:
   name: heapster-binding
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -22,7 +21,6 @@ metadata:
   name: system:pod-nanny
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
@@ -45,7 +43,6 @@ metadata:
   name: heapster-binding
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
