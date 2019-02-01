@@ -176,7 +176,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       core.NewSchedulingQueue(),
+		podQueue:                       core.NewSchedulingQueue(stopEverything),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
