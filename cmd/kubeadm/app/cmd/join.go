@@ -196,8 +196,8 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 	}
 
-	AddJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
-	AddJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token)
+	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
+	addJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token)
 
 	joinRunner.AppendPhase(phases.NewPreflightJoinPhase())
 
@@ -214,60 +214,48 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	return cmd
 }
 
-// AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration) {
+// addJoinConfigFlags adds join flags bound to the config to the specified flagset
+func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
+	)
+	// add control plane endpoint flags to the specified flagset
+	flagSet.StringVar(
+		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
+		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
+	)
+	flagSet.Int32Var(
+		&cfg.ControlPlane.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.ControlPlane.LocalAPIEndpoint.BindPort,
+		"If the node should host a new control plane instance, the port for the API Server to bind to.",
+	)
+	// adds bootstrap token specific discovery flags to the specified flagset
+	flagSet.StringVar(
+		&cfg.Discovery.BootstrapToken.Token, options.TokenDiscovery, "",
+		"For token-based discovery, the token used to validate cluster information fetched from the API server.",
+	)
+	flagSet.StringSliceVar(
+		&cfg.Discovery.BootstrapToken.CACertHashes, options.TokenDiscoveryCAHash, []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").",
+	)
+	flagSet.BoolVar(
+		&cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification, options.TokenDiscoverySkipCAHash, false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.",
+	)
+	//	discovery via kube config file flag
+	flagSet.StringVar(
+		&cfg.Discovery.File.KubeConfigPath, options.FileDiscovery, "",
+		"For file-based discovery, a file or URL from which to load cluster information.",
 	)
 	flagSet.StringVar(
 		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
 		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
 	)
-	AddControlPlaneFlags(flagSet, cfg.ControlPlane)
-	AddJoinBootstrapTokenDiscoveryFlags(flagSet, cfg.Discovery.BootstrapToken)
-	AddJoinFileDiscoveryFlags(flagSet, cfg.Discovery.File)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
 
-// AddJoinBootstrapTokenDiscoveryFlags adds bootstrap token specific discovery flags to the specified flagset
-func AddJoinBootstrapTokenDiscoveryFlags(flagSet *flag.FlagSet, btd *kubeadmapiv1beta1.BootstrapTokenDiscovery) {
-	flagSet.StringVar(
-		&btd.Token, options.TokenDiscovery, "",
-		"For token-based discovery, the token used to validate cluster information fetched from the API server.",
-	)
-	flagSet.StringSliceVar(
-		&btd.CACertHashes, options.TokenDiscoveryCAHash, []string{},
-		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").",
-	)
-	flagSet.BoolVar(
-		&btd.UnsafeSkipCAVerification, options.TokenDiscoverySkipCAHash, false,
-		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.",
-	)
-}
-
-// AddJoinFileDiscoveryFlags adds file discovery flags to the specified flagset
-func AddJoinFileDiscoveryFlags(flagSet *flag.FlagSet, fd *kubeadmapiv1beta1.FileDiscovery) {
-	flagSet.StringVar(
-		&fd.KubeConfigPath, options.FileDiscovery, "",
-		"For file-based discovery, a file or URL from which to load cluster information.",
-	)
-}
-
-// AddControlPlaneFlags adds file control plane flags to the specified flagset
-func AddControlPlaneFlags(flagSet *flag.FlagSet, cp *kubeadmapiv1beta1.JoinControlPlane) {
-	flagSet.StringVar(
-		&cp.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cp.LocalAPIEndpoint.AdvertiseAddress,
-		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
-	)
-	flagSet.Int32Var(
-		&cp.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cp.LocalAPIEndpoint.BindPort,
-		"If the node should host a new control plane instance, the port for the API Server to bind to.",
-	)
-}
-
-// AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string, controlPlane *bool, token *string) {
+// addJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
+func addJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string, controlPlane *bool, token *string) {
 	flagSet.StringVar(
 		cfgPath, options.CfgPath, *cfgPath,
 		"Path to kubeadm config file.",
