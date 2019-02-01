@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
@@ -145,8 +146,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
-				"runtime": runtimeContExpectations,
 				"pods":    podsContExpectations,
+			}
+			if framework.TestContext.ContainerRuntime == "docker" {
+				systemContainers["runtime"] = runtimeContExpectations
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
@@ -165,6 +168,26 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
+
+			// Make expected inode values more robust for btrfs
+			expectedInodes := bounded(1E4, 1E8)
+			findmnt, err := exec.Command("which", "findmnt").CombinedOutput()
+			if err == nil {
+				stdout, err := exec.Command(strings.TrimSpace(string(findmnt)),
+					"/", "-no", "FSTYPE").CombinedOutput()
+				if err == nil && strings.TrimSpace(string(stdout)) == "btrfs" {
+					expectedInodes = gstruct.PointTo(And(BeEquivalentTo(0)))
+				}
+			}
+
+			// Retrieve all interface names
+			ifaceRegex := ""
+			interfaces, err := net.Interfaces()
+			Expect(err).To(BeNil())
+			for _, iface := range interfaces {
+				ifaceRegex += "|" + iface.Name
+			}
+
 			// Expectations for pods.
 			podExpectations := gstruct.MatchAllFields(gstruct.Fields{
 				"PodRef":    gstruct.Ignore(),
@@ -192,33 +215,35 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
-							"InodesUsed":     bounded(0, 1E8),
+							"UsedBytes": Or(gstruct.PointTo(And(BeEquivalentTo(0))),
+								bounded(framework.Kb, 10*framework.Mb)),
+							"InodesFree": expectedInodes,
+							"Inodes":     expectedInodes,
+							"InodesUsed": bounded(0, 1E8),
 						}),
 						"Logs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
-							"InodesUsed":     bounded(0, 1E8),
+							"UsedBytes": Or(gstruct.PointTo(And(BeEquivalentTo(0))),
+								bounded(framework.Kb, 10*framework.Mb)),
+							"InodesFree": expectedInodes,
+							"Inodes":     expectedInodes,
+							"InodesUsed": bounded(0, 1E8),
 						}),
 						"UserDefinedMetrics": BeEmpty(),
 					}),
 				}),
 				"Network": ptrMatchAllFields(gstruct.Fields{
 					"Time": recent(maxStatsAge),
-					"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
-						"Name":     Equal("eth0"),
-						"RxBytes":  bounded(10, 10*framework.Mb),
-						"RxErrors": bounded(0, 1000),
-						"TxBytes":  bounded(10, 10*framework.Mb),
-						"TxErrors": bounded(0, 1000),
-					}),
-					"Interfaces": Not(BeNil()),
+					"InterfaceStats": Or(BeNil(), gstruct.MatchAllFields(gstruct.Fields{
+						"Name":     Or(BeNil(), MatchRegexp(ifaceRegex)),
+						"RxBytes":  Or(BeNil(), bounded(10, 10*framework.Mb)),
+						"RxErrors": Or(BeNil(), bounded(0, 1000)),
+						"TxBytes":  Or(BeNil(), bounded(10, 10*framework.Mb)),
+						"TxErrors": Or(BeNil(), bounded(0, 1000)),
+					})),
+					"Interfaces": Or(BeNil(), Not(BeNil())),
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
@@ -243,8 +268,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(framework.Kb, 1*framework.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
+							"InodesFree":     expectedInodes,
+							"Inodes":         expectedInodes,
 							"InodesUsed":     bounded(0, 1E8),
 						}),
 					}),
@@ -254,8 +279,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
 					"UsedBytes":      bounded(framework.Kb, 21*framework.Mb),
-					"InodesFree":     bounded(1E4, 1E8),
-					"Inodes":         bounded(1E4, 1E8),
+					"InodesFree":     expectedInodes,
+					"Inodes":         expectedInodes,
 					"InodesUsed":     bounded(0, 1E8),
 				}),
 			})
@@ -280,17 +305,16 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
-					// TODO(#28407): Handle non-eth0 network interface names.
 					"Network": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
 						"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
-							"Name":     Or(BeEmpty(), Equal("eth0")),
+							"Name":     Or(BeNil(), MatchRegexp(ifaceRegex)),
 							"RxBytes":  Or(BeNil(), bounded(1*framework.Mb, 100*framework.Gb)),
 							"RxErrors": Or(BeNil(), bounded(0, 100000)),
 							"TxBytes":  Or(BeNil(), bounded(10*framework.Kb, 10*framework.Gb)),
 							"TxErrors": Or(BeNil(), bounded(0, 100000)),
 						}),
-						"Interfaces": Not(BeNil()),
+						"Interfaces": Or(BeNil(), Not(BeNil())),
 					}),
 					"Fs": ptrMatchAllFields(gstruct.Fields{
 						"Time":           recent(maxStatsAge),
@@ -298,8 +322,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"CapacityBytes":  fsCapacityBounds,
 						// we assume we are not running tests on machines < 10tb of disk
 						"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
-						"InodesFree": bounded(1E4, 1E8),
-						"Inodes":     bounded(1E4, 1E8),
+						"InodesFree": expectedInodes,
+						"Inodes":     expectedInodes,
 						"InodesUsed": bounded(0, 1E8),
 					}),
 					"Runtime": ptrMatchAllFields(gstruct.Fields{
@@ -309,8 +333,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							// we assume we are not running tests on machines < 10tb of disk
 							"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
-							"InodesFree": bounded(1E4, 1E8),
-							"Inodes":     bounded(1E4, 1E8),
+							"InodesFree": expectedInodes,
+							"Inodes":     expectedInodes,
 							"InodesUsed": bounded(0, 1E8),
 						}),
 					}),
