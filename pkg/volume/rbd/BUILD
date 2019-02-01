@@ -41,7 +41,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["rbd_test.go"],
+    srcs = [
+        "attacher_test.go",
+        "rbd_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/util/mount:go_default_library",

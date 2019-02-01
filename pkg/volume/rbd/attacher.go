@@ -19,10 +19,12 @@ package rbd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -186,6 +188,25 @@ var _ volume.Detacher = &rbdDetacher{}
 
 var _ volume.DeviceUnmounter = &rbdDetacher{}
 
+// reference `mount.GetDeviceNameFromMount`
+func getMountPointFromMounts(mounter mount.Interface, mountPath string) (*mount.MountPoint, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return nil, err
+	}
+
+	slTarget, err := filepath.EvalSymlinks(mountPath)
+	if err != nil {
+		slTarget = mountPath
+	}
+	for i := range mps {
+		if mps[i].Path == slTarget {
+			return &mps[i], nil
+		}
+	}
+	return nil, fmt.Errorf("can't find mointpoint for: %s", mountPath)
+}
+
 // UnmountDevice implements Detacher.UnmountDevice. It unmounts the global
 // mount of the RBD image. This is called once all bind mounts have been
 // unmounted.
@@ -203,7 +224,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
-	devicePath, _, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
+	mp, err := getMountPointFromMounts(detacher.mounter, deviceMountPath)
 	if err != nil {
 		return err
 	}
@@ -213,13 +234,35 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
+	klog.V(4).Infof("rbd: detaching device %s", mp.Device)
 
-	klog.V(4).Infof("rbd: detaching device %s", devicePath)
-	err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, devicePath)
+	// add some retries for detach operation
+	backoff := wait.Backoff{
+		Duration: time.Second,
+		Factor:   2,
+		Steps:    5,
+	}
+	wait.ExponentialBackoff(backoff, func() (bool, error) {
+		err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, mp.Device)
+		if err == nil {
+			return true, nil
+		}
+		klog.Errorf("rbd: detach device failed: %s, %v, will try again.", mp.Device, err)
+		return false, nil
+	})
 	if err != nil {
+		klog.Errorf("rbd: detach device failed: %s, %s, try to mount device back: %v", mp.Device, err, *mp)
+		// Try to mount back the device, otherwise the next UnmountDevice call will get an empty DevicePath,
+		// then the device will get no chance to be unmounted.
+		mErr := detacher.mounter.Mount(mp.Device, mp.Path, mp.Type, mp.Opts)
+		if mErr != nil {
+			klog.Errorf("rbd: mount back device failed: %s, %v", mErr, *mp)
+		} else {
+			klog.Infof("rbd: successfully mount back device: %v", *mp)
+		}
 		return err
 	}
-	klog.V(3).Infof("rbd: successfully detach device %s", devicePath)
+	klog.V(3).Infof("rbd: successfully detach device %s", mp.Device)
 	err = os.Remove(deviceMountPath)
 	if err != nil {
 		return err
