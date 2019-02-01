@@ -2679,6 +2679,12 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// The Windows specific settings applied to container
+	// if unspecified the options within in the container will be used
+	// May also be set in SecurityContext. If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// +optional
+	WindowsOptions *WindowsOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -4623,6 +4629,12 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// The Windows specific settings applied to container
+	// if unspecified the options within in the container will be used
+	// May also be set in SecurityContext. If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// +optional
+	WindowsOptions *WindowsOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -4687,6 +4699,13 @@ type SELinuxOptions struct {
 	// SELinux level label.
 	// +optional
 	Level string
+}
+
+// WindowsOptions are the windows specific options to be applied to the container
+type WindowsOptions struct {
+	// The UserName in Windows to run the entrypoint of the container process.
+	// +optional
+	RunAsUserName string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

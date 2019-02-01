@@ -93,8 +93,8 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
 	}
 
-	if *effectiveSc.WindowsOptions.RunAsUserName != "" {
-		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
+	if effectiveSc.WindowsOptions.RunAsUserName != "" {
+		wc.SecurityContext.RunAsUsername = effectiveSc.WindowsOptions.RunAsUserName
 	} else if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}

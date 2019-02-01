@@ -5298,11 +5298,8 @@ type SELinuxOptions struct {
 // WindowsOptions are the windows specific options to be applied to the container
 type WindowsOptions struct {
 	// The UserName in Windows to run the entrypoint of the container process.
-	// Defaults to user specified in image metadata if unspecified.
-	// May also be set in PodSecurityContext.  If set in both SecurityContext and
-	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
-	RunAsUserName *string `json:"runAsUserName,omitempty" protobuf:"bytes,2,opt,name=runAsUserName"`
+	RunAsUserName string `json:"runAsUserName,omitempty" protobuf:"bytes,2,opt,name=runAsUserName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

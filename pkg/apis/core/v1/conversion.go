@@ -375,6 +375,14 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 	} else {
 		out.SELinuxOptions = nil
 	}
+	if in.WindowsOptions != nil {
+		out.WindowsOptions = new(v1.WindowsOptions)
+		if err := Convert_core_WindowsOptions_To_v1_WindowsOptions(in.WindowsOptions, out.WindowsOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.WindowsOptions = nil
+	}
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
@@ -397,6 +405,14 @@ func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecuri
 		}
 	} else {
 		out.SELinuxOptions = nil
+	}
+	if in.WindowsOptions != nil {
+		out.WindowsOptions = new(v1.WindowsOptions)
+		if err := Convert_core_WindowsOptions_To_v1_WindowsOptions(in.WindowsOptions, out.WindowsOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.WindowsOptions = nil
 	}
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
@@ -422,6 +438,14 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurity
 		}
 	} else {
 		out.SELinuxOptions = nil
+	}
+	if in.WindowsOptions != nil {
+		out.WindowsOptions = new(core.WindowsOptions)
+		if err := Convert_v1_WindowsOptions_To_core_WindowsOptions(in.WindowsOptions, out.WindowsOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.WindowsOptions = nil
 	}
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
