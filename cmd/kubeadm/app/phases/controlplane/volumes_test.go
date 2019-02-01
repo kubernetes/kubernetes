@@ -514,11 +514,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
-		// TODO: Make getHostPathVolumesForTheControlPlane accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *rt.cfg,
-		}
-		mounts := getHostPathVolumesForTheControlPlane(initcfg)
+		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
 
 		// Avoid unit test errors when the flexvolume is mounted
 		if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {

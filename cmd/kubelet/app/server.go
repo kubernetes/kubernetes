@@ -369,7 +369,10 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		}
 		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
 		// an exec interface which can use nsenter for flex plugin calls
-		pluginRunner = nsenter.NewNsenterExecutor(nsenter.DefaultHostRootFsPath, exec.New())
+		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var dockerClientConfig *dockershim.ClientConfig

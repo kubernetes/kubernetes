@@ -313,7 +313,7 @@ data:
            fallthrough in-addr.arpa ip6.arpa
         }{{ .Federation }}
         prometheus :9153
-        proxy . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }}
         cache 30
         loop
         reload

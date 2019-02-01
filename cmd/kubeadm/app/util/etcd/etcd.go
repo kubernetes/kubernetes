@@ -290,14 +290,14 @@ func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
 
 // GetClientURL creates an HTTPS URL that uses the configured advertise
 // address and client port for the API controller
-func GetClientURL(cfg *kubeadmapi.InitConfiguration) string {
-	return "https://" + net.JoinHostPort(cfg.LocalAPIEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenClientPort))
+func GetClientURL(localEndpoint *kubeadmapi.APIEndpoint) string {
+	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenClientPort))
 }
 
 // GetPeerURL creates an HTTPS URL that uses the configured advertise
 // address and peer port for the API controller
-func GetPeerURL(cfg *kubeadmapi.InitConfiguration) string {
-	return "https://" + net.JoinHostPort(cfg.LocalAPIEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenPeerPort))
+func GetPeerURL(localEndpoint *kubeadmapi.APIEndpoint) string {
+	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenPeerPort))
 }
 
 // GetClientURLByIP creates an HTTPS URL based on an IP address

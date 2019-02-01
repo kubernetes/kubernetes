@@ -33,8 +33,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
@@ -134,7 +135,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 			spec.APIServer,
 			clustername,
 			spec.ClientName,
-			certutil.EncodeCertPEM(spec.CACert),
+			pkiutil.EncodeCertPEM(spec.CACert),
 			spec.TokenAuth.Token,
 		), nil
 	}
@@ -210,9 +211,9 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 		spec.APIServer,
 		clustername,
 		spec.ClientName,
-		certutil.EncodeCertPEM(spec.CACert),
+		pkiutil.EncodeCertPEM(spec.CACert),
 		certutil.EncodePrivateKeyPEM(clientKey),
-		certutil.EncodeCertPEM(clientCert),
+		pkiutil.EncodeCertPEM(clientCert),
 	), nil
 }
 
@@ -284,7 +285,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
@@ -311,7 +312,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,4 @@
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
-cmd/hyperkube
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
@@ -100,7 +99,6 @@ pkg/controller/clusterroleaggregation
 pkg/controller/cronjob
 pkg/controller/daemon
 pkg/controller/deployment
-pkg/controller/deployment/util
 pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/garbagecollector
@@ -193,8 +191,6 @@ pkg/kubelet/checkpointmanager/checksum
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client
 pkg/kubelet/cm
-pkg/kubelet/cm/devicemanager/checkpoint
-pkg/kubelet/cm/util
 pkg/kubelet/config
 pkg/kubelet/configmap
 pkg/kubelet/container
@@ -359,7 +355,6 @@ pkg/util/bandwidth
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env
-pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
 pkg/util/iptables

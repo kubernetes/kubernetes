@@ -103,7 +103,6 @@ go_library(
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/dbus:go_default_library",
-        "//pkg/util/file:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -150,6 +149,7 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/path:go_default_library",
     ],
 )
 

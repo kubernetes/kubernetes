@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -264,7 +264,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
 		// cleanup upon failure.
-		util.UnmountPath(dir, cephfsVolume.mounter)
+		mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 		return err
 	}
 	return nil
@@ -283,19 +283,19 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, cephfsVolume.mounter)
+	return mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 }
 
 // GetPath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
-	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedName(name), cephfsVolume.volName)
 }
 
 // GetKeyringPath creates cephfuse keyring path
 func (cephfsVolume *cephfs) GetKeyringPath() string {
 	name := cephfsPluginName
-	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedName(name), cephfsVolume.volName)
 	volumeKeyringDir := volumeDir + "~keyring"
 	return volumeKeyringDir
 }

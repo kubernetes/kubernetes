@@ -899,6 +899,15 @@ type APIResource struct {
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
 	// categories is a list of the grouped resources this resource belongs to (e.g. 'all')
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,7,rep,name=categories"`
+	// The hash value of the storage version, the version this resource is
+	// converted to when written to the data store. Value must be treated
+	// as opaque by clients. Only equality comparison on the value is valid.
+	// This is an alpha feature and may change or be removed in the future.
+	// The field is populated by the apiserver only if the
+	// StorageVersionHash feature gate is enabled.
+	// This field will remain optional even if it graduates.
+	// +optional
+	StorageVersionHash string `json:"storageVersionHash,omitempty" protobuf:"bytes,10,opt,name=storageVersionHash"`
 }
 
 // Verbs masks the value so protobuf can generate

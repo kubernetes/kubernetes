@@ -34,10 +34,10 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var (
@@ -75,7 +75,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(rbdPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(rbdPluginName), volName)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -852,7 +852,7 @@ func (c *rbdUnmounter) TearDown() error {
 
 func (c *rbdUnmounter) TearDownAt(dir string) error {
 	klog.V(4).Infof("rbd: attempting to teardown at %s", dir)
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
@@ -930,7 +930,7 @@ func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
 
 func (rbd *rbd) rbdPodDeviceMapPath() (string, string) {
 	name := rbdPluginName
-	return rbd.plugin.host.GetPodVolumeDeviceDir(rbd.podUID, strings.EscapeQualifiedNameForDisk(name)), rbd.volName
+	return rbd.plugin.host.GetPodVolumeDeviceDir(rbd.podUID, utilstrings.EscapeQualifiedName(name)), rbd.volName
 }
 
 type rbdDiskUnmapper struct {

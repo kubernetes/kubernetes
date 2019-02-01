@@ -388,7 +388,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1beta1.InitConfiguration) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	phaseutil.SetKubernetesVersion(defaultcfg)
+	phaseutil.SetKubernetesVersion(&defaultcfg.ClusterConfiguration)
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk

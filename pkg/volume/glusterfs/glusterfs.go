@@ -40,9 +40,9 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -200,7 +200,7 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 			mounter:         mounter,
 			pod:             pod,
 			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, strings.EscapeQualifiedNameForDisk(glusterfsPluginName), spec.Name())),
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(glusterfsPluginName), spec.Name())),
 		},
 		hosts:        ep,
 		path:         volPath,
@@ -219,7 +219,7 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 		mounter:         mounter,
 		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, strings.EscapeQualifiedNameForDisk(glusterfsPluginName), volName)),
+		MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(glusterfsPluginName), volName)),
 	}}, nil
 }
 
@@ -295,13 +295,13 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Cleanup upon failure.
-	volutil.UnmountPath(dir, b.mounter)
+	mount.CleanupMountPoint(dir, b.mounter, false)
 	return err
 }
 
 func (glusterfsVolume *glusterfs) GetPath() string {
 	name := glusterfsPluginName
-	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
+	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, utilstrings.EscapeQualifiedName(name), glusterfsVolume.volName)
 }
 
 type glusterfsUnmounter struct {
@@ -315,7 +315,7 @@ func (c *glusterfsUnmounter) TearDown() error {
 }
 
 func (c *glusterfsUnmounter) TearDownAt(dir string) error {
-	return volutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func (b *glusterfsMounter) setUpAtInternal(dir string) error {
@@ -542,7 +542,7 @@ type glusterfsVolumeDeleter struct {
 
 func (d *glusterfsVolumeDeleter) GetPath() string {
 	name := glusterfsPluginName
-	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
+	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, utilstrings.EscapeQualifiedName(name), d.glusterfsMounter.glusterfs.volName)
 }
 
 // Traverse the PVs, fetching all the GIDs from those

@@ -56,7 +56,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
+			"Rev": "d4020504c68b6bfa818032bedfb48e33e9638506"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
@@ -112,31 +112,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+			"Rev": "c818fa66e4c88b30db28038fe3f18f2f4a0db9a8"
 		},
 		{
 			"ImportPath": "github.com/gregjones/httpcache",
@@ -616,15 +616,15 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "8a87304934321b4b0ad72a7cb3cbc715d67d38c7"
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

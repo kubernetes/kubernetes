@@ -33,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/keymutex"
 )
 
 type azureDiskDetacher struct {
@@ -309,7 +309,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := util.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
+	err := mount.CleanupMountPoint(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()), false)
 	if err == nil {
 		klog.V(2).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

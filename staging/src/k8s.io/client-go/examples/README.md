@@ -3,6 +3,25 @@
 This directory contains examples that cover various use cases and functionality
 for client-go.
 
+### Auth plugins
+
+Client configuration is typically loaded from kubeconfig files containing server and credential configuration.
+Several plugins for obtaining credentials from external sources are available, but are not loaded by default.
+To enable these plugins in your program, import them in your main package.
+
+You can load all auth plugins:
+```go
+import _ "k8s.io/client-go/plugin/pkg/client/auth
+```
+
+Or you can load specific auth plugins:
+```go
+import _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
+import _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+import _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
+```
+
 ### Configuration
 
 - [**Authenticate in cluster**](./in-cluster-client-configuration): Configure a

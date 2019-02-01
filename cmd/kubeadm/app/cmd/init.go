@@ -148,6 +148,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			err = showJoinCommand(data, out)
 			kubeadmutil.CheckErr(err)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	// adds flags to the init command
@@ -286,27 +287,27 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// validated values to the public kubeadm config API when applicable
 	var err error
 	if options.externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
 	if err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	if err = options.bto.ApplyTo(options.externalcfg); err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
 	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
 	if err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	// override node name and CRI socket from the command line options
@@ -318,29 +319,29 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	}
 
 	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
-		return &initData{}, err
+		return nil, err
 	}
 
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
 		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
-			return &initData{}, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
 	// Checks if an external CA is provided by the user.
-	externalCA, _ := certsphase.UsingExternalCA(cfg)
+	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
 	if externalCA {
 		kubeconfigDir := kubeadmconstants.KubernetesDir
 		if options.dryRun {
 			kubeconfigDir = dryRunDir
 		}
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
-			return &initData{}, err
+			return nil, err
 		}
 	}
 

@@ -19,8 +19,8 @@ package flexvolume
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type flexVolume struct {
@@ -51,5 +51,5 @@ type flexVolume struct {
 
 func (f *flexVolume) GetPath() string {
 	name := f.driverName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
+	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedName(name), f.volName)
 }
