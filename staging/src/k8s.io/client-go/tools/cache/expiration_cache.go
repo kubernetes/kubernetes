@@ -177,8 +177,6 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 // before attempting the replace operation. The replace operation will
 // delete the contents of the ExpirationCache `c`.
 func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) error {
-	c.expirationLock.Lock()
-	defer c.expirationLock.Unlock()
 	items := make(map[string]interface{}, len(list))
 	ts := c.clock.Now()
 	for _, item := range list {
@@ -188,6 +186,8 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 		}
 		items[key] = &timestampedEntry{item, ts}
 	}
+	c.expirationLock.Lock()
+	defer c.expirationLock.Unlock()
 	c.cacheStorage.Replace(items, resourceVersion)
 	return nil
 }
