@@ -245,6 +245,7 @@ func restrictedPod(name string) *v1.Pod {
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
 					RunAsUser:                utilpointer.Int64Ptr(65534),
+					RunAsGroup:               utilpointer.Int64Ptr(65534),
 				},
 			}},
 		},
@@ -269,6 +270,11 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:                  true,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: int64(999), Max: int64(999)}},
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
@@ -324,6 +330,11 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:     false,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAsNonRoot,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: int64(999), Max: int64(999)}},
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
