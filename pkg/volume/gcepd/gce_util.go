@@ -31,7 +31,6 @@ import (
 	cloudfeatures "k8s.io/cloud-provider/features"
 	"k8s.io/klog"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -354,8 +353,8 @@ func udevadmChangeToDrive(drivePath string) error {
 // Checks whether the given GCE PD volume spec is associated with a regional PD.
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
-		zonesLabel := spec.PersistentVolume.Labels[kubeletapis.LabelZoneFailureDomain]
-		zones := strings.Split(zonesLabel, kubeletapis.LabelMultiZoneDelimiter)
+		zonesLabel := spec.PersistentVolume.Labels[v1.LabelZoneFailureDomain]
+		zones := strings.Split(zonesLabel, v1.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
 	return false

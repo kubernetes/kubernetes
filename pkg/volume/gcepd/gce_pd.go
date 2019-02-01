@@ -32,7 +32,6 @@ import (
 	"k8s.io/klog"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -544,7 +543,7 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 		for k, v := range labels {
 			pv.Labels[k] = v
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				values, err = util.LabelZonesToList(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)

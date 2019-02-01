@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/resizefs:go_default_library",
         "//pkg/volume:go_default_library",
@@ -60,7 +59,6 @@ go_test(
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

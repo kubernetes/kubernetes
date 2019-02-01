@@ -30,7 +30,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -153,7 +152,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -226,10 +225,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
-			volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+			volumeLabels[v1.LabelZoneFailureDomain] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+			volumeLabels[v1.LabelZoneRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

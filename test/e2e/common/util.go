@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -147,7 +146,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)

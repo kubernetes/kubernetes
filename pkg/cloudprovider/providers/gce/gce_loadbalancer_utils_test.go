@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // TODO(yankaiz): Create shared error types for both test/non-test codes.
@@ -99,8 +98,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          name,
-						kubeletapis.LabelZoneFailureDomain: zoneName,
+						v1.LabelHostname:          name,
+						v1.LabelZoneFailureDomain: zoneName,
 					},
 				},
 				Status: v1.NodeStatus{

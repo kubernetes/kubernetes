@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"strings"
 )
 
@@ -284,9 +283,9 @@ func createPVSpec(name string, readOnly bool, zones []string) *volume.Spec {
 	}
 
 	if zones != nil {
-		zonesLabel := strings.Join(zones, kubeletapis.LabelMultiZoneDelimiter)
+		zonesLabel := strings.Join(zones, v1.LabelMultiZoneDelimiter)
 		spec.PersistentVolume.ObjectMeta.Labels = map[string]string{
-			kubeletapis.LabelZoneFailureDomain: zonesLabel,
+			v1.LabelZoneFailureDomain: zonesLabel,
 		}
 	}
 

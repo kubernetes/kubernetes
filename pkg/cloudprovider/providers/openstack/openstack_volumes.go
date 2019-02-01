@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -715,8 +714,8 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 
 	// Construct Volume Labels
 	labels := make(map[string]string)
-	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
-	labels[kubeletapis.LabelZoneRegion] = os.region
+	labels[v1.LabelZoneFailureDomain] = volume.AvailabilityZone
+	labels[v1.LabelZoneRegion] = os.region
 	klog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
 
 	return labels, nil

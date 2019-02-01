@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -4565,13 +4564,13 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 func TestVolumeZonePredicate(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-c"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-c"}},
 		},
 	}
 
@@ -4608,7 +4607,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"},
 				},
 			},
 			Fits: true,
@@ -4629,7 +4628,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -4640,7 +4639,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -4651,7 +4650,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -4662,7 +4661,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -4694,13 +4693,13 @@ func TestVolumeZonePredicate(t *testing.T) {
 func TestVolumeZonePredicateMultiZone(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
 		},
 	}
 
@@ -4745,7 +4744,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -4756,7 +4755,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -4806,7 +4805,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
@@ -4835,7 +4834,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "host1",
-			Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+			Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 		},
 	}
 

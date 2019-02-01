@@ -31,7 +31,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	vol "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -153,7 +152,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 
 			// Set NodeSelectorRequirements based on the labels
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				zones, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))

@@ -30,7 +30,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -333,12 +332,12 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		for i := 0; i < 3; i++ {
 			requirements := []v1.NodeSelectorRequirement{
 				{
-					Key:      kubeletapis.LabelZoneRegion,
+					Key:      v1.LabelZoneRegion,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{diskController.GetLocation()},
 				},
 				{
-					Key:      kubeletapis.LabelZoneFailureDomain,
+					Key:      v1.LabelZoneFailureDomain,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{strconv.Itoa(i)},
 				},

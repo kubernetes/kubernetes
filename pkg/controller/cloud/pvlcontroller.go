@@ -40,7 +40,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -210,7 +209,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		// Set NodeSelectorRequirements based on the labels
 		if populateAffinity {
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				zones, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v)

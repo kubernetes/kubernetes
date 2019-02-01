@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -1191,8 +1190,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		kubeletapis.LabelZoneFailureDomain: "us-east-1a",
-		kubeletapis.LabelZoneRegion:        "us-east-1"}, labels)
+		v1.LabelZoneFailureDomain: "us-east-1a",
+		v1.LabelZoneRegion:        "us-east-1"}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1265,8 +1264,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 				AvailabilityZone: aws.String("us-east-1a"),
 			}},
 			map[string]string{
-				kubeletapis.LabelZoneFailureDomain: "us-east-1a",
-				kubeletapis.LabelZoneRegion:        "us-east-1",
+				v1.LabelZoneFailureDomain: "us-east-1a",
+				v1.LabelZoneRegion:        "us-east-1",
 			},
 			nil,
 		},
