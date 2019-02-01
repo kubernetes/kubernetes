@@ -3550,7 +3550,7 @@ type ContainerStats struct {
 	Cpu *CpuUsage `protobuf:"bytes,2,opt,name=cpu" json:"cpu,omitempty"`
 	// Memory usage gathered from the container.
 	Memory *MemoryUsage `protobuf:"bytes,3,opt,name=memory" json:"memory,omitempty"`
-	// Usage of the writeable layer.
+	// Usage of the writable layer.
 	WritableLayer *FilesystemUsage `protobuf:"bytes,4,opt,name=writable_layer,json=writableLayer" json:"writable_layer,omitempty"`
 }
 
