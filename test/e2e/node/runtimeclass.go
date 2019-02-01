@@ -21,14 +21,17 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -37,21 +40,17 @@ import (
 
 const runtimeClassCRDName = "runtimeclasses.node.k8s.io"
 
-var (
-	runtimeClassGVR = schema.GroupVersionResource{
-		Group:    "node.k8s.io",
-		Version:  "v1alpha1",
-		Resource: "runtimeclasses",
-	}
-)
-
 var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
+	BeforeEach(func() {
+		createRuntimeClassCRD(f)
+	})
+
+	It("should run a Pod requesting a non-existent RuntimeClass", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+		expectPodSuccess(f, pod)
 	})
 
 	It("should run a Pod requesting a RuntimeClass with an empty handler", func() {
@@ -60,14 +59,14 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 		expectPodSuccess(f, pod)
 	})
 
-	It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
+	It("should run a Pod requesting a RuntimeClass with an unconfigured handler", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, handler)
+		expectPodSuccess(f, pod)
 	})
 
-	It("should reject a Pod requesting a deleted RuntimeClass", func() {
+	It("should run a Pod requesting a deleted RuntimeClass", func() {
 		rcName := createRuntimeClass(f, "delete-me", "")
 		rcClient := f.NodeAPIClientSet.NodeV1alpha1().RuntimeClasses()
 
@@ -89,10 +88,10 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 		})
 
 		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+		expectPodSuccess(f, pod)
 	})
 
-	It("should recover when the RuntimeClass CRD is deleted [Slow]", func() {
+	It("should recover when the RuntimeClass CRD is deleted [Serial] [Slow]", func() {
 		By("Deleting the RuntimeClass CRD", func() {
 			crds := f.APIExtensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions()
 			runtimeClassCRD, err := crds.Get(runtimeClassCRDName, metav1.GetOptions{})
@@ -102,7 +101,7 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 			err = crds.Delete(runtimeClassCRDName, nil)
 			framework.ExpectNoError(err, "failed to delete RuntimeClass CRD %s", runtimeClassCRDName)
 
-			By("Waiting for the CRD to disappear")
+			By(fmt.Sprintf("Waiting for the CRD (%s) to disappear", string(runtimeClassCRDUID)))
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
 				crd, err := crds.Get(runtimeClassCRDName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
@@ -112,24 +111,18 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 					return true, err // stop wait with error
 				}
 				// If the UID changed, that means the addon manager has already recreated it.
-				return crd.GetUID() != runtimeClassCRDUID, nil
+				if crd.GetUID() != runtimeClassCRDUID {
+					By(fmt.Sprintf("A new RuntimeClass CRD (%s) has been created", string(crd.GetUID())))
+					return true, nil
+				} else {
+					return false, nil
+				}
 			}))
 
-			By("Waiting for the CRD to be recreated")
-			framework.ExpectNoError(wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-				crd, err := crds.Get(runtimeClassCRDName, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
-					return false, nil // still not recreated
-				}
-				if err != nil {
-					return true, err // stop wait with error
-				}
-				if crd.GetUID() == runtimeClassCRDUID {
-					return true, fmt.Errorf("RuntimeClass CRD never deleted") // this shouldn't happen
-				}
-				return true, nil
-			}))
 		})
+
+		By("Recreating the RuntimeClass CRD manually")
+		createRuntimeClassCRD(f)
 
 		rcName := createRuntimeClass(f, "valid", "")
 		pod := createRuntimeClassPod(f, rcName)
@@ -143,6 +136,47 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 	// TODO(tallclair): Test an actual configured non-default runtimeHandler.
 })
 
+// createRuntimeClassCRD creates CRD for RuntimeClass.
+func createRuntimeClassCRD(f *framework.Framework) {
+	crdFilePath := "cluster/addons/runtimeclass/runtimeclass_crd.yaml"
+	data := testfiles.ReadOrDie(crdFilePath, Fail)
+	var crd apiextensionsv1beta1.CustomResourceDefinition
+	framework.ExpectNoError(runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, &crd),
+		"failed to decode the content of the CRD file")
+
+	crds := f.APIExtensionsClientSet.ApiextensionsV1beta1().CustomResourceDefinitions()
+	By("Creating CRD for RuntimeClass")
+	_, err := crds.Create(&crd)
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			By("The RuntimeClass CRD is already created")
+		} else {
+			framework.ExpectNoError(err, "Failed to create %s CRD", crd.Name)
+		}
+	}
+
+	var crdUID string
+	By("Waiting up to 5 minutes for the RuntimeClass CRD to be established")
+	framework.ExpectNoError(wait.PollImmediate(
+		500*time.Millisecond, 5*time.Minute, func() (bool, error) {
+			crd, err := crds.Get(crd.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			for _, cond := range crd.Status.Conditions {
+				switch cond.Type {
+				case apiextensionsv1beta1.Established:
+					if cond.Status == apiextensionsv1beta1.ConditionTrue {
+						crdUID = string(crd.GetUID())
+						return true, nil
+					}
+				}
+			}
+			return false, nil
+		}))
+	By(fmt.Sprintf("The RuntimeClass CRD (%s) is established", crdUID))
+}
+
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
 // synchronously creates it, and returns the generated name.
 func createRuntimeClass(f *framework.Framework, name, handler string) string {
@@ -150,11 +184,13 @@ func createRuntimeClass(f *framework.Framework, name, handler string) string {
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
 	rc, err := f.NodeAPIClientSet.NodeV1alpha1().RuntimeClasses().Create(rc)
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+	By(fmt.Sprintf("RuntimeClass %s is created", uniqueName))
 	return rc.GetName()
 }
 
 // createRuntimeClass creates a test pod with the given runtimeClassName.
 func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.Pod {
+	By(fmt.Sprintf("Creating pod using RuntimeClass %s", runtimeClassName))
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),

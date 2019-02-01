@@ -45,6 +45,7 @@ BINDATA_OUTPUT="test/e2e/generated/bindata.go"
 # test/e2e/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
+	"cluster/addons/runtimeclass/..." \
 	"test/e2e/testing-manifests/..." \
 	"test/images/..." \
 	"test/fixtures/..."
