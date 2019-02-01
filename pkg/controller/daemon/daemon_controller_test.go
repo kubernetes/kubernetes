@@ -2461,7 +2461,11 @@ func TestDeletePodForNotExistingNode(t *testing.T) {
 			addNodes(manager.nodeStore, 0, 1, nil)
 			addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, 1)
 			addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 0)
+			if f {
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 0)
+			} else {
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+			}
 		}
 	}
 }
