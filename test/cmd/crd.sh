@@ -44,7 +44,7 @@ run_crd_tests() {
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \\\"foos.company.com\\\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \"foos.company.com\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'foos.company.com:'
 
   kubectl "${KUBE_FLAGS_WITH_TOKEN[@]}" create -f - << __EOF__
 {
@@ -66,7 +66,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \\\"foos.company.com\\\" \\\"bars.company.com\\\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \"foos.company.com\" \"bars.company.com\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
 
   # This test ensures that the name printer is able to output a resource
   # in the proper "kind.group/resource_name" format, and that the
@@ -93,7 +93,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
 
   # This test ensures that we can create complex validation without client-side validation complaining
   kubectl "${KUBE_FLAGS_WITH_TOKEN[@]}" create -f - << __EOF__
@@ -128,7 +128,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\" \\\"validfoos.company.com\\\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $ID_FIELD \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\" \"validfoos.company.com\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
 
   run_non_native_resource_tests
 

@@ -210,7 +210,7 @@ run_recursive_resources_tests() {
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$ID_FIELD}}:{{end}}" 'busybox0:busybox1:'
   # Command
-  echo -e "#!/usr/bin/env bash\nsed -i 's/image: busybox/image: prom\/busybox/g' $1" > /tmp/tmp-editor.sh
+  echo -e "#!/usr/bin/env bash\nsed -i \"s/image: busybox/image: prom\/busybox/g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   output_message=$(! EDITOR=/tmp/tmp-editor.sh kubectl edit -f hack/testdata/recursive/pod --recursive 2>&1 "${KUBE_FLAGS[@]}")
   # Post-condition: busybox0 & busybox1 PODs are not edited, and since busybox2 is malformed, it should error

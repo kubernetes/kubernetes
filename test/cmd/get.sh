@@ -313,7 +313,7 @@ run_kubectl_all_namespace_tests() {
   kube::log::status "Testing kubectl --all-namespace"
 
   # Pre-condition: the "default" namespace exists
-  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $ID_FIELD \\\"default\\\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $ID_FIELD \"default\"}}{{$ID_FIELD}}:{{end}}{{end}}" 'default:'
 
   ### Create POD
   # Pre-condition: no POD exists

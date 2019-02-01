@@ -481,13 +481,12 @@ run_pod_tests() {
   # Needs to retry because other party may change the resource.
   for count in {0..3}; do
     resourceVersion=$(kubectl get "${KUBE_FLAGS[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
-    kubectl patch "${KUBE_FLAGS[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'"$resourceVersion}}" 2> "${ERROR_FILE}" || true
+    kubectl patch "${KUBE_FLAGS[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'"$resourceVersion"'"}}' 2> "${ERROR_FILE}" || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
       kube::log::status "retry $1, error: $(cat "${ERROR_FILE}")"
       rm "${ERROR_FILE}"
       sleep $((2**count))
     else
-      rm "${ERROR_FILE}"
       kube::test::get_object_assert pods "{{range.items}}{{$IMAGE_FIELD}}:{{end}}" 'nginx:'
       break
     fi
@@ -497,7 +496,7 @@ run_pod_tests() {
   resourceVersion=$(kubectl get "${KUBE_FLAGS[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
   ((resourceVersion+=100))
   # Command
-  kubectl patch "${KUBE_FLAGS[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'$resourceVersion'"}}' 2> "${ERROR_FILE}" || true
+  kubectl patch "${KUBE_FLAGS[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'"$resourceVersion"'"}}' 2> "${ERROR_FILE}" || true
   # Post-condition: should get an error reporting the conflict
   if grep -q "please apply your changes to the latest version and try again" "${ERROR_FILE}"; then
     kube::log::status "\"kubectl patch with resourceVersion $resourceVersion\" returns error as expected: $(cat "${ERROR_FILE}")"

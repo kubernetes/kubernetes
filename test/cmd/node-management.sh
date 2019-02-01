@@ -76,7 +76,7 @@ __EOF__
   kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
   # taint can add a taint
   kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key "dedicated"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
   # Post-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
