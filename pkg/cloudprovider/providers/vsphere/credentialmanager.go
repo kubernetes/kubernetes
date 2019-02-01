@@ -30,9 +30,9 @@ import (
 
 // Error Messages
 const (
-	CredentialsNotFoundErrMsg = "Credentials not found"
-	CredentialMissingErrMsg   = "Username/Password is missing"
-	UnknownSecretKeyErrMsg    = "Unknown secret key"
+	CredentialsNotFoundErrMsg = "credentials not found"
+	CredentialMissingErrMsg   = "username/password is missing"
+	UnknownSecretKeyErrMsg    = "unknown secret key"
 )
 
 // Error constants
