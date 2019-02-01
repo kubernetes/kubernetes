@@ -25,16 +25,19 @@ import (
 
 func TestAddToNodeAddresses(t *testing.T) {
 	testCases := []struct {
+		name     string
 		existing []v1.NodeAddress
 		toAdd    []v1.NodeAddress
 		expected []v1.NodeAddress
 	}{
 		{
+			name:     "add no addresses to empty node addresses",
 			existing: []v1.NodeAddress{},
 			toAdd:    []v1.NodeAddress{},
 			expected: []v1.NodeAddress{},
 		},
 		{
+			name:     "add new node addresses to empty existing addresses",
 			existing: []v1.NodeAddress{},
 			toAdd: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
@@ -46,6 +49,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 			},
 		},
 		{
+			name:     "add a duplicate node address",
 			existing: []v1.NodeAddress{},
 			toAdd: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
@@ -56,6 +60,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 			},
 		},
 		{
+			name: "add 1 new and 1 duplicate address",
 			existing: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
@@ -72,10 +77,12 @@ func TestAddToNodeAddresses(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
-		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			AddToNodeAddresses(&tc.existing, tc.toAdd...)
+			if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
+				t.Errorf("expected: %v, got: %v", tc.expected, tc.existing)
+			}
+		})
 	}
 }
