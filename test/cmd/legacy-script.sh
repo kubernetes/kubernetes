@@ -384,13 +384,12 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
-  if [ ! -z "$WHAT" ]; then #ccheck not empty
+   if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do 
       record_command run_${pkg}_tests
     done
   else
-
     #########################
     # Kubectl version #
     #########################
