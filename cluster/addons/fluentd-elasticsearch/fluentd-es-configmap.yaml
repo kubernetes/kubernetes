@@ -176,6 +176,16 @@ data:
       </parse>
     </filter>
 
+    # Modify tag to namespace
+    <match kubernetes.**>
+      @type rewrite_tag_filter
+      <rule>
+        key $['kubernetes']['namespace_name']
+        pattern ^(.+)$
+       tag $1
+       </rule>
+    </match>
+
   system.input.conf: |-
     # Example:
     # 2015-12-21 23:17:22,066 [salt.state       ][INFO    ] Completed state [net.ipv4.ip_forward] at time 23:17:22.066081
@@ -463,6 +473,7 @@ data:
       host elasticsearch-logging
       port 9200
       logstash_format true
+      logstash_prefix ${tag}
       <buffer>
         @type file
         path /var/log/fluentd-buffers/kubernetes.system.buffer
