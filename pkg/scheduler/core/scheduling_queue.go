@@ -50,7 +50,14 @@ import (
 type SchedulingQueue interface {
 	Add(pod *v1.Pod) error
 	AddIfNotPresent(pod *v1.Pod) error
-	AddUnschedulableIfNotPresent(pod *v1.Pod) error
+	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
+	// The podSchedulingCycle represents the current scheduling cycle number which can be
+	// returned by calling SchedulingCycle().
+	AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error
+	// SchedulingCycle returns the current number of scheduling cycle which is
+	// cached by scheduling queue. Normally, incrementing this number whenever
+	// a pod is popped (e.g. called Pop()) is enough.
+	SchedulingCycle() int64
 	Pop() (*v1.Pod, error)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
@@ -97,8 +104,13 @@ func (f *FIFO) AddIfNotPresent(pod *v1.Pod) error {
 
 // AddUnschedulableIfNotPresent adds an unschedulable pod back to the queue. In
 // FIFO it is added to the end of the queue.
-func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
+func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
 	return f.FIFO.AddIfNotPresent(pod)
+}
+
+// SchedulingCycle implements SchedulingQueue.SchedulingCycle interface.
+func (f *FIFO) SchedulingCycle() int64 {
+	return 0
 }
 
 // Update updates a pod in the FIFO.
@@ -191,12 +203,14 @@ type PriorityQueue struct {
 	// nominatedPods is a structures that stores pods which are nominated to run
 	// on nodes.
 	nominatedPods *nominatedPodMap
-	// receivedMoveRequest is set to true whenever we receive a request to move a
-	// pod from the unschedulableQ to the activeQ, and is set to false, when we pop
-	// a pod from the activeQ. It indicates if we received a move request when a
-	// pod was in flight (we were trying to schedule it). In such a case, we put
-	// the pod back into the activeQ if it is determined unschedulable.
-	receivedMoveRequest bool
+	// schedulingCycle represents sequence number of scheduling cycle and is incremented
+	// when a pod is popped.
+	schedulingCycle int64
+	// moveRequestCycle caches the sequence number of scheduling cycle when we
+	// received a move request. Unscheduable pods in and before this scheduling
+	// cycle will be put back to activeQueue if we were trying to schedule them
+	// when we received move request.
+	moveRequestCycle int64
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -229,9 +243,10 @@ func activeQComp(pod1, pod2 interface{}) bool {
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue() *PriorityQueue {
 	pq := &PriorityQueue{
-		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, activeQComp),
-		unschedulableQ: newUnschedulablePodsMap(),
-		nominatedPods:  newNominatedPodMap(),
+		activeQ:          newHeap(cache.MetaNamespaceKeyFunc, activeQComp),
+		unschedulableQ:   newUnschedulablePodsMap(),
+		nominatedPods:    newNominatedPodMap(),
+		moveRequestCycle: -1,
 	}
 	pq.cond.L = &pq.lock
 	return pq
@@ -282,10 +297,19 @@ func isPodUnschedulable(pod *v1.Pod) bool {
 	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
 }
 
-// AddUnschedulableIfNotPresent does nothing if the pod is present in either
-// queue. Otherwise it adds the pod to the unschedulable queue if
-// p.receivedMoveRequest is false, and to the activeQ if p.receivedMoveRequest is true.
-func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
+// SchedulingCycle returns current scheduling cycle.
+func (p *PriorityQueue) SchedulingCycle() int64 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	return p.schedulingCycle
+}
+
+// AddUnschedulableIfNotPresent does nothing if the pod is present in any
+// queue. If pod is unschedulable, it adds pod to unschedulable queue if
+// p.moveRequestCycle > podSchedulingCycle or to backoff queue if p.moveRequestCycle
+// <= podSchedulingCycle but pod is subject to backoff. In other cases, it adds pod to
+// active queue.
+func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	if p.unschedulableQ.get(pod) != nil {
@@ -294,7 +318,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	if _, exists, _ := p.activeQ.Get(pod); exists {
 		return fmt.Errorf("pod is already present in the activeQ")
 	}
-	if !p.receivedMoveRequest && isPodUnschedulable(pod) {
+	if podSchedulingCycle > p.moveRequestCycle && isPodUnschedulable(pod) {
 		p.unschedulableQ.addOrUpdate(pod)
 		p.nominatedPods.add(pod, "")
 		return nil
@@ -308,8 +332,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
-// activeQ is empty and waits until a new item is added to the queue. It also
-// clears receivedMoveRequest to mark the beginning of a new scheduling cycle.
+// activeQ is empty and waits until a new item is added to the queue. It
+// increments scheduling cycle when a pod is popped.
 func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -321,7 +345,7 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 		return nil, err
 	}
 	pod := obj.(*v1.Pod)
-	p.receivedMoveRequest = false
+	p.schedulingCycle++
 	return pod, err
 }
 
@@ -419,7 +443,7 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 		}
 	}
 	p.unschedulableQ.clear()
-	p.receivedMoveRequest = true
+	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
 
@@ -432,7 +456,7 @@ func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
 			glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 		}
 	}
-	p.receivedMoveRequest = true
+	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
 
