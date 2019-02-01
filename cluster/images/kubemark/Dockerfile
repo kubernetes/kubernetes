@@ -14,4 +14,6 @@
 
 FROM k8s.gcr.io/debian-base-amd64:0.4.1
 
+RUN clean-install bash
+
 COPY kubemark /kubemark
