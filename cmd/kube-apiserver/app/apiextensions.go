@@ -48,12 +48,15 @@ func createAPIExtensionsConfig(
 
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
 	// because apiextentions apiserver should use its own scheme to convert resources.
-	commandOptions.Admission.ApplyTo(
+	err := commandOptions.Admission.ApplyTo(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
 		apiextensionsapiserver.Scheme,
 		pluginInitializers...)
+	if err != nil {
+		return nil, err
+	}
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
