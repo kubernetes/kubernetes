@@ -72,7 +72,6 @@ var _ = SIGDescribe("DNS", func() {
 		namesToResolve := []string{
 			"kubernetes.default",
 			"kubernetes.default.svc",
-			"kubernetes.default.svc.cluster",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
