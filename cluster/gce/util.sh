@@ -2774,7 +2774,7 @@ function create-heapster-node() {
       --tags "${NODE_TAG}" \
       ${network} \
       $(get-scope-flags) \
-      --metadata-from-file "$(get-linux-node-instance-metadata-from-file)"
+      --metadata-from-file "$(get-node-instance-metadata-from-file)"
 }
 
 # Assumes:
