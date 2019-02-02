@@ -91,6 +91,10 @@
 			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
 			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
 		},
@@ -456,6 +460,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/third_party/forked/golang/reflect",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/util/feature",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
