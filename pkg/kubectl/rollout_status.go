@@ -102,7 +102,7 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, daemon, err)
 	}
 	
-	if daemon.Spec.UpdateStrategy.cType != appsv1.RollingUpdateDaemonSetStrategyType {
+	if daemon.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
 		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateStatefulSetStrategyType)
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
