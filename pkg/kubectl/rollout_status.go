@@ -108,6 +108,8 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
 		//we can stop with some unavailable as long as it's less than maxUnavailble. This should help when there are node issues
 		//and not all daemonse pods can be succesfully updated/ready
+		//may already be handled here https://github.com/kubernetes/kubernetes/blob/8e05f0904b36aeaa828c2f716d72b665921d97bb/pkg/controller/daemon/update.go
+
 		numberRequiredForSuccess := daemon.Status.DesiredNumberScheduled - daemon.spec.updateStrategy.maxUnavailable
 		
 		if daemon.Status.UpdatedNumberScheduled < numberRequiredForSuccess {
