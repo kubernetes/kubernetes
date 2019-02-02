@@ -140,8 +140,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
 		driverName := utilstrings.UnescapeQualifiedName(driverDirName)
-		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
-
+		probeEvent.PluginName = driverName
 	} else {
 		return probeEvent, fmt.Errorf("Unknown Operation on directory: %s. ", driverDirName)
 	}
