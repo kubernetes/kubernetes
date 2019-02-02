@@ -6686,6 +6686,33 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     core.DNSClusterFirst,
 			},
 		},
+		{ // valid serviceaccount token projected volume with serviceaccount name specified
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+			Spec: core.PodSpec{
+				ServiceAccountName: "some-service-account",
+				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy:      core.RestartPolicyAlways,
+				DNSPolicy:          core.DNSClusterFirst,
+				Volumes: []core.Volume{
+					{
+						Name: "projected-volume",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								Sources: []core.VolumeProjection{
+									{
+										ServiceAccountToken: &core.ServiceAccountTokenProjection{
+											Audience:          "foo-audience",
+											ExpirationSeconds: 6000,
+											Path:              "foo-path",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, pod := range successCases {
 		if errs := ValidatePod(&pod); len(errs) != 0 {
