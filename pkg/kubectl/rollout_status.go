@@ -101,16 +101,20 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, daemon, err)
 	}
-
-	if daemon.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
+	
+	if daemon.Spec.UpdateStrategy.cType != appsv1.RollingUpdateDaemonSetStrategyType {
 		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateStatefulSetStrategyType)
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
-		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
+		//we can stop with some unavailable as long as it's less than maxUnavailble. This should help when there are node issues
+		//and not all daemonse pods can be succesfully updated/ready
+		numberRequiredForSuccess := daemon.Status.DesiredNumberScheduled - daemon.spec.updateStrategy.maxUnavailable
+		
+		if daemon.Status.UpdatedNumberScheduled < numberRequiredForSuccess {
 			return fmt.Sprintf("Waiting for daemon set %q rollout to finish: %d out of %d new pods have been updated...\n", daemon.Name, daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
 		}
-		if daemon.Status.NumberAvailable < daemon.Status.DesiredNumberScheduled {
-			return fmt.Sprintf("Waiting for daemon set %q rollout to finish: %d of %d updated pods are available...\n", daemon.Name, daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled), false, nil
+		if daemon.Status.NumberAvailable < numberRequiredForSuccess) {
+			return fmt.Sprintf("Waiting for daemon set %q rollout to finish: %d of %d updated pods are available...\n", daemon.Name, daemon.Status.NumberAvailable, numberRequiredForSuccess), false, nil
 		}
 		return fmt.Sprintf("daemon set %q successfully rolled out\n", daemon.Name), true, nil
 	}
