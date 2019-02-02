@@ -32,9 +32,10 @@ func NewCache(maxSize int) Cache {
 	}
 	cache := make(Cache, shardsCount)
 	for i := 0; i < shardsCount; i++ {
+                size := maxSize / shardsCount
 		cache[i] = &cacheShard{
-			items:   make(map[uint64]interface{}),
-			maxSize: maxSize / shardsCount,
+			items:   make(map[uint64]interface{}, size),
+			maxSize: size,
 		}
 	}
 	return cache
