@@ -51,9 +51,13 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         command:
-        - /bin/sh
-        - -c
-        - /kubemark --morph=kubelet --name=$(NODE_NAME) {{hollow_kubelet_params}} --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        - /kubemark
+        - --morph=kubelet
+        - --name=$(NODE_NAME)
+        - {{hollow_kubelet_params}}
+        - --kubeconfig=/kubeconfig/kubelet.kubeconfig
+        - $(CONTENT_TYPE)
+        - --log-file=/var/log/kubelet-$(NODE_NAME).log
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -79,9 +83,13 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         command:
-        - /bin/sh
-        - -c
-        - /kubemark --morph=proxy --name=$(NODE_NAME) {{hollow_proxy_params}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        - /kubemark
+        - --morph=proxy
+        - --name=$(NODE_NAME)
+        - {{hollow_proxy_params}}
+        - --kubeconfig=/kubeconfig/kubeproxy.kubeconfig
+        - $(CONTENT_TYPE)
+        - --log-file=/var/log/kubeproxy-$(NODE_NAME).log
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
