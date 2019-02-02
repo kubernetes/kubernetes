@@ -72,10 +72,6 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 			return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 		}
 
-		if err := DetectUnsupportedVersion(b); err != nil {
-			return nil, err
-		}
-
 		gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 		if err != nil {
 			return nil, err
@@ -83,11 +79,20 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 
 		joinBytes := []byte{}
 		for gvk, bytes := range gvkmap {
-			if gvk.Kind == constants.JoinConfigurationKind {
-				joinBytes = bytes
-				// verify the validity of the YAML
-				strict.VerifyUnmarshalStrict(bytes, gvk)
+			// not interested in anything other than JoinConfiguration
+			if gvk.Kind != constants.JoinConfigurationKind {
+				continue
 			}
+
+			// check if this version is supported one
+			if err := ValidateSupportedVersion(gvk.GroupVersion()); err != nil {
+				return nil, err
+			}
+
+			// verify the validity of the YAML
+			strict.VerifyUnmarshalStrict(bytes, gvk)
+
+			joinBytes = bytes
 		}
 
 		if len(joinBytes) == 0 {
