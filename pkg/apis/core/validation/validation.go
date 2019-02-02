@@ -2632,18 +2632,11 @@ func validateRestartPolicy(restartPolicy *core.RestartPolicy, fldPath *field.Pat
 func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
-	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault:
-	case core.DNSNone:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			allErrors = append(allErrors, field.Invalid(fldPath, dnsPolicy, "DNSPolicy: can not use 'None', custom pod DNS is disabled by feature gate"))
-		}
+	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault, core.DNSNone:
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
-		validValues := []string{string(core.DNSClusterFirstWithHostNet), string(core.DNSClusterFirst), string(core.DNSDefault)}
-		if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			validValues = append(validValues, string(core.DNSNone))
-		}
+		validValues := []string{string(core.DNSClusterFirstWithHostNet), string(core.DNSClusterFirst), string(core.DNSDefault), string(core.DNSNone)}
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors
@@ -2674,7 +2667,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 	allErrs := field.ErrorList{}
 
 	// Validate DNSNone case. Must provide at least one DNS name server.
-	if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) && dnsPolicy != nil && *dnsPolicy == core.DNSNone {
+	if dnsPolicy != nil && *dnsPolicy == core.DNSNone {
 		if dnsConfig == nil {
 			return append(allErrs, field.Required(fldPath, fmt.Sprintf("must provide `dnsConfig` when `dnsPolicy` is %s", core.DNSNone)))
 		}
@@ -2684,10 +2677,6 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 	}
 
 	if dnsConfig != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			return append(allErrs, field.Forbidden(fldPath, "DNSConfig: custom pod DNS is disabled by feature gate"))
-		}
-
 		// Validate nameservers.
 		if len(dnsConfig.Nameservers) > MaxDNSNameservers {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
