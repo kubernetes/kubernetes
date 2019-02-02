@@ -167,7 +167,6 @@
       "AllowedPrefixes": [
         "k8s.io/kubernetes/pkg/api/legacyscheme",
         "k8s.io/kubernetes/pkg/api/v1/endpoints",
-        "k8s.io/kubernetes/pkg/api/v1/node",
         "k8s.io/kubernetes/pkg/api/v1/pod",
         "k8s.io/kubernetes/pkg/apis/apps/v1",
         "k8s.io/kubernetes/pkg/apis/autoscaling",

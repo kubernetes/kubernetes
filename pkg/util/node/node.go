@@ -142,6 +142,20 @@ func GetZoneKey(node *v1.Node) string {
 	return region + ":\x00:" + failureDomain
 }
 
+// GetNodeCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
+func GetNodeCondition(status *v1.NodeStatus, conditionType v1.NodeConditionType) (int, *v1.NodeCondition) {
+	if status == nil {
+		return -1, nil
+	}
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == conditionType {
+			return i, &status.Conditions[i]
+		}
+	}
+	return -1, nil
+}
+
 // SetNodeCondition updates specific node condition with patch operation.
 func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.NodeCondition) error {
 	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {
@@ -210,4 +224,14 @@ func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, n
 		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for node %q: %v", nodeName, err)
 	}
 	return patchBytes, nil
+}
+
+// IsNodeReady returns true if a node is ready; false otherwise.
+func IsNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }
