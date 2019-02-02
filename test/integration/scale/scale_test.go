@@ -25,7 +25,7 @@ import (
 	_ "github.com/coreos/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
 
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -141,13 +141,13 @@ func TestScaleSubresources(t *testing.T) {
 	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(rcStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().ReplicaSets("default").Create(rsStub); err != nil {
+	if _, err := clientSet.AppsV1().ReplicaSets("default").Create(rsStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().Deployments("default").Create(deploymentStub); err != nil {
+	if _, err := clientSet.AppsV1().Deployments("default").Create(deploymentStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(ssStub); err != nil {
+	if _, err := clientSet.AppsV1().StatefulSets("default").Create(ssStub); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,19 +203,19 @@ var (
 		Spec:       corev1.ReplicationControllerSpec{Selector: podStub.Labels, Replicas: &replicas, Template: &podStub},
 	}
 
-	rsStub = &appsv1beta2.ReplicaSet{
+	rsStub = &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	deploymentStub = &appsv1beta2.Deployment{
+	deploymentStub = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	ssStub = &appsv1beta2.StatefulSet{
+	ssStub = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 )
 
