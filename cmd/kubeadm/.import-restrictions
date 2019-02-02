@@ -42,7 +42,8 @@
 				"k8s.io/utils/exec",
 				"k8s.io/utils/integer",
 				"k8s.io/utils/path",
-				"k8s.io/utils/pointer"
+				"k8s.io/utils/pointer",
+				"k8s.io/utils/net"
 			]
 		},
 		{
@@ -82,7 +83,6 @@
 				"k8s.io/kubernetes/pkg/util/initsystem",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
-				"k8s.io/kubernetes/pkg/util/net/sets",
 				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/normalizer",
 				"k8s.io/kubernetes/pkg/util/parsers",

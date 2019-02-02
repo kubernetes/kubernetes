@@ -48,7 +48,6 @@ go_library(
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -89,6 +88,7 @@ go_library(
         "//vendor/google.golang.org/api/tpu/v1:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
@@ -111,7 +111,6 @@ go_test(
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -128,6 +127,7 @@ go_test(
         "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

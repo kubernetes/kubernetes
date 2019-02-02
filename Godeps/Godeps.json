@@ -4121,6 +4121,10 @@
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
 		{
+			"ImportPath": "k8s.io/utils/net",
+			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
 			"ImportPath": "k8s.io/utils/nsenter",
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
 		},
