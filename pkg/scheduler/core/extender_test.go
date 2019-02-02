@@ -500,7 +500,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(createNode(name))
 		}
-		queue := NewSchedulingQueue()
+		queue := NewSchedulingQueue(nil)
 		scheduler := NewGenericScheduler(
 			cache,
 			nil,
