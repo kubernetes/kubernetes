@@ -19,9 +19,9 @@ package tests
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -155,8 +155,8 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 	}
 }
 
-func testSA(ns, name string) *api.ServiceAccount {
-	return &api.ServiceAccount{
+func testSA(ns, name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -164,8 +164,8 @@ func testSA(ns, name string) *api.ServiceAccount {
 	}
 }
 
-func testPod(ns, name string) *api.Pod {
-	return &api.Pod{
+func testPod(ns, name string) *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -173,8 +173,8 @@ func testPod(ns, name string) *api.Pod {
 	}
 }
 
-func testNamespace(ns string) *api.Namespace {
-	return &api.Namespace{
+func testNamespace(ns string) *corev1.Namespace {
+	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns,
 		},
