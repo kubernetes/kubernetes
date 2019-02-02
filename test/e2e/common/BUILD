@@ -43,7 +43,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common",
     deps = [
-        "//pkg/api/v1/node:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -52,6 +51,7 @@ go_library(
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -56,8 +56,8 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/api/v1/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
+            "//pkg/util/node:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -109,7 +109,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//pkg/api/v1/node:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
@@ -131,6 +130,7 @@ go_test(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
