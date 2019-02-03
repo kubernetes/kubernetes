@@ -17,10 +17,9 @@ limitations under the License.
 package v1
 
 const (
-	LabelHostname           = "kubernetes.io/hostname"
-	LabelZoneFailureDomain  = "failure-domain.beta.kubernetes.io/zone"
-	LabelMultiZoneDelimiter = "__"
-	LabelZoneRegion         = "failure-domain.beta.kubernetes.io/region"
+	LabelHostname          = "kubernetes.io/hostname"
+	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
+	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"
 
 	LabelInstanceType = "beta.kubernetes.io/instance-type"
 

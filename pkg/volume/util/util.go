@@ -73,6 +73,9 @@ const (
 	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
+
+	// LabelMultiZoneDelimiter separates zones for volumes
+	LabelMultiZoneDelimiter = "__"
 )
 
 // VolumeZoneConfig contains config information about zonal volume.
@@ -329,7 +332,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 
 // ZonesSetToLabelValue converts zones set to label value
 func ZonesSetToLabelValue(strSet sets.String) string {
-	return strings.Join(strSet.UnsortedList(), v1.LabelMultiZoneDelimiter)
+	return strings.Join(strSet.UnsortedList(), LabelMultiZoneDelimiter)
 }
 
 // ZonesToSet converts a string containing a comma separated list of zones to set
@@ -343,7 +346,7 @@ func ZonesToSet(zonesString string) (sets.String, error) {
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
 func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
-	return stringToSet(labelZonesValue, v1.LabelMultiZoneDelimiter)
+	return stringToSet(labelZonesValue, LabelMultiZoneDelimiter)
 }
 
 // StringToSet converts a string containing list separated by specified delimiter to a set
@@ -365,7 +368,7 @@ func stringToSet(str, delimiter string) (sets.String, error) {
 
 // LabelZonesToList converts a PV label value from string containing a delimited list of zones to list
 func LabelZonesToList(labelZonesValue string) ([]string, error) {
-	return stringToList(labelZonesValue, v1.LabelMultiZoneDelimiter)
+	return stringToList(labelZonesValue, LabelMultiZoneDelimiter)
 }
 
 // StringToList converts a string containing list separated by specified delimiter to a list

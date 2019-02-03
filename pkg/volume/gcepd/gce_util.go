@@ -354,7 +354,7 @@ func udevadmChangeToDrive(drivePath string) error {
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
 		zonesLabel := spec.PersistentVolume.Labels[v1.LabelZoneFailureDomain]
-		zones := strings.Split(zonesLabel, v1.LabelMultiZoneDelimiter)
+		zones := strings.Split(zonesLabel, volumeutil.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
 	return false
