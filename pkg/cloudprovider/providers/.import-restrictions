@@ -13,10 +13,8 @@
 		    "k8s.io/kubernetes/pkg/kubelet/apis",
 		    "k8s.io/kubernetes/pkg/master/ports",
 		    "k8s.io/kubernetes/pkg/util/mount",
-		    "k8s.io/kubernetes/pkg/util/file",
 		    "k8s.io/kubernetes/pkg/util/net/sets",
 		    "k8s.io/kubernetes/pkg/util/resizefs",
-		    "k8s.io/kubernetes/pkg/util/strings",
 		    "k8s.io/kubernetes/pkg/version",
 		    "k8s.io/kubernetes/pkg/volume"
 		],
