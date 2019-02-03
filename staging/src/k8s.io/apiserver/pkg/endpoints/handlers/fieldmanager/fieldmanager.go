@@ -51,6 +51,7 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 	if err != nil {
 		return nil, err
 	}
+
 	return &FieldManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -130,6 +131,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
+	managed = f.stripFields(managed, manager)
 
 	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
@@ -180,6 +182,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 		}
 		return nil, err
 	}
+	managed = f.stripFields(managed, manager)
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {
@@ -222,4 +225,32 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 		managerInfo.Manager = "unknown"
 	}
 	return internal.BuildManagerIdentifier(&managerInfo)
+}
+
+// stripSet is the list of fields that should never be part of a mangedFields.
+var stripSet = fieldpath.NewSet(
+	fieldpath.MakePathOrDie("apiVersion"),
+	fieldpath.MakePathOrDie("kind"),
+	fieldpath.MakePathOrDie("metadata", "name"),
+	fieldpath.MakePathOrDie("metadata", "namespace"),
+	fieldpath.MakePathOrDie("metadata", "creationTimestamp"),
+	fieldpath.MakePathOrDie("metadata", "selfLink"),
+	fieldpath.MakePathOrDie("metadata", "uid"),
+	fieldpath.MakePathOrDie("metadata", "resourceVersion"),
+)
+
+// stripFields removes a predefined set of paths found in typed from managed and returns the updated ManagedFields
+func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager string) fieldpath.ManagedFields {
+	vs, ok := managed[manager]
+	if ok {
+		if vs == nil {
+			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
+		}
+		vs.Set = vs.Set.Difference(stripSet)
+		if vs.Set.Empty() {
+			delete(managed, manager)
+		}
+	}
+
+	return managed
 }
