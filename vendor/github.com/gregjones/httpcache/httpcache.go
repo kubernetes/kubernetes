@@ -471,7 +471,7 @@ func cloneRequest(r *http.Request) *http.Request {
 	r2 := new(http.Request)
 	*r2 = *r
 	// deep copy of the Header
-	r2.Header = make(http.Header, len(r.Header))
+	r2.Header = make(http.Header)
 	for k, s := range r.Header {
 		r2.Header[k] = s
 	}
