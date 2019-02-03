@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -45,10 +39,8 @@ go_library(
         "token_source.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis:go_default_library",
-        "//pkg/api/v1/service:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -111,15 +103,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-<<<<<<< HEAD
-=======
-        "//pkg/api/v1/service:go_default_library",
-<<<<<<< HEAD
->>>>>>> move pkg/kubelet/apis/well_known_labels.go to staging/src/k8s.io/api/core/v1/
-        "//pkg/kubelet/apis:go_default_library",
-=======
-        "//pkg/util/net/sets:go_default_library",
->>>>>>> move pkg/kubelet/apis/well_known_labels.go to staging/src/k8s.io/api/core/v1/
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -152,4 +135,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
