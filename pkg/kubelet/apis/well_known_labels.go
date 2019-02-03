@@ -31,10 +31,6 @@ const (
 	labelInstanceTypeGA      = "kubernetes.io/instance-type"
 )
 
-// When the --failure-domains scheduler flag is not specified,
-// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
-var DefaultFailureDomains string = v1.LabelHostname + "," + v1.LabelZoneFailureDomain + "," + v1.LabelZoneRegion
-
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
 	v1.LabelZoneFailureDomain,
