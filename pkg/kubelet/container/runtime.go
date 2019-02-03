@@ -88,7 +88,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *v1.Pod, apiPodStatus v1.PodStatus, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -155,7 +155,7 @@ type ContainerAttacher interface {
 
 type ContainerCommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
-	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
+	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
 	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 

@@ -65,6 +65,7 @@ go_library(
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",

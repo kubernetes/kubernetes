@@ -29,7 +29,6 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

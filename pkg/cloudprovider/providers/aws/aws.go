@@ -3725,8 +3725,15 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			tcpHealthCheckPort = int32(*listener.InstancePort)
 			break
 		}
+		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var hcProtocol string
+		if annotationProtocol == "https" || annotationProtocol == "ssl" {
+			hcProtocol = "SSL"
+		} else {
+			hcProtocol = "TCP"
+		}
 		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "", annotations)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}

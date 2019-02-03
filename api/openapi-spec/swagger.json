@@ -84986,7 +84986,7 @@
       "type": "string"
      },
      "enableServiceLinks": {
-      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links.",
+      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links. Optional: Defaults to true.",
       "type": "boolean"
      },
      "hostAliases": {
@@ -89234,9 +89234,6 @@
    "io.k8s.api.rbac.v1.ClusterRole": {
     "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "aggregationRule": {
       "description": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
@@ -89426,9 +89423,6 @@
    "io.k8s.api.rbac.v1.Role": {
     "description": "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -89632,9 +89626,6 @@
    "io.k8s.api.rbac.v1alpha1.ClusterRole": {
     "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "aggregationRule": {
       "description": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
@@ -89824,9 +89815,6 @@
    "io.k8s.api.rbac.v1alpha1.Role": {
     "description": "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -90030,9 +90018,6 @@
    "io.k8s.api.rbac.v1beta1.ClusterRole": {
     "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "aggregationRule": {
       "description": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
@@ -90222,9 +90207,6 @@
    "io.k8s.api.rbac.v1beta1.Role": {
     "description": "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
     "type": "object",
-    "required": [
-     "rules"
-    ],
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
