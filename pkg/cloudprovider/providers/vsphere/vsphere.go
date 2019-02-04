@@ -53,8 +53,6 @@ const (
 	VolDir                        = "kubevols"
 	RoundTripperDefaultCount      = 3
 	DummyVMPrefixName             = "vsphere-k8s"
-	MacOuiVC                      = "00:50:56"
-	MacOuiEsx                     = "00:0c:29"
 	CleanUpDummyVMRoutineInterval = 5
 )
 
@@ -529,6 +527,15 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 }
 
 func getLocalIP() ([]v1.NodeAddress, error) {
+	// hashtable with VMware-allocated OUIs for MAC filtering
+	// List of official OUIs: http://standards-oui.ieee.org/oui.txt
+	vmwareOUI := map[string]bool{
+		"00:05:69": true,
+		"00:0c:29": true,
+		"00:1c:14": true,
+		"00:50:56": true,
+	}
+
 	addrs := []v1.NodeAddress{}
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -544,9 +551,12 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 					if ipnet.IP.To4() != nil {
 						// Filter external IP by MAC address OUIs from vCenter and from ESX
-						var addressType v1.NodeAddressType
-						if strings.HasPrefix(i.HardwareAddr.String(), MacOuiVC) ||
-							strings.HasPrefix(i.HardwareAddr.String(), MacOuiEsx) {
+						vmMACAddr := strings.ToLower(i.HardwareAddr.String())
+						// Making sure that the MAC address is long enough
+						if len(vmMACAddr) < 17 {
+							return addrs, fmt.Errorf("MAC address %q is invalid", vmMACAddr)
+						}
+						if vmwareOUI[vmMACAddr[:8]] {
 							v1helper.AddToNodeAddresses(&addrs,
 								v1.NodeAddress{
 									Type:    v1.NodeExternalIP,
@@ -557,8 +567,10 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 									Address: ipnet.IP.String(),
 								},
 							)
+							klog.V(4).Infof("Detected local IP address as %q", ipnet.IP.String())
+						} else {
+							klog.Warningf("Failed to patch IP as MAC address %q does not belong to a VMware platform", vmMACAddr)
 						}
-						klog.V(4).Infof("Find local IP address %v and set type to %v", ipnet.IP.String(), addressType)
 					}
 				}
 			}
