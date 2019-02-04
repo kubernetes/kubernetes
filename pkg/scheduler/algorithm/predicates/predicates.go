@@ -1081,7 +1081,13 @@ func PodFitsHostPorts(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveOverlap(a1, a2 []string) bool {
-	m := map[string]bool{}
+        // use the longer array to fill the map so that expected number of comparisons is lower
+        if (len(a1) < len(a2)) {
+            b := a2
+            a2 = a1
+            a1 = b
+        }
+	m := make(map[string]bool, len(a1))
 
 	for _, val := range a1 {
 		m[val] = true
