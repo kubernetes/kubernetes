@@ -46,7 +46,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
     deps = [
-        "//pkg/api/v1/service:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -72,6 +71,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/features:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter:go_default_library",
@@ -109,7 +109,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/v1/service:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -117,6 +116,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock:go_default_library",

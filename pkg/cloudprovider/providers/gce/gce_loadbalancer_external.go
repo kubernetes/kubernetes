@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	utilnet "k8s.io/utils/net"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
@@ -162,7 +162,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
 	// Check if user specified the allow source range
-	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, fmt.Errorf("error checking HTTP health check for load balancer (%s): %v", lbRefStr, err)
 	}
-	if path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs local traffic health checks on: %d%s.", lbRefStr, healthCheckNodePort, path)
 		if hcLocalTrafficExisting == nil {
 			// This logic exists to detect a transition for non-OnlyLocal to OnlyLocal service
@@ -292,7 +292,7 @@ func (g *Cloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string,
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 
 	var hcNames []string
-	if path, _ := apiservice.GetServiceHealthCheckPathPort(service); path != "" {
+	if path, _ := servicehelpers.GetServiceHealthCheckPathPort(service); path != "" {
 		hcToDelete, err := g.GetHTTPHealthCheck(loadBalancerName)
 		if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 			klog.Infof("ensureExternalLoadBalancerDeleted(%s): Failed to retrieve health check:%v.", lbRefStr, err)
