@@ -2954,7 +2954,7 @@ type PodSecurityContext struct {
 	// May also be set in SecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// +optional
-	WindowsOptions *WindowsOptions `json:"windowsOptions,omitempty" protobuf:"bytes,3,opt,name=windowsOptions"`
+	WindowsOptions *WindowsOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -5224,7 +5224,7 @@ type SecurityContext struct {
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// +optional
-	WindowsOptions *WindowsOptions `json:"windowsOptions,omitempty" protobuf:"bytes,3,opt,name=windowsOptions"`
+	WindowsOptions *WindowsOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -5299,7 +5299,7 @@ type SELinuxOptions struct {
 type WindowsOptions struct {
 	// The UserName in Windows to run the entrypoint of the container process.
 	// +optional
-	RunAsUserName string `json:"runAsUserName,omitempty" protobuf:"bytes,2,opt,name=runAsUserName"`
+	RunAsUserName string `json:"runAsUserName,omitempty" protobuf:"bytes,1,opt,name=runAsUserName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
