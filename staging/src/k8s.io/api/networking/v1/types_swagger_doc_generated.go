@@ -39,7 +39,7 @@ func (IPBlock) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicy = map[string]string{
 	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
 }
 
@@ -69,7 +69,7 @@ func (NetworkPolicyIngressRule) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicyList = map[string]string{
 	"":         "NetworkPolicyList is a list of NetworkPolicy objects.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of schema objects.",
 }
 
