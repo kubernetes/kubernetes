@@ -544,9 +544,9 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 									Address: ipnet.IP.String(),
 								},
 							)
-							klog.V(4).Infof("Detected local IP address as %q", ipnet.IP.String())
+							glog.V(4).Infof("Detected local IP address as %q", ipnet.IP.String())
 						} else {
-							klog.Warningf("Failed to patch IP as MAC address %q does not belong to a VMware platform", vmMACAddr)
+							glog.Warningf("Failed to patch IP as MAC address %q does not belong to a VMware platform", vmMACAddr)
 						}
 					}
 				}
