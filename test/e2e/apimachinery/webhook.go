@@ -189,7 +189,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	//   2.1 and sets status.allowed=true
 	//   2.2 and sets status.allowed=false
 	// 3. mutating webhook that sends patch, but also sets status.allowed=false
-	// 4. mtuating webhook that fail-open v.s. fail-closed
+	// 4. mutating webhook that fail-open v.s. fail-closed
 })
 
 func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
