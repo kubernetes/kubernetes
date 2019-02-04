@@ -467,7 +467,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA},
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
-	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
+	RuntimeClass:                                {Default: true, PreRelease: utilfeature.Alpha},
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
