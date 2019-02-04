@@ -51,6 +51,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -66,6 +67,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	appsv1beta2.AddToScheme,
+	apiextensionsv1beta1.AddToScheme,
 	auditregistrationv1alpha1.AddToScheme,
 	authenticationv1.AddToScheme,
 	authenticationv1beta1.AddToScheme,
