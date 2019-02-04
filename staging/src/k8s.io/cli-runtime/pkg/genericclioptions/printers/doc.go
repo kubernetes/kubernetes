@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package genericclioptions contains flags which can be added to you command, bound, completed, and produce
-// useful helper functions.  Nothing in this package can depend on kube/kube
-package genericclioptions // import "k8s.io/cli-runtime/pkg/genericclioptions"
+// Package printers is helper for formatting and printing runtime objects into
+// primitives io.writer.
+package printers // import "k8s.io/cli-runtime/pkg/genericclioptions/printers"

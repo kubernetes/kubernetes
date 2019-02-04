@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "discard.go",
+        "doc.go",
         "interface.go",
         "json.go",
         "jsonpath.go",
