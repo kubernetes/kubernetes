@@ -28,6 +28,8 @@ go_library(
         "//cmd/kubeadm/app/cmd/alpha:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases:go_default_library",
+        "//cmd/kubeadm/app/cmd/phases/init:go_default_library",
+        "//cmd/kubeadm/app/cmd/phases/join:go_default_library",
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/upgrade:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
