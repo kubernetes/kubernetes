@@ -2666,7 +2666,7 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 
 func TestDeletePodForNotExistingNode(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		setFeatureGate(t, features.ScheduleDaemonSetPods, f)
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
