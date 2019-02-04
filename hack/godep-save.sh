@@ -99,6 +99,8 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - dep-approvers
 __EOF__
