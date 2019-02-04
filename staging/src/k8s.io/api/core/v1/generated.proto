@@ -2892,6 +2892,13 @@ message PodSecurityContext {
   // +optional
   optional SELinuxOptions seLinuxOptions = 1;
 
+  // The Windows specific settings applied to container
+  // if unspecified the options within in the container will be used
+  // May also be set in SecurityContext. If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence
+  // +optional
+  optional WindowsOptions windowsOptions = 8;
+
   // The UID to run the entrypoint of the container process.
   // Defaults to user specified in image metadata if unspecified.
   // May also be set in SecurityContext.  If set in both SecurityContext and
@@ -4040,6 +4047,13 @@ message SecurityContext {
   // +optional
   optional SELinuxOptions seLinuxOptions = 3;
 
+  // The Windows specific settings applied to container
+  // if unspecified the options within in the container will be used
+  // May also be set in PodSecurityContext. If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence
+  // +optional
+  optional WindowsOptions windowsOptions = 10;
+
   // The UID to run the entrypoint of the container process.
   // Defaults to user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -4785,5 +4799,12 @@ message WeightedPodAffinityTerm {
 
   // Required. A pod affinity term, associated with the corresponding weight.
   optional PodAffinityTerm podAffinityTerm = 2;
+}
+
+// WindowsOptions are the windows specific options to be applied to the container
+message WindowsOptions {
+  // The UserName in Windows to run the entrypoint of the container process.
+  // +optional
+  optional string runAsUserName = 1;
 }
 

@@ -84945,6 +84945,10 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.Sysctl"
       }
+     },
+     "windowsOptions": {
+      "description": "The Windows specific settings applied to container if unspecified the options within in the container will be used May also be set in SecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence",
+      "$ref": "#/definitions/io.k8s.api.core.v1.WindowsOptions"
      }
     }
    },
@@ -86176,6 +86180,10 @@
      "seLinuxOptions": {
       "description": "The SELinux context to be applied to the container. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
       "$ref": "#/definitions/io.k8s.api.core.v1.SELinuxOptions"
+     },
+     "windowsOptions": {
+      "description": "The Windows specific settings applied to container if unspecified the options within in the container will be used May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence",
+      "$ref": "#/definitions/io.k8s.api.core.v1.WindowsOptions"
      }
     }
    },
@@ -86911,6 +86919,16 @@
       "description": "weight associated with matching the corresponding podAffinityTerm, in the range 1-100.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.WindowsOptions": {
+    "description": "WindowsOptions are the windows specific options to be applied to the container",
+    "type": "object",
+    "properties": {
+     "runAsUserName": {
+      "description": "The UserName in Windows to run the entrypoint of the container process.",
+      "type": "string"
      }
     }
    },
