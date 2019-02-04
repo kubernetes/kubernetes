@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -417,8 +415,7 @@ func New(client clientset.Interface,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(stopEverything, scheduledPodsHasSynced)
 		},
-		NextPod: internalqueue.MakeNextPodFunc(podQueue),
-		// c.client, podBackoff, c.podQueue, c.schedulerCache, c.StopEverything
+		NextPod:           internalqueue.MakeNextPodFunc(podQueue),
 		Error:             factory.MakeDefaultErrorFunc(client, podBackoff, podQueue, schedulerCache, stopEverything),
 		StopEverything:    stopEverything,
 		VolumeBinder:      volumeBinder,
@@ -537,53 +534,6 @@ func (p *podPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
 	return p.SetNominatedNodeName(pod, "")
 }
 
-// skipPodUpdate checks whether the specified pod update should be ignored.
-// This function will return true if
-//   - The pod has already been assumed, AND
-//   - The pod has only its ResourceVersion, Spec.NodeName and/or Annotations
-//     updated.
-func skipPodUpdate(pod *v1.Pod, schedulerCache schedulerinternalcache.Cache) bool {
-	// Non-assumed pods should never be skipped.
-	isAssumed, err := schedulerCache.IsAssumedPod(pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
-		return false
-	}
-	if !isAssumed {
-		return false
-	}
-
-	// Gets the assumed pod from the cache.
-	assumedPod, err := schedulerCache.GetPod(pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to get assumed pod %s/%s from cache: %v", pod.Namespace, pod.Name, err))
-		return false
-	}
-
-	// Compares the assumed pod in the cache with the pod update. If they are
-	// equal (with certain fields excluded), this pod update will be skipped.
-	f := func(pod *v1.Pod) *v1.Pod {
-		p := pod.DeepCopy()
-		// ResourceVersion must be excluded because each object update will
-		// have a new resource version.
-		p.ResourceVersion = ""
-		// Spec.NodeName must be excluded because the pod assumed in the cache
-		// is expected to have a node assigned while the pod update may nor may
-		// not have this field set.
-		p.Spec.NodeName = ""
-		// Annotations must be excluded for the reasons described in
-		// https://github.com/kubernetes/kubernetes/issues/52914.
-		p.Annotations = nil
-		return p
-	}
-	assumedPodCopy, podCopy := f(assumedPod), f(pod)
-	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
-		return false
-	}
-	klog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
-	return true
-}
-
 // initPolicyFromFile initialize policy from file
 func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	// Use a policy serialized in a file.
@@ -624,6 +574,8 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 func NewFromConfig(config *factory.Config) *Scheduler {
 	metrics.Register()
 	return &Scheduler{
+		SchedulerCache:      config.SchedulerCache,
+		NodeLister:          config.NodeLister,
 		Algorithm:           config.Algorithm,
 		GetBinder:           config.GetBinder,
 		PodConditionUpdater: config.PodConditionUpdater,

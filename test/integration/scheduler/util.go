@@ -210,8 +210,16 @@ func initTestSchedulerWithOptions(
 		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
 	}
 
+<<<<<<< HEAD
+=======
+	// Set pluginSet if provided. DefaultPluginSet is used if this is not specified.
+	if pluginSet != nil {
+		context.scheduler.PluginSet = pluginSet
+	}
+
+>>>>>>> refactoring
 	eventBroadcaster := record.NewBroadcaster()
-	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
+	context.scheduler.Recorder = eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.EventSource{Component: v1.DefaultSchedulerName},
 	)
@@ -680,7 +688,7 @@ func waitForPDBsStable(context *testContext, pdbs []*policy.PodDisruptionBudget,
 // waitCachedPodsStable waits until scheduler cache has the given pods.
 func waitCachedPodsStable(context *testContext, pods []*v1.Pod) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		cachedPods, err := context.scheduler.Config().SchedulerCache.List(labels.Everything())
+		cachedPods, err := context.scheduler.SchedulerCache.List(labels.Everything())
 		if err != nil {
 			return false, err
 		}
@@ -692,7 +700,7 @@ func waitCachedPodsStable(context *testContext, pods []*v1.Pod) error {
 			if err1 != nil {
 				return false, err1
 			}
-			cachedPod, err2 := context.scheduler.Config().SchedulerCache.GetPod(actualPod)
+			cachedPod, err2 := context.scheduler.SchedulerCache.GetPod(actualPod)
 			if err2 != nil || cachedPod == nil {
 				return false, err2
 			}
