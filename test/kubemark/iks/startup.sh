@@ -25,7 +25,8 @@ RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 # templates, and finally create these resources through kubectl.
 function create-kube-hollow-node-resources {
   # Create kubeconfig for Kubelet.
-  KUBELET_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBELET_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: kubelet
@@ -42,10 +43,13 @@ contexts:
     cluster: kubemark
     user: kubelet
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+)"
 
   # Create kubeconfig for Kubeproxy.
-  KUBEPROXY_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBEPROXY_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: kube-proxy
@@ -62,10 +66,13 @@ contexts:
     cluster: kubemark
     user: kube-proxy
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+  )"
 
   # Create kubeconfig for Heapster.
-  HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  HEAPSTER_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: heapster
@@ -82,10 +89,13 @@ contexts:
     cluster: kubemark
     user: heapster
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+)"
 
   # Create kubeconfig for Cluster Autoscaler.
-  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: cluster-autoscaler
@@ -102,10 +112,13 @@ contexts:
     cluster: kubemark
     user: cluster-autoscaler
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+)"
 
   # Create kubeconfig for NodeProblemDetector.
-  NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  NPD_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: node-problem-detector
@@ -122,10 +135,13 @@ contexts:
     cluster: kubemark
     user: node-problem-detector
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+)"
 
   # Create kubeconfig for Kube DNS.
-  KUBE_DNS_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBE_DNS_KUBECONFIG_CONTENTS="$(cat <<EOF
+apiVersion: v1
 kind: Config
 users:
 - name: kube-dns
@@ -142,7 +158,9 @@ contexts:
     cluster: kubemark
     user: kube-dns
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context
+EOF
+)"
 
   # Create kubemark namespace.
   spawn-config
@@ -173,14 +191,14 @@ current-context: kubemark-context")
   mkdir -p "${RESOURCE_DIRECTORY}/addons"
   sed "s/{{MASTER_IP}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_mem_per_node=4
-  metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES}))
+  metrics_mem=$((200 + metrics_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_cpu_per_node_numerator=${NUM_NODES}
   metrics_cpu_per_node_denominator=2
   metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
   sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   eventer_mem_per_node=500
-  eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES}))
+  eventer_mem=$((200 * 1024 + eventer_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
@@ -216,7 +234,7 @@ current-context: kubemark-context")
     proxy_cpu=50
   fi
   proxy_mem_per_node=50
-  proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
+  proxy_mem=$((100 * 1024 + proxy_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}${KUBE_NAMESPACE}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -236,8 +254,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   echo -n "Waiting for all hollow-nodes to become Running"
   start=$(date +%s)
   nodes=$("${KUBECTL}" --kubeconfig="${KUBECONFIG}" get node 2> /dev/null) || true
-  ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
-
+  ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
   until [[ "${ready}" -ge "${NUM_REPLICAS}" ]]; do
     echo -n "."
     sleep 1
@@ -245,6 +262,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     # Fail it if it already took more than 30 minutes.
     if [ $((now - start)) -gt 1800 ]; then
       echo ""
+      # shellcheck disable=SC2154 # Color defined in sourced script
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
       # Try listing nodes again - if it fails it means that API server is not responding
       if "${KUBECTL}" --kubeconfig="${KUBECONFIG}" get node &> /dev/null; then
@@ -254,16 +272,17 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       fi
       spawn-config
       pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
-      running=$(($(echo "${pods}" | grep "Running" | wc -l)))
+      running=$(($(echo "${pods}" | grep -c "Running")))
       echo "${running} hollow-nodes are reported as 'Running'"
-      not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
+      not_running=$(($(echo "${pods}" | grep -vc "Running") - 1))
       echo "${not_running} hollow-nodes are reported as NOT 'Running'"
-      echo $(echo "${pods}" | grep -v "Running")
+      echo "${pods}" | grep -v "Running"
       exit 1
     fi
     nodes=$("${KUBECTL}" --kubeconfig="${KUBECONFIG}" get node 2> /dev/null) || true
-    ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
+    ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
   done
+  # shellcheck disable=SC2154 # Color defined in sourced script
   echo -e "${color_green} Done!${color_norm}"
 }
 
@@ -281,14 +300,17 @@ set-hollow-master
 echo "Creating kube hollow node resources"
 create-kube-hollow-node-resources
 master-config
+# shellcheck disable=SC2154 # Color defined in sourced script
 echo -e "${color_blue}EXECUTION COMPLETE${color_norm}"
 
 # Check status of Kubemark
+# shellcheck disable=SC2154 # Color defined in sourced script
 echo -e "${color_yellow}CHECKING STATUS${color_norm}"
 wait-for-hollow-nodes-to-run-or-timeout
 
 # Celebrate
 echo ""
+# shellcheck disable=SC2154 # Color defined in sourced script
 echo -e "${color_blue}SUCCESS${color_norm}"
 clean-repo
 exit 0
