@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 
 source "${KUBE_ROOT}/test/kubemark/common/util.sh"
 
@@ -47,7 +47,7 @@ function get-or-create-master-ip {
 }
 
 function create-master-instance-with-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
+  GCLOUD_COMMON_ARGS=(--project "${PROJECT}" --zone "${ZONE}")
   # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
   DEFAULT_GCI_PROJECT=google-containers
   if [[ "${GCI_VERSION}" == "cos"* ]]; then
@@ -56,13 +56,13 @@ function create-master-instance-with-resources {
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
 
   run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} \
+    "${GCLOUD_COMMON_ARGS[@]}" \
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}" &
 
   if [ "${EVENT_PD:-}" == "true" ]; then
     run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} \
+      "${GCLOUD_COMMON_ARGS[@]}" \
       --type "${MASTER_DISK_TYPE}" \
       --size "${MASTER_DISK_SIZE}" &
   fi
@@ -72,7 +72,7 @@ function create-master-instance-with-resources {
   wait
 
   run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
+    "${GCLOUD_COMMON_ARGS[@]}" \
     --address "${MASTER_IP}" \
     --machine-type "${MASTER_SIZE}" \
     --image-project="${MASTER_IMAGE_PROJECT}" \
@@ -84,13 +84,13 @@ function create-master-instance-with-resources {
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
   run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
+    "${GCLOUD_COMMON_ARGS[@]}" \
     --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh" &
 
   if [ "${EVENT_PD:-}" == "true" ]; then
     echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
     run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} \
+   "${GCLOUD_COMMON_ARGS[@]}" \
     --disk "${MASTER_NAME}-event-pd" \
     --device-name="master-event-pd" &
   fi
@@ -112,20 +112,20 @@ function execute-cmd-on-master-with-retries() {
 }
 
 function copy-files() {
-	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
+	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" "$@"
 }
 
 function delete-master-instance-and-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
+  GCLOUD_COMMON_ARGS=(--project "${PROJECT}" --zone "${ZONE}" --quiet)
 
   gcloud compute instances delete "${MASTER_NAME}" \
-      ${GCLOUD_COMMON_ARGS} || true
+      "${GCLOUD_COMMON_ARGS[@]}" || true
 
   gcloud compute disks delete "${MASTER_NAME}-pd" \
-      ${GCLOUD_COMMON_ARGS} || true
+      "${GCLOUD_COMMON_ARGS[@]}" || true
 
   gcloud compute disks delete "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} &> /dev/null || true
+      "${GCLOUD_COMMON_ARGS[@]}" &> /dev/null || true
 
   gcloud compute addresses delete "${MASTER_NAME}-ip" \
       --project "${PROJECT}" \
@@ -138,9 +138,9 @@ function delete-master-instance-and-resources {
 
   if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
 	  gcloud compute instances delete "${EVENT_STORE_NAME}" \
-    	  ${GCLOUD_COMMON_ARGS} || true
+    	  "${GCLOUD_COMMON_ARGS[@]}" || true
 
 	  gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-    	  ${GCLOUD_COMMON_ARGS} || true
+        "${GCLOUD_COMMON_ARGS[@]}" || true
   fi
 }
