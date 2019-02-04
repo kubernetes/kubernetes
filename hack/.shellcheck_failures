@@ -19,7 +19,6 @@
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
 ./cluster/images/conformance/run_e2e.sh
-./cluster/kubemark/iks/config-default.sh
 ./cluster/kubemark/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
