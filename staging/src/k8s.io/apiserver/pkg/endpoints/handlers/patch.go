@@ -334,7 +334,7 @@ func strategicPatchObject(
 ) error {
 	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error encoding object to be patched: %v", err)
 	}
 
 	patchMap := make(map[string]interface{})
@@ -415,7 +415,7 @@ func applyPatchToObject(
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
-		return err
+		return fmt.Errorf("Error decoding patch: %v", err)
 	}
 	// Decoding from JSON to a versioned object would apply defaults, so we do the same here
 	defaulter.Default(objToUpdate)
