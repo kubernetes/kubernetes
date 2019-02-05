@@ -238,10 +238,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
 func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
-	flagSet.StringVar(
-		cfgPath, options.CfgPath, *cfgPath,
-		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
-	)
+	options.AddConfigFlag(flagSet, cfgPath)
 	flagSet.StringSliceVar(
 		ignorePreflightErrors, options.IgnorePreflightErrors, *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
