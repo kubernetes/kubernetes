@@ -145,7 +145,6 @@
 ./test/images/volume/rbd/create_block.sh
 ./test/images/volume/rbd/mon.sh
 ./test/images/volume/rbd/osd.sh
-./test/kubemark/start-kubemark.sh
 ./test/kubemark/stop-kubemark.sh
 ./third_party/forked/shell2junit/sh2ju.sh
 ./third_party/intemp/intemp.sh
