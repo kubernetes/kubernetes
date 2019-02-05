@@ -391,6 +391,9 @@ func (d *fakeFailingDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	return &metav1.APIGroupList{Groups: d.groups}, d.groupsErr
 }
 
+func (d *fakeFailingDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return ServerGroupsAndResources(d)
+}
 func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	if rs, found := d.resourcesForGroupVersion[groupVersion]; found {
 		return rs, d.resourcesForGroupVersionErr[groupVersion]
@@ -449,6 +452,10 @@ func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, err
 	return &metav1.APIGroupList{}, nil
 }
 
+func (c *fakeCachedDiscoveryInterface) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return ServerGroupsAndResources(c)
+}
+
 func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	if c.enabledGroupA && groupVersion == "a/v1" {
 		return &aResources, nil
@@ -457,12 +464,9 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*metav1.APIResourceList, error) {
-	if c.enabledGroupA {
-		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
-		return []*metav1.APIResourceList{av1}, nil
-	}
-	return []*metav1.APIResourceList{}, nil
+	return ServerResources(c)
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
