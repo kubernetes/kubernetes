@@ -145,7 +145,6 @@
 ./test/images/volume/rbd/create_block.sh
 ./test/images/volume/rbd/mon.sh
 ./test/images/volume/rbd/osd.sh
-./test/kubemark/resources/start-kubemark-master.sh
 ./test/kubemark/run-e2e-tests.sh
 ./test/kubemark/start-kubemark.sh
 ./test/kubemark/stop-kubemark.sh
