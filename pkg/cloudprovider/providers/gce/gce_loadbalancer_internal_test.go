@@ -31,7 +31,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 )
 
 func createInternalLoadBalancer(gce *Cloud, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
@@ -169,7 +169,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !servicehelper.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	existingHC := newInternalLBHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
@@ -224,7 +224,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	}
 	gce.CreateFirewall(existingFirewall)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !servicehelper.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -278,7 +278,7 @@ func TestEnsureInternalLoadBalancerHealthCheckConfigurable(t *testing.T) {
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !servicehelper.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
