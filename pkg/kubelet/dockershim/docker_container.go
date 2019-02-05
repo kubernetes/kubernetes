@@ -167,19 +167,23 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 		return nil, err
 	}
 
-	createResp, err := ds.client.CreateContainer(createConfig)
-	if err != nil {
-		createResp, err = recoverFromCreationConflictIfNeeded(ds.client, createConfig, err)
+	createResp, createErr := ds.client.CreateContainer(createConfig)
+	if createErr != nil {
+		createResp, createErr = recoverFromCreationConflictIfNeeded(ds.client, createConfig, createErr)
 	}
 
 	if err = ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo); err != nil {
+		if createErr != nil {
+			// that one is more important to surface
+			return nil, createErr
+		}
 		return nil, err
 	}
 
 	if createResp != nil {
 		return &runtimeapi.CreateContainerResponse{ContainerId: createResp.ID}, nil
 	}
-	return nil, err
+	return nil, createErr
 }
 
 // getContainerLogPath returns the container log path specified by kubelet and the real

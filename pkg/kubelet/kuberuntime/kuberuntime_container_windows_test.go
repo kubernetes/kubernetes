@@ -38,7 +38,7 @@ func TestDetermineEffectiveSecurityContext(t *testing.T) {
 		}
 	}
 
-	t.Run("when there's a specific GMSA for that pod, and no pod-wide GMSA", func(t *testing.T) {
+	t.Run("when there's a specific GMSA for that container, and no pod-wide GMSA", func(t *testing.T) {
 		containerConfig := &runtimeapi.ContainerConfig{}
 
 		pod := buildPod(map[string]string{
@@ -49,7 +49,7 @@ func TestDetermineEffectiveSecurityContext(t *testing.T) {
 
 		assert.Equal(t, dummyCredSpec, containerConfig.Annotations["container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
 	})
-	t.Run("when there's a specific GMSA for that pod, and a pod-wide GMSA", func(t *testing.T) {
+	t.Run("when there's a specific GMSA for that container, and a pod-wide GMSA", func(t *testing.T) {
 		containerConfig := &runtimeapi.ContainerConfig{}
 
 		pod := buildPod(map[string]string{
@@ -61,7 +61,7 @@ func TestDetermineEffectiveSecurityContext(t *testing.T) {
 
 		assert.Equal(t, dummyCredSpec, containerConfig.Annotations["container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
 	})
-	t.Run("when there's no specific GMSA for that pod, and a pod-wide GMSA", func(t *testing.T) {
+	t.Run("when there's no specific GMSA for that container, and a pod-wide GMSA", func(t *testing.T) {
 		containerConfig := &runtimeapi.ContainerConfig{}
 
 		pod := buildPod(map[string]string{
@@ -72,7 +72,7 @@ func TestDetermineEffectiveSecurityContext(t *testing.T) {
 
 		assert.Equal(t, dummyCredSpec, containerConfig.Annotations["container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
 	})
-	t.Run("when there's no specific GMSA for that pod, and no pod-wide GMSA", func(t *testing.T) {
+	t.Run("when there's no specific GMSA for that container, and no pod-wide GMSA", func(t *testing.T) {
 		containerConfig := &runtimeapi.ContainerConfig{}
 
 		determineEffectiveSecurityContext(containerConfig, container, &corev1.Pod{})

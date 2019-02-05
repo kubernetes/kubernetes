@@ -66,7 +66,6 @@ func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
 	}, nameDelimiter)
 }
 
-// makeContainerName generates a container name that's guaranteed to be unique on its host.
 func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
 	return strings.Join([]string{
 		kubePrefix,                            // 0

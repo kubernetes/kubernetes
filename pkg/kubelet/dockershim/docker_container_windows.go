@@ -20,10 +20,9 @@ package dockershim
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
+	"regexp"
 
 	"golang.org/x/sys/windows/registry"
 
@@ -48,7 +47,7 @@ func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.C
 	cleanupInfo := &containerCreationCleanupInfo{}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		if err := applyGMSAConfig(request, createConfig, cleanupInfo); err != nil {
+		if err := applyGMSAConfig(request.GetConfig(), createConfig, cleanupInfo); err != nil {
 			return nil, err
 		}
 	}
@@ -63,14 +62,13 @@ func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.C
 // C: drive)
 // When docker supports passing a credential spec's contents directly, we should switch to using that
 // as it will avoid cluttering the registry.
-func applyGMSAConfig(request *runtimeapi.CreateContainerRequest, createConfig *dockertypes.ContainerCreateConfig, cleanupInfo *containerCreationCleanupInfo) error {
-	config := request.GetConfig()
+func applyGMSAConfig(config *runtimeapi.ContainerConfig, createConfig *dockertypes.ContainerCreateConfig, cleanupInfo *containerCreationCleanupInfo) error {
 	credSpec := config.Annotations[kuberuntime.GMSASpecContainerAnnotationKey]
 	if credSpec == "" {
 		return nil
 	}
 
-	valueName, err := copyGMSACredSpecToRegistryValue(credSpec, makeContainerName(request.GetSandboxConfig(), config))
+	valueName, err := copyGMSACredSpecToRegistryValue(credSpec)
 	if err != nil {
 		return err
 	}
@@ -86,15 +84,19 @@ func applyGMSAConfig(request *runtimeapi.CreateContainerRequest, createConfig *d
 }
 
 const (
-	registryNamePrefix = "k8s-cred-spec-"
 	// same as https://github.com/moby/moby/blob/93d994e29c9cc8d81f1b0477e28d705fa7e2cd72/daemon/oci_windows.go#L23
 	credentialSpecRegistryLocation = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Virtualization\Containers\CredentialSpecs`
+	// the prefix for the registry values we write GMSA cred specs to
+	gMSARegistryValueNamePrefix = "k8s-cred-spec-"
+	// the number of random bytes to generate suffixes for registry value names
+	gMSARegistryValueNameSuffixRandomBytes = 40
 )
 
 // useful to allow mocking the registry in tests
 type registryKey interface {
 	SetStringValue(name, value string) error
 	DeleteValue(name string) error
+	ReadValueNames(n int) ([]string, error)
 	Close() error
 }
 
@@ -106,10 +108,8 @@ var registryCreateKeyFunc = func(baseKey registry.Key, path string, access uint3
 var randomReader = rand.Reader
 
 // copyGMSACredSpecToRegistryKey copies the credential specs to a unique registry value, and returns its name.
-// To avoid leaking registry keys over the life of the node, we generate a unique name for that value, and clean
-// it up after creating the container.
-func copyGMSACredSpecToRegistryValue(credSpec string, dockerContainerName string) (string, error) {
-	valueName, err := gMSARegistryValueName(credSpec, dockerContainerName)
+func copyGMSACredSpecToRegistryValue(credSpec string) (string, error) {
+	valueName, err := gMSARegistryValueName()
 	if err != nil {
 		return "", err
 	}
@@ -128,21 +128,18 @@ func copyGMSACredSpecToRegistryValue(credSpec string, dockerContainerName string
 }
 
 // gMSARegistryValueName computes the name of the registry value where to store the GMSA cred spec contents.
-// The value's name is computed by concatenating the docker container's name (guaranteed to be unique over the
-// container's lifetime), the value itself, and an additional 64 random bytes.
-func gMSARegistryValueName(inputs ...string) (string, error) {
-	hasher := sha256.New()
-	for _, s := range inputs {
-		// according to the doc, that can never return an error
-		io.WriteString(hasher, s)
-	}
-	randBytes := make([]byte, 64)
-	if _, err := randomReader.Read(randBytes); err != nil {
-		return "", fmt.Errorf("unable to generate random string: %v", err)
-	}
-	hasher.Write(randBytes)
+// The value's name is purely random.
+func gMSARegistryValueName() (string, error) {
+	randBytes := make([]byte, gMSARegistryValueNameSuffixRandomBytes)
 
-	return registryNamePrefix + hex.EncodeToString(hasher.Sum(nil)), nil
+	if n, err := randomReader.Read(randBytes); err != nil || n != gMSARegistryValueNameSuffixRandomBytes {
+		if err == nil {
+			err = fmt.Errorf("only got %v random bytes, expected %v", n, len(randBytes))
+		}
+		return "", fmt.Errorf("unable to generate random registry value name: %v", err)
+	}
+
+	return gMSARegistryValueNamePrefix + hex.EncodeToString(randBytes), nil
 }
 
 // performPlatformSpecificContainerCreationCleanup is responsible for doing any platform-specific cleanup
@@ -161,9 +158,8 @@ func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanup
 	return nil
 }
 
-// removeGMSARegistryValue removes the registry value containing the GMSA cred spec for this container, if any.
 func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
-	if cleanupInfo.gMSARegistryValueName == "" {
+	if cleanupInfo == nil || cleanupInfo.gMSARegistryValueName == "" {
 		return nil
 	}
 
@@ -177,4 +173,40 @@ func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
 	}
 
 	return nil
+}
+
+// platformSpecificContainerCreationKubeletInitCleanup is called when the kubelet
+// is starting, and is meant to clean up any cruft left by previous runs;
+// errors are simply logged, but don't prevent the kubelet from starting.
+func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
+		errors = removeAllGMSARegistryValues()
+	}
+	return
+}
+
+// This is the regex used to detect gMSA cred spec registry values.
+var gMSARegistryValueNamesRegex = regexp.MustCompile(fmt.Sprintf("^%s[0-9a-f]{%d}$", gMSARegistryValueNamePrefix, 2*gMSARegistryValueNameSuffixRandomBytes))
+
+func removeAllGMSARegistryValues() (errors []error) {
+	key, _, err := registryCreateKeyFunc(registry.LOCAL_MACHINE, credentialSpecRegistryLocation, registry.SET_VALUE)
+	if err != nil {
+		return []error{fmt.Errorf("unable to open registry key %s: %v", credentialSpecRegistryLocation, err)}
+	}
+	defer key.Close()
+
+	valueNames, err := key.ReadValueNames(0)
+	if err != nil {
+		return []error{fmt.Errorf("unable to list values under registry key %s: %v", credentialSpecRegistryLocation, err)}
+	}
+
+	for _, valueName := range valueNames {
+		if gMSARegistryValueNamesRegex.MatchString(valueName) {
+			if err = key.DeleteValue(valueName); err != nil {
+				errors = append(errors, fmt.Errorf("unable to remove registry value %s/%s: %v", credentialSpecRegistryLocation, valueName, err))
+			}
+		}
+	}
+
+	return
 }

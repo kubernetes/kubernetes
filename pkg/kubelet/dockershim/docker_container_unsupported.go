@@ -37,3 +37,10 @@ func (ds *dockerService) applyPlatformSpecificDockerConfig(*runtimeapi.CreateCon
 func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(*containerCreationCleanupInfo) error {
 	return nil
 }
+
+// platformSpecificContainerCreationKubeletInitCleanup is called when the kubelet
+// is starting, and is meant to clean up any cruft left by previous runs;
+// errors are simply logged, but don't prevent the kubelet from starting.
+func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
+	return
+}
