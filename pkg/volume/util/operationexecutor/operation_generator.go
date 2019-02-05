@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	volerr "k8s.io/cloud-provider/volume/errors"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
@@ -316,7 +317,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 
 		if attachErr != nil {
-			if derr, ok := attachErr.(*util.DanglingAttachError); ok {
+			if derr, ok := attachErr.(*volerr.DanglingAttachError); ok {
 				addErr := actualStateOfWorld.MarkVolumeAsAttached(
 					v1.UniqueVolumeName(""),
 					volumeToAttach.VolumeSpec,

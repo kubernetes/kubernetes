@@ -60,7 +60,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/kubernetes/pkg/volume"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volerr "k8s.io/cloud-provider/volume/errors"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -2035,7 +2036,7 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 		}
 		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "VolumeInUse" {
-				return false, volume.NewDeletedVolumeInUseError(err.Error())
+				return false, volerr.NewDeletedVolumeInUseError(err.Error())
 			}
 		}
 		return false, fmt.Errorf("error deleting EBS volume %q: %q", d.awsID, err)
@@ -2424,7 +2425,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 			devicePath := aws.StringValue(attachment.Device)
 			nodeName := mapInstanceToNodeName(attachedInstance)
 
-			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			danglingErr := volerr.NewDanglingError(attachErr, nodeName, devicePath)
 			return false, danglingErr
 		}
 
@@ -2443,7 +2444,7 @@ func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
+	if pv.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 

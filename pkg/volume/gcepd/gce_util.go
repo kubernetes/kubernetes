@@ -29,6 +29,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudfeatures "k8s.io/cloud-provider/features"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -99,7 +101,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	name := volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// GCE PDs are allocated in chunks of GiBs
-	requestGB := volumeutil.RoundUpToGiB(capacity)
+	requestGB := volumehelpers.RoundUpToGiB(capacity)
 
 	// Apply Parameters.
 	// Values for parameter "replication-type" are canonicalized to lower case.
@@ -121,7 +123,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			configuredZone = v
 		case "zones":
 			zonesPresent = true
-			configuredZones, err = volumeutil.ZonesToSet(v)
+			configuredZones, err = volumehelpers.ZonesToSet(v)
 			if err != nil {
 				return "", 0, nil, "", err
 			}
@@ -152,7 +154,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 
 	switch replicationType {
 	case replicationTypeRegionalPD:
-		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
+		selectedZones, err := volumehelpers.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
 		if err != nil {
 			klog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -169,7 +171,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		klog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
 
 	case replicationTypeNone:
-		selectedZone, err := volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
+		selectedZone, err := volumehelpers.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
 		if err != nil {
 			return "", 0, nil, "", err
 		}
@@ -354,7 +356,7 @@ func udevadmChangeToDrive(drivePath string) error {
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
 		zonesLabel := spec.PersistentVolume.Labels[v1.LabelZoneFailureDomain]
-		zones := strings.Split(zonesLabel, volumeutil.LabelMultiZoneDelimiter)
+		zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
 	return false

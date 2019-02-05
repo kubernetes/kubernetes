@@ -24,9 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
@@ -284,7 +284,7 @@ func createPVSpec(name string, readOnly bool, zones []string) *volume.Spec {
 	}
 
 	if zones != nil {
-		zonesLabel := strings.Join(zones, volumeutil.LabelMultiZoneDelimiter)
+		zonesLabel := strings.Join(zones, cloudvolume.LabelMultiZoneDelimiter)
 		spec.PersistentVolume.ObjectMeta.Labels = map[string]string{
 			v1.LabelZoneFailureDomain: zonesLabel,
 		}

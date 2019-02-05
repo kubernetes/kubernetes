@@ -30,7 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/volume"
+	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -281,7 +281,7 @@ func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.AzureDisk.DiskName == volume.ProvisionedVolumeName {
+	if pv.Spec.AzureDisk.DiskName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 

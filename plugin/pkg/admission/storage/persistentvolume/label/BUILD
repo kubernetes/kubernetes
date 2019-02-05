@@ -17,11 +17,11 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

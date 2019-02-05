@@ -188,12 +188,6 @@ type DeletableVolumePlugin interface {
 	NewDeleter(spec *Spec) (Deleter, error)
 }
 
-const (
-	// Name of a volume in external cloud that is being provisioned and thus
-	// should be ignored by rest of Kubernetes.
-	ProvisionedVolumeName = "placeholder-for-provisioning"
-)
-
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
 // used to create volumes for the cluster.
 type ProvisionableVolumePlugin interface {
