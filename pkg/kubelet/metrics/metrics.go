@@ -65,6 +65,10 @@ const (
 	ConfigUIDLabelKey             = "node_config_uid"
 	ConfigResourceVersionLabelKey = "node_config_resource_version"
 	KubeletConfigKeyLabelKey      = "node_config_kubelet_key"
+
+	// Metrics keys for RuntimeClass
+	RunPodSandboxLatenciesKey = "run_podsandbox_latencies"
+	RunPodSandboxErrorsKey    = "run_podsandbox_errors"
 )
 
 var (
@@ -209,6 +213,22 @@ var (
 			Name:      ConfigErrorKey,
 			Help:      "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
 		},
+	)
+	RunPodSandboxLatencies = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RunPodSandboxLatenciesKey,
+			Help:      "Latencies in microseconds of the run_podsandbox operations. Broken down by RuntimeClass.",
+		},
+		[]string{"runtime_handler"},
+	)
+	RunPodSandboxErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RunPodSandboxErrorsKey,
+			Help:      "Cumulative number of the run_podsandbox operation errors by RuntimeClass.",
+		},
+		[]string{"runtime_handler"},
 	)
 )
 
