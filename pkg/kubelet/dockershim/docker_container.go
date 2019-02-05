@@ -162,9 +162,18 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
+	cleanupInfo, err := ds.applyPlatformSpecificDockerConfig(r, &createConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	createResp, err := ds.client.CreateContainer(createConfig)
 	if err != nil {
 		createResp, err = recoverFromCreationConflictIfNeeded(ds.client, createConfig, err)
+	}
+
+	if err = ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo); err != nil {
+		return nil, err
 	}
 
 	if createResp != nil {

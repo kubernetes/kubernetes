@@ -404,6 +404,12 @@ const (
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
+
+	// owner: @wk8
+	// alpha: v1.14
+	//
+	// Enables GMSA support for Windows workloads.
+	WindowsGMSA utilfeature.Feature = "WindowsGMSA"
 )
 
 func init() {
