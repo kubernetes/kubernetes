@@ -329,7 +329,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental.")
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 	return cmd
 }
 

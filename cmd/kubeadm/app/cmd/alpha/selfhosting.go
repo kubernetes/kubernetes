@@ -141,7 +141,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	// Add flags to the command
 	// flags bound to the configuration object
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, `The path where certificates are stored`)
-	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 
 	cmd.Flags().BoolVarP(
 		&certsInSecrets, "store-certs-in-secrets", "s",
