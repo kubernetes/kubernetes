@@ -26,9 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -159,9 +157,7 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		val := MilliCPUToShares(q.MilliValue())
 		rc.CpuShares = &val
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-		rc.HugePageLimit = HugePageLimits(rl)
-	}
+	rc.HugePageLimit = HugePageLimits(rl)
 
 	return &rc
 }
