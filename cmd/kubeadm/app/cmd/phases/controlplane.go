@@ -108,6 +108,12 @@ func NewControlPlanePreparePhase() workflow.Phase {
 		Short: "Prepares the machine for serving a control plane.",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Prepares the machine for serving a control plane.",
+				InheritFlags:   getControlPlanePreparePhaseFlags(),
+				RunAllSiblings: true,
+			},
 			newControlPlanePrepareCertsSubphase(),
 			newControlPlanePrepareKubeconfigSubphase(),
 			newControlPlanePrepareManifestsSubphases(),
