@@ -291,7 +291,8 @@ func testSubPath(input *subPathTestInput) {
 			SubPath:   "subpath2",
 		})
 
-		addMultipleWrites(&input.pod.Spec.InitContainers[1], filepath1, filepath2)
+		// Write the files from container 0 and instantly read them back
+		addMultipleWrites(&input.pod.Spec.Containers[0], filepath1, filepath2)
 		testMultipleReads(input.f, input.pod, 0, filepath1, filepath2)
 	})
 
