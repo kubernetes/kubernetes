@@ -16,7 +16,6 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
-	"log"
 	"math"
 	"math/big"
 	"sort"
@@ -39,6 +38,11 @@ const debugFormat = false // default: false
 const trace = false // default: false
 
 // Current export format version. Increase with each format change.
+// Note: The latest binary (non-indexed) export format is at version 6.
+//       This exporter is still at level 4, but it doesn't matter since
+//       the binary importer can handle older versions just fine.
+// 6: package height (CL 105038) -- NOT IMPLEMENTED HERE
+// 5: improved position encoding efficiency (issue 20080, CL 41619) -- NOT IMPLEMEMTED HERE
 // 4: type name objects support type aliases, uses aliasTag
 // 3: Go1.8 encoding (same as version 2, aliasTag defined but never used)
 // 2: removed unused bool in ODCL export (compiler only)
@@ -76,9 +80,29 @@ type exporter struct {
 	indent  int // for trace
 }
 
+// internalError represents an error generated inside this package.
+type internalError string
+
+func (e internalError) Error() string { return "gcimporter: " + string(e) }
+
+func internalErrorf(format string, args ...interface{}) error {
+	return internalError(fmt.Sprintf(format, args...))
+}
+
 // BExportData returns binary export data for pkg.
 // If no file set is provided, position info will be missing.
-func BExportData(fset *token.FileSet, pkg *types.Package) []byte {
+func BExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			if ierr, ok := e.(internalError); ok {
+				err = ierr
+				return
+			}
+			// Not an internal error; panic again.
+			panic(e)
+		}
+	}()
+
 	p := exporter{
 		fset:          fset,
 		strIndex:      map[string]int{"": 0}, // empty string is mapped to 0
@@ -103,11 +127,11 @@ func BExportData(fset *token.FileSet, pkg *types.Package) []byte {
 	// --- generic export data ---
 
 	// populate type map with predeclared "known" types
-	for index, typ := range predeclared {
+	for index, typ := range predeclared() {
 		p.typIndex[typ] = index
 	}
-	if len(p.typIndex) != len(predeclared) {
-		log.Fatalf("gcimporter: duplicate entries in type map?")
+	if len(p.typIndex) != len(predeclared()) {
+		return nil, internalError("duplicate entries in type map?")
 	}
 
 	// write package data
@@ -145,12 +169,12 @@ func BExportData(fset *token.FileSet, pkg *types.Package) []byte {
 
 	// --- end of export data ---
 
-	return p.out.Bytes()
+	return p.out.Bytes(), nil
 }
 
 func (p *exporter) pkg(pkg *types.Package, emptypath bool) {
 	if pkg == nil {
-		log.Fatalf("gcimporter: unexpected nil pkg")
+		panic(internalError("unexpected nil pkg"))
 	}
 
 	// if we saw the package before, write its index (>= 0)
@@ -185,7 +209,7 @@ func (p *exporter) obj(obj types.Object) {
 		p.value(obj.Val())
 
 	case *types.TypeName:
-		if isAlias(obj) {
+		if obj.IsAlias() {
 			p.tag(aliasTag)
 			p.pos(obj)
 			p.qualifiedName(obj)
@@ -209,7 +233,7 @@ func (p *exporter) obj(obj types.Object) {
 		p.paramList(sig.Results(), false)
 
 	default:
-		log.Fatalf("gcimporter: unexpected object %v (%T)", obj, obj)
+		panic(internalErrorf("unexpected object %v (%T)", obj, obj))
 	}
 }
 
@@ -273,7 +297,7 @@ func (p *exporter) qualifiedName(obj types.Object) {
 
 func (p *exporter) typ(t types.Type) {
 	if t == nil {
-		log.Fatalf("gcimporter: nil type")
+		panic(internalError("nil type"))
 	}
 
 	// Possible optimization: Anonymous pointer types *T where
@@ -356,7 +380,7 @@ func (p *exporter) typ(t types.Type) {
 		p.typ(t.Elem())
 
 	default:
-		log.Fatalf("gcimporter: unexpected type %T: %s", t, t)
+		panic(internalErrorf("unexpected type %T: %s", t, t))
 	}
 }
 
@@ -422,7 +446,7 @@ func (p *exporter) fieldList(t *types.Struct) {
 
 func (p *exporter) field(f *types.Var) {
 	if !f.IsField() {
-		log.Fatalf("gcimporter: field expected")
+		panic(internalError("field expected"))
 	}
 
 	p.pos(f)
@@ -452,7 +476,7 @@ func (p *exporter) iface(t *types.Interface) {
 func (p *exporter) method(m *types.Func) {
 	sig := m.Type().(*types.Signature)
 	if sig.Recv() == nil {
-		log.Fatalf("gcimporter: method expected")
+		panic(internalError("method expected"))
 	}
 
 	p.pos(m)
@@ -575,13 +599,13 @@ func (p *exporter) value(x constant.Value) {
 		p.tag(unknownTag)
 
 	default:
-		log.Fatalf("gcimporter: unexpected value %v (%T)", x, x)
+		panic(internalErrorf("unexpected value %v (%T)", x, x))
 	}
 }
 
 func (p *exporter) float(x constant.Value) {
 	if x.Kind() != constant.Float {
-		log.Fatalf("gcimporter: unexpected constant %v, want float", x)
+		panic(internalErrorf("unexpected constant %v, want float", x))
 	}
 	// extract sign (there is no -0)
 	sign := constant.Sign(x)
@@ -616,7 +640,7 @@ func (p *exporter) float(x constant.Value) {
 	m.SetMantExp(&m, int(m.MinPrec()))
 	mant, acc := m.Int(nil)
 	if acc != big.Exact {
-		log.Fatalf("gcimporter: internal error")
+		panic(internalError("internal error"))
 	}
 
 	p.int(sign)
@@ -653,7 +677,7 @@ func (p *exporter) bool(b bool) bool {
 
 func (p *exporter) index(marker byte, index int) {
 	if index < 0 {
-		log.Fatalf("gcimporter: invalid index < 0")
+		panic(internalError("invalid index < 0"))
 	}
 	if debugFormat {
 		p.marker('t')
@@ -666,7 +690,7 @@ func (p *exporter) index(marker byte, index int) {
 
 func (p *exporter) tag(tag int) {
 	if tag >= 0 {
-		log.Fatalf("gcimporter: invalid tag >= 0")
+		panic(internalError("invalid tag >= 0"))
 	}
 	if debugFormat {
 		p.marker('t')
