@@ -951,8 +951,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-    - repository: utils
-      branch: master
   - source:
       branch: release-1.13
       dir: staging/src/k8s.io/cloud-provider
