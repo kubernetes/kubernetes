@@ -56,6 +56,7 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 		resourceConfig.EnableResources(resources...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})

@@ -27,7 +27,6 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,10 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
@@ -261,6 +263,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
+	if err != nil {
+		return nil, err
+	}
+	versionedPatchOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("PatchOptions"))
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +517,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	reqScope.OpenAPIModels = a.group.OpenAPIModels
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		fm, err := fieldmanager.NewFieldManager(
+			a.group.OpenAPIModels,
+			a.group.UnsafeConvertor,
+			a.group.Defaulter,
+			fqKindToRegister.GroupVersion(),
+			reqScope.HubGroupVersion,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create field manager: %v", err)
+		}
+		reqScope.FieldManager = fm
+	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -671,17 +689,20 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.MergePatchType),
 				string(types.StrategicMergePatchType),
 			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Consumes(string(types.JSONPatchType), string(types.MergePatchType), string(types.StrategicMergePatchType)).
+				Consumes(supportedTypes...).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
-			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+			if err := addObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, err
 			}
 			addParams(route, action.Params)

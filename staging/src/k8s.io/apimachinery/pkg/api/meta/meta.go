@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/klog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 // errNotList is returned when an object implements the Object style interfaces but not the List style
@@ -138,6 +137,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				Finalizers:                 m.GetFinalizers(),
 				ClusterName:                m.GetClusterName(),
 				Initializers:               m.GetInitializers(),
+				ManagedFields:              m.GetManagedFields(),
 			},
 		}
 	}
