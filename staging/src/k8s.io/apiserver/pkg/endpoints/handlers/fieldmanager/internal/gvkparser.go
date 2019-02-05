@@ -62,7 +62,7 @@ func newGVKParser(models proto.Models) (*gvkParser, error) {
 			if len(gvk.Kind) > 0 {
 	                        _, ok := parser.gvks[gvk]
                                 if ok {
-                                    panic(fmt.Sprintf("Duplicate entry for %v", gvk))
+                                    return nil, fmt.Errorf("Duplicate entry for %v", gvk)
                                 }
 				parser.gvks[gvk] = modelName
 			}
