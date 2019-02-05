@@ -35,11 +35,7 @@ import (
 )
 
 var (
-	initPreflightExample = normalizer.Examples(`
-		# Run master pre-flight checks using a config file.
-		kubeadm init phase preflight --config kubeadm-config.yml
-		`)
-	joinPreflightExample = normalizer.Examples(`
+	preflightExample = normalizer.Examples(`
 		# Run join pre-flight checks using a config file.
 		kubeadm join phase preflight --config kubeadm-config.yml
 		`)
@@ -56,71 +52,20 @@ var (
 		`)))
 )
 
-// preflightMasterData defines the behavior that a runtime data struct passed to the PreflightMaster master phase
-// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
-// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
-type preflightMasterData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	DryRun() bool
-	IgnorePreflightErrors() sets.String
-}
-
-type preflightJoinData interface {
+type preflightData interface {
 	Cfg() *kubeadmapi.JoinConfiguration
 	InitCfg() (*kubeadmapi.InitConfiguration, error)
 	IgnorePreflightErrors() sets.String
 }
 
-// NewPreflightMasterPhase creates a kubeadm workflow phase that implements preflight checks for a new master node.
-func NewPreflightMasterPhase() workflow.Phase {
-	return workflow.Phase{
-		Name:    "preflight",
-		Short:   "Run master pre-flight checks",
-		Long:    "Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.",
-		Example: initPreflightExample,
-		Run:     runPreflightMaster,
-		InheritFlags: []string{
-			options.CfgPath,
-			options.IgnorePreflightErrors,
-		},
-	}
-}
-
-// TODO(dmaiocchi):  rename all instances of master to controlPlane in this file.
-// runPreflightMaster executes preflight checks logic.
-func runPreflightMaster(c workflow.RunData) error {
-	data, ok := c.(preflightMasterData)
-	if !ok {
-		return errors.New("preflight phase invoked with an invalid data struct")
-	}
-
-	fmt.Println("[preflight] Running pre-flight checks")
-	if err := preflight.RunInitMasterChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
-		return err
-	}
-
-	if !data.DryRun() {
-		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
-	}
-
-	return nil
-}
-
-// NewPreflightJoinPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
-func NewPreflightJoinPhase() workflow.Phase {
+// NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
+func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "preflight",
 		Short:   "Run join pre-flight checks",
-		Long:    "Run join pre-flight checks, functionally equivalent to what is implemented by kubeadm join.",
-		Example: joinPreflightExample,
-		Run:     runPreflightJoin,
+		Long:    "Run pre-flight checks for kubeadm join.",
+		Example: preflightExample,
+		Run:     runPreflight,
 		InheritFlags: []string{
 			options.CfgPath,
 			options.IgnorePreflightErrors,
@@ -139,12 +84,14 @@ func NewPreflightJoinPhase() workflow.Phase {
 	}
 }
 
-// runPreflightJoin executes preflight checks logic.
-func runPreflightJoin(c workflow.RunData) error {
-	j, ok := c.(preflightJoinData)
+// runPreflight executes preflight checks logic.
+func runPreflight(c workflow.RunData) error {
+	j, ok := c.(preflightData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
+	fmt.Println("[preflight] Running pre-flight checks")
+
 	// Start with general checks
 	klog.V(1).Infoln("[preflight] Running general checks")
 	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.Cfg(), j.IgnorePreflightErrors()); err != nil {
@@ -182,7 +129,9 @@ func runPreflightJoin(c workflow.RunData) error {
 			return err
 		}
 
-		fmt.Println("[preflight] Pulling control-plane images")
+		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
 		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
 			return err
 		}
