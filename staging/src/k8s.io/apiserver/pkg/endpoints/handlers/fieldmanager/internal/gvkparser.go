@@ -60,6 +60,10 @@ func newGVKParser(models proto.Models) (*gvkParser, error) {
 		gvkList := parseGroupVersionKind(model)
 		for _, gvk := range gvkList {
 			if len(gvk.Kind) > 0 {
+	                        _, ok := parser.gvks[gvk]
+                                if ok {
+                                    return nil, fmt.Errorf("Duplicate entry for %v", gvk)
+                                }
 				parser.gvks[gvk] = modelName
 			}
 		}
