@@ -3379,6 +3379,7 @@ func TestValidateVolumes(t *testing.T) {
 						ReadOnly: false,
 						User:     "root",
 						Group:    "root",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3390,6 +3391,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
 						Volume: "/test",
+						Tenant: "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3406,6 +3408,7 @@ func TestValidateVolumes(t *testing.T) {
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry7861",
 						Volume:   "/test",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3422,6 +3425,7 @@ func TestValidateVolumes(t *testing.T) {
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry:7861,reg2",
 						Volume:   "/test",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3437,12 +3441,47 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry:7861",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "quobyte.volume",
+			}},
+		},
+		{
+			name: "empty tenant quobyte",
+			vol: core.Volume{
+				Name: "quobyte",
+				VolumeSource: core.VolumeSource{
+					Quobyte: &core.QuobyteVolumeSource{
+						Registry: "registry:7861,reg2",
+						Volume:   "/test",
+						Tenant:   "",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.tenant",
+			}},
+		},
+		{
+			name: "too long tenant quobyte",
+			vol: core.Volume{
+				Name: "quobyte",
+				VolumeSource: core.VolumeSource{
+					Quobyte: &core.QuobyteVolumeSource{
+						Registry: "registry:7861,reg2",
+						Volume:   "/test",
+						Tenant:   "this is too long to be a valid uuid so this test has to fail on the maximum length validation of the tenant.",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.tenant",
 			}},
 		},
 		// AzureDisk

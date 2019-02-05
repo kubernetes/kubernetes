@@ -3422,6 +3422,11 @@ message QuobyteVolumeSource {
   // Default is no group
   // +optional
   optional string group = 5;
+
+  // Tenant owning the given Quobyte volume in the Backend
+  // Used with dynamically provisioned Quobyte volumes, value is set by the plugin
+  // +optional
+  optional string tenant = 6;
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.

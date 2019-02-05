@@ -873,6 +873,10 @@ func validateQuobyteVolumeSource(quobyte *core.QuobyteVolumeSource, fldPath *fie
 	allErrs := field.ErrorList{}
 	if len(quobyte.Registry) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("registry"), "must be a host:port pair or multiple pairs separated by commas"))
+	} else if len(quobyte.Tenant) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID provided by the configuration and may not be omitted "))
+	} else if len(quobyte.Tenant) >= 65 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID and may not exceed a length of 64 characters"))
 	} else {
 		for _, hostPortPair := range strings.Split(quobyte.Registry, ",") {
 			if _, _, err := net.SplitHostPort(hostPortPair); err != nil {

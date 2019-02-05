@@ -3013,8 +3013,8 @@
 		},
 		{
 			"ImportPath": "github.com/quobyte/api",
-			"Comment": "v0.1.1-4-g206ef832283c1a",
-			"Rev": "206ef832283c1a0144bbc762be2634d49987b5ff"
+			"Comment": "v0.1.2",
+			"Rev": "9cfd29338dd9fdaaf956b7082e5550aab5fe3841"
 		},
 		{
 			"ImportPath": "github.com/rancher/go-rancher/client",
