@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -192,7 +193,7 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 	for _, specInfo := range specs {
 		// TODO: Make kube-openapi.MergeSpec(s) accept nil or empty spec as destination and just clone the spec in that case.
 		if specToReturn == nil {
-			specToReturn, err = aggregator.CloneSpec(specInfo.spec)
+			specToReturn, err = cloneSpec(specInfo.spec)
 			if err != nil {
 				return nil, err
 			}
@@ -315,4 +316,18 @@ func (s *specAggregator) GetAPIServiceInfo(apiServiceName string) (handler http.
 		return info.handler, info.etag, true
 	}
 	return nil, "", false
+}
+
+// cloneSpec clones OpenAPI spec
+func cloneSpec(source *spec.Swagger) (*spec.Swagger, error) {
+	bytes, err := json.Marshal(source)
+	if err != nil {
+		return nil, err
+	}
+	var ret spec.Swagger
+	err = json.Unmarshal(bytes, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }
