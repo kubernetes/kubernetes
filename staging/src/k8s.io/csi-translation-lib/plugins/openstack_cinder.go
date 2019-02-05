@@ -38,6 +38,11 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 	return &osCinderCSITranslator{}
 }
 
+// TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
+func (t *osCinderCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with Cinder set from in-tree
 // and converts the Cinder source to a CSIPersistentVolumeSource
 func (t *osCinderCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {

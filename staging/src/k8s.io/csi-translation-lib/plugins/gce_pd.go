@@ -58,6 +58,11 @@ func NewGCEPersistentDiskCSITranslator() InTreePlugin {
 	return &gcePersistentDiskCSITranslator{}
 }
 
+// TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
 // and converts the GCEPersistentDisk source to a CSIPersistentVolumeSource
 func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
