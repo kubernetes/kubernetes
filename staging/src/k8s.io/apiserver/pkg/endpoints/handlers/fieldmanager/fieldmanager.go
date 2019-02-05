@@ -101,9 +101,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 		}
-                if len(managed) == 0 {
-			return nil, fmt.Errorf("decoding managed fields yielded nothing")
-		}
 	}
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
