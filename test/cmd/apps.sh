@@ -183,7 +183,7 @@ run_deployment_tests() {
   # Post-Condition: Deployment "nginx" is created.
   kube::test::get_object_assert 'deploy test-nginx-extensions' "{{$container_name_field}}" 'nginx'
   # and old generator was used, iow. old defaults are applied
-  output_message=$(kubectl get deployment.extensions/test-nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
+  output_message=$(kubectl get deployment.apps/test-nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
   kube::test::if_has_not_string "${output_message}" '2'
   # Ensure we can interact with deployments through extensions and apps endpoints
   output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
@@ -275,7 +275,7 @@ run_deployment_tests() {
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
-  kubectl delete deployment.extensions nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment.apps nginx-deployment "${kube_flags[@]}"
 
   ### Rollback a deployment
   # Pre-condition: no deployment exists
@@ -290,10 +290,10 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1 with dry-run - should be no-op
   kubectl rollout undo deployment nginx --dry-run=true "${kube_flags[@]}" | grep "test-cmd"
-  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
   kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
   sleep 1

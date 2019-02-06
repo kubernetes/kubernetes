@@ -122,7 +122,7 @@ type VersionFile struct {
 	path string
 }
 
-// Exists returns true if a version.txt file exists on the filesystem.
+// Exists returns true if a version.txt file exists on the file system.
 func (v *VersionFile) Exists() (bool, error) {
 	return exists(v.path)
 }

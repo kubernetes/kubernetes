@@ -113,9 +113,18 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 		t.Errorf("unexpected objects differerence after modifying status: %v", diff.ObjectDiff(statusVolumeAttachment, expectedVolumeAttachment))
 	}
 
-	// modifying spec should be dropped
+	// spec and metadata modifications should be dropped
 	newVolumeAttachment := volumeAttachment.DeepCopy()
 	newVolumeAttachment.Spec.NodeName = "valid-node-2"
+	newVolumeAttachment.Labels = map[string]string{"foo": "bar"}
+	newVolumeAttachment.Annotations = map[string]string{"foo": "baz"}
+	newVolumeAttachment.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Name:       "Foo",
+		},
+	}
 
 	StatusStrategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(newVolumeAttachment, volumeAttachment) {

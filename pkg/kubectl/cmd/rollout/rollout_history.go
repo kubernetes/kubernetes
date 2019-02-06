@@ -32,10 +32,10 @@ import (
 )
 
 var (
-	history_long = templates.LongDesc(`
+	historyLong = templates.LongDesc(`
 		View previous rollout revisions and configurations.`)
 
-	history_example = templates.Examples(`
+	historyExample = templates.Examples(`
 		# View the rollout history of a deployment
 		kubectl rollout history deployment/abc
 
@@ -43,6 +43,7 @@ var (
 		kubectl rollout history daemonset/abc --revision=3`)
 )
 
+// RolloutHistoryOptions holds the options for 'rollout history' sub command
 type RolloutHistoryOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
@@ -61,6 +62,7 @@ type RolloutHistoryOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewRolloutHistoryOptions returns an initialized RolloutHistoryOptions instance
 func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHistoryOptions {
 	return &RolloutHistoryOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
@@ -68,6 +70,7 @@ func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHisto
 	}
 }
 
+// NewCmdRolloutHistory returns a Command instance for RolloutHistory sub command
 func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutHistoryOptions(streams)
 
@@ -77,8 +80,8 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Use:                   "history (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("View rollout history"),
-		Long:                  history_long,
-		Example:               history_example,
+		Long:                  historyLong,
+		Example:               historyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -97,6 +100,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 	return cmd
 }
 
+// Complete completes al the required options
 func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
@@ -117,6 +121,7 @@ func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, 
 	return nil
 }
 
+// Validate makes sure all the provided values for command-line options are valid
 func (o *RolloutHistoryOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("required resource not specified")
@@ -128,6 +133,7 @@ func (o *RolloutHistoryOptions) Validate() error {
 	return nil
 }
 
+// Run performs the execution of 'rollout history' sub command
 func (o *RolloutHistoryOptions) Run() error {
 
 	r := o.Builder().

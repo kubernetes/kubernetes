@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/config"
@@ -99,7 +101,9 @@ type TestContextType struct {
 	ContainerRuntimePidFile     string
 	// SystemdServices are comma separated list of systemd services the test framework
 	// will dump logs for.
-	SystemdServices          string
+	SystemdServices string
+	// DumpSystemdJournal controls whether to dump the full systemd journal.
+	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
 	MasterOSDistro           string
 	NodeOSDistro             string
@@ -115,6 +119,7 @@ type TestContextType struct {
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            string
 	GatherSuiteMetricsAfterTest       bool
+	MaxNodesToGather                  int
 	AllowGatheringProfiles            bool
 	// If set to 'true' framework will gather ClusterAutoscaler metrics when gathering them for other components.
 	IncludeClusterAutoscalerMetrics bool
@@ -148,6 +153,26 @@ type TestContextType struct {
 
 	// The DNS Domain of the cluster.
 	ClusterDNSDomain string
+
+	// The configration of NodeKiller.
+	NodeKiller NodeKillerConfig
+}
+
+// NodeKillerConfig describes configuration of NodeKiller -- a utility to
+// simulate node failures.
+type NodeKillerConfig struct {
+	// Enabled determines whether NodeKill should do anything at all.
+	// All other options below are ignored if Enabled = false.
+	Enabled bool
+	// FailureRatio is a percentage of all nodes that could fail simultinously.
+	FailureRatio float64
+	// Interval is time between node failures.
+	Interval time.Duration
+	// JitterFactor is factor used to jitter node failures.
+	// Node will be killed between [Interval, Interval + (1.0 + JitterFactor)].
+	JitterFactor float64
+	// SimulatedDowntime is a duration between node is killed and recreated.
+	SimulatedDowntime time.Duration
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -206,6 +231,7 @@ func RegisterCommonFlags() {
 
 	flag.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flag.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
+	flag.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
 	flag.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only master component metrics would be gathered.")
 	flag.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
 	flag.BoolVar(&TestContext.AllowGatheringProfiles, "allow-gathering-profiles", true, "If set to true framework will allow to gather CPU/memory allocation pprof profiles from the master.")
@@ -227,6 +253,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
 	flag.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flag.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
@@ -242,7 +269,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
-	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, etc.)")
+	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
 	flag.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
@@ -281,6 +308,13 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.IngressUpgradeImage, "ingress-upgrade-image", "", "Image to upgrade to if doing an upgrade test for ingress.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
+
+	nodeKiller := &TestContext.NodeKiller
+	flag.BoolVar(&nodeKiller.Enabled, "node-killer", false, "Whether NodeKiller should kill any nodes.")
+	flag.Float64Var(&nodeKiller.FailureRatio, "node-killer-failure-ratio", 0.01, "Percentage of nodes to be killed")
+	flag.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
+	flag.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
+	flag.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
 // Register flags specific to the node e2e test suite.
@@ -315,7 +349,8 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	config := clientcmdapi.NewConfig()
 
 	credentials := clientcmdapi.NewAuthInfo()
-	credentials.TokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	credentials.Token = clientCfg.BearerToken
+	credentials.TokenFile = clientCfg.BearerTokenFile
 	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
 	if len(credentials.ClientCertificate) == 0 {
 		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
@@ -369,22 +404,33 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
+	// TODO: whether and how long this code is needed is getting discussed
+	// in https://github.com/kubernetes/kubernetes/issues/70194.
+	if TestContext.Provider == "" {
+		// Some users of the e2e.test binary pass --provider=.
+		// We need to support that, changing it would break those usages.
+		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
+		TestContext.Provider = "skeleton"
+	}
+
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
-	if err == nil {
-		return
-	}
-	if !os.IsNotExist(errors.Cause(err)) {
-		Failf("Failed to setup provider config: %v", err)
-	}
-	// We allow unknown provider parameters for historic reasons. At least log a
-	// warning to catch typos.
-	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
-	// - remove the fallback for unknown providers
-	// - proper error message instead of Failf (which panics)
-	klog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
-	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
 	if err != nil {
-		Failf("Failed to setup fallback skeleton provider config: %v", err)
+		if os.IsNotExist(errors.Cause(err)) {
+			// Provide a more helpful error message when the provider is unknown.
+			var providers []string
+			for _, name := range GetProviders() {
+				// The empty string is accepted, but looks odd in the output below unless we quote it.
+				if name == "" {
+					name = `""`
+				}
+				providers = append(providers, name)
+			}
+			sort.Strings(providers)
+			klog.Errorf("Unknown provider %q. The following providers are known: %v", TestContext.Provider, strings.Join(providers, " "))
+		} else {
+			klog.Errorf("Failed to setup provider config for %q: %v", TestContext.Provider, err)
+		}
+		os.Exit(1)
 	}
 }

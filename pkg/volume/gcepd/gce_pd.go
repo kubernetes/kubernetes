@@ -34,9 +34,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -72,7 +72,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(gcePersistentDiskPluginName), volName)
 }
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
@@ -96,6 +96,11 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (string,
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
+}
+
+func (plugin *gcePersistentDiskPlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 }
 
 func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
@@ -454,7 +459,7 @@ func (c *gcePersistentDiskUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *gcePersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 type gcePersistentDiskDeleter struct {
@@ -551,7 +556,7 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && len(requirements) > 0 {
+	if len(requirements) > 0 {
 		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
 		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
 		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)

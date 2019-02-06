@@ -131,7 +131,7 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	for _, c := range status.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
-			if oc == nil || oc.Status != c.Status {
+			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
 			}
 		}
@@ -375,7 +375,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
-		klog.V(5).Infof("Status Manager: adding pod: %q, with status: (%q, %v) to podStatusChannel",
+		klog.V(5).Infof("Status Manager: adding pod: %q, with status: (%d, %v) to podStatusChannel",
 			pod.UID, newStatus.version, newStatus.status)
 		return true
 	default:

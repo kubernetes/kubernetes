@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -51,7 +50,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/integer"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
@@ -115,7 +113,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/integer"
 )
 
 const (
@@ -249,7 +249,7 @@ type Dependencies struct {
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
 	CSIClient               csiclientset.Interface
-	DynamicKubeClient       dynamic.Interface
+	NodeAPIClient           nodeapiclientset.Interface
 	Mounter                 mount.Interface
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
@@ -590,6 +590,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager, checkpointManager)
 
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+
 	if remoteRuntimeEndpoint != "" {
 		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
 		if remoteImageEndpoint == "" {
@@ -608,10 +610,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
-
-	if containerRuntime == "rkt" {
-		klog.Fatalln("rktnetes has been deprecated in favor of rktlet. Please see https://github.com/kubernetes-incubator/rktlet for more information.")
-	}
 
 	// if left at nil, that means it is unneeded
 	var legacyLogProvider kuberuntime.LegacyLogProvider
@@ -660,8 +658,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeService = runtimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.DynamicKubeClient != nil {
-		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.DynamicKubeClient)
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.NodeAPIClient != nil {
+		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.NodeAPIClient)
 	}
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
@@ -705,7 +703,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.resourceAnalyzer,
 			klet.podManager,
 			klet.runtimeCache,
-			klet.containerRuntime)
+			klet.containerRuntime,
+			klet.statusManager)
 	} else {
 		klet.StatsProvider = stats.NewCRIStatsProvider(
 			klet.cadvisor,
@@ -753,8 +752,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	} else {
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
-
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
@@ -1064,15 +1061,15 @@ type Kubelet struct {
 	lastStatusReportTime time.Time
 
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	syncNodeStatusMux sync.Mutex
 
 	// updatePodCIDRMux is a lock on updating pod CIDR, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	updatePodCIDRMux sync.Mutex
 
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
-	// This lock is used by Kublet.updateRuntimeUp function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updateRuntimeUp function and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
@@ -1221,29 +1218,6 @@ type Kubelet struct {
 	runtimeClassManager *runtimeclass.Manager
 }
 
-func allGlobalUnicastIPs() ([]net.IP, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("could not list network interfaces: %v", err)
-	}
-	var ips []net.IP
-	for _, i := range interfaces {
-		addresses, err := i.Addrs()
-		if err != nil {
-			return nil, fmt.Errorf("could not list the addresses for network interface %v: %v", i, err)
-		}
-		for _, address := range addresses {
-			switch v := address.(type) {
-			case *net.IPNet:
-				if v.IP.IsGlobalUnicast() {
-					ips = append(ips, v.IP)
-				}
-			}
-		}
-	}
-	return ips, nil
-}
-
 // setupDataDirs creates:
 // 1.  the root directory
 // 2.  the pods directory
@@ -1329,6 +1303,7 @@ func (kl *Kubelet) initializeModules() error {
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
+	metrics.SetNodeName(kl.nodeName)
 
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
@@ -1452,7 +1427,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
-		go kl.runtimeClassManager.Run(wait.NeverStop)
+		kl.runtimeClassManager.Start(wait.NeverStop)
 	}
 
 	// Start the pod lifecycle event generator.
@@ -1585,9 +1560,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, rs)
-		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, rs)
+	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
+		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}
 
 	// Create Cgroups for the pod and apply resource parameters
@@ -1686,7 +1661,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
@@ -1842,8 +1817,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	)
 	duration := base
 	for {
-		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-			klog.Infof("skipping pod synchronization - %v", rs)
+		if err := kl.runtimeState.runtimeErrors(); err != nil {
+			klog.Infof("skipping pod synchronization - %v", err)
 			// exponential backoff
 			time.Sleep(duration)
 			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))

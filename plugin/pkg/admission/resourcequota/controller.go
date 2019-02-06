@@ -37,8 +37,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
-	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
-	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 

@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -48,15 +49,9 @@ func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	}
 }
 
-// DetectUnsupportedVersion reads YAML bytes, extracts the TypeMeta information and errors out with an user-friendly message if the API spec is too old for this kubeadm version
-func DetectUnsupportedVersion(b []byte) error {
-	gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
-	if err != nil {
-		return err
-	}
-
-	// TODO: On our way to making the kubeadm API beta and higher, give good user output in case they use an old config file with a new kubeadm version, and
-	// tell them how to upgrade. The support matrix will look something like this now and in the future:
+// ValidateSupportedVersion checks if a supplied GroupVersion is not on the list of unsupported GVs. If it is, an error is returned.
+func ValidateSupportedVersion(gv schema.GroupVersion) error {
+	// The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
 	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
@@ -65,27 +60,9 @@ func DetectUnsupportedVersion(b []byte) error {
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
-	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
-	knownKinds := map[string]bool{}
-	for _, gvk := range gvks {
-		if useKubeadmVersion := oldKnownAPIVersions[gvk.GroupVersion().String()]; len(useKubeadmVersion) != 0 {
-			return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvk.GroupVersion().String(), useKubeadmVersion)
-		}
-		knownKinds[gvk.Kind] = true
+	if useKubeadmVersion := oldKnownAPIVersions[gv.String()]; useKubeadmVersion != "" {
+		return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
 	}
-
-	// InitConfiguration and JoinConfiguration may not apply together, warn if more than one is specified
-	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
-	mutuallyExclusiveCount := 0
-	for _, kind := range mutuallyExclusive {
-		if knownKinds[kind] {
-			mutuallyExclusiveCount++
-		}
-	}
-	if mutuallyExclusiveCount > 1 {
-		klog.Warningf("WARNING: Detected resource kinds that may not apply: %v", mutuallyExclusive)
-	}
-
 	return nil
 }
 

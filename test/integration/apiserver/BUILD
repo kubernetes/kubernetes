@@ -20,12 +20,13 @@ go_test(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
         "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -43,6 +44,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
@@ -66,6 +68,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/integration/apiserver/apply:all-srcs",
+    ],
     tags = ["automanaged"],
 )

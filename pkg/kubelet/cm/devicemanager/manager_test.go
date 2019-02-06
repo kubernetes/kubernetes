@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const (
@@ -635,13 +635,13 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 	return testManager, nil
 }
 
-func getTestNodeInfo(allocatable v1.ResourceList) *schedulercache.NodeInfo {
+func getTestNodeInfo(allocatable v1.ResourceList) *schedulernodeinfo.NodeInfo {
 	cachedNode := &v1.Node{
 		Status: v1.NodeStatus{
 			Allocatable: allocatable,
 		},
 	}
-	nodeInfo := &schedulercache.NodeInfo{}
+	nodeInfo := &schedulernodeinfo.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 	return nodeInfo
 }
@@ -875,7 +875,7 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 			},
 		},
 	}
-	nodeInfo := &schedulercache.NodeInfo{}
+	nodeInfo := &schedulernodeinfo.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 
 	testManager.sanitizeNodeAllocatable(nodeInfo)

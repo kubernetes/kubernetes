@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"io/ioutil"
-	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -334,19 +333,7 @@ func TestBasicTokenFile(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	var out *http.Request
-	clientConfig.WrapTransport(fakeTransport(func(req *http.Request) (*http.Response, error) {
-		out = req
-		return &http.Response{}, nil
-	})).RoundTrip(&http.Request{})
-
-	matchStringArg(token, strings.TrimPrefix(out.Header.Get("Authorization"), "Bearer "), t)
-}
-
-type fakeTransport func(*http.Request) (*http.Response, error)
-
-func (ft fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return ft(req)
+	matchStringArg(token, clientConfig.BearerToken, t)
 }
 
 func TestPrecedenceTokenFile(t *testing.T) {

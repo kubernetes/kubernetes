@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
+// CreateOptions is the commandline options for 'create' sub command
 type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
@@ -79,6 +80,7 @@ var (
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
+// NewCreateOptions returns an initialized CreateOptions instance
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -90,6 +92,7 @@ func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	}
 }
 
+// NewCmdCreate returns new initialized instance of create sub command
 func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateOptions(ioStreams)
 
@@ -146,6 +149,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
+// ValidateArgs makes sure there is no discrepency in command options
 func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
@@ -177,6 +181,7 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Complete completes all the required options
 func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
@@ -203,6 +208,7 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
+// RunCreate performs the creation
 func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
 	// the validator enforces this, so
@@ -300,6 +306,7 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 	return nil
 }
 
+// RunEditOnCreate performs edit on creation
 func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions) error {
 	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
@@ -363,6 +370,7 @@ type CreateSubcommandOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateSubcommandOptions returns initialized CreateSubcommandOptions
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -370,6 +378,7 @@ func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSu
 	}
 }
 
+// Complete completes all the required options
 func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator generate.StructuredGenerator) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -411,7 +420,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return nil
 }
 
-// RunCreateSubcommand executes a create subcommand using the specified options
+// Run executes a create subcommand using the specified options
 func (o *CreateSubcommandOptions) Run() error {
 	obj, err := o.StructuredGenerator.StructuredGenerate()
 	if err != nil {

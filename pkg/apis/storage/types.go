@@ -195,7 +195,7 @@ type VolumeError struct {
 	Time metav1.Time
 
 	// String detailing the error encountered during Attach or Detach operation.
-	// This string maybe logged, so it should not contain sensitive
+	// This string may be logged, so it should not contain sensitive
 	// information.
 	// +optional
 	Message string

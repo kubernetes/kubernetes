@@ -25,15 +25,18 @@ import (
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
+		name          string
 		cfg           *kubeadmapi.ClusterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
 		{
+			name:          "config is nil",
 			cfg:           nil,
 			expectedBytes: []byte(""),
 		},
 		{
+			name: "cluster config with local Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Etcd: kubeadmapi.Etcd{
@@ -67,6 +70,7 @@ func TestPrintConfiguration(t *testing.T) {
 `),
 		},
 		{
+			name: "cluster config with ServiceSubnet and external Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Networking: kubeadmapi.Networking{
@@ -108,15 +112,17 @@ func TestPrintConfiguration(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		rt.buf = bytes.NewBufferString("")
-		printConfiguration(rt.cfg, rt.buf)
-		actualBytes := rt.buf.Bytes()
-		if !bytes.Equal(actualBytes, rt.expectedBytes) {
-			t.Errorf(
-				"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
-				string(rt.expectedBytes),
-				string(actualBytes),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			rt.buf = bytes.NewBufferString("")
+			printConfiguration(rt.cfg, rt.buf)
+			actualBytes := rt.buf.Bytes()
+			if !bytes.Equal(actualBytes, rt.expectedBytes) {
+				t.Errorf(
+					"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
+					string(rt.expectedBytes),
+					string(actualBytes),
+				)
+			}
+		})
 	}
 }

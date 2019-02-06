@@ -17,6 +17,7 @@ limitations under the License.
 package get
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -25,10 +26,20 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
+func toUnstructuredOrDie(data []byte) *unstructured.Unstructured {
+	unstrBody := map[string]interface{}{}
+	err := json.Unmarshal(data, &unstrBody)
+	if err != nil {
+		panic(err)
+	}
+	return &unstructured.Unstructured{Object: unstrBody}
+}
 func encodeOrDie(obj runtime.Object) []byte {
 	data, err := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), obj)
 	if err != nil {
@@ -65,6 +76,16 @@ func TestSortingPrinter(t *testing.T) {
 		name        string
 		expectedErr string
 	}{
+		{
+			name: "empty",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{},
+			},
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{},
+			},
+			field: "{.metadata.name}",
+		},
 		{
 			name: "in-order-already",
 			obj: &corev1.PodList{
@@ -237,16 +258,16 @@ func TestSortingPrinter(t *testing.T) {
 			name: "v1.List in order",
 			obj: &corev1.List{
 				Items: []runtime.RawExtension{
-					{Raw: encodeOrDie(a)},
-					{Raw: encodeOrDie(b)},
-					{Raw: encodeOrDie(c)},
+					{Object: a, Raw: encodeOrDie(a)},
+					{Object: b, Raw: encodeOrDie(b)},
+					{Object: c, Raw: encodeOrDie(c)},
 				},
 			},
 			sort: &corev1.List{
 				Items: []runtime.RawExtension{
-					{Raw: encodeOrDie(a)},
-					{Raw: encodeOrDie(b)},
-					{Raw: encodeOrDie(c)},
+					{Object: a, Raw: encodeOrDie(a)},
+					{Object: b, Raw: encodeOrDie(b)},
+					{Object: c, Raw: encodeOrDie(c)},
 				},
 			},
 			field: "{.metadata.name}",
@@ -255,16 +276,16 @@ func TestSortingPrinter(t *testing.T) {
 			name: "v1.List in reverse",
 			obj: &corev1.List{
 				Items: []runtime.RawExtension{
-					{Raw: encodeOrDie(c)},
-					{Raw: encodeOrDie(b)},
-					{Raw: encodeOrDie(a)},
+					{Object: c, Raw: encodeOrDie(c)},
+					{Object: b, Raw: encodeOrDie(b)},
+					{Object: a, Raw: encodeOrDie(a)},
 				},
 			},
 			sort: &corev1.List{
 				Items: []runtime.RawExtension{
-					{Raw: encodeOrDie(a)},
-					{Raw: encodeOrDie(b)},
-					{Raw: encodeOrDie(c)},
+					{Object: a, Raw: encodeOrDie(a)},
+					{Object: b, Raw: encodeOrDie(b)},
+					{Object: c, Raw: encodeOrDie(c)},
 				},
 			},
 			field: "{.metadata.name}",
@@ -390,6 +411,43 @@ func TestSortingPrinter(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		t.Run(tt.name+" table", func(t *testing.T) {
+			table := &metav1beta1.Table{}
+			meta.EachListItem(tt.obj, func(item runtime.Object) error {
+				table.Rows = append(table.Rows, metav1beta1.TableRow{
+					Object: runtime.RawExtension{Object: toUnstructuredOrDie(encodeOrDie(item))},
+				})
+				return nil
+			})
+
+			expectedTable := &metav1beta1.Table{}
+			meta.EachListItem(tt.sort, func(item runtime.Object) error {
+				expectedTable.Rows = append(expectedTable.Rows, metav1beta1.TableRow{
+					Object: runtime.RawExtension{Object: toUnstructuredOrDie(encodeOrDie(item))},
+				})
+				return nil
+			})
+
+			sorter, err := NewTableSorter(table, tt.field)
+			if err == nil {
+				err = sorter.Sort()
+			}
+			if err != nil {
+				if len(tt.expectedErr) > 0 {
+					if strings.Contains(err.Error(), tt.expectedErr) {
+						return
+					}
+					t.Fatalf("%s: expected error containing: %q, got: \"%v\"", tt.name, tt.expectedErr, err)
+				}
+				t.Fatalf("%s: unexpected error: %v", tt.name, err)
+			}
+			if len(tt.expectedErr) > 0 {
+				t.Fatalf("%s: expected error containing: %q, got none", tt.name, tt.expectedErr)
+			}
+			if !reflect.DeepEqual(table, expectedTable) {
+				t.Errorf("[%s]\nexpected/saw:\n%s", tt.name, diff.ObjectReflectDiff(expectedTable, table))
+			}
+		})
 		t.Run(tt.name, func(t *testing.T) {
 			sort := &SortingPrinter{SortField: tt.field, Decoder: scheme.Codecs.UniversalDecoder()}
 			err := sort.sortObj(tt.obj)

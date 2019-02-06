@@ -39,7 +39,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
@@ -50,7 +50,7 @@ function detect_kube_release() {
 
   if [[ ! -e "${KUBE_ROOT}/version" ]]; then
     echo "Can't determine Kubernetes release." >&2
-    echo "${BASH_SOURCE} should only be run from a prebuilt Kubernetes release." >&2
+    echo "${BASH_SOURCE[0]} should only be run from a prebuilt Kubernetes release." >&2
     echo "Did you mean to use get-kube.sh instead?" >&2
     exit 1
   fi
@@ -59,7 +59,8 @@ function detect_kube_release() {
 }
 
 function detect_client_info() {
-  local kernel=$(uname -s)
+  local kernel machine
+  kernel="$(uname -s)"
   case "${kernel}" in
     Darwin)
       CLIENT_PLATFORM="darwin"
@@ -76,7 +77,7 @@ function detect_client_info() {
 
   # TODO: migrate the kube::util::host_platform function out of hack/lib and
   # use it here.
-  local machine=$(uname -m)
+  machine="$(uname -m)"
   case "${machine}" in
     x86_64*|i?86_64*|amd64*)
       CLIENT_ARCH="amd64"
@@ -92,7 +93,7 @@ function detect_client_info() {
       ;;
     s390x*)
       CLIENT_ARCH="s390x"
-      ;;	  
+      ;;
     *)
       echo "Unknown, unsupported architecture (${machine})." >&2
       echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
@@ -132,9 +133,10 @@ function download_tarball() {
     exit 4
   fi
   echo
-  local md5sum=$(md5sum_file "${download_path}/${file}")
+  local md5sum sha1sum
+  md5sum=$(md5sum_file "${download_path}/${file}")
   echo "md5sum(${file})=${md5sum}"
-  local sha1sum=$(sha1sum_file "${download_path}/${file}")
+  sha1sum=$(sha1sum_file "${download_path}/${file}")
   echo "sha1sum(${file})=${sha1sum}"
   echo
   # TODO: add actual verification
@@ -151,8 +153,8 @@ function extract_arch_tarball() {
   # Tarball looks like kubernetes/{client,server}/bin/BINARY"
   tar -xzf "${tarfile}" --strip-components 3 -C "${platforms_dir}"
   # Create convenience symlink
-  ln -sf "${platforms_dir}" "$(dirname ${tarfile})/bin"
-  echo "Add '$(dirname ${tarfile})/bin' to your PATH to use newly-installed binaries."
+  ln -sf "${platforms_dir}" "$(dirname "${tarfile}")/bin"
+  echo "Add '$(dirname "${tarfile}")/bin' to your PATH to use newly-installed binaries."
 }
 
 detect_kube_release
@@ -161,6 +163,11 @@ DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}"
 SERVER_PLATFORM="linux"
 SERVER_ARCH="${KUBERNETES_SERVER_ARCH:-amd64}"
 SERVER_TAR="kubernetes-server-${SERVER_PLATFORM}-${SERVER_ARCH}.tar.gz"
+if [[ -n "${KUBERNETES_NODE_PLATFORM-}" || -n "${KUBERNETES_NODE_ARCH-}" ]]; then
+  NODE_PLATFORM="${KUBERNETES_NODE_PLATFORM:${SERVER_PLATFORM}}"
+  NODE_ARCH="${KUBERNETES_NODE_ARCH:${SERVER_ARCH}}"
+  NODE_TAR="kubernetes-node-${NODE_PLATFORM}-${NODE_ARCH}.tar.gz"
+fi
 
 detect_client_info
 CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
@@ -186,6 +193,12 @@ if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]
   echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
+DOWNLOAD_NODE_TAR=false
+if [[ -n "${NODE_TAR:-}" ]]; then
+  DOWNLOAD_NODE_TAR=true
+  echo "Will download and extract ${NODE_TAR} from ${DOWNLOAD_URL_PREFIX}"
+fi
+
 TESTS_TAR="kubernetes-test.tar.gz"
 DOWNLOAD_TESTS_TAR=false
 if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
@@ -202,7 +215,7 @@ fi
 
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
-  read confirm
+  read -r confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
     echo "Aborting."
     exit 1
@@ -211,6 +224,10 @@ fi
 
 if "${DOWNLOAD_SERVER_TAR}"; then
   download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
+fi
+
+if "${DOWNLOAD_NODE_TAR}"; then
+  download_tarball "${KUBE_ROOT}/node" "${NODE_TAR}"
 fi
 
 if "${DOWNLOAD_CLIENT_TAR}"; then

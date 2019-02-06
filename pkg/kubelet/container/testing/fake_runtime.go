@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -219,7 +220,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
+func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -298,7 +299,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error) {
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 

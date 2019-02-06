@@ -103,7 +103,7 @@ func (attacher *rbdAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 	return volumesAttachedCheck, nil
 }
 
-// WaitForAttach implements Attacher.WaitForAttach. It's called by kublet to
+// WaitForAttach implements Attacher.WaitForAttach. It's called by kubelet to
 // attach volume onto the node.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (attacher *rbdAttacher) WaitForAttach(spec *volume.Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error) {
@@ -197,7 +197,7 @@ var _ volume.DeviceUnmounter = &rbdDetacher{}
 //  - Remove the deviceMountPath at last.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
-	if pathExists, pathErr := volutil.PathExists(deviceMountPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)

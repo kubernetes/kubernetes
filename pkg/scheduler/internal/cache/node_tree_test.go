@@ -116,8 +116,8 @@ func verifyNodeTree(t *testing.T, nt *NodeTree, expectedTree map[string]*nodeArr
 	for _, na := range expectedTree {
 		expectedNumNodes += len(na.nodes)
 	}
-	if nt.NumNodes != expectedNumNodes {
-		t.Errorf("unexpected NodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, nt.NumNodes)
+	if numNodes := nt.NumNodes(); numNodes != expectedNumNodes {
+		t.Errorf("unexpected NodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, numNodes)
 	}
 	if !reflect.DeepEqual(nt.tree, expectedTree) {
 		t.Errorf("The node tree is not the same as expected. Expected: %v, Got: %v", expectedTree, nt.tree)

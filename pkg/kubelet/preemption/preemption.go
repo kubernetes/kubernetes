@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
@@ -61,13 +60,13 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []algorithm.PredicateFailureReason{}
+	nonResourceReasons := []predicates.PredicateFailureReason{}
 	resourceReasons := []*admissionRequirement{}
 	for _, reason := range failureReasons {
 		if r, ok := reason.(*predicates.InsufficientResourceError); ok {

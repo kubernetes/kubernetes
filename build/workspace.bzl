@@ -13,3 +13,5 @@
 # limitations under the License.
 
 CRI_TOOLS_VERSION = "1.12.0"
+
+CNI_VERSION = "0.6.0"

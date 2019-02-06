@@ -23,6 +23,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -31,6 +32,8 @@ import (
 
 const (
 	KubeletSubsystem             = "kubelet"
+	NodeNameKey                  = "node_name"
+	NodeLabelKey                 = "node"
 	PodWorkerLatencyKey          = "pod_worker_latency_microseconds"
 	PodStartLatencyKey           = "pod_start_latency_microseconds"
 	CgroupManagerOperationsKey   = "cgroup_manager_latency_microseconds"
@@ -62,9 +65,21 @@ const (
 	ConfigUIDLabelKey             = "node_config_uid"
 	ConfigResourceVersionLabelKey = "node_config_resource_version"
 	KubeletConfigKeyLabelKey      = "node_config_kubelet_key"
+
+	// Metrics keys for RuntimeClass
+	RunPodSandboxLatenciesKey = "run_podsandbox_latencies"
+	RunPodSandboxErrorsKey    = "run_podsandbox_errors"
 )
 
 var (
+	NodeName = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      NodeNameKey,
+			Help:      "The node's name. The count is always 1.",
+		},
+		[]string{NodeLabelKey},
+	)
 	ContainersPerPodCount = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
@@ -199,6 +214,22 @@ var (
 			Help:      "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
 		},
 	)
+	RunPodSandboxLatencies = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RunPodSandboxLatenciesKey,
+			Help:      "Latencies in microseconds of the run_podsandbox operations. Broken down by RuntimeClass.",
+		},
+		[]string{"runtime_handler"},
+	)
+	RunPodSandboxErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RunPodSandboxErrorsKey,
+			Help:      "Cumulative number of the run_podsandbox operation errors by RuntimeClass.",
+		},
+		[]string{"runtime_handler"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -207,6 +238,7 @@ var registerMetrics sync.Once
 func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheus.Collector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
+		prometheus.MustRegister(NodeName)
 		prometheus.MustRegister(PodWorkerLatency)
 		prometheus.MustRegister(PodStartLatency)
 		prometheus.MustRegister(CgroupManagerLatency)
@@ -371,4 +403,8 @@ func SetConfigError(err bool) {
 	} else {
 		ConfigError.Set(0)
 	}
+}
+
+func SetNodeName(name types.NodeName) {
+	NodeName.WithLabelValues(string(name)).Set(1)
 }

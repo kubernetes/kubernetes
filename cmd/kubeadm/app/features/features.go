@@ -31,9 +31,6 @@ const (
 
 	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
-
-	// DynamicKubeletConfig is beta in v1.11
-	DynamicKubeletConfig = "DynamicKubeletConfig"
 )
 
 var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +

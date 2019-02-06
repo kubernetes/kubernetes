@@ -26,29 +26,16 @@ const (
 	// and removed when node becomes ready.
 	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 
-	// DeprecatedTaintNodeNotReady is the deprecated version of TaintNodeNotReady.
-	// It is deprecated since 1.9
-	DeprecatedTaintNodeNotReady = "node.alpha.kubernetes.io/notReady"
-
 	// TaintNodeUnreachable will be added when node becomes unreachable
 	// (corresponding to NodeReady status ConditionUnknown)
 	// and feature-gate for TaintBasedEvictions flag is enabled,
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
 	TaintNodeUnreachable = "node.kubernetes.io/unreachable"
 
-	// DeprecatedTaintNodeUnreachable is the deprecated version of TaintNodeUnreachable.
-	// It is deprecated since 1.9
-	DeprecatedTaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
-
 	// TaintNodeUnschedulable will be added when node becomes unschedulable
 	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node becomes scheduable.
 	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
-
-	// TaintNodeOutOfDisk will be added when node becomes out of disk
-	// and feature-gate for TaintNodesByCondition flag is enabled,
-	// and removed when node has enough disk.
-	TaintNodeOutOfDisk = "node.kubernetes.io/out-of-disk"
 
 	// TaintNodeMemoryPressure will be added when node has memory pressure
 	// and feature-gate for TaintNodesByCondition flag is enabled,

@@ -16,7 +16,7 @@ limitations under the License.
 
 package vclib
 
-// Volume Constnts
+// Volume Constants
 const (
 	ThinDiskType             = "thin"
 	PreallocatedDiskType     = "preallocated"

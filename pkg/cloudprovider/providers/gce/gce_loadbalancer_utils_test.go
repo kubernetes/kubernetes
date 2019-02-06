@@ -31,11 +31,11 @@ import (
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -211,7 +211,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 	}
 
 	// Check that HealthCheck is created
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
+	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	healthcheck, err := gce.GetHealthCheck(hcName)
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
+	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 
 	// ensureExternalLoadBalancer and ensureInternalLoadBalancer both create

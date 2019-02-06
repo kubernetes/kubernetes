@@ -109,7 +109,7 @@ func (e *E2EServices) Stop() {
 func RunE2EServices(t *testing.T) {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
-	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
+	utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 	e := newE2EServices()
 	if err := e.run(t); err != nil {
 		klog.Fatalf("Failed to run e2e services: %v", err)

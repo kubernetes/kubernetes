@@ -52,39 +52,53 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 
 	// This is a dummy replication controller for scale subresource purposes.
 	// TODO: figure out how to enable this only if needed as a part of scale subresource GA.
-	controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
-	storage["replicationcontrollers"] = controllerStorage.ReplicationController
-	storage["replicationcontrollers/scale"] = controllerStorage.Scale
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicationcontrollers")) {
+		controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
+		storage["replicationcontrollers"] = controllerStorage.ReplicationController
+		storage["replicationcontrollers/scale"] = controllerStorage.Scale
+	}
 
 	// daemonsets
-	daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
-	storage["daemonsets"] = daemonSetStorage.WithCategories(nil)
-	storage["daemonsets/status"] = daemonSetStatusStorage
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets")) {
+		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
+		storage["daemonsets"] = daemonSetStorage.WithCategories(nil)
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
 
 	//deployments
-	deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-	storage["deployments"] = deploymentStorage.Deployment.WithCategories(nil)
-	storage["deployments/status"] = deploymentStorage.Status
-	storage["deployments/rollback"] = deploymentStorage.Rollback
-	storage["deployments/scale"] = deploymentStorage.Scale
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
+		storage["deployments"] = deploymentStorage.Deployment.WithCategories(nil)
+		storage["deployments/status"] = deploymentStorage.Status
+		storage["deployments/rollback"] = deploymentStorage.Rollback
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
 	// ingresses
-	ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
-	storage["ingresses"] = ingressStorage
-	storage["ingresses/status"] = ingressStatusStorage
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses")) {
+		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
+		storage["ingresses"] = ingressStorage
+		storage["ingresses/status"] = ingressStatusStorage
+	}
 
 	// podsecuritypolicy
-	podSecurityPolicyStorage := pspstore.NewREST(restOptionsGetter)
-	storage["podSecurityPolicies"] = podSecurityPolicyStorage
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies")) {
+		podSecurityPolicyStorage := pspstore.NewREST(restOptionsGetter)
+		storage["podSecurityPolicies"] = podSecurityPolicyStorage
+	}
 
 	// replicasets
-	replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
-	storage["replicasets"] = replicaSetStorage.ReplicaSet.WithCategories(nil)
-	storage["replicasets/status"] = replicaSetStorage.Status
-	storage["replicasets/scale"] = replicaSetStorage.Scale
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets")) {
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet.WithCategories(nil)
+		storage["replicasets/status"] = replicaSetStorage.Status
+		storage["replicasets/scale"] = replicaSetStorage.Scale
+	}
 
 	// networkpolicies
-	networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter)
-	storage["networkpolicies"] = networkExtensionsStorage
+	if apiResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies")) {
+		networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter)
+		storage["networkpolicies"] = networkExtensionsStorage
+	}
 
 	return storage
 }

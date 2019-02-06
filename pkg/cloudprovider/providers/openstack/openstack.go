@@ -46,8 +46,8 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -125,6 +125,9 @@ type MetadataOpts struct {
 	SearchOrder    string     `gcfg:"search-order"`
 	RequestTimeout MyDuration `gcfg:"request-timeout"`
 }
+
+var _ cloudprovider.Interface = (*OpenStack)(nil)
+var _ cloudprovider.Zones = (*OpenStack)(nil)
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
@@ -473,7 +476,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 				addressType = v1.NodeInternalIP
 			}
 
-			v1helper.AddToNodeAddresses(&addrs,
+			nodehelpers.AddToNodeAddresses(&addrs,
 				v1.NodeAddress{
 					Type:    addressType,
 					Address: props.Addr,
@@ -484,7 +487,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 
 	// AccessIPs are usually duplicates of "public" addresses.
 	if srv.AccessIPv4 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv4,
@@ -493,7 +496,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.AccessIPv6 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv6,
@@ -502,7 +505,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.Metadata[TypeHostName] != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeHostName,
 				Address: srv.Metadata[TypeHostName],

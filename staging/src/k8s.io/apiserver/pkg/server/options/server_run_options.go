@@ -154,5 +154,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

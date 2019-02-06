@@ -32,8 +32,8 @@ import (
 	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -377,7 +377,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			name:         "view resource/name invalid format",
 			filePath:     "",
 			outputFormat: "wide",
-			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
+			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples",
 			expectedOut:  "",
 			selector:     "",
 			args:         []string{"replicationcontroller", "test-rc"},
@@ -648,7 +648,7 @@ func TestApplyRetry(t *testing.T) {
 					case p == pathRC && m == "PATCH":
 						if firstPatch {
 							firstPatch = false
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil
@@ -876,7 +876,7 @@ const (
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
-	obj := &extensionsv1beta1.Deployment{}
+	obj := &appsv1.Deployment{}
 	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
@@ -948,7 +948,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 			cmd.Run(cmd, []string{})
 
-			expected := "deployment.extensions/" + deploymentName + "\n"
+			expected := "deployment.apps/" + deploymentName + "\n"
 			if buf.String() != expected {
 				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 			}
@@ -1280,7 +1280,7 @@ func TestForceApply(t *testing.T) {
 					case strings.HasSuffix(p, pathRC) && m == "PATCH":
 						counts["patch"]++
 						if counts["patch"] <= 6 {
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil

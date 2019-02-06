@@ -50,10 +50,10 @@ type UndoOptions struct {
 }
 
 var (
-	undo_long = templates.LongDesc(`
+	undoLong = templates.LongDesc(`
 		Rollback to a previous rollout.`)
 
-	undo_example = templates.Examples(`
+	undoExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
@@ -64,6 +64,7 @@ var (
 		kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
+// NewRolloutUndoOptions returns an initialized UndoOptions instance
 func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 	return &UndoOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme),
@@ -72,6 +73,7 @@ func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 	}
 }
 
+// NewCmdRolloutUndo returns a Command instance for the 'rollout undo' sub command
 func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutUndoOptions(streams)
 
@@ -81,8 +83,8 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Use:                   "undo (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Undo a previous rollout"),
-		Long:                  undo_long,
-		Example:               undo_example,
+		Long:                  undoLong,
+		Example:               undoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -99,6 +101,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	return cmd
 }
 
+// Complete completes al the required options
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
@@ -129,6 +132,7 @@ func (o *UndoOptions) Validate() error {
 	return nil
 }
 
+// RunUndo performs the execution of 'rollout undo' sub command
 func (o *UndoOptions) RunUndo() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).

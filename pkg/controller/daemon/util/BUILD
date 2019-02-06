@@ -13,14 +13,11 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/features:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -39,13 +36,9 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "daemonset_util_test.go",
-        "main_test.go",
-    ],
+    srcs = ["daemonset_util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/api:go_default_library",

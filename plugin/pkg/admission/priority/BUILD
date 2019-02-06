@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "admission_test.go",
-        "main_test.go",
-    ],
+    srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",

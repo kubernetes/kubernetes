@@ -36,7 +36,8 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
-	"k8s.io/klog"
+
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -45,15 +46,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/klog"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 const (
@@ -98,6 +97,14 @@ type gceObject interface {
 	MarshalJSON() ([]byte, error)
 }
 
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var _ cloudprovider.Clusters = (*Cloud)(nil)
+
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type Cloud struct {
 	// ClusterID contains functionality for getting (and initializing) the ingress-uid. Call Cloud.Initialize()
@@ -110,7 +117,7 @@ type Cloud struct {
 	containerService *container.Service
 	tpuService       *tpuService
 	client           clientset.Interface
-	clientBuilder    controller.ControllerClientBuilder
+	clientBuilder    cloudprovider.ControllerClientBuilder
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
 	projectID        string
@@ -764,9 +771,6 @@ func isProjectNumber(idOrNumber string) bool {
 	_, err := strconv.ParseUint(idOrNumber, 10, 64)
 	return err == nil
 }
-
-// Cloud implements cloudprovider.Interface.
-var _ cloudprovider.Interface = (*Cloud)(nil)
 
 func gceNetworkURL(apiEndpoint, project, network string) string {
 	if apiEndpoint == "" {

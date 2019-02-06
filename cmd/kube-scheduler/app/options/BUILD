@@ -21,7 +21,6 @@ go_library(
         "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -70,11 +70,10 @@ go_test(
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
     ],
 )

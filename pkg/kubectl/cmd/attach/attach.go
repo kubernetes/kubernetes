@@ -76,7 +76,7 @@ type AttachOptions struct {
 	AttachFunc       func(*AttachOptions, *corev1.Container, bool, remotecommand.TerminalSizeQueue) func() error
 	Resources        []string
 	Builder          func() *resource.Builder
-	AttachablePodFn  polymorphichelpers.AttachableLogsForObjectFunc
+	AttachablePodFn  polymorphichelpers.AttachablePodForObjectFunc
 	restClientGetter genericclioptions.RESTClientGetter
 
 	Attach        RemoteAttach

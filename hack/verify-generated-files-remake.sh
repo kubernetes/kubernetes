@@ -21,6 +21,21 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::ensure_clean_working_dir
+
+_tmpdir="$(kube::realpath $(mktemp -d -t verify-generated-files.XXXXXX))"
+kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
+
+_tmp_gopath="${_tmpdir}/go"
+_tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
+mkdir -p "${_tmp_kuberoot}/.."
+cp -a "${KUBE_ROOT}" "${_tmp_kuberoot}/.."
+
+cd "${_tmp_kuberoot}"
+
+# clean out anything from the temp dir that's not checked in
+git clean -ffxd
+
 # $1 = filename pattern as in "zz_generated.$1.go"
 function find_genfiles() {
     find .                         \
@@ -37,7 +52,7 @@ function find_genfiles() {
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function newer() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "${F}" -nt "$2" ]]; then
             echo "${F}"
         fi
@@ -47,7 +62,7 @@ function newer() {
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function older() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "$2" -nt "${F}" ]]; then
             echo "${F}"
         fi
@@ -61,7 +76,7 @@ function assert_clean() {
     X=($(newer deepcopy "${STAMP}"))
     if [[ "${#X[*]}" != 0 ]]; then
         echo "Generated files changed on back-to-back 'make' runs:"
-        echo "  ${X[@]:-(none)}"
+        echo "  ${X[*]:-(none)}"
         return 1
     fi
     true
@@ -82,19 +97,19 @@ make generated_files >/dev/null
 X=($(newer deepcopy "${STAMP}"))
 if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.deepcopy.go" ) ]]; then
     echo "Wrong generated deepcopy files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 X=($(newer defaults "${STAMP}"))
 if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.defaults.go" ) ]]; then
     echo "Wrong generated defaults files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 X=($(newer conversion "${STAMP}"))
 if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "${DIR}/zz_generated.conversion.go" ) ]]; then
     echo "Wrong generated conversion files changed after touching src file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -110,7 +125,7 @@ make generated_files >/dev/null
 X=($(older deepcopy "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated deepcopy files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -122,7 +137,7 @@ make generated_files >/dev/null
 X=($(older deepcopy "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]}:-(none)"
     exit 1
 fi
 
@@ -134,7 +149,7 @@ make generated_files >/dev/null
 X=($(older deepcopy "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -146,7 +161,7 @@ make generated_files >/dev/null
 X=($(older deepcopy "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated deepcopy files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -162,7 +177,7 @@ make generated_files >/dev/null
 X=($(older defaults "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated defaults files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -174,7 +189,7 @@ make generated_files >/dev/null
 X=($(older defaults "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated defaults files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -186,7 +201,7 @@ make generated_files >/dev/null
 X=($(older defaults "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated defaults files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -198,7 +213,7 @@ make generated_files >/dev/null
 X=($(older defaults "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated defaults files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -214,7 +229,7 @@ make generated_files >/dev/null
 X=($(older conversion "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated conversion files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -226,7 +241,7 @@ make generated_files >/dev/null
 X=($(older conversion "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated conversion files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -238,7 +253,7 @@ make generated_files >/dev/null
 X=($(older conversion "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated conversion files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -250,7 +265,7 @@ make generated_files >/dev/null
 X=($(older conversion "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated conversion files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -266,7 +281,7 @@ make generated_files >/dev/null
 X=($(newer openapi "${STAMP}"))
 if [[ "${#X[*]}" != 1 || ! ( "${X[0]}" =~ "pkg/generated/openapi/zz_generated.openapi.go" ) ]]; then
     echo "Wrong generated openapi files changed after touching src file:"
-    echo "${X[@]:-(none)}"
+    echo "${X[*]:-(none)}"
     exit 1
 fi
 
@@ -282,7 +297,7 @@ make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated openapi files did not change after touching code-generator file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -294,7 +309,7 @@ make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated openapi files did not change after touching code-generator dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -306,7 +321,7 @@ make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated openapi files did not change after touching code-generator dep file:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi
 
@@ -318,6 +333,6 @@ make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))
 if [[ "${#X[*]}" != 0 ]]; then
     echo "Generated openapi files did not change after touching code-generator dep dir:"
-    echo "  ${X[@]:-(none)}"
+    echo "  ${X[*]:-(none)}"
     exit 1
 fi

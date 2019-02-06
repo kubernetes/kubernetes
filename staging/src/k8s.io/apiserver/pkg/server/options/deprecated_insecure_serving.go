@@ -85,14 +85,16 @@ func (s *DeprecatedInsecureServingOptions) AddUnqualifiedFlags(fs *pflag.FlagSet
 	}
 
 	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
-		"DEPRECATED: see --bind-address instead.")
+		"The IP address on which to serve the insecure --port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.MarkDeprecated("address", "see --bind-address instead.")
+	fs.Lookup("address").Hidden = false
 
-	fs.IntVar(&s.BindPort, "port", s.BindPort, "DEPRECATED: see --secure-port instead.")
+	fs.IntVar(&s.BindPort, "port", s.BindPort, "The port on which to serve unsecured, unauthenticated access. Set to 0 to disable.")
 	fs.MarkDeprecated("port", "see --secure-port instead.")
+	fs.Lookup("port").Hidden = false
 }
 
-// ApplyTo adds DeprecatedInsecureServingOptions to the insecureserverinfo amd kube-controller manager configuration.
+// ApplyTo adds DeprecatedInsecureServingOptions to the insecureserverinfo and kube-controller manager configuration.
 // Note: the double pointer allows to set the *DeprecatedInsecureServingInfo to nil without referencing the struct hosting this pointer.
 func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecureServingInfo) error {
 	if s == nil {

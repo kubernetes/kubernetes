@@ -70,7 +70,7 @@ go_test(
     name = "go_default_test",
     srcs = ["cmd_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
         "//pkg/kubectl/cmd/plugin:testdata",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",

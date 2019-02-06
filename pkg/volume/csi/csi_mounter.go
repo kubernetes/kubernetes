@@ -31,9 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 //TODO (vladimirvivien) move this in a central loc later
@@ -80,8 +79,8 @@ func (c *csiMountMgr) GetPath() string {
 }
 
 func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) string {
-	specVolID := kstrings.EscapeQualifiedNameForDisk(specVolumeID)
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(csiPluginName), specVolID)
+	specVolID := utilstrings.EscapeQualifiedName(specVolumeID)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(csiPluginName), specVolID)
 }
 
 // volume.Mounter methods
@@ -289,20 +288,6 @@ func (c *csiMountMgr) TearDown() error {
 func (c *csiMountMgr) TearDownAt(dir string) error {
 	klog.V(4).Infof(log("Unmounter.TearDown(%s)", dir))
 
-	// is dir even mounted ?
-	// TODO (vladimirvivien) this check may not work for an emptyDir or local storage
-	// see https://github.com/kubernetes/kubernetes/pull/56836#discussion_r155834524
-	mounted, err := isDirMounted(c.plugin, dir)
-	if err != nil {
-		klog.Error(log("unmounter.Teardown failed while checking mount status for dir [%s]: %v", dir, err))
-		return err
-	}
-
-	if !mounted {
-		klog.V(4).Info(log("unmounter.Teardown skipping unmount, dir not mounted [%s]", dir))
-		return nil
-	}
-
 	volID := c.volumeID
 	csi := c.csiClient
 
@@ -319,7 +304,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		klog.Error(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 		return err
 	}
-	klog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
+	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
 }
@@ -375,21 +360,12 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
 func removeMountDir(plug *csiPlugin, mountPath string) error {
 	klog.V(4).Info(log("removing mount path [%s]", mountPath))
-	if pathExists, pathErr := util.PathExists(mountPath); pathErr != nil {
-		klog.Error(log("failed while checking mount path stat [%s]", pathErr))
-		return pathErr
-	} else if !pathExists {
-		klog.Warning(log("skipping mount dir removal, path does not exist [%v]", mountPath))
-		return nil
-	}
 
-	mounter := plug.host.GetMounter(plug.GetPluginName())
-	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+	mnt, err := isDirMounted(plug, mountPath)
 	if err != nil {
-		klog.Error(log("mount dir removal failed [%s]: %v", mountPath, err))
 		return err
 	}
-	if notMnt {
+	if !mnt {
 		klog.V(4).Info(log("dir not mounted, deleting it [%s]", mountPath))
 		if err := os.Remove(mountPath); err != nil && !os.IsNotExist(err) {
 			klog.Error(log("failed to remove dir [%s]: %v", mountPath, err))

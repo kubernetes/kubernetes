@@ -95,7 +95,6 @@ go_test(
         "kuberuntime_sandbox_test.go",
         "labels_test.go",
         "legacy_test.go",
-        "main_test.go",
         "security_context_test.go",
     ],
     embed = [":go_default_library"],

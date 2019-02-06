@@ -30,18 +30,26 @@ const (
 	DefaultCompactInterval = 5 * time.Minute
 )
 
-// Config is configuration for creating a storage backend.
-type Config struct {
-	// Type defines the type of storage backend. Default ("") is "etcd3".
-	Type string
-	// Prefix is the prefix to all keys passed to storage.Interface methods.
-	Prefix string
+// TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
+type TransportConfig struct {
 	// ServerList is the list of storage servers to connect with.
 	ServerList []string
 	// TLS credentials
 	KeyFile  string
 	CertFile string
 	CAFile   string
+}
+
+// Config is configuration for creating a storage backend.
+type Config struct {
+	// Type defines the type of storage backend. Default ("") is "etcd3".
+	Type string
+	// Prefix is the prefix to all keys passed to storage.Interface methods.
+	Prefix string
+	// Transport holds all connection related info, i.e. equal TransportConfig means equal servers we talk to.
+	Transport TransportConfig
+	// Quorum indicates that whether read operations should be quorum-level consistent.
+	Quorum bool
 	// Paging indicates whether the server implementation should allow paging (if it is
 	// supported). This is generally configured by feature gating, or by a specific
 	// resource type not wishing to allow paging, and is not intended for end users to
@@ -55,7 +63,6 @@ type Config struct {
 	// CompactionInterval is an interval of requesting compaction from apiserver.
 	// If the value is 0, no compaction will be issued.
 	CompactionInterval time.Duration
-
 	// CountMetricPollPeriod specifies how often should count metric be updated
 	CountMetricPollPeriod time.Duration
 }

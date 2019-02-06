@@ -47,7 +47,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "events_test.go",
-        "main_test.go",
         "validation_test.go",
     ],
     embed = [":go_default_library"],

@@ -334,7 +334,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			disruptOp := t.disruptOp
 			It(fmt.Sprintf("when %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce")
-				origNodeCnt := len(nodes.Items) // healhy nodes running kublet
+				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
 				By("creating a pd")
 				diskName, err := framework.CreatePDWithRetry()

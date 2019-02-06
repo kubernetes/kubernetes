@@ -30,6 +30,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 )
 
+var _ cloudprovider.Instances = (*Instances)(nil)
+
 // Instances encapsulates an implementation of Instances for OpenStack.
 type Instances struct {
 	compute *gophercloud.ServiceClient

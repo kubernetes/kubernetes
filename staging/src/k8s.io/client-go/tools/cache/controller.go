@@ -28,9 +28,9 @@ import (
 
 // Config contains all the settings for a Controller.
 type Config struct {
-	// The queue for your objects; either a FIFO or
-	// a DeltaFIFO. Your Process() function should accept
-	// the output of this Queue's Pop() method.
+	// The queue for your objects - has to be a DeltaFIFO due to
+	// assumptions in the implementation. Your Process() function
+	// should accept the output of this Queue's Pop() method.
 	Queue
 
 	// Something that can list and watch your objects.

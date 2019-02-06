@@ -29,6 +29,7 @@ RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
+NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
 MASTER_DISK_TYPE=pd-ssd
@@ -44,6 +45,7 @@ NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 # fluentd is not running as a manifest pod with appropriate label.
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
 
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
@@ -63,6 +65,7 @@ MIG_WAIT_UNTIL_STABLE_TIMEOUT=${MIG_WAIT_UNTIL_STABLE_TIMEOUT:-1800}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
+WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win1803}
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
     MASTER_OS_DISTRIBUTION="gci"
@@ -173,15 +176,19 @@ HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
+WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS:-}"
 
 if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
     NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+    WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS},cloud.google.com/gke-preemptible=true"
 elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
+    WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
 fi
 
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
+# Windows nodes do not support Calico.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
 fi
@@ -194,6 +201,7 @@ CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
 
 # To avoid running netd on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
+# Windows nodes do not support netd.
 if [[ ${ENABLE_NETD:-} == "true" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
@@ -409,8 +417,8 @@ fi
 
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
-FLUENTD_GCP_YAML_VERSION="v3.1.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.5-1.5.36-1-k8s}"
+FLUENTD_GCP_YAML_VERSION="v3.2.0"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -467,3 +475,7 @@ ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
 if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
 fi
+
+# Taint Windows nodes by default to prevent Linux workloads from being
+# scheduled onto them.
+WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=windows:NoSchedule}"

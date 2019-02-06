@@ -212,7 +212,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 }
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
-	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
+	// NOTE: devicePath is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
@@ -237,7 +237,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				// Using the Cinder volume ID, find the real device path (See Issue #33128)
 				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
 			}
-			exists, err := volumeutil.PathExists(devicePath)
+			exists, err := mount.PathExists(devicePath)
 			if exists && err == nil {
 				klog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
@@ -403,7 +403,7 @@ func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.Nod
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {

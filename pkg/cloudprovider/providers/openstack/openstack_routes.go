@@ -33,6 +33,8 @@ import (
 
 var errNoRouterID = errors.New("router-id not set in cloud provider config")
 
+var _ cloudprovider.Routes = (*Routes)(nil)
+
 // Routes implements the cloudprovider.Routes for OpenStack clouds
 type Routes struct {
 	compute *gophercloud.ServiceClient

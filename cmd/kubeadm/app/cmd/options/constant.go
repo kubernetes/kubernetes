@@ -31,7 +31,7 @@ const APIServerExtraArgs = "apiserver-extra-args"
 // CertificatesDir flag sets the path where to save and read the certificates.
 const CertificatesDir = "cert-dir"
 
-// CfgPath flag sets the path to kubeadm config file. WARNING: Usage of a configuration file is experimental.
+// CfgPath flag sets the path to kubeadm config file.
 const CfgPath = "config"
 
 // ControllerManagerExtraArgs flag sets extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>.
@@ -84,3 +84,36 @@ const CSROnly = "csr-only"
 
 // CSRDir flag sets the location for CSRs and flags to be output
 const CSRDir = "csr-dir"
+
+// TokenStr flags sets both the discovery-token and the tls-bootstrap-token when those values are not provided
+const TokenStr = "token"
+
+// TokenTTL flag sets the time to live for token
+const TokenTTL = "token-ttl"
+
+// TokenUsages flag sets the usages of the token
+const TokenUsages = "usages"
+
+// TokenGroups flag sets the authentication groups of the token
+const TokenGroups = "groups"
+
+// TokenDescription flag sets the description of the token
+const TokenDescription = "description"
+
+// TLSBootstrapToken flag sets the token used to temporarily authenticate with the Kubernetes Master to submit a certificate signing request (CSR) for a locally created key pair
+const TLSBootstrapToken = "tls-bootstrap-token"
+
+// TokenDiscovery flag sets the token used to validate cluster information fetched from the API server (for token-based discovery)
+const TokenDiscovery = "discovery-token"
+
+// TokenDiscoveryCAHash flag instruct kubeadm to validate that the root CA public key matches this hash (for token-based discovery)
+const TokenDiscoveryCAHash = "discovery-token-ca-cert-hash"
+
+// TokenDiscoverySkipCAHash flag instruct kubeadm to skip CA hash verification (for token-based discovery)
+const TokenDiscoverySkipCAHash = "discovery-token-unsafe-skip-ca-verification"
+
+// FileDiscovery flag sets the file or URL from which to load cluster information (for file-based discovery)
+const FileDiscovery = "discovery-file"
+
+// ControlPlane flag instruct kubeadm to create a new control plane instance on this node
+const ControlPlane = "experimental-control-plane"

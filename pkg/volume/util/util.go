@@ -18,18 +18,23 @@ package util
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
-	"syscall"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,19 +44,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"reflect"
-
-	"hash/fnv"
-	"math/rand"
-	"strconv"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -124,106 +120,6 @@ func SetReady(dir string) {
 		return
 	}
 	file.Close()
-}
-
-// UnmountPath is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
-}
-
-// UnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
-		return nil
-	}
-	corruptedMnt := IsCorruptedMnt(pathErr)
-	if pathErr != nil && !corruptedMnt {
-		return fmt.Errorf("Error checking path: %v", pathErr)
-	}
-	return doUnmountMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
-}
-
-// doUnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, Take it as an argument for convenience of testing
-func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
-	if !corruptedMnt {
-		var notMnt bool
-		var err error
-		if extensiveMountPointCheck {
-			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-		} else {
-			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if notMnt {
-			klog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-			return os.Remove(mountPath)
-		}
-	}
-
-	// Unmount the mount path
-	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
-	if err := mounter.Unmount(mountPath); err != nil {
-		return err
-	}
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
-	if mntErr != nil {
-		return mntErr
-	}
-	if notMnt {
-		klog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
-		return os.Remove(mountPath)
-	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
-}
-
-// PathExists returns true if the specified path exists.
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if IsCorruptedMnt(err) {
-		return true, err
-	} else {
-		return false, err
-	}
-}
-
-// IsCorruptedMnt return true if err is about corrupted mount point
-func IsCorruptedMnt(err error) bool {
-	if err == nil {
-		return false
-	}
-	var underlyingError error
-	switch pe := err.(type) {
-	case nil:
-		return false
-	case *os.PathError:
-		underlyingError = pe.Err
-	case *os.LinkError:
-		underlyingError = pe.Err
-	case *os.SyscallError:
-		underlyingError = pe.Err
-	}
-
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
@@ -825,9 +721,10 @@ func GetUniqueVolumeName(pluginName, volumeName string) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
 }
 
-// GetUniqueVolumeNameForNonAttachableVolume returns the unique volume name
-// for a non-attachable volume.
-func GetUniqueVolumeNameForNonAttachableVolume(
+// GetUniqueVolumeNameFromSpecWithPod returns a unique volume name with pod
+// name included. This is useful to generate different names for different pods
+// on same volume.
+func GetUniqueVolumeNameFromSpecWithPod(
 	podName types.UniquePodName, volumePlugin volume.VolumePlugin, volumeSpec *volume.Spec) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(
 		fmt.Sprintf("%s/%v-%s", volumePlugin.GetPluginName(), podName, volumeSpec.Name()))

@@ -33,7 +33,7 @@ func AddKubeConfigDirFlag(fs *pflag.FlagSet, kubeConfigDir *string) {
 
 // AddConfigFlag adds the --config flag to the given flagset
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
-	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental).")
+	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to a kubeadm configuration file.")
 }
 
 // AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset

@@ -196,11 +196,11 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		klog.V(2).Infof("NODE DENY: %v", err)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 	}
 	if !ok {
 		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -221,11 +221,11 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		klog.V(2).Infof("NODE DENY: %v", err)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 	}
 	if !ok {
 		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -333,7 +333,7 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return found
 	})
 	if !found {
-		return false, fmt.Errorf("node %q cannot get %s %s/%s, no path was found", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node %q cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 	return true, nil
 }

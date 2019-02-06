@@ -29,11 +29,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/ssh"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
-
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/ssh"
+	utilpath "k8s.io/utils/path"
 )
 
 type InstallSSHKey func(ctx context.Context, user string, data []byte) error
@@ -83,9 +81,8 @@ type SSHTunneler struct {
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
-	tunnels        *ssh.SSHTunnelList
-	lastSyncMetric prometheus.GaugeFunc
-	clock          clock.Clock
+	tunnels *ssh.SSHTunnelList
+	clock   clock.Clock
 
 	getAddresses AddressFunc
 	stopChan     chan struct{}
@@ -122,7 +119,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 
 	// public keyfile is written last, so check for that.
 	publicKeyFile := c.SSHKeyfile + ".pub"
-	exists, err := utilfile.FileExists(publicKeyFile)
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, publicKeyFile)
 	if err != nil {
 		klog.Errorf("Error detecting if key exists: %v", err)
 	} else if !exists {
@@ -211,7 +208,7 @@ func generateSSHKey(privateKeyfile, publicKeyfile string) error {
 	}
 	// If private keyfile already exists, we must have only made it halfway
 	// through last time, so delete it.
-	exists, err := utilfile.FileExists(privateKeyfile)
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, privateKeyfile)
 	if err != nil {
 		klog.Errorf("Error detecting if private key exists: %v", err)
 	} else if exists {

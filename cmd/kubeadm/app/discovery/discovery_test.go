@@ -24,11 +24,17 @@ import (
 
 func TestFor(t *testing.T) {
 	tests := []struct {
+		name   string
 		d      kubeadm.JoinConfiguration
 		expect bool
 	}{
-		{d: kubeadm.JoinConfiguration{}, expect: false},
 		{
+			name:   "default Discovery",
+			d:      kubeadm.JoinConfiguration{},
+			expect: false,
+		},
+		{
+			name: "file Discovery with a path",
 			d: kubeadm.JoinConfiguration{
 				Discovery: kubeadm.Discovery{
 					File: &kubeadm.FileDiscovery{
@@ -39,6 +45,7 @@ func TestFor(t *testing.T) {
 			expect: false,
 		},
 		{
+			name: "file Discovery with an url",
 			d: kubeadm.JoinConfiguration{
 				Discovery: kubeadm.Discovery{
 					File: &kubeadm.FileDiscovery{
@@ -49,6 +56,7 @@ func TestFor(t *testing.T) {
 			expect: false,
 		},
 		{
+			name: "BootstrapTokenDiscovery",
 			d: kubeadm.JoinConfiguration{
 				Discovery: kubeadm.Discovery{
 					BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
@@ -60,13 +68,15 @@ func TestFor(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, actual := For(&rt.d)
-		if (actual == nil) != rt.expect {
-			t.Errorf(
-				"failed For:\n\texpected: %t\n\t  actual: %t",
-				rt.expect,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			_, actual := For(&rt.d)
+			if (actual == nil) != rt.expect {
+				t.Errorf(
+					"failed For:\n\texpected: %t\n\t  actual: %t",
+					rt.expect,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }

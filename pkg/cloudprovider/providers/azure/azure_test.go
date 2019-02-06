@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
@@ -1231,8 +1231,8 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 
 			expectedProbeCount++
 			foundProbe := false
-			if serviceapi.NeedsHealthCheck(&svc) {
-				path, port := serviceapi.GetServiceHealthCheckPathPort(&svc)
+			if servicehelpers.NeedsHealthCheck(&svc) {
+				path, port := servicehelpers.GetServiceHealthCheckPathPort(&svc)
 				for _, actualProbe := range *loadBalancer.Probes {
 					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
 						*actualProbe.Port == port &&

@@ -13,7 +13,7 @@ go_test(
         "delaying_queue_test.go",
         "metrics_test.go",
         "queue_test.go",
-        "rate_limitting_queue_test.go",
+        "rate_limiting_queue_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -31,7 +31,7 @@ go_library(
         "metrics.go",
         "parallelizer.go",
         "queue.go",
-        "rate_limitting_queue.go",
+        "rate_limiting_queue.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/workqueue",
     importpath = "k8s.io/client-go/util/workqueue",

@@ -34,11 +34,11 @@ type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter,
 // LogsForObjectFn gives a way to easily override the function for unit testing if needed.
 var LogsForObjectFn LogsForObjectFunc = logsForObject
 
-// AttachableLogsForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
-type AttachableLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)
+// AttachablePodForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
+type AttachablePodForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)
 
 // AttachablePodForObjectFn gives a way to easily override the function for unit testing if needed.
-var AttachablePodForObjectFn AttachableLogsForObjectFunc = attachablePodForObject
+var AttachablePodForObjectFn AttachablePodForObjectFunc = attachablePodForObject
 
 // HistoryViewerFunc is a function type that can tell you how to view change history
 type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)

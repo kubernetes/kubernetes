@@ -39,9 +39,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
-	// install the prometheus plugin
-	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
 )

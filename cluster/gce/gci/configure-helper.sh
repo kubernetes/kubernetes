@@ -1089,6 +1089,11 @@ EOF
 }
 
 function create-node-problem-detector-kubeconfig {
+  local apiserver_address="${1}"
+  if [[ -z "${apiserver_address}" ]]; then
+    echo "Must provide API server address to create node-problem-detector kubeconfig file!"
+    exit 1
+  fi
   echo "Creating node-problem-detector kubeconfig file"
   mkdir -p /var/lib/node-problem-detector
   cat <<EOF >/var/lib/node-problem-detector/kubeconfig
@@ -1101,6 +1106,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://${apiserver_address}
     certificate-authority-data: ${CA_CERT}
 contexts:
 - context:
@@ -1118,6 +1124,30 @@ function create-master-etcd-auth {
     echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
     echo "${ETCD_PEER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-peer.crt"
   fi
+}
+
+function create-master-etcd-apiserver-auth {
+   if [[ -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+     local -r auth_dir="/etc/srv/kubernetes/pki"
+
+     ETCD_APISERVER_CA_KEY_PATH="${auth_dir}/etcd-apiserver-ca.key"
+     echo "${ETCD_APISERVER_CA_KEY}" | base64 --decode > "${ETCD_APISERVER_CA_KEY_PATH}"
+
+     ETCD_APISERVER_CA_CERT_PATH="${auth_dir}/etcd-apiserver-ca.crt"
+     echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-ca.crt"
+
+     ETCD_APISERVER_SERVER_KEY_PATH="${auth_dir}/etcd-apiserver-server.key"
+     echo "${ETCD_APISERVER_SERVER_KEY}" | base64 --decode > "${ETCD_APISERVER_SERVER_KEY_PATH}"
+
+     ETCD_APISERVER_SERVER_CERT_PATH="${auth_dir}/etcd-apiserver-server.crt"
+     echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-server.crt"
+
+     ETCD_APISERVER_CLIENT_KEY_PATH="${auth_dir}/etcd-apiserver-client.key"
+     echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${auth_dir}/etcd-apiserver-client.key"
+
+     ETCD_APISERVER_CLIENT_CERT_PATH="${auth_dir}/etcd-apiserver-client.crt"
+     echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-client.crt"
+   fi
 }
 
 function assemble-docker-flags {
@@ -1230,7 +1260,7 @@ function start-node-problem-detector {
   local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
   # TODO(random-liu): Handle this for alternative container runtime.
   local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
-  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
+  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
   echo "Using node problem detector binary at ${npd_bin}"
   local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
   flags+=" --logtostderr"
@@ -1351,6 +1381,7 @@ function prepare-etcd-manifest {
   local cluster_state="new"
   local etcd_protocol="http"
   local etcd_creds=""
+  local etcd_apiserver_creds="${ETCD_APISERVER_CREDS:-}"
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
@@ -1359,6 +1390,10 @@ function prepare-etcd-manifest {
   if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
+  fi
+
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" ]]; then
+    etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
@@ -1406,6 +1441,7 @@ function prepare-etcd-manifest {
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
@@ -1515,6 +1551,11 @@ function start-kube-apiserver {
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
   fi
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+    params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
+    params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
+    params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
+  fi
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
@@ -1557,9 +1598,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${NUM_NODES:-}" ]]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
-    if [[ "${NUM_NODES}" -ge 3000 ]]; then
+    if [[ "${NUM_NODES}" -gt 3000 ]]; then
       params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
-    elif [[ "${NUM_NODES}" -ge 1000 ]]; then
+    elif [[ "${NUM_NODES}" -gt 500 ]]; then
       params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
     fi
     # Set amount of memory available for apiserver based on number of nodes.
@@ -2290,8 +2331,9 @@ function update-dashboard-controller {
 
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
-  local -r coredns_file="${dst_dir}/dns/coredns/coredns.yaml"
-  mv "${dst_dir}/dns/coredns/coredns.yaml.in" "${coredns_file}"
+  setup-addon-manifests "addons" "0-dns/coredns"
+  local -r coredns_file="${dst_dir}/0-dns/coredns/coredns.yaml"
+  mv "${dst_dir}/0-dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
@@ -2321,10 +2363,10 @@ function setup-fluentd {
     fluentd_gcp_configmap_name="fluentd-gcp-config-old"
   fi
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
-  fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.1.0}"
+  fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.2.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
-  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.5-1.5.36-1-k8s}"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
@@ -2334,8 +2376,9 @@ function setup-fluentd {
 
 # Sets up the manifests of kube-dns for k8s addons.
 function setup-kube-dns-manifest {
-  local -r kubedns_file="${dst_dir}/dns/kube-dns/kube-dns.yaml"
-  mv "${dst_dir}/dns/kube-dns/kube-dns.yaml.in" "${kubedns_file}"
+  setup-addon-manifests "addons" "0-dns/kube-dns"
+  local -r kubedns_file="${dst_dir}/0-dns/kube-dns/kube-dns.yaml"
+  mv "${dst_dir}/0-dns/kube-dns/kube-dns.yaml.in" "${kubedns_file}"
   if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
     # Replace with custom GKE kube-dns deployment.
     cat > "${kubedns_file}" <<EOF
@@ -2356,8 +2399,8 @@ EOF
 
 # Sets up the manifests of local dns cache agent for k8s addons.
 function setup-nodelocaldns-manifest {
-  setup-addon-manifests "addons" "dns/nodelocaldns"
-  local -r localdns_file="${dst_dir}/dns/nodelocaldns/nodelocaldns.yaml"
+  setup-addon-manifests "addons" "0-dns/nodelocaldns"
+  local -r localdns_file="${dst_dir}/0-dns/nodelocaldns/nodelocaldns.yaml"
   # Replace the sed configurations with variable values.
   sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
   sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
@@ -2528,11 +2571,17 @@ EOF
       setup-node-termination-handler-manifest
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
+    # Create a new directory for the DNS addon and prepend a "0" on the name.
+    # Prepending "0" to the directory ensures that add-on manager
+    # creates the dns service first. This ensures no other add-on
+    # can "steal" the designated DNS clusterIP.
+    BASE_ADDON_DIR=${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty
+    BASE_DNS_DIR=${BASE_ADDON_DIR}/dns
+    NEW_DNS_DIR=${BASE_ADDON_DIR}/0-dns
+    mkdir ${NEW_DNS_DIR} && mv ${BASE_DNS_DIR}/* ${NEW_DNS_DIR} && rm -r ${BASE_DNS_DIR}
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "dns/coredns"
       setup-coredns-manifest
     else
-      setup-addon-manifests "addons" "dns/kube-dns"
       setup-kube-dns-manifest
     fi
     if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
@@ -2622,7 +2671,7 @@ function setup-node-termination-handler-manifest {
     local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
     if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
         sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
-    fi 
+    fi
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2817,6 +2866,7 @@ function main() {
     create-master-auth
     create-master-kubelet-auth
     create-master-etcd-auth
+    create-master-etcd-apiserver-auth
     override-pv-recycler
     gke-master-start
   else
@@ -2826,7 +2876,7 @@ function main() {
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      create-node-problem-detector-kubeconfig
+      create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
     fi
   fi
 
@@ -2839,8 +2889,10 @@ function main() {
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     compute-master-manifest-variables
-    start-etcd-servers
-    start-etcd-empty-dir-cleanup-pod
+    if [[ -z "${ETCD_SERVERS:-}" ]]; then
+      start-etcd-servers
+      start-etcd-empty-dir-cleanup-pod
+    fi
     start-kube-apiserver
     start-kube-controller-manager
     start-kube-scheduler

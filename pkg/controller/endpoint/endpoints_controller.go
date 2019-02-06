@@ -428,8 +428,8 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	subsets := []v1.EndpointSubset{}
-	var totalReadyEps int = 0
-	var totalNotReadyEps int = 0
+	var totalReadyEps int
+	var totalNotReadyEps int
 
 	for _, pod := range pods {
 		if len(pod.Status.PodIP) == 0 {
@@ -559,8 +559,8 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
-	var readyEps int = 0
-	var notReadyEps int = 0
+	var readyEps int
+	var notReadyEps int
 	ports := []v1.EndpointPort{}
 	if epp != nil {
 		ports = append(ports, *epp)

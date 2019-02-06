@@ -150,7 +150,12 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 
 		// if we got a default namespace, determine whether it was explicit or implicit
 		if raw, err := mergedKubeConfig.RawConfig(); err == nil {
-			if context := raw.Contexts[raw.CurrentContext]; context != nil && len(context.Namespace) > 0 {
+			// determine the current context
+			currentContext := raw.CurrentContext
+			if config.overrides != nil && len(config.overrides.CurrentContext) > 0 {
+				currentContext = config.overrides.CurrentContext
+			}
+			if context := raw.Contexts[currentContext]; context != nil && len(context.Namespace) > 0 {
 				return ns, false, nil
 			}
 		}

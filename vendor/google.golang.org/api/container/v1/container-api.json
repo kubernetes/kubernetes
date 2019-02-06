@@ -12,7 +12,7 @@
   "baseUrl": "https://container.googleapis.com/",
   "batchPath": "batch",
   "canonicalName": "Container",
-  "description": "The Google Kubernetes Engine API is used for building and managing container based applications, powered by the open source Kubernetes technology.",
+  "description": "Builds and manages container-based applications, powered by the open source Kubernetes technology.",
   "discoveryVersion": "v1",
   "documentationLink": "https://cloud.google.com/container-engine/",
   "fullyEncodeReservedExpansion": true,
@@ -668,7 +668,7 @@
                       ],
                       "parameters": {
                         "parent": {
-                          "description": "The parent (project, location, cluster id) where the node pool will be\ncreated. Specified in the format\n'projects/*/locations/*/clusters/*/nodePools/*'.",
+                          "description": "The parent (project, location, cluster id) where the node pool will be\ncreated. Specified in the format\n'projects/*/locations/*/clusters/*'.",
                           "location": "path",
                           "pattern": "^projects/[^/]+/locations/[^/]+/clusters/[^/]+$",
                           "required": true,
@@ -2361,7 +2361,7 @@
       }
     }
   },
-  "revision": "20180607",
+  "revision": "20181109",
   "rootUrl": "https://container.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -2479,6 +2479,13 @@
           "description": "The IP address range of the container pods in this cluster, in\n[CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)\nnotation (e.g. `10.96.0.0/14`). Leave blank to have\none automatically chosen or specify a `/14` block in `10.0.0.0/8`.",
           "type": "string"
         },
+        "conditions": {
+          "description": "Which conditions caused the current cluster state.",
+          "items": {
+            "$ref": "StatusCondition"
+          },
+          "type": "array"
+        },
         "createTime": {
           "description": "[Output only] The time the cluster was created, in\n[RFC3339](https://www.ietf.org/rfc/rfc3339.txt) text format.",
           "type": "string"
@@ -2488,12 +2495,12 @@
           "type": "string"
         },
         "currentNodeCount": {
-          "description": "[Output only] The number of nodes currently in the cluster.",
+          "description": "[Output only]  The number of nodes currently in the cluster. Deprecated.\nCall Kubernetes API directly to retrieve node information.",
           "format": "int32",
           "type": "integer"
         },
         "currentNodeVersion": {
-          "description": "[Output only] The current version of the node software components.\nIf they are currently at multiple versions because they're in the process\nof being upgraded, this reflects the minimum version of all nodes.",
+          "description": "[Output only] Deprecated, use\n[NodePool.version](/kubernetes-engine/docs/reference/rest/v1/projects.zones.clusters.nodePool)\ninstead. The current version of the node software components. If they are\ncurrently at multiple versions because they're in the process of being\nupgraded, this reflects the minimum version of all nodes.",
           "type": "string"
         },
         "description": {
@@ -2545,7 +2552,7 @@
           "type": "string"
         },
         "locations": {
-          "description": "The list of Google Compute Engine\n[locations](/compute/docs/zones#available) in which the cluster's nodes\nshould be located.",
+          "description": "The list of Google Compute Engine\n[zones](/compute/docs/zones#available) in which the cluster's nodes\nshould be located.",
           "items": {
             "type": "string"
           },
@@ -2561,7 +2568,7 @@
         },
         "masterAuth": {
           "$ref": "MasterAuth",
-          "description": "The authentication information for accessing the master endpoint."
+          "description": "The authentication information for accessing the master endpoint.\nIf unspecified, the defaults are used:\nFor clusters before v1.12, if master_auth is unspecified, `username` will\nbe set to \"admin\", a random password will be generated, and a client\ncertificate will be issued."
         },
         "masterAuthorizedNetworksConfig": {
           "$ref": "MasterAuthorizedNetworksConfig",
@@ -2578,6 +2585,10 @@
         "network": {
           "description": "The name of the Google Compute Engine\n[network](/compute/docs/networks-and-firewalls#networks) to which the\ncluster is connected. If left unspecified, the `default` network\nwill be used.",
           "type": "string"
+        },
+        "networkConfig": {
+          "$ref": "NetworkConfig",
+          "description": "Configuration for cluster networking."
         },
         "networkPolicy": {
           "$ref": "NetworkPolicy",
@@ -2598,6 +2609,10 @@
             "$ref": "NodePool"
           },
           "type": "array"
+        },
+        "privateClusterConfig": {
+          "$ref": "PrivateClusterConfig",
+          "description": "Configuration for private cluster."
         },
         "resourceLabels": {
           "additionalProperties": {
@@ -2664,7 +2679,7 @@
           "type": "string"
         },
         "desiredLocations": {
-          "description": "The desired list of Google Compute Engine\n[locations](/compute/docs/zones#available) in which the cluster's nodes\nshould be located. Changing the locations a cluster is in will result\nin nodes being either created or removed from the cluster, depending on\nwhether locations are being added or removed.\n\nThis list must always include the cluster's primary zone.",
+          "description": "The desired list of Google Compute Engine\n[zones](/compute/docs/zones#available) in which the cluster's nodes\nshould be located. Changing the locations a cluster is in will result\nin nodes being either created or removed from the cluster, depending on\nwhether locations are being added or removed.\n\nThis list must always include the cluster's primary zone.",
           "items": {
             "type": "string"
           },
@@ -2756,7 +2771,7 @@
           "description": "The node pool to create."
         },
         "parent": {
-          "description": "The parent (project, location, cluster id) where the node pool will be\ncreated. Specified in the format\n'projects/*/locations/*/clusters/*/nodePools/*'.",
+          "description": "The parent (project, location, cluster id) where the node pool will be\ncreated. Specified in the format\n'projects/*/locations/*/clusters/*'.",
           "type": "string"
         },
         "projectId": {
@@ -2974,7 +2989,7 @@
         },
         "clientCertificateConfig": {
           "$ref": "ClientCertificateConfig",
-          "description": "Configuration for client certificate authentication on the cluster.  If no\nconfiguration is specified, a client certificate is issued."
+          "description": "Configuration for client certificate authentication on the cluster. For\nclusters before v1.12, if no configuration is specified, a client\ncertificate is issued."
         },
         "clientKey": {
           "description": "[Output only] Base64-encoded private key used by clients to authenticate\nto the cluster endpoint.",
@@ -2989,7 +3004,7 @@
           "type": "string"
         },
         "username": {
-          "description": "The username to use for HTTP basic authentication to the master endpoint.\nFor clusters v1.6.0 and later, you can disable basic authentication by\nproviding an empty username.",
+          "description": "The username to use for HTTP basic authentication to the master endpoint.\nFor clusters v1.6.0 and later, basic authentication can be disabled by\nleaving username unspecified (or setting it to the empty string).",
           "type": "string"
         }
       },
@@ -3009,6 +3024,21 @@
         "enabled": {
           "description": "Whether or not master authorized networks is enabled.",
           "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "NetworkConfig": {
+      "description": "NetworkConfig reports the relative names of network \u0026 subnetwork.",
+      "id": "NetworkConfig",
+      "properties": {
+        "network": {
+          "description": "Output only. The relative name of the Google Compute Engine\nnetwork(/compute/docs/networks-and-firewalls#networks) to which\nthe cluster is connected.\nExample: projects/my-project/global/networks/my-network",
+          "type": "string"
+        },
+        "subnetwork": {
+          "description": "Output only. The relative name of the Google Compute Engine\n[subnetwork](/compute/docs/vpc) to which the cluster is connected.\nExample: projects/my-project/regions/us-central1/subnetworks/my-subnet",
+          "type": "string"
         }
       },
       "type": "object"
@@ -3063,6 +3093,10 @@
           "format": "int32",
           "type": "integer"
         },
+        "diskType": {
+          "description": "Type of the disk attached to each node (e.g. 'pd-standard' or 'pd-ssd')\n\nIf unspecified, the default disk type is 'pd-standard'",
+          "type": "string"
+        },
         "imageType": {
           "description": "The image type to use for this node. Note that for a given image type,\nthe latest version of it will be used.",
           "type": "string"
@@ -3087,7 +3121,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The metadata key/value pairs assigned to instances in the cluster.\n\nKeys must conform to the regexp [a-zA-Z0-9-_]+ and be less than 128 bytes\nin length. These are reflected as part of a URL in the metadata server.\nAdditionally, to avoid ambiguity, keys must not conflict with any other\nmetadata keys for the project or be one of the reserved keys:\n \"cluster-location\"\n \"cluster-name\"\n \"cluster-uid\"\n \"configure-sh\"\n \"gci-update-strategy\"\n \"gci-ensure-gke-docker\"\n \"instance-template\"\n \"kube-env\"\n \"startup-script\"\n \"user-data\"\n\nValues are free-form strings, and only have meaning as interpreted by\nthe image running in the instance. The only restriction placed on them is\nthat each value's size must be less than or equal to 32 KB.\n\nThe total size of all keys and values must be less than 512 KB.",
+          "description": "The metadata key/value pairs assigned to instances in the cluster.\n\nKeys must conform to the regexp [a-zA-Z0-9-_]+ and be less than 128 bytes\nin length. These are reflected as part of a URL in the metadata server.\nAdditionally, to avoid ambiguity, keys must not conflict with any other\nmetadata keys for the project or be one of the reserved keys:\n \"cluster-location\"\n \"cluster-name\"\n \"cluster-uid\"\n \"configure-sh\"\n \"enable-os-login\"\n \"gci-update-strategy\"\n \"gci-ensure-gke-docker\"\n \"instance-template\"\n \"kube-env\"\n \"startup-script\"\n \"user-data\"\n\nValues are free-form strings, and only have meaning as interpreted by\nthe image running in the instance. The only restriction placed on them is\nthat each value's size must be less than or equal to 32 KB.\n\nThe total size of all keys and values must be less than 512 KB.",
           "type": "object"
         },
         "minCpuPlatform": {
@@ -3113,6 +3147,13 @@
           "description": "The list of instance tags applied to all nodes. Tags are used to identify\nvalid sources or targets for network firewalls and are specified by\nthe client during cluster or node pool creation. Each tag within the list\nmust comply with RFC1035.",
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "taints": {
+          "description": "List of kubernetes taints to be applied to each node.\n\nFor more information, including usage and the valid values, see:\nhttps://kubernetes.io/docs/concepts/configuration/taint-and-toleration/",
+          "items": {
+            "$ref": "NodeTaint"
           },
           "type": "array"
         }
@@ -3145,6 +3186,13 @@
         "autoscaling": {
           "$ref": "NodePoolAutoscaling",
           "description": "Autoscaler configuration for this NodePool. Autoscaler is enabled\nonly if a valid configuration is present."
+        },
+        "conditions": {
+          "description": "Which conditions caused the current node pool state.",
+          "items": {
+            "$ref": "StatusCondition"
+          },
+          "type": "array"
         },
         "config": {
           "$ref": "NodeConfig",
@@ -3228,10 +3276,48 @@
       },
       "type": "object"
     },
+    "NodeTaint": {
+      "description": "Kubernetes taint is comprised of three fields: key, value, and effect. Effect\ncan only be one of three types:  NoSchedule, PreferNoSchedule or NoExecute.\n\nFor more information, including usage and the valid values, see:\nhttps://kubernetes.io/docs/concepts/configuration/taint-and-toleration/",
+      "id": "NodeTaint",
+      "properties": {
+        "effect": {
+          "description": "Effect for taint.",
+          "enum": [
+            "EFFECT_UNSPECIFIED",
+            "NO_SCHEDULE",
+            "PREFER_NO_SCHEDULE",
+            "NO_EXECUTE"
+          ],
+          "enumDescriptions": [
+            "Not set",
+            "NoSchedule",
+            "PreferNoSchedule",
+            "NoExecute"
+          ],
+          "type": "string"
+        },
+        "key": {
+          "description": "Key for taint.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value for taint.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Operation": {
       "description": "This operation resource represents operations that may have happened or are\nhappening on the cluster. All fields are output only.",
       "id": "Operation",
       "properties": {
+        "clusterConditions": {
+          "description": "Which conditions caused the current cluster state.",
+          "items": {
+            "$ref": "StatusCondition"
+          },
+          "type": "array"
+        },
         "detail": {
           "description": "Detailed operation progress, if available.",
           "type": "string"
@@ -3247,6 +3333,13 @@
         "name": {
           "description": "The server-assigned ID for the operation.",
           "type": "string"
+        },
+        "nodepoolConditions": {
+          "description": "Which conditions caused the current node pool state.",
+          "items": {
+            "$ref": "StatusCondition"
+          },
+          "type": "array"
         },
         "operationType": {
           "description": "The operation type.",
@@ -3326,6 +3419,33 @@
         },
         "zone": {
           "description": "The name of the Google Compute Engine\n[zone](/compute/docs/zones#available) in which the operation\nis taking place.\nThis field is deprecated, use location instead.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PrivateClusterConfig": {
+      "description": "Configuration options for private clusters.",
+      "id": "PrivateClusterConfig",
+      "properties": {
+        "enablePrivateEndpoint": {
+          "description": "Whether the master's internal IP address is used as the cluster endpoint.",
+          "type": "boolean"
+        },
+        "enablePrivateNodes": {
+          "description": "Whether nodes have internal IP addresses only. If enabled, all nodes are\ngiven only RFC 1918 private addresses and communicate with the master via\nprivate networking.",
+          "type": "boolean"
+        },
+        "masterIpv4CidrBlock": {
+          "description": "The IP range in CIDR notation to use for the hosted master network. This\nrange will be used for assigning internal IP addresses to the master or\nset of masters, as well as the ILB VIP. This range must not overlap with\nany other ranges in use within the cluster's network.",
+          "type": "string"
+        },
+        "privateEndpoint": {
+          "description": "Output only. The internal IP address of this cluster's master endpoint.",
+          "type": "string"
+        },
+        "publicEndpoint": {
+          "description": "Output only. The external IP address of this cluster's master endpoint.",
           "type": "string"
         }
       },
@@ -3491,7 +3611,7 @@
           "type": "string"
         },
         "locations": {
-          "description": "The desired list of Google Compute Engine\n[locations](/compute/docs/zones#available) in which the cluster's nodes\nshould be located. Changing the locations a cluster is in will result\nin nodes being either created or removed from the cluster, depending on\nwhether locations are being added or removed.\n\nThis list must always include the cluster's primary zone.",
+          "description": "The desired list of Google Compute Engine\n[zones](/compute/docs/zones#available) in which the cluster's nodes\nshould be located. Changing the locations a cluster is in will result\nin nodes being either created or removed from the cluster, depending on\nwhether locations are being added or removed.\n\nThis list must always include the cluster's primary zone.",
           "items": {
             "type": "string"
           },
@@ -3779,6 +3899,35 @@
         },
         "zone": {
           "description": "Deprecated. The name of the Google Compute Engine\n[zone](/compute/docs/zones#available) in which the cluster\nresides.\nThis field has been deprecated and replaced by the name field.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StatusCondition": {
+      "description": "StatusCondition describes why a cluster or a node pool has a certain status\n(e.g., ERROR or DEGRADED).",
+      "id": "StatusCondition",
+      "properties": {
+        "code": {
+          "description": "Machine-friendly representation of the condition",
+          "enum": [
+            "UNKNOWN",
+            "GCE_STOCKOUT",
+            "GKE_SERVICE_ACCOUNT_DELETED",
+            "GCE_QUOTA_EXCEEDED",
+            "SET_BY_OPERATOR"
+          ],
+          "enumDescriptions": [
+            "UNKNOWN indicates a generic condition.",
+            "GCE_STOCKOUT indicates a Google Compute Engine stockout.",
+            "GKE_SERVICE_ACCOUNT_DELETED indicates that the user deleted their robot\nservice account.",
+            "Google Compute Engine quota was exceeded.",
+            "Cluster state was manually changed by an SRE due to a system logic error.\nMore codes TBA"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-friendly representation of the condition",
           "type": "string"
         }
       },

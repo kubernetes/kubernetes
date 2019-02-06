@@ -46,19 +46,20 @@ type deploymentStrategy struct {
 // objects via the REST API.
 var Strategy = deploymentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+// DefaultGarbageCollectionPolicy returns OrphanDependents for extensions/v1beta1, apps/v1beta1, and apps/v1beta2 for backwards compatibility,
+// and DeleteDependents for all other versions.
 func (deploymentStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		switch groupVersion {
-		case extensionsv1beta1.SchemeGroupVersion, appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-			// for back compatibility
-			return rest.OrphanDependents
-		default:
-			return rest.DeleteDependents
-		}
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	return rest.OrphanDependents
+	switch groupVersion {
+	case extensionsv1beta1.SchemeGroupVersion, appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped is true for deployment.
@@ -72,7 +73,7 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
-	pod.DropDisabledAlphaFields(&deployment.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
 // Validate validates a new deployment.
@@ -96,8 +97,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
-	pod.DropDisabledAlphaFields(&newDeployment.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldDeployment.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation

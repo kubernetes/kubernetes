@@ -244,7 +244,8 @@ func (g *GenericPLEG) relist() {
 			// serially may take a while. We should be aware of this and
 			// parallelize if needed.
 			if err := g.updateCache(pod, pid); err != nil {
-				klog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+				// Rely on updateCache calling GetPodStatus to log the actual error.
+				klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
 
 				// make sure we try to reinspect the pod during the next relisting
 				needsReinspection[pid] = pod
@@ -274,7 +275,8 @@ func (g *GenericPLEG) relist() {
 			klog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
 			for pid, pod := range g.podsToReinspect {
 				if err := g.updateCache(pod, pid); err != nil {
-					klog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
+					// Rely on updateCache calling GetPodStatus to log the actual error.
+					klog.V(5).Infof("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
 					needsReinspection[pid] = pod
 				}
 			}

@@ -60,6 +60,23 @@ iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
 e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
 54LzHNk/+Q==
 -----END RSA PRIVATE KEY-----`)
+var expiredStoreCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
+MIIBFzCBwgIJALhygXnxXmN1MA0GCSqGSIb3DQEBCwUAMBMxETAPBgNVBAMMCGhv
+c3QtMTIzMB4XDTE4MTEwNDIzNTc1NFoXDTE4MTEwNTIzNTc1NFowEzERMA8GA1UE
+AwwIaG9zdC0xMjMwXDANBgkqhkiG9w0BAQEFAANLADBIAkEAtBMa7NWpv3BVlKTC
+PGO/LEsguKqWHBtKzweMY2CVtAL1rQm913huhxF9w+ai76KQ3MHK5IVnLJjYYA5M
+zP2H5QIDAQABMA0GCSqGSIb3DQEBCwUAA0EAN2DPFUtCzqnidL+5nh+46Sk6dkMI
+T5DD11UuuIjZusKvThsHKVCIsyJ2bDo7cTbI+/nklLRP+FcC2wESFUgXbA==
+-----END CERTIFICATE-----`, `-----BEGIN RSA PRIVATE KEY-----
+MIIBUwIBADANBgkqhkiG9w0BAQEFAASCAT0wggE5AgEAAkEAtBMa7NWpv3BVlKTC
+PGO/LEsguKqWHBtKzweMY2CVtAL1rQm913huhxF9w+ai76KQ3MHK5IVnLJjYYA5M
+zP2H5QIDAQABAkAS9BfXab3OKpK3bIgNNyp+DQJKrZnTJ4Q+OjsqkpXvNltPJosf
+G8GsiKu/vAt4HGqI3eU77NvRI+mL4MnHRmXBAiEA3qM4FAtKSRBbcJzPxxLEUSwg
+XSCcosCktbkXvpYrS30CIQDPDxgqlwDEJQ0uKuHkZI38/SPWWqfUmkecwlbpXABK
+iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
+e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
+54LzHNk/+Q==
+-----END RSA PRIVATE KEY-----`)
 var bootstrapCertData = newCertificateData(
 	`-----BEGIN CERTIFICATE-----
 MIICRzCCAfGgAwIBAgIJANXr+UzRFq4TMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
@@ -388,8 +405,8 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
 		usages:      []certificates.KeyUsage{},
-		certSigningRequestClient: fakeClient{
-			failureType: createError,
+		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+			return fakeClient{failureType: createError}, nil
 		},
 	}
 
@@ -411,8 +428,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
 		usages:      []certificates.KeyUsage{},
-		certSigningRequestClient: fakeClient{
-			failureType: watchError,
+		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+			return fakeClient{failureType: watchError}, nil
 		},
 	}
 
@@ -598,6 +615,14 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 			expectedCertBeforeStart: storeCertData,
 			expectedCertAfterStart:  storeCertData,
 		},
+		{
+			description:             "Current certificate expired, no bootstrap certificate",
+			storeCert:               expiredStoreCertData,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: nil,
+			expectedCertAfterStart:  apiServerCertData,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -621,19 +646,25 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
+				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+					return &fakeClient{
+						certificatePEM: tc.apiCert.certificatePEM,
+					}, nil
+				},
 			})
 			if err != nil {
 				t.Errorf("Got %v, wanted no error.", err)
 			}
 
 			certificate := certificateManager.Current()
-			if !certificatesEqual(certificate, tc.expectedCertBeforeStart.certificate) {
-				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertBeforeStart.certificate))
-			}
-			if err := certificateManager.SetCertificateSigningRequestClient(&fakeClient{
-				certificatePEM: tc.apiCert.certificatePEM,
-			}); err != nil {
-				t.Errorf("Got error %v, expected none.", err)
+			if tc.expectedCertBeforeStart == nil {
+				if certificate != nil {
+					t.Errorf("Expected certificate to be nil, was %s", certificate.Leaf.NotAfter)
+				}
+			} else {
+				if !certificatesEqual(certificate, tc.expectedCertBeforeStart.certificate) {
+					t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertBeforeStart.certificate))
+				}
 			}
 
 			if m, ok := certificateManager.(*manager); !ok {
@@ -649,6 +680,12 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 			}
 
 			certificate = certificateManager.Current()
+			if tc.expectedCertAfterStart == nil {
+				if certificate != nil {
+					t.Errorf("Expected certificate to be nil, was %s", certificate.Leaf.NotAfter)
+				}
+				return
+			}
 			if !certificatesEqual(certificate, tc.expectedCertAfterStart.certificate) {
 				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertAfterStart.certificate))
 			}
@@ -721,8 +758,10 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
-				CertificateSigningRequestClient: &fakeClient{
-					certificatePEM: tc.apiCert.certificatePEM,
+				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+					return &fakeClient{
+						certificatePEM: tc.apiCert.certificatePEM,
+					}, nil
 				},
 			})
 			if err != nil {
@@ -873,10 +912,12 @@ func TestServerHealth(t *testing.T) {
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
-				CertificateSigningRequestClient: &fakeClient{
-					certificatePEM: tc.apiCert.certificatePEM,
-					failureType:    tc.failureType,
-					err:            tc.clientErr,
+				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+					return &fakeClient{
+						certificatePEM: tc.apiCert.certificatePEM,
+						failureType:    tc.failureType,
+						err:            tc.clientErr,
+					}, nil
 				},
 			})
 			if err != nil {

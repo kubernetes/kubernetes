@@ -27,6 +27,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	codegennamer "k8s.io/code-generator/pkg/namer"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -101,7 +102,7 @@ func NameSystems() namer.NameSystems {
 		"publicPlural":       publicPluralNamer,
 		"privatePlural":      privatePluralNamer,
 		"allLowercasePlural": lowercaseNamer,
-		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
+		"resource":           codegennamer.NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
 }
 
@@ -399,28 +400,4 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	return generator.Packages(packageList)
-}
-
-// tagOverrideNamer is a namer which pulls names from a given tag, if specified,
-// and otherwise falls back to a different namer.
-type tagOverrideNamer struct {
-	tagName  string
-	fallback namer.Namer
-}
-
-func (n *tagOverrideNamer) Name(t *types.Type) string {
-	if nameOverride := extractTag(n.tagName, append(t.SecondClosestCommentLines, t.CommentLines...)); nameOverride != "" {
-		return nameOverride
-	}
-
-	return n.fallback.Name(t)
-}
-
-// NewTagOverrideNamer creates a namer.Namer which uses the contents of the given tag as
-// the name, or falls back to another Namer if the tag is not present.
-func NewTagOverrideNamer(tagName string, fallback namer.Namer) namer.Namer {
-	return &tagOverrideNamer{
-		tagName:  tagName,
-		fallback: fallback,
-	}
 }

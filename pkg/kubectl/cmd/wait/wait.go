@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +45,7 @@ import (
 )
 
 var (
-	wait_long = templates.LongDesc(`
+	waitLong = templates.LongDesc(`
 		Experimental: Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
@@ -56,7 +57,7 @@ var (
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. One can use -o option to change to output destination.`)
 
-	wait_example = templates.Examples(`
+	waitExample = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
 
@@ -89,7 +90,10 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
+			WithFieldSelector("").
+			WithAll(false).
 			WithAllNamespaces(false).
+			WithAll(false).
 			WithLatest(),
 
 		Timeout: 30 * time.Second,
@@ -103,11 +107,12 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "wait resource.group/name [--for=delete|--for condition=available]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
+		Short:   "Experimental: Wait for a specific condition on one or many resources.",
+		Long:    waitLong,
+		Example: waitExample,
+
 		DisableFlagsInUseLine: true,
-		Short:                 "Experimental: Wait for a specific condition on one or many resources.",
-		Long:                  wait_long,
-		Example:               wait_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
@@ -191,12 +196,14 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	return nil, fmt.Errorf("unrecognized condition: %q", condition)
 }
 
+// ResourceLocation holds the location of a resource
 type ResourceLocation struct {
 	GroupResource schema.GroupResource
 	Namespace     string
 	Name          string
 }
 
+// UIDMap maps ResourceLocation with UID
 type UIDMap map[ResourceLocation]types.UID
 
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
@@ -252,7 +259,11 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		if len(info.Name) == 0 {
 			return info.Object, false, fmt.Errorf("resource name must be provided")
 		}
-		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
+
+		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+
+		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
+		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
 		if apierrors.IsNotFound(err) {
 			return info.Object, true, nil
 		}
@@ -260,6 +271,10 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			// TODO this could do something slightly fancier if we wish
 			return info.Object, false, err
 		}
+		if len(gottenObjList.Items) != 1 {
+			return info.Object, true, nil
+		}
+		gottenObj := &gottenObjList.Items[0]
 		resourceLocation := ResourceLocation{
 			GroupResource: info.Mapping.Resource.GroupResource(),
 			Namespace:     gottenObj.GetNamespace(),
@@ -272,8 +287,8 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		}
 
 		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = "metadata.name=" + info.Name
-		watchOptions.ResourceVersion = gottenObj.GetResourceVersion()
+		watchOptions.FieldSelector = nameSelector
+		watchOptions.ResourceVersion = gottenObjList.GetResourceVersion()
 		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
 		if err != nil {
 			return gottenObj, false, err
@@ -340,14 +355,21 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 		if len(info.Name) == 0 {
 			return info.Object, false, fmt.Errorf("resource name must be provided")
 		}
+
+		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+
+		var gottenObj *unstructured.Unstructured
+		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
+		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
+
 		resourceVersion := ""
-		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
 		switch {
-		case apierrors.IsNotFound(err):
-			resourceVersion = "0"
 		case err != nil:
 			return info.Object, false, err
+		case len(gottenObjList.Items) != 1:
+			resourceVersion = gottenObjList.GetResourceVersion()
 		default:
+			gottenObj = &gottenObjList.Items[0]
 			conditionMet, err := w.checkCondition(gottenObj)
 			if conditionMet {
 				return gottenObj, true, nil
@@ -355,11 +377,11 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			if err != nil {
 				return gottenObj, false, err
 			}
-			resourceVersion = gottenObj.GetResourceVersion()
+			resourceVersion = gottenObjList.GetResourceVersion()
 		}
 
 		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = "metadata.name=" + info.Name
+		watchOptions.FieldSelector = nameSelector
 		watchOptions.ResourceVersion = resourceVersion
 		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
 		if err != nil {

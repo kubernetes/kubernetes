@@ -158,6 +158,19 @@ func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
 // objectSliceType is the type of a slice of Objects
 var objectSliceType = reflect.TypeOf([]runtime.Object{})
 
+// LenList returns the length of this list or 0 if it is not a list.
+func LenList(list runtime.Object) int {
+	itemsPtr, err := GetItemsPtr(list)
+	if err != nil {
+		return 0
+	}
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return 0
+	}
+	return items.Len()
+}
+
 // SetList sets the given list object's Items member have the elements given in
 // objects.
 // Returns an error if list is not a List type (does not have an Items member),

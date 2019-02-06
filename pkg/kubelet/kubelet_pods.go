@@ -384,7 +384,6 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
-	// TODO(vmarmol): Handle better.
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
 	hostname := pod.Name
@@ -534,6 +533,10 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 // Make the environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	if pod.Spec.EnableServiceLinks != nil {
+		enableServiceLinks = *pod.Spec.EnableServiceLinks
+	}
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
 	// v1.Container is already running by its hash. (We don't want to restart a container just
@@ -543,7 +546,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, enableServiceLinks)
 	if err != nil {
 		return result, err
 	}
@@ -852,7 +855,7 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
-// IsPodTerminated returns trus if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
+// IsPodTerminated returns true if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
 // or if the pod has been deleted or removed
 func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
 	pod, podFound := kl.podManager.GetPodByUID(uid)

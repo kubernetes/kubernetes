@@ -43,12 +43,12 @@ type createClusterOptions struct {
 }
 
 var (
-	create_cluster_long = templates.LongDesc(`
+	createClusterLong = templates.LongDesc(`
 		Sets a cluster entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_cluster_example = templates.Examples(`
+	createClusterExample = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values.
 		kubectl config set-cluster e2e --server=https://1.2.3.4
 
@@ -59,6 +59,7 @@ var (
 		kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
 )
 
+// NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createClusterOptions{configAccess: configAccess}
 
@@ -66,8 +67,8 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a cluster entry in kubeconfig"),
-		Long:                  create_cluster_long,
-		Example:               create_cluster_example,
+		Long:                  createClusterLong,
+		Example:               createClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

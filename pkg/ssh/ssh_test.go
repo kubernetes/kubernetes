@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"golang.org/x/crypto/ssh"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
 
@@ -134,7 +134,7 @@ func TestSSHTunnel(t *testing.T) {
 	}
 
 	privateData := EncodePrivateKey(private)
-	tunnel, err := NewSSHTunnelFromBytes("foo", privateData, server.Host)
+	tunnel, err := newSSHTunnelFromBytes("foo", privateData, server.Host)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -183,7 +183,7 @@ func (*fakeTunnel) Dial(ctx context.Context, network, address string) (net.Conn,
 
 type fakeTunnelCreator struct{}
 
-func (*fakeTunnelCreator) NewSSHTunnel(string, string, string) (tunnel, error) {
+func (*fakeTunnelCreator) newSSHTunnel(string, string, string) (tunnel, error) {
 	return &fakeTunnel{}, nil
 }
 
@@ -354,4 +354,12 @@ func TestTimeoutDialer(t *testing.T) {
 	}
 
 	listener.Close()
+}
+
+func newSSHTunnelFromBytes(user string, privateKey []byte, host string) (*sshTunnel, error) {
+	signer, err := MakePrivateKeySignerFromBytes(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	return makeSSHTunnel(user, signer, host)
 }

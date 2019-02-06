@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -107,6 +108,14 @@ type ServiceTestJig struct {
 	Name   string
 	Client clientset.Interface
 	Labels map[string]string
+}
+
+// PodNode is a pod-node pair indicating which node a given pod is running on
+type PodNode struct {
+	// Pod represents pod name
+	Pod string
+	// Node represents node name
+	Node string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
@@ -348,6 +357,25 @@ func PickNodeIP(c clientset.Interface) string {
 	return ip
 }
 
+// PodNodePairs return PodNode pairs for all pods in a namespace
+func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
+	var result []PodNode
+
+	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return result, err
+	}
+
+	for _, pod := range podList.Items {
+		result = append(result, PodNode{
+			Pod:  pod.Name,
+			Node: pod.Spec.NodeName,
+		})
+	}
+
+	return result, nil
+}
+
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the given Service are running.
 func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
@@ -530,7 +558,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 		service, err = j.UpdateService(namespace, name, func(s *v1.Service) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
-		if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
+		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
 			Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}

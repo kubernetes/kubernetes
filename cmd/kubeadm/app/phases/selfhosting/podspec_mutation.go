@@ -159,7 +159,14 @@ func setSelfHostedVolumesForControllerManager(podSpec *v1.PodSpec) {
 	// This is not a problem with hostPath mounts as hostPath supports mounting one file only, instead of always a full directory. Secrets and Projected Volumes
 	// don't support that.
 	podSpec.Containers[0].Command = kubeadmutil.ReplaceArgument(podSpec.Containers[0].Command, func(argMap map[string]string) map[string]string {
-		argMap["kubeconfig"] = filepath.Join(selfHostedKubeConfigDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		controllerManagerKubeConfigPath := filepath.Join(selfHostedKubeConfigDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		argMap["kubeconfig"] = controllerManagerKubeConfigPath
+		if _, ok := argMap["authentication-kubeconfig"]; ok {
+			argMap["authentication-kubeconfig"] = controllerManagerKubeConfigPath
+		}
+		if _, ok := argMap["authorization-kubeconfig"]; ok {
+			argMap["authorization-kubeconfig"] = controllerManagerKubeConfigPath
+		}
 		return argMap
 	})
 }

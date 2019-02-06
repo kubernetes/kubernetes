@@ -333,8 +333,12 @@ run_kubectl_all_namespace_tests() {
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-1
   kubectl create "${kube_flags[@]}" namespace all-ns-test-2
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-2
-  # Ensure listing across namespaces displays the namespace
+  # Ensure listing across namespaces displays the namespace (--all-namespaces)
   output_message=$(kubectl get serviceaccounts --all-namespaces "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "all-ns-test-1"
+  kube::test::if_has_string "${output_message}" "all-ns-test-2"
+  # Ensure listing across namespaces displays the namespace (-A)
+  output_message=$(kubectl get serviceaccounts -A "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" "all-ns-test-1"
   kube::test::if_has_string "${output_message}" "all-ns-test-2"
   # Clean up

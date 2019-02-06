@@ -23,13 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"k8s.io/klog"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -47,6 +46,10 @@ type downwardAPIPlugin struct {
 }
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(downwardAPIPluginName), volName)
+}
 
 func wrappedVolumeSpec() volume.Spec {
 	return volume.Spec{
@@ -77,6 +80,10 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
+func (plugin *downwardAPIPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *downwardAPIPlugin) RequiresRemount() bool {
 	return true
 }
@@ -91,11 +98,12 @@ func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
-		volName: spec.Name(),
-		items:   spec.Volume.DownwardAPI.Items,
-		pod:     pod,
-		podUID:  pod.UID,
-		plugin:  plugin,
+		volName:         spec.Name(),
+		items:           spec.Volume.DownwardAPI.Items,
+		pod:             pod,
+		podUID:          pod.UID,
+		plugin:          plugin,
+		MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 	}
 	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
@@ -107,9 +115,10 @@ func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts
 func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	return &downwardAPIVolumeUnmounter{
 		&downwardAPIVolume{
-			volName: volName,
-			podUID:  podUID,
-			plugin:  plugin,
+			volName:         volName,
+			podUID:          podUID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -131,7 +140,7 @@ type downwardAPIVolume struct {
 	pod     *v1.Pod
 	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *v1.POD and not only types.UID
 	plugin  *downwardAPIPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 // downwardAPIVolumeMounter fetches info from downward API from the pod
@@ -279,7 +288,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedName(downwardAPIPluginName), d.volName)
 }
 
 // downwardAPIVolumeCleaner handles cleaning up downwardAPI volumes

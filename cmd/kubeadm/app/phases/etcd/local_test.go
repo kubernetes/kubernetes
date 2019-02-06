@@ -32,19 +32,18 @@ import (
 
 func TestGetEtcdPodSpec(t *testing.T) {
 	// Creates a Master Configuration
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.7.0",
-			Etcd: kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					DataDir: "/var/lib/etcd",
-				},
+	cfg := &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: "v1.7.0",
+		Etcd: kubeadmapi.Etcd{
+			Local: &kubeadmapi.LocalEtcd{
+				DataDir: "/var/lib/etcd",
 			},
 		},
 	}
+	endpoint := &kubeadmapi.APIEndpoint{}
 
 	// Executes GetEtcdPodSpec
-	spec := GetEtcdPodSpec(cfg, []etcdutil.Member{})
+	spec := GetEtcdPodSpec(cfg, endpoint, "", []etcdutil.Member{})
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
@@ -58,35 +57,31 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	var tests = []struct {
-		cfg           *kubeadmapi.InitConfiguration
+		cfg           *kubeadmapi.ClusterConfiguration
 		expectedError bool
 	}{
 		{
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.7.0",
-					Etcd: kubeadmapi.Etcd{
-						Local: &kubeadmapi.LocalEtcd{
-							DataDir: "/var/lib/etcd",
-						},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v1.7.0",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						DataDir: tmpdir + "/etcd",
 					},
 				},
 			},
 			expectedError: false,
 		},
 		{
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.7.0",
-					Etcd: kubeadmapi.Etcd{
-						External: &kubeadmapi.ExternalEtcd{
-							Endpoints: []string{
-								"https://etcd-instance:2379",
-							},
-							CAFile:   "/etc/kubernetes/pki/etcd/ca.crt",
-							CertFile: "/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
-							KeyFile:  "/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v1.7.0",
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{
+							"https://etcd-instance:2379",
 						},
+						CAFile:   "/etc/kubernetes/pki/etcd/ca.crt",
+						CertFile: "/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
+						KeyFile:  "/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
 					},
 				},
 			},
@@ -97,7 +92,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	for _, test := range tests {
 		// Execute createStaticPodFunction
 		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, test.cfg)
+		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", test.cfg, &kubeadmapi.APIEndpoint{})
 
 		if !test.expectedError {
 			if err != nil {
@@ -230,23 +225,18 @@ func TestGetEtcdCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			cfg := &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
-					AdvertiseAddress: rt.advertiseAddress,
-				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
-					Name: rt.nodeName,
-				},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{
-						Local: &kubeadmapi.LocalEtcd{
-							DataDir:   "/var/lib/etcd",
-							ExtraArgs: rt.extraArgs,
-						},
+			endpoint := &kubeadmapi.APIEndpoint{
+				AdvertiseAddress: rt.advertiseAddress,
+			}
+			cfg := &kubeadmapi.ClusterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						DataDir:   "/var/lib/etcd",
+						ExtraArgs: rt.extraArgs,
 					},
 				},
 			}
-			actual := getEtcdCommand(cfg, rt.initialCluster)
+			actual := getEtcdCommand(cfg, endpoint, rt.nodeName, rt.initialCluster)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {

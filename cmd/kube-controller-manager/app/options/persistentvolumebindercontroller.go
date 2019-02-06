@@ -19,14 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // PersistentVolumeBinderControllerOptions holds the PersistentVolumeBinderController options.
 type PersistentVolumeBinderControllerOptions struct {
-	PVClaimBinderSyncPeriod metav1.Duration
-	VolumeConfiguration     kubectrlmgrconfig.VolumeConfiguration
+	*kubectrlmgrconfig.PersistentVolumeBinderControllerConfiguration
 }
 
 // AddFlags adds flags related to PersistentVolumeBinderController for controller manager to the specified FlagSet.

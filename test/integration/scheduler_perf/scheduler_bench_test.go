@@ -43,6 +43,7 @@ func BenchmarkScheduling(b *testing.B) {
 		{nodes: 100, existingPods: 1000, minPods: 100},
 		{nodes: 1000, existingPods: 0, minPods: 100},
 		{nodes: 1000, existingPods: 1000, minPods: 100},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
 	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
@@ -62,6 +63,7 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
@@ -86,6 +88,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
@@ -112,6 +115,7 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")

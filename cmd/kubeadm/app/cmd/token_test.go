@@ -25,13 +25,14 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -96,7 +97,7 @@ func TestRunCreateToken(t *testing.T) {
 	var buf bytes.Buffer
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, errors.NewNotFound(v1.Resource("secrets"), "foo")
+		return true, nil, apierrors.NewNotFound(v1.Resource("secrets"), "foo")
 	})
 
 	testCases := []struct {
@@ -166,31 +167,33 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
-		if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
-			t.Fatalf("token couldn't be parsed for testing: %v", err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
+			if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
+				t.Fatalf("token couldn't be parsed for testing: %v", err)
+			}
 
-		cfg := &kubeadmapiv1beta1.InitConfiguration{
-			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-				// KubernetesVersion is not used, but we set this explicitly to avoid
-				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-				KubernetesVersion: "v1.12.0",
-			},
-			BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
-				{
-					Token:  bts,
-					TTL:    &metav1.Duration{Duration: 0},
-					Usages: tc.usages,
-					Groups: tc.extraGroups,
+			cfg := &kubeadmapiv1beta1.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+					// KubernetesVersion is not used, but we set this explicitly to avoid
+					// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 				},
-			},
-		}
+				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+					{
+						Token:  bts,
+						TTL:    &metav1.Duration{Duration: 0},
+						Usages: tc.usages,
+						Groups: tc.extraGroups,
+					},
+				},
+			}
 
-		err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
-		if (err != nil) != tc.expectedError {
-			t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
-		}
+			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
+			if (err != nil) != tc.expectedError {
+				t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			}
+		})
 	}
 }
 
@@ -252,24 +255,26 @@ func TestNewCmdToken(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// the command is created for each test so that the kubeConfigFile
-		// variable in NewCmdToken() is reset.
-		cmd := NewCmdToken(&buf, &bufErr)
-		if _, err = f.WriteString(tc.configToWrite); err != nil {
-			t.Errorf("Unable to write test file %q: %v", fullPath, err)
-		}
-		// store the current value of the environment variable.
-		storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-		if tc.kubeConfigEnv != "" {
-			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
-		}
-		cmd.SetArgs(tc.args)
-		err := cmd.Execute()
-		if (err != nil) != tc.expectedError {
-			t.Errorf("Test case %q: NewCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
-		}
-		// restore the environment variable.
-		os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
+		t.Run(tc.name, func(t *testing.T) {
+			// the command is created for each test so that the kubeConfigFile
+			// variable in NewCmdToken() is reset.
+			cmd := NewCmdToken(&buf, &bufErr)
+			if _, err = f.WriteString(tc.configToWrite); err != nil {
+				t.Errorf("Unable to write test file %q: %v", fullPath, err)
+			}
+			// store the current value of the environment variable.
+			storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
+			if tc.kubeConfigEnv != "" {
+				os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
+			}
+			cmd.SetArgs(tc.args)
+			err := cmd.Execute()
+			if (err != nil) != tc.expectedError {
+				t.Errorf("Test case %q: NewCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			}
+			// restore the environment variable.
+			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
+		})
 	}
 }
 

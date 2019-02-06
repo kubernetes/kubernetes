@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -66,8 +67,8 @@ func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	return args.Get(0).([]*Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, apiStatus v1.PodStatus, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
-	args := r.Called(pod, apiStatus, status, secrets, backOff)
+func (r *Mock) SyncPod(pod *v1.Pod, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
+	args := r.Called(pod, status, secrets, backOff)
 	return args.Get(0).(PodSyncResult)
 }
 
@@ -106,7 +107,7 @@ func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID Cont
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error) {
+func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	args := r.Called(image, pullSecrets)
 	return image.Image, args.Error(0)
 }

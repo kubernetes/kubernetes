@@ -24,11 +24,8 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -49,7 +46,7 @@ func GetTemplateGeneration(ds *apps.DaemonSet) (*int64, error) {
 }
 
 // AddOrUpdateDaemonPodTolerations apply necessary tolerations to DeamonSet Pods, e.g. node.kubernetes.io/not-ready:NoExecute.
-func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
+func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
@@ -71,8 +68,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 	})
 
 	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
-	// MemoryPressure, DisPressure, Unschedulable and NetworkUnavailable taints,
-	// and the critical pods should tolerate OutOfDisk taint.
+	// MemoryPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      schedulerapi.TaintNodeDiskPressure,
 		Operator: v1.TolerationOpExists,
@@ -81,6 +77,12 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      schedulerapi.TaintNodeMemoryPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodePIDPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
@@ -98,33 +100,15 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 			Effect:   v1.TaintEffectNoSchedule,
 		})
 	}
-
-	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if isCritical {
-		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      schedulerapi.TaintNodeOutOfDisk,
-			Operator: v1.TolerationOpExists,
-			Effect:   v1.TaintEffectNoExecute,
-		})
-		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      schedulerapi.TaintNodeOutOfDisk,
-			Operator: v1.TolerationOpExists,
-			Effect:   v1.TaintEffectNoSchedule,
-		})
-	}
 }
 
 // CreatePodTemplate returns copy of provided template with additional
 // label which contains templateGeneration (for backward compatibility),
 // hash of provided template and sets default daemon tolerations.
-func CreatePodTemplate(ns string, template v1.PodTemplateSpec, generation *int64, hash string) v1.PodTemplateSpec {
+func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash string) v1.PodTemplateSpec {
 	newTemplate := *template.DeepCopy()
 
-	// TODO(k82cn): when removing CritialPod feature, also remove 'ns' parameter.
-	isCritical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCritical(ns, newTemplate.Annotations)
-
-	AddOrUpdateDaemonPodTolerations(&newTemplate.Spec, isCritical)
+	AddOrUpdateDaemonPodTolerations(&newTemplate.Spec)
 
 	if newTemplate.ObjectMeta.Labels == nil {
 		newTemplate.ObjectMeta.Labels = make(map[string]string)

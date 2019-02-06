@@ -250,7 +250,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.2.24"
+	DefaultEtcdVersion = "3.3.10"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -332,7 +332,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.2.6"
+	CoreDNSVersion = "1.3.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -382,12 +382,16 @@ var (
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.12.0")
 
+	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.13.0")
+
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
 		11: "3.2.18",
 		12: "3.2.24",
 		13: "3.2.24",
+		14: "3.3.10",
 	}
 )
 

@@ -51,6 +51,7 @@ readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
@@ -164,6 +165,10 @@ function save-logs() {
         for svc in "${services[@]}"; do
             log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
+
+        if [[ "$dump_systemd_journal" == "true" ]]; then
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise" > "${dir}/systemd.log" || true
+        fi
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
@@ -429,6 +434,33 @@ function dump_nodes_with_logexporter() {
   fi
 }
 
+function detect_node_failures() {
+  if ! [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    return
+  fi
+
+  detect-node-names
+  if [ -z "${INSTANCE_GROUPS:-}" ]; then
+    return
+  fi
+  for group in "${INSTANCE_GROUPS[@]}"; do
+    local creation_timestamp=$(gcloud compute instance-groups managed describe \
+                              "${group}" \
+                              --project "${PROJECT}" \
+                              --zone "${ZONE}" \
+                              --format='value(creationTimestamp)')
+    echo "Failures for ${group}"
+    gcloud logging read --order=asc \
+          --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
+          --project "${PROJECT}" \
+          "resource.type=\"gce_instance\"
+           logName=\"projects/${PROJECT}/logs/compute.googleapis.com%2Factivity_log\"
+           (jsonPayload.event_subtype=\"compute.instances.hostError\" OR jsonPayload.event_subtype=\"compute.instances.automaticRestart\")
+           jsonPayload.resource.name:\"${group}\"
+           timestamp >= \"${creation_timestamp}\""
+  done
+}
+
 function main() {
   setup
   # Copy master logs to artifacts dir locally (through SSH).
@@ -447,6 +479,8 @@ function main() {
     echo "Dumping logs from nodes locally to '${report_dir}'"
     dump_nodes
   fi
+
+  detect_node_failures
 }
 
 main

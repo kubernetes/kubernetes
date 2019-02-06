@@ -149,7 +149,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: metav1.NamespaceDefault,
+			Namespace: metav1.NamespaceNone,
 		},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -1691,41 +1691,7 @@ func setDaemonSetToleration(ds *apps.DaemonSet, tolerations []v1.Toleration) {
 	ds.Spec.Template.Spec.Tolerations = tolerations
 }
 
-// DaemonSet should launch a critical pod even when the node with OutOfDisk taints.
-// TODO(#48843) OutOfDisk taints will be removed in 1.10
-func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
-	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
-		for _, strategy := range updateStrategies() {
-			ds := newDaemonSet("critical")
-			ds.Spec.UpdateStrategy = *strategy
-			setDaemonSetCritical(ds)
-			manager, podControl, _, err := newTestController(ds)
-			if err != nil {
-				t.Fatalf("error creating DaemonSets controller: %v", err)
-			}
-
-			node := newNode("not-enough-disk", nil)
-			node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
-			node.Spec.Taints = []v1.Taint{{Key: schedulerapi.TaintNodeOutOfDisk, Effect: v1.TaintEffectNoSchedule}}
-			manager.nodeStore.Add(node)
-
-			// NOTE: Whether or not TaintNodesByCondition is enabled, it'll add toleration to DaemonSet pods.
-
-			// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
-			manager.dsStore.Add(ds)
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
-
-			// With enabling critical pod annotation feature gate, we will create critical pod
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
-			manager.dsStore.Add(ds)
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-		}
-	}
-}
-
-// DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure taints.
+// DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure/PIDPressure taints.
 func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
 		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
@@ -1742,10 +1708,12 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 			node.Status.Conditions = []v1.NodeCondition{
 				{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue},
 				{Type: v1.NodeMemoryPressure, Status: v1.ConditionTrue},
+				{Type: v1.NodePIDPressure, Status: v1.ConditionTrue},
 			}
 			node.Spec.Taints = []v1.Taint{
 				{Key: schedulerapi.TaintNodeDiskPressure, Effect: v1.TaintEffectNoSchedule},
 				{Key: schedulerapi.TaintNodeMemoryPressure, Effect: v1.TaintEffectNoSchedule},
+				{Key: schedulerapi.TaintNodePIDPressure, Effect: v1.TaintEffectNoSchedule},
 			}
 			manager.nodeStore.Add(node)
 
@@ -2474,6 +2442,29 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 			manager.deletePod(c.deletedPod)
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
+			}
+		}
+	}
+}
+
+func TestDeletePodForNotExistingNode(t *testing.T) {
+	for _, f := range []bool{true, false} {
+		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		for _, strategy := range updateStrategies() {
+			ds := newDaemonSet("foo")
+			ds.Spec.UpdateStrategy = *strategy
+			manager, podControl, _, err := newTestController(ds)
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
+			manager.dsStore.Add(ds)
+			addNodes(manager.nodeStore, 0, 1, nil)
+			addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, 1)
+			addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
+			if f {
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 0)
+			} else {
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 			}
 		}
 	}

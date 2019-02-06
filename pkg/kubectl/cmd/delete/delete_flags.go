@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// PrintFlags composes common printer flag structs
+// DeleteFlags composes common printer flag structs
 // used for commands requiring deletion logic.
 type DeleteFlags struct {
 	FileNameFlags *genericclioptions.FileNameFlags

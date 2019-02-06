@@ -21,8 +21,8 @@ import (
 	"io"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/liggitt/tabwriter"
 	"github.com/spf13/cobra"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"

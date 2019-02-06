@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 type containerManagerStub struct{}
@@ -94,7 +94,7 @@ func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Containe
 	return &kubecontainer.RunContainerOptions{}, nil
 }
 
-func (cm *containerManagerStub) UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error {
+func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 

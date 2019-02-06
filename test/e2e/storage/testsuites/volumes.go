@@ -23,11 +23,16 @@ package testsuites
 
 import (
 	"fmt"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type volumesTestSuite struct {
@@ -67,10 +72,20 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+}
+
+func skipPersistenceTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.IsPersistent {
+	if !dInfo.Capabilities[CapPersistence] {
 		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
+	}
+}
+
+func skipExecTest(driver TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapExec] {
+		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
 	}
 }
 
@@ -78,23 +93,25 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	volSource := resource.volSource
 
 	if volSource == nil {
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.IsFsGroupSupported {
+	if dInfo.Capabilities[CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
 
 	return volumesTestInput{
-		f:       f,
-		name:    dInfo.Name,
-		config:  dInfo.Config,
-		fsGroup: fsGroup,
+		f:        f,
+		name:     dInfo.Name,
+		config:   &dInfo.Config,
+		fsGroup:  fsGroup,
+		resource: resource,
+		fsType:   pattern.FsType,
 		tests: []framework.VolumeTest{
 			{
 				Volume: *volSource,
@@ -107,7 +124,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	}
 }
 
-func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
 			resource     genericVolumeTestResource
@@ -140,21 +157,84 @@ func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 }
 
 type volumesTestInput struct {
-	f       *framework.Framework
-	name    string
-	config  framework.VolumeTestConfig
-	fsGroup *int64
-	tests   []framework.VolumeTest
+	f        *framework.Framework
+	name     string
+	config   *TestConfig
+	fsGroup  *int64
+	fsType   string
+	tests    []framework.VolumeTest
+	resource genericVolumeTestResource
 }
 
 func testVolumes(input *volumesTestInput) {
 	It("should be mountable", func() {
 		f := input.f
 		cs := f.ClientSet
-		defer framework.VolumeTestCleanup(f, input.config)
+		defer framework.VolumeTestCleanup(f, convertTestConfig(input.config))
+
+		skipPersistenceTest(input.resource.driver)
 
 		volumeTest := input.tests
-		framework.InjectHtml(cs, input.config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
-		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.tests)
+		config := convertTestConfig(input.config)
+		framework.InjectHtml(cs, config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
+		framework.TestVolumeClient(cs, config, input.fsGroup, input.fsType, input.tests)
 	})
+	It("should allow exec of files on the volume", func() {
+		f := input.f
+		skipExecTest(input.resource.driver)
+
+		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.resource.driver.GetDriverInfo().Config.ClientNodeSelector)
+	})
+}
+
+func testScriptInPod(
+	f *framework.Framework,
+	volumeType string,
+	source *v1.VolumeSource,
+	nodeSelector map[string]string) {
+
+	const (
+		volPath = "/vol1"
+		volName = "vol1"
+	)
+	suffix := generateSuffixForPodName(volumeType)
+	scriptName := fmt.Sprintf("test-%s.sh", suffix)
+	fullPath := filepath.Join(volPath, scriptName)
+	cmd := fmt.Sprintf("echo \"ls %s\" > %s; chmod u+x %s; %s", volPath, fullPath, fullPath, fullPath)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("exec-volume-test-%s", suffix),
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("exec-container-%s", suffix),
+					Image:   imageutils.GetE2EImage(imageutils.Nginx),
+					Command: []string{"/bin/sh", "-ec", cmd},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volName,
+							MountPath: volPath,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name:         volName,
+					VolumeSource: *source,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
+		},
+	}
+	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	f.TestContainerOutput("exec-volume-test", pod, 0, []string{scriptName})
+
+	By(fmt.Sprintf("Deleting pod %s", pod.Name))
+	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }

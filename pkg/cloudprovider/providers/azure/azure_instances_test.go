@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -213,6 +215,125 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 
 		if hasShutdown != test.expected {
 			t.Errorf("Test [%s] unexpected hasShutdown: %v, expected %v", test.name, hasShutdown, test.expected)
+		}
+	}
+}
+
+func TestNodeAddresses(t *testing.T) {
+	cloud := getTestCloud()
+	cloud.Config.UseInstanceMetadata = true
+	metadataTemplate := `{"compute":{"name":"%s"},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]},"ipv6":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]}}]}}`
+
+	testcases := []struct {
+		name        string
+		nodeName    string
+		ipV4        string
+		ipV6        string
+		ipV4Public  string
+		ipV6Public  string
+		expected    []v1.NodeAddress
+		expectError bool
+	}{
+		{
+			name:     "NodeAddresses should get both ipV4 and ipV6 private addresses",
+			nodeName: "vm1",
+			ipV4:     "10.240.0.1",
+			ipV6:     "1111:11111:00:00:1111:1111:000:111",
+			expected: []v1.NodeAddress{
+				{
+					Type:    v1.NodeHostName,
+					Address: "vm1",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "10.240.0.1",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "1111:11111:00:00:1111:1111:000:111",
+				},
+			},
+		},
+		{
+			name:        "NodeAddresses should report error when IPs are empty",
+			nodeName:    "vm1",
+			expectError: true,
+		},
+		{
+			name:       "NodeAddresses should get ipV4 private and public addresses",
+			nodeName:   "vm1",
+			ipV4:       "10.240.0.1",
+			ipV4Public: "9.9.9.9",
+			expected: []v1.NodeAddress{
+				{
+					Type:    v1.NodeHostName,
+					Address: "vm1",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "10.240.0.1",
+				},
+				{
+					Type:    v1.NodeExternalIP,
+					Address: "9.9.9.9",
+				},
+			},
+		},
+		{
+			name:       "NodeAddresses should get ipV6 private and public addresses",
+			nodeName:   "vm1",
+			ipV6:       "1111:11111:00:00:1111:1111:000:111",
+			ipV6Public: "2222:22221:00:00:2222:2222:000:111",
+			expected: []v1.NodeAddress{
+				{
+					Type:    v1.NodeHostName,
+					Address: "vm1",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "1111:11111:00:00:1111:1111:000:111",
+				},
+				{
+					Type:    v1.NodeExternalIP,
+					Address: "2222:22221:00:00:2222:2222:000:111",
+				},
+			},
+		},
+	}
+
+	for _, test := range testcases {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+
+		mux := http.NewServeMux()
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, fmt.Sprintf(metadataTemplate, test.nodeName, test.ipV4, test.ipV4Public, test.ipV6, test.ipV6Public))
+		}))
+		go func() {
+			http.Serve(listener, mux)
+		}()
+		defer listener.Close()
+
+		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+
+		ipAddresses, err := cloud.NodeAddresses(context.Background(), types.NodeName(test.nodeName))
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Test [%s] unexpected nil err", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+			}
+		}
+
+		if !reflect.DeepEqual(ipAddresses, test.expected) {
+			t.Errorf("Test [%s] unexpected ipAddresses: %s, expected %q", test.name, ipAddresses, test.expected)
 		}
 	}
 }

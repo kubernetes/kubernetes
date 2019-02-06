@@ -822,8 +822,16 @@ func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWr
 }
 
 func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
+	var sizeLimit string
+	if emptyDir.SizeLimit != nil && emptyDir.SizeLimit.Cmp(resource.Quantity{}) > 0 {
+		sizeLimit = fmt.Sprintf("%v", emptyDir.SizeLimit)
+	} else {
+		sizeLimit = "<unset>"
+	}
 	w.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
-		"    Medium:\t%v\n", emptyDir.Medium)
+		"    Medium:\t%v\n"+
+		"    SizeLimit:\t%v\n",
+		emptyDir.Medium, sizeLimit)
 }
 
 func printGCEPersistentDiskVolumeSource(gce *corev1.GCEPersistentDiskVolumeSource, w PrefixWriter) {
@@ -881,8 +889,8 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 				"    ConfigMapOptional:\t%v\n",
 				source.ConfigMap.Name, source.ConfigMap.Optional)
 		} else if source.ServiceAccountToken != nil {
-			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
-				source.ServiceAccountToken.ExpirationSeconds)
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
+				*source.ServiceAccountToken.ExpirationSeconds)
 		}
 	}
 }
@@ -1041,18 +1049,18 @@ func printCinderVolumeSource(cinder *corev1.CinderVolumeSource, w PrefixWriter) 
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		"    SecretRef:\t%v\n"+
-			cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
+		"    ReadOnly:\t%v\n"+
+		"    SecretRef:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printCinderPersistentVolumeSource(cinder *corev1.CinderPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		"    SecretRef:\t%v\n"+
-			cinder.VolumeID, cinder.SecretRef, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
+		"    ReadOnly:\t%v\n"+
+		"    SecretRef:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printScaleIOVolumeSource(sio *corev1.ScaleIOVolumeSource, w PrefixWriter) {
@@ -1647,12 +1655,12 @@ func describeContainerVolumes(container corev1.Container, w PrefixWriter) {
 	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
 	for _, mount := range container.VolumeMounts {
 		flags := []string{}
-		switch {
-		case mount.ReadOnly:
+		if mount.ReadOnly {
 			flags = append(flags, "ro")
-		case !mount.ReadOnly:
+		} else {
 			flags = append(flags, "rw")
-		case len(mount.SubPath) > 0:
+		}
+		if len(mount.SubPath) > 0 {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
@@ -2073,6 +2081,16 @@ func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (s
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", cronJob.Spec.SuccessfulJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
+		}
+		if cronJob.Spec.FailedJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t%d\n", *cronJob.Spec.FailedJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t<unset>\n")
+		}
 		if cronJob.Spec.StartingDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
 		} else {
@@ -2298,7 +2316,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 			}
 			w.Write(LEVEL_1, "%s\t\n", host)
 			for _, path := range rules.HTTP.Paths {
-				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ns, &path.Backend))
+				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ing.Namespace, &path.Backend))
 			}
 		}
 		if count == 0 {
@@ -2949,7 +2967,7 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
-		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
+		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", *ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
@@ -3101,11 +3119,20 @@ func describeHorizontalPodAutoscaler(hpa *autoscalingv2beta2.HorizontalPodAutosc
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
 			case autoscalingv2beta2.ObjectMetricSourceType:
-				current := "<unknown>"
-				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
-					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
+				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, "(target average value):\t%s / %s\n", current, metric.Object.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+					}
+					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
 			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {

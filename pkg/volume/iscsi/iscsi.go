@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/utils/keymutex"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -74,6 +74,10 @@ func (plugin *iscsiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 
 func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.ISCSI != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI != nil)
+}
+
+func (plugin *iscsiPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *iscsiPlugin) RequiresRemount() bool {
@@ -177,7 +181,7 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 			VolName:         volName,
 			manager:         manager,
 			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedNameForDisk(iscsiPluginName), volName)),
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(iscsiPluginName), volName)),
 		},
 		mounter:    mounter,
 		exec:       exec,
@@ -262,17 +266,17 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 }
 
 type iscsiDisk struct {
-	VolName        string
-	podUID         types.UID
-	Portals        []string
-	Iqn            string
-	Lun            string
-	Iface          string
-	chap_discovery bool
-	chap_session   bool
-	secret         map[string]string
-	InitiatorName  string
-	plugin         *iscsiPlugin
+	VolName       string
+	podUID        types.UID
+	Portals       []string
+	Iqn           string
+	Lun           string
+	Iface         string
+	chapDiscovery bool
+	chapSession   bool
+	secret        map[string]string
+	InitiatorName string
+	plugin        *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	volume.MetricsProvider
@@ -281,7 +285,7 @@ type iscsiDisk struct {
 func (iscsi *iscsiDisk) GetPath() string {
 	name := iscsiPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.VolName)
+	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedName(name), iscsi.VolName)
 }
 
 func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -295,7 +299,7 @@ func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
 
 func (iscsi *iscsiDisk) iscsiPodDeviceMapPath() (string, string) {
 	name := iscsiPluginName
-	return iscsi.plugin.host.GetPodVolumeDeviceDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name)), iscsi.VolName
+	return iscsi.plugin.host.GetPodVolumeDeviceDir(iscsi.podUID, utilstrings.EscapeQualifiedName(name)), iscsi.VolName
 }
 
 type iscsiDiskMounter struct {
@@ -355,7 +359,7 @@ func (c *iscsiDiskUnmounter) TearDown() error {
 }
 
 func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
-	return ioutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 // Block Volumes Support
@@ -539,18 +543,18 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 	}
 
 	return &iscsiDisk{
-		podUID:         podUID,
-		VolName:        spec.Name(),
-		Portals:        bkportal,
-		Iqn:            iqn,
-		Lun:            lun,
-		Iface:          iface,
-		chap_discovery: chapDiscovery,
-		chap_session:   chapSession,
-		secret:         secret,
-		InitiatorName:  initiatorName,
-		manager:        manager,
-		plugin:         plugin}, nil
+		podUID:        podUID,
+		VolName:       spec.Name(),
+		Portals:       bkportal,
+		Iqn:           iqn,
+		Lun:           lun,
+		Iface:         iface,
+		chapDiscovery: chapDiscovery,
+		chapSession:   chapSession,
+		secret:        secret,
+		InitiatorName: initiatorName,
+		manager:       manager,
+		plugin:        plugin}, nil
 }
 
 func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (map[string]string, error) {

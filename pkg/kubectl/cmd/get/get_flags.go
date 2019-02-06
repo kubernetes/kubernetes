@@ -64,6 +64,7 @@ func (f *PrintFlags) Copy() PrintFlags {
 	return printFlags
 }
 
+// AllowedFormats is the list of formats in which data can be displayed
 func (f *PrintFlags) AllowedFormats() []string {
 	formats := f.JSONYamlPrintFlags.AllowedFormats()
 	formats = append(formats, f.NamePrintFlags.AllowedFormats()...)
@@ -164,10 +165,6 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	if f.NoHeaders != nil {
 		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
 	}
-
-	// TODO(juanvallejo): This is deprecated - remove
-	cmd.Flags().BoolP("show-all", "a", true, "When printing, show all resources (default show all pods including terminated one.)")
-	cmd.Flags().MarkDeprecated("show-all", "will be removed in an upcoming release")
 }
 
 // NewGetPrintFlags returns flags associated with humanreadable,

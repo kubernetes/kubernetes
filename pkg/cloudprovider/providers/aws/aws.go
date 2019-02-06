@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -42,7 +43,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
-	gcfg "gopkg.in/gcfg.v1"
+	"gopkg.in/gcfg.v1"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -54,10 +55,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/controller"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -260,9 +262,6 @@ const DefaultVolumeType = "gp2"
 
 // Used to call recognizeWellKnownRegions just once
 var once sync.Once
-
-// AWS implements PVLabeler.
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
@@ -480,6 +479,13 @@ type InstanceGroupInfo interface {
 	CurrentSize() (int, error)
 }
 
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
 	ec2      EC2
@@ -500,7 +506,7 @@ type Cloud struct {
 
 	instanceCache instanceCache
 
-	clientBuilder    controller.ControllerClientBuilder
+	clientBuilder    cloudprovider.ControllerClientBuilder
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -566,6 +572,91 @@ type CloudConfig struct {
 		//issue body.
 		DisableStrictZoneCheck bool
 	}
+	// [ServiceOverride "1"]
+	//  Service = s3
+	//  Region = region1
+	//  URL = https://s3.foo.bar
+	//  SigningRegion = signing_region
+	//  SigningMethod = signing_method
+	//
+	//  [ServiceOverride "2"]
+	//     Service = ec2
+	//     Region = region2
+	//     URL = https://ec2.foo.bar
+	//     SigningRegion = signing_region
+	//     SigningMethod = signing_method
+	ServiceOverride map[string]*struct {
+		Service       string
+		Region        string
+		URL           string
+		SigningRegion string
+		SigningMethod string
+		SigningName   string
+	}
+}
+
+func (cfg *CloudConfig) validateOverrides() error {
+	if len(cfg.ServiceOverride) == 0 {
+		return nil
+	}
+	set := make(map[string]bool)
+	for onum, ovrd := range cfg.ServiceOverride {
+		// Note: gcfg does not space trim, so we have to when comparing to empty string ""
+		name := strings.TrimSpace(ovrd.Service)
+		if name == "" {
+			return fmt.Errorf("service name is missing [Service is \"\"] in override %s", onum)
+		}
+		// insure the map service name is space trimmed
+		ovrd.Service = name
+
+		region := strings.TrimSpace(ovrd.Region)
+		if region == "" {
+			return fmt.Errorf("service region is missing [Region is \"\"] in override %s", onum)
+		}
+		// insure the map region is space trimmed
+		ovrd.Region = region
+
+		url := strings.TrimSpace(ovrd.URL)
+		if url == "" {
+			return fmt.Errorf("url is missing [URL is \"\"] in override %s", onum)
+		}
+		signingRegion := strings.TrimSpace(ovrd.SigningRegion)
+		if signingRegion == "" {
+			return fmt.Errorf("signingRegion is missing [SigningRegion is \"\"] in override %s", onum)
+		}
+		signature := name + "_" + region
+		if set[signature] {
+			return fmt.Errorf("duplicate entry found for service override [%s] (%s in %s)", onum, name, region)
+		}
+		set[signature] = true
+	}
+	return nil
+}
+
+func (cfg *CloudConfig) getResolver() endpoints.ResolverFunc {
+	defaultResolver := endpoints.DefaultResolver()
+	defaultResolverFn := func(service, region string,
+		optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
+	if len(cfg.ServiceOverride) == 0 {
+		return defaultResolverFn
+	}
+
+	return func(service, region string,
+		optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		for _, override := range cfg.ServiceOverride {
+			if override.Service == service && override.Region == region {
+				return endpoints.ResolvedEndpoint{
+					URL:           override.URL,
+					SigningRegion: override.SigningRegion,
+					SigningMethod: override.SigningMethod,
+					SigningName:   override.SigningName,
+				}, nil
+			}
+		}
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
 }
 
 // awsSdkEC2 is an implementation of the EC2 interface, backed by aws-sdk-go
@@ -573,21 +664,33 @@ type awsSdkEC2 struct {
 	ec2 *ec2.EC2
 }
 
+// Interface to make the CloudConfig immutable for awsSDKProvider
+type awsCloudConfigProvider interface {
+	getResolver() endpoints.ResolverFunc
+}
+
 type awsSDKProvider struct {
 	creds *credentials.Credentials
+	cfg   awsCloudConfigProvider
 
 	mutex          sync.Mutex
 	regionDelayers map[string]*CrossRequestRetryDelay
 }
 
-func newAWSSDKProvider(creds *credentials.Credentials) *awsSDKProvider {
+func newAWSSDKProvider(creds *credentials.Credentials, cfg *CloudConfig) *awsSDKProvider {
 	return &awsSDKProvider{
 		creds:          creds,
+		cfg:            cfg,
 		regionDelayers: make(map[string]*CrossRequestRetryDelay),
 	}
 }
 
 func (p *awsSDKProvider) addHandlers(regionName string, h *request.Handlers) {
+	h.Build.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/user-agent",
+		Fn:   request.MakeAddToUserAgentHandler("kubernetes", version.Get().String()),
+	})
+
 	h.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
 		Fn:   awsHandlerLogger,
@@ -647,7 +750,8 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -668,7 +772,8 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -685,7 +790,8 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -703,7 +809,8 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -717,7 +824,9 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	sess, err := session.NewSession(&aws.Config{})
+	sess, err := session.NewSession(&aws.Config{
+		EndpointResolver: p.cfg.getResolver(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -731,7 +840,8 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -956,6 +1066,10 @@ func init() {
 			return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
 		}
 
+		if err = cfg.validateOverrides(); err != nil {
+			return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
+		}
+
 		sess, err := session.NewSession(&aws.Config{})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
@@ -981,7 +1095,7 @@ func init() {
 				&credentials.SharedCredentialsProvider{},
 			})
 
-		aws := newAWSSDKProvider(creds)
+		aws := newAWSSDKProvider(creds, cfg)
 		return newAWSCloud(*cfg, aws)
 	})
 }
@@ -1322,7 +1436,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
 		return nil, err
 	}
@@ -1338,7 +1452,7 @@ func (c *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
 		return false, err
 	}
@@ -1369,7 +1483,7 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
 		return false, err
 	}
@@ -1425,7 +1539,7 @@ func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
 		return "", err
 	}
@@ -1511,7 +1625,7 @@ func (c *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (c *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -1592,7 +1706,7 @@ func newAWSInstance(ec2Service EC2, instance *ec2.Instance) *awsInstance {
 
 // Gets the full information about this instance from the EC2 API
 func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
-	return describeInstance(i.ec2, awsInstanceID(i.awsID))
+	return describeInstance(i.ec2, InstanceID(i.awsID))
 }
 
 // Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
@@ -1824,7 +1938,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 		Value:  "true",
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	err := controller.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
+	err := nodehelpers.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
 	if err != nil {
 		klog.Errorf("Error applying taint to node %s with error %v", nodeName, err)
 		return
@@ -2324,6 +2438,11 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 
 // GetLabelsForVolume gets the volume labels for a volume
 func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not AWSElasticBlockStore.
+	if pv.Spec.AWSElasticBlockStore == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
 		return nil, nil
@@ -3315,7 +3434,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return nil, err
 	}
 
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -3331,7 +3450,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	if isNLB(annotations) {
 
-		if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 			for i := range v2Mappings {
 				v2Mappings[i].HealthCheckPort = int64(healthCheckNodePort)
 				v2Mappings[i].HealthCheckPath = path
@@ -3589,7 +3708,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
@@ -3606,8 +3725,15 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			tcpHealthCheckPort = int32(*listener.InstancePort)
 			break
 		}
+		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var hcProtocol string
+		if annotationProtocol == "https" || annotationProtocol == "ssl" {
+			hcProtocol = "SSL"
+		} else {
+			hcProtocol = "TCP"
+		}
 		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "", annotations)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}
@@ -3772,7 +3898,7 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
-func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[awsInstanceID]*ec2.Instance) error {
+func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[InstanceID]*ec2.Instance) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}

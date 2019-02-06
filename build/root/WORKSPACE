@@ -1,11 +1,11 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//build:workspace_mirror.bzl", "mirror")
-load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "f87fa87475ea107b3c69196f39c82b7bbf58fe27c62a338684c20ca17d1d8613",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.2/rules_go-0.16.2.tar.gz"),
+    sha256 = "ade51a315fa17347e5c31201fdc55aa5ffb913377aa315dceb56ee9725e620ee",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.6/rules_go-0.16.6.tar.gz"),
 )
 
 http_archive(
@@ -22,12 +22,12 @@ http_archive(
     urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"),
 )
 
-ETCD_VERSION = "3.2.24"
+ETCD_VERSION = "3.3.10"
 
 http_archive(
     name = "com_coreos_etcd",
     build_file = "@//third_party:etcd.BUILD",
-    sha256 = "947849dbcfa13927c81236fb76a7c01d587bbab42ab1e807184cd91b026ebed7",
+    sha256 = "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = mirror("https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)),
 )
@@ -49,7 +49,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_reposit
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.11.2",
+    go_version = "1.11.5",
 )
 
 docker_repositories()
@@ -58,7 +58,7 @@ http_file(
     name = "kubernetes_cni",
     downloaded_file_path = "kubernetes_cni.tgz",
     sha256 = "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
-    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz"),
+    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v%s.tgz" % CNI_VERSION),
 )
 
 http_file(

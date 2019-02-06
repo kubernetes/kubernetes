@@ -31,9 +31,9 @@ import (
 	"github.com/spf13/cobra"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 

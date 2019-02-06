@@ -36,7 +36,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:go_default_library",
@@ -123,6 +122,7 @@ go_test(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 

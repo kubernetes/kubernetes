@@ -18,13 +18,13 @@ package printers
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 // GoTemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.

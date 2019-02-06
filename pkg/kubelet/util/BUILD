@@ -34,6 +34,8 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "boottime_util_darwin.go",
+        "boottime_util_linux.go",
         "doc.go",
         "util.go",
         "util_unix.go",

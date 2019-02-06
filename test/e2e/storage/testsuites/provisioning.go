@@ -29,27 +29,29 @@ import (
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // StorageClassTest represents parameters to be used by provisioning tests
 type StorageClassTest struct {
-	Name               string
-	CloudProviders     []string
-	Provisioner        string
-	StorageClassName   string
-	Parameters         map[string]string
-	DelayBinding       bool
-	ClaimSize          string
-	ExpectedSize       string
-	PvCheck            func(volume *v1.PersistentVolume) error
-	NodeName           string
-	SkipWriteReadCheck bool
-	VolumeMode         *v1.PersistentVolumeMode
+	Name                string
+	CloudProviders      []string
+	Provisioner         string
+	StorageClassName    string
+	Parameters          map[string]string
+	DelayBinding        bool
+	ClaimSize           string
+	ExpectedSize        string
+	PvCheck             func(volume *v1.PersistentVolume) error
+	NodeName            string
+	SkipWriteReadCheck  bool
+	VolumeMode          *v1.PersistentVolumeMode
+	NodeSelector        map[string]string // NodeSelector for the pod
+	ExpectUnschedulable bool              // Whether the test pod is expected to be unschedulable
 }
 
 type provisioningTestSuite struct {
@@ -74,10 +76,10 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
+func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
 	// Setup test resource for driver and testpattern
 	resource := provisioningTestResource{}
 	resource.setupResource(driver, pattern)
@@ -87,7 +89,7 @@ func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
 		},
-		cs:    driver.GetDriverInfo().Framework.ClientSet,
+		cs:    driver.GetDriverInfo().Config.Framework.ClientSet,
 		pvc:   resource.pvc,
 		sc:    resource.sc,
 		dInfo: driver.GetDriverInfo(),
@@ -100,7 +102,7 @@ func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns
 	return resource, input
 }
 
-func (p *provisioningTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(p, pattern), func() {
 		var (
 			resource     provisioningTestResource
@@ -132,7 +134,7 @@ func (p *provisioningTestSuite) execTest(driver drivers.TestDriver, pattern test
 }
 
 type provisioningTestResource struct {
-	driver drivers.TestDriver
+	driver TestDriver
 
 	claimSize string
 	sc        *storage.StorageClass
@@ -141,18 +143,18 @@ type provisioningTestResource struct {
 
 var _ TestResource = &provisioningTestResource{}
 
-func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	// Setup provisioningTest resource
 	switch pattern.VolType {
 	case testpatterns.DynamicPV:
-		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
+		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			p.sc = dDriver.GetDynamicProvisionStorageClass("")
 			if p.sc == nil {
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "5Gi"
-			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
+			p.claimSize = dDriver.GetClaimSize()
+			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
 		}
@@ -161,7 +163,7 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 	}
 }
 
-func (p *provisioningTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 type provisioningTestInput struct {
@@ -169,7 +171,7 @@ type provisioningTestInput struct {
 	cs       clientset.Interface
 	pvc      *v1.PersistentVolumeClaim
 	sc       *storage.StorageClass
-	dInfo    *drivers.DriverInfo
+	dInfo    *DriverInfo
 }
 
 func testProvisioning(input *provisioningTestInput) {
@@ -187,7 +189,7 @@ func testProvisioning(input *provisioningTestInput) {
 	})
 
 	It("should create and delete block persistent volumes", func() {
-		if !input.dInfo.IsBlockSupported {
+		if !input.dInfo.Capabilities[CapBlock] {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
 		}
 		block := v1.PersistentVolumeBlock
@@ -281,10 +283,10 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
 		command += " || (mount | grep 'on /mnt/test'; false)"
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command)
+		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
 
 		By("checking the created volume is readable and retains data")
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, "grep 'hello world' /mnt/test/data")
+		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, "grep 'hello world' /mnt/test/data", t.NodeSelector, t.ExpectUnschedulable)
 	}
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
 	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
@@ -304,8 +306,97 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 	return pv
 }
 
+func TestBindingWaitForFirstConsumer(t StorageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolume, *v1.Node) {
+	pvs, node := TestBindingWaitForFirstConsumerMultiPVC(t, client, []*v1.PersistentVolumeClaim{claim}, class)
+	if pvs == nil {
+		return nil, node
+	}
+	return pvs[0], node
+}
+
+func TestBindingWaitForFirstConsumerMultiPVC(t StorageClassTest, client clientset.Interface, claims []*v1.PersistentVolumeClaim, class *storage.StorageClass) ([]*v1.PersistentVolume, *v1.Node) {
+	var err error
+	Expect(len(claims)).ToNot(Equal(0))
+	namespace := claims[0].Namespace
+
+	By("creating a storage class " + class.Name)
+	class, err = client.StorageV1().StorageClasses().Create(class)
+	Expect(err).NotTo(HaveOccurred())
+	defer deleteStorageClass(client, class.Name)
+
+	By("creating claims")
+	var claimNames []string
+	var createdClaims []*v1.PersistentVolumeClaim
+	for _, claim := range claims {
+		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+		claimNames = append(claimNames, c.Name)
+		createdClaims = append(createdClaims, c)
+		Expect(err).NotTo(HaveOccurred())
+	}
+	defer func() {
+		var errors map[string]error
+		for _, claim := range createdClaims {
+			err := framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace)
+			if err != nil {
+				errors[claim.Name] = err
+			}
+		}
+		if len(errors) > 0 {
+			for claimName, err := range errors {
+				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
+			}
+		}
+	}()
+
+	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
+	By("checking the claims are in pending state")
+	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
+	Expect(err).To(HaveOccurred())
+	verifyPVCsPending(client, createdClaims)
+
+	By("creating a pod referring to the claims")
+	// Create a pod referring to the claim and wait for it to get to running
+	var pod *v1.Pod
+	if t.ExpectUnschedulable {
+		pod, err = framework.CreateUnschedulablePod(client, namespace, t.NodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
+	} else {
+		pod, err = framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
+	}
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
+		framework.WaitForPodToDisappear(client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+	}()
+	if t.ExpectUnschedulable {
+		// Verify that no claims are provisioned.
+		verifyPVCsPending(client, createdClaims)
+		return nil, nil
+	}
+
+	// collect node details
+	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	By("re-checking the claims to see they binded")
+	var pvs []*v1.PersistentVolume
+	for _, claim := range createdClaims {
+		// Get new copy of the claim
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		// make sure claim did bind
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred())
+
+		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		pvs = append(pvs, pv)
+	}
+	Expect(len(pvs)).To(Equal(len(createdClaims)))
+	return pvs, node
+}
+
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string) {
+func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string, nodeSelector map[string]string, unschedulable bool) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -341,6 +432,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 					},
 				},
 			},
+			NodeSelector: nodeSelector,
 		},
 	}
 
@@ -358,5 +450,19 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 		}
 		framework.DeletePodOrFail(c, ns, pod.Name)
 	}()
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+
+	if unschedulable {
+		framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(c, pod.Name, pod.Namespace))
+	} else {
+		framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+	}
+}
+
+func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
+	for _, claim := range pvcs {
+		// Get new copy of the claim
+		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
+	}
 }

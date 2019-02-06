@@ -108,7 +108,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
 	}
-	key, err := c.common.cloud.getStorageAccesskey(accountName, c.common.resourceGroup)
+	key, err := c.common.cloud.GetStorageAccesskey(accountName, c.common.resourceGroup)
 	if err != nil {
 		return fmt.Errorf("no key for storage account %s, err %v", accountName, err)
 	}

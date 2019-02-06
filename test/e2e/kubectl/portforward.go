@@ -189,7 +189,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 
 	listenPort, err := strconv.Atoi(match[2])
 	if err != nil {
-		framework.Failf("Error converting %s to an int: %v", match[1], err)
+		framework.Failf("Error converting %s to an int: %v", match[2], err)
 	}
 
 	return &portForwardCommand{

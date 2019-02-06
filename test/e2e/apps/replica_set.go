@@ -271,7 +271,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImageName,
+					Image: NginxImage,
 				},
 			},
 		},
@@ -279,7 +279,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 	By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	Expect(err).NotTo(HaveOccurred())

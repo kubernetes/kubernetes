@@ -85,7 +85,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
-		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue())
+		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue(), "PV Protection finalizer(%v) is not set in %v", volumeutil.PVProtectionFinalizer, pv.ObjectMeta.Finalizers)
 	})
 
 	AfterEach(func() {

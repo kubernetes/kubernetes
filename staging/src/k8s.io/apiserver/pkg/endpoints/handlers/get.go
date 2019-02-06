@@ -33,10 +33,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -58,24 +59,21 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
-		result, err := getter(ctx, name, req, trace)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+
+		result, err := getter(ctx, name, req, trace)
+		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
 		trace.Step("About to write a response")
 		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
 		trace.Step("Transformed response object")
 	}
 }
@@ -187,6 +185,12 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
 			err = errors.NewBadRequest(err.Error())
@@ -252,7 +256,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
-			metrics.RecordLongRunning(req, requestInfo, func() {
+			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 				serveWatch(watcher, scope, req, w, timeout)
 			})
 			return
@@ -267,22 +271,9 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Listing from storage done")
-		numberOfItems, err := setListSelfLink(result, ctx, req, scope.Namer)
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-linking done")
-		// Ensure empty lists return a non-nil items slice
-		if numberOfItems == 0 && meta.IsListType(result) {
-			if err := meta.SetList(result, []runtime.Object{}); err != nil {
-				scope.err(err, w, req)
-				return
-			}
-		}
 
 		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
-		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+		trace.Step(fmt.Sprintf("Writing http response done (%d items)", meta.LenList(result)))
 	}
 }

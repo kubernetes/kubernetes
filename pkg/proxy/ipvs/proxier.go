@@ -44,9 +44,9 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -162,6 +162,8 @@ const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
 const sysctlConnReuse = "net/ipv4/vs/conn_reuse_mode"
+const sysctlExpireNoDestConn = "net/ipv4/vs/expire_nodest_conn"
+const sysctlExpireQuiescentTemplate = "net/ipv4/vs/expire_quiescent_template"
 const sysctlForward = "net/ipv4/ip_forward"
 const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
 const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
@@ -321,6 +323,20 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
+	// Set the expire_nodest_conn sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlExpireNoDestConn); val != 1 {
+		if err := sysctl.SetSysctl(sysctlExpireNoDestConn, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireNoDestConn, err)
+		}
+	}
+
+	// Set the expire_quiescent_template sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlExpireQuiescentTemplate); val != 1 {
+		if err := sysctl.SetSysctl(sysctlExpireQuiescentTemplate, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireQuiescentTemplate, err)
+		}
+	}
+
 	// Set the ip_forward sysctl we need for
 	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
 		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
@@ -357,7 +373,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDR(clusterCIDR) != isIPv6 {
+	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != isIPv6 {
 		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
 	}
 
@@ -390,14 +406,14 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle()},
+		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(isIPv6)},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
 		natChains:             bytes.NewBuffer(nil),
 		natRules:              bytes.NewBuffer(nil),
 		filterChains:          bytes.NewBuffer(nil),
 		filterRules:           bytes.NewBuffer(nil),
-		netlinkHandle:         NewNetLinkHandle(),
+		netlinkHandle:         NewNetLinkHandle(isIPv6),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     utilproxy.RealNetwork{},
@@ -550,7 +566,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 		}
 	}
 
-	// Flush and remove all of our chains.
+	// Flush and remove all of our chains. Flushing all chains before removing them also removes all links between chains first.
 	for _, ch := range iptablesChains {
 		if err := ipt.FlushChain(ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
@@ -558,6 +574,10 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 				encounteredError = true
 			}
 		}
+	}
+
+	// Remove all of our chains.
+	for _, ch := range iptablesChains {
 		if err := ipt.DeleteChain(ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				klog.Errorf("Error removing iptables rules in ipvs proxier: %v", err)
@@ -584,7 +604,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 		}
 	}
 	// Delete dummy interface created by ipvs Proxier.
-	nl := NewNetLinkHandle()
+	nl := NewNetLinkHandle(false)
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Error deleting dummy device %s created by IPVS proxier: %v", DefaultDummyDevice, err)
@@ -649,7 +669,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
 }
 
-// OnServiceSynced is called once all the initial even handlers were called and the state is fully propagated to local cache.
+// OnServiceSynced is called once all the initial event handlers were called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
@@ -699,7 +719,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	start := time.Now()
 	defer func() {
-		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		metrics.DeprecatedSyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
@@ -1008,11 +1029,9 @@ func (proxier *Proxier) syncProxyRules() {
 					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
 				}
 				if err := proxier.syncService(svcNameString, serv, true); err == nil {
-					// check if service need skip endpoints that not in same host as kube-proxy
-					onlyLocal := svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP && svcInfo.OnlyNodeLocalEndpoints
 					activeIPVSServices[serv.String()] = true
 					activeBindAddrs[serv.Address.String()] = true
-					if err := proxier.syncEndpoint(svcName, onlyLocal, serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
 						klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1190,7 +1209,15 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.portsMap = replacementPortsMap
 
-	// Clean up legacy IPVS services
+	// Get legacy bind address
+	// currentBindAddrs represents ip addresses bind to DefaultDummyDevice from the system
+	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	if err != nil {
+		klog.Errorf("Failed to get bind address, err: %v", err)
+	}
+	legacyBindAddrs := proxier.getLegacyBindAddr(activeBindAddrs, currentBindAddrs)
+
+	// Clean up legacy IPVS services and unbind addresses
 	appliedSvcs, err := proxier.ipvs.GetVirtualServers()
 	if err == nil {
 		for _, appliedSvc := range appliedSvcs {
@@ -1199,15 +1226,7 @@ func (proxier *Proxier) syncProxyRules() {
 	} else {
 		klog.Errorf("Failed to get ipvs service, err: %v", err)
 	}
-	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices)
-
-	// Clean up legacy bind address
-	// currentBindAddrs represents ip addresses bind to DefaultDummyDevice from the system
-	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	if err != nil {
-		klog.Errorf("Failed to get bind address, err: %v", err)
-	}
-	proxier.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
+	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices, legacyBindAddrs)
 
 	// Update healthz timestamp
 	if proxier.healthzServer != nil {
@@ -1602,32 +1621,41 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			Port:    uint16(portNum),
 		}
 
-		klog.V(5).Infof("Using graceful delete to delete: %v", delDest)
+		klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
 		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
 		if err != nil {
-			klog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
+			klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 			continue
 		}
 	}
 	return nil
 }
 
-func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {
+func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
 	for cs := range currentServices {
 		svc := currentServices[cs]
 		if _, ok := activeServices[cs]; !ok {
 			// This service was not processed in the latest sync loop so before deleting it,
-			// make sure it does not fall within an excluded CIDR range.
 			okayToDelete := true
 			rsList, _ := proxier.ipvs.GetRealServers(svc)
+
+			// If we still have real servers graceful termination is not done
+			if len(rsList) > 0 {
+				okayToDelete = false
+			}
+			// Applying graceful termination to all real servers
 			for _, rs := range rsList {
 				uniqueRS := GetUniqueRSName(svc, rs)
-				// if there are in terminating real server in this service, then handle it later
+				// If RS is already in the graceful termination list, no need to add it again
 				if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
-					okayToDelete = false
-					break
+					continue
+				}
+				klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
+				if err := proxier.gracefuldeleteManager.GracefulDeleteRS(svc, rs); err != nil {
+					klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 				}
 			}
+			// make sure it does not fall within an excluded CIDR range.
 			for _, excludedCIDR := range proxier.excludeCIDRs {
 				// Any validation of this CIDR already should have occurred.
 				_, n, _ := net.ParseCIDR(excludedCIDR)
@@ -1637,26 +1665,38 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 				}
 			}
 			if okayToDelete {
+				klog.V(4).Infof("Delete service %s", svc.String())
 				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
-					klog.Errorf("Failed to delete service, error: %v", err)
+					klog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
+				}
+				addr := svc.Address.String()
+				if _, ok := legacyBindAddrs[addr]; ok {
+					klog.V(4).Infof("Unbinding address %s", addr)
+					if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
+						klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+					} else {
+						// In case we delete a multi-port service, avoid trying to unbind multiple times
+						delete(legacyBindAddrs, addr)
+					}
 				}
 			}
 		}
 	}
 }
 
-func (proxier *Proxier) cleanLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) {
+func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
+	legacyAddrs := make(map[string]bool)
+	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
+		addrIsIpv6 := utilnet.IsIPv6(net.ParseIP(addr))
+		if addrIsIpv6 && !isIpv6 || !addrIsIpv6 && isIpv6 {
+			continue
+		}
 		if _, ok := activeBindAddrs[addr]; !ok {
-			// This address was not processed in the latest sync loop
-			klog.V(4).Infof("Unbind addr %s", addr)
-			err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice)
-			// Ignore no such address error when try to unbind address
-			if err != nil {
-				klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
-			}
+			legacyAddrs[addr] = true
 		}
 	}
+	return legacyAddrs
 }
 
 // Join all words with spaces, terminate with newline and write to buff.

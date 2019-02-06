@@ -70,7 +70,6 @@ type sandboxTemplate struct {
 type containerTemplate struct {
 	pod            *v1.Pod
 	container      *v1.Container
-	containerType  kubecontainer.ContainerType
 	sandboxAttempt uint32
 	attempt        int
 	createdAt      int64
@@ -143,7 +142,7 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, _, err := m.generateContainerConfig(template.container, template.pod, template.attempt, "", template.container.Image, template.containerType)
+	containerConfig, _, err := m.generateContainerConfig(template.container, template.pod, template.attempt, "", template.container.Image)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
@@ -567,7 +566,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -656,7 +655,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -666,7 +665,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -681,7 +680,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -696,7 +695,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.

@@ -18,6 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/images",
     deps = [
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",

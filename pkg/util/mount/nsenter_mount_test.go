@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/util/nsenter"
+	"k8s.io/utils/nsenter"
 )
 
 func TestParseFindMnt(t *testing.T) {
@@ -169,11 +169,19 @@ func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *NsenterMounter
 }
 
 func TestNsenterExistsFile(t *testing.T) {
-	user, err := user.Current()
-	if err != nil {
-		t.Error(err)
+	var isRoot bool
+	usr, err := user.Current()
+	if err == nil {
+		isRoot = usr.Username == "root"
+	} else {
+		switch err.(type) {
+		case user.UnknownUserIdError:
+			// Root should be always known, this is some random UID
+			isRoot = false
+		default:
+			t.Fatal(err)
+		}
 	}
-	isRoot := user.Username == "root"
 
 	tests := []struct {
 		name           string

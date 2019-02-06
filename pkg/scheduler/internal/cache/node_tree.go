@@ -32,7 +32,7 @@ type NodeTree struct {
 	tree      map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones     []string              // a list of all the zones in the tree (keys)
 	zoneIndex int
-	NumNodes  int
+	numNodes  int
 	mu        sync.RWMutex
 }
 
@@ -91,7 +91,7 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 		nt.tree[zone] = &nodeArray{nodes: []string{n.Name}, lastIndex: 0}
 	}
 	klog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
-	nt.NumNodes++
+	nt.numNodes++
 }
 
 // RemoveNode removes a node from the NodeTree.
@@ -111,7 +111,7 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 					nt.removeZone(zone)
 				}
 				klog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
-				nt.NumNodes--
+				nt.numNodes--
 				return nil
 			}
 		}
@@ -183,4 +183,11 @@ func (nt *NodeTree) Next() string {
 			return nodeName
 		}
 	}
+}
+
+// NumNodes returns the number of nodes.
+func (nt *NodeTree) NumNodes() int {
+	nt.mu.RLock()
+	defer nt.mu.RUnlock()
+	return nt.numNodes
 }

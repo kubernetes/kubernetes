@@ -26,15 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"k8s.io/klog"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -67,7 +66,7 @@ func wrappedVolumeSpec() volume.Spec {
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(projectedPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(projectedPluginName), volName)
 }
 
 func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
@@ -96,6 +95,10 @@ func (plugin *projectedPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Projected != nil
 }
 
+func (plugin *projectedPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *projectedPlugin) RequiresRemount() bool {
 	return true
 }
@@ -111,10 +114,11 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
-			volName: spec.Name(),
-			sources: spec.Volume.Projected.Sources,
-			podUID:  pod.UID,
-			plugin:  plugin,
+			volName:         spec.Name(),
+			sources:         spec.Volume.Projected.Sources,
+			podUID:          pod.UID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source: *spec.Volume.Projected,
 		pod:    pod,
@@ -125,9 +129,10 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 func (plugin *projectedPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	return &projectedVolumeUnmounter{
 		&projectedVolume{
-			volName: volName,
-			podUID:  podUID,
-			plugin:  plugin,
+			volName:         volName,
+			podUID:          podUID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -148,7 +153,7 @@ type projectedVolume struct {
 	sources []v1.VolumeProjection
 	podUID  types.UID
 	plugin  *projectedPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &projectedVolume{}

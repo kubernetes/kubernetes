@@ -173,7 +173,7 @@ func (g *dockerConfigUrlKeyProvider) Provide() credentialprovider.DockerConfig {
 	return credentialprovider.DockerConfig{}
 }
 
-// runcWithBackoff runs input function `f` with an exponential backoff.
+// runWithBackoff runs input function `f` with an exponential backoff.
 // Note that this method can block indefinitely.
 func runWithBackoff(f func() ([]byte, error)) []byte {
 	var backoff = 100 * time.Millisecond

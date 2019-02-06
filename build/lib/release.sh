@@ -30,6 +30,7 @@ readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
+KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
 # Validate a ci version
 #
@@ -372,7 +373,15 @@ EOF
         if [[ "${base_image}" =~ busybox ]]; then
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
-        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+
+        # provide `--pull` argument to `docker build` if `KUBE_BUILD_PULL_LATEST_IMAGES`
+        # is set to y or Y; otherwise try to build the image without forcefully
+        # pulling the latest base image.
+        local -a docker_build_opts=()
+        if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
+            docker_build_opts+=("--pull")
+        fi
+        "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"

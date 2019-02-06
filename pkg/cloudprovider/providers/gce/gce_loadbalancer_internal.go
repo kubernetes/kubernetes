@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 const (
@@ -69,12 +69,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 
 	// Ensure health check exists before creating the backend service. The health check is shared
 	// if externalTrafficPolicy=Cluster.
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	if !sharedHealthCheck {
 		// Service requires a special health check, retrieve the OnlyLocal port & path
-		hcPath, hcPort = v1_service.GetServiceHealthCheckPathPort(svc)
+		hcPath, hcPort = servicehelpers.GetServiceHealthCheckPathPort(svc)
 	}
 	hc, err := g.ensureInternalHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
 	if err != nil {
@@ -224,7 +224,7 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(svc)
 
 	g.sharedResourceLock.Lock()
 	defer g.sharedResourceLock.Unlock()
@@ -367,7 +367,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
-	sourceRanges, err := v1_service.GetLoadBalancerSourceRanges(svc)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(svc)
 	if err != nil {
 		return err
 	}
@@ -581,7 +581,7 @@ func (g *Cloud) ensureInternalBackendServiceGroups(name string, igLinks []string
 }
 
 func shareBackendService(svc *v1.Service) bool {
-	return GetLoadBalancerAnnotationBackendShare(svc) && !v1_service.RequestsOnlyLocalTraffic(svc)
+	return GetLoadBalancerAnnotationBackendShare(svc) && !servicehelpers.RequestsOnlyLocalTraffic(svc)
 }
 
 func backendsFromGroupLinks(igLinks []string) (backends []*compute.Backend) {

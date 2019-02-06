@@ -19,8 +19,6 @@ package garbagecollector
 import (
 	"fmt"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog"
 )
 
 // cluster scoped resources don't have namespaces.  Default to the item's namespace, but clear it for cluster scoped resources
@@ -81,7 +80,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	if err != nil {
 		return nil, err
 	}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.UpdateOptions{})
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.PatchOptions{})
 }
 
 // TODO: Using Patch when strategicmerge supports deleting an entry from a
@@ -93,11 +92,11 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later.", owner.identity, err)
+			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", owner.identity, err)
 		}
 		accessor, err := meta.Accessor(ownerObject)
 		if err != nil {
-			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later.", ownerObject, err)
+			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later", ownerObject, err)
 		}
 		finalizers := accessor.GetFinalizers()
 		var newFinalizers []string
@@ -119,7 +118,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		return err
 	})
 	if errors.IsConflict(err) {
-		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retry.DefaultBackoff.Steps, owner.identity)
+		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v", retry.DefaultBackoff.Steps, owner.identity)
 	}
 	return err
 }

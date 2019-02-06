@@ -159,7 +159,6 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
@@ -167,7 +166,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	if err != nil {
 		klog.Error(log("registrationHandler.RegisterPlugin failed at CSI.NodeGetInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous: %v", unregErr))
+			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
 			return unregErr
 		}
 		return err
@@ -277,6 +276,10 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	// TODO (vladimirvivien) CanSupport should also take into account
 	// the availability/registration of specified Driver in the volume source
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
+}
+
+func (p *csiPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *csiPlugin) RequiresRemount() bool {
@@ -705,15 +708,15 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 	return nil, fmt.Errorf("None of the CSI versions reported by this driver are supported")
 }
 
-// Only CSI 0.x drivers are allowed to use deprecated socket dir.
+// Only drivers that implement CSI 0.x are allowed to use deprecated socket dir.
 func isDeprecatedSocketDirAllowed(versions []string) bool {
 	for _, version := range versions {
-		if !isV0Version(version) {
-			return false
+		if isV0Version(version) {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 func isV0Version(version string) bool {

@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -46,6 +46,10 @@ type configMapPlugin struct {
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(configMapPluginName), volName)
+}
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -73,6 +77,10 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
+func (plugin *configMapPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *configMapPlugin) RequiresRemount() bool {
 	return true
 }
@@ -92,7 +100,7 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:       *spec.Volume.ConfigMap,
 		pod:          *pod,
@@ -108,7 +116,7 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -128,13 +136,13 @@ type configMapVolume struct {
 	podUID  types.UID
 	plugin  *configMapPlugin
 	mounter mount.Interface
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &configMapVolume{}
 
 func (sv *configMapVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(configMapPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podUID, utilstrings.EscapeQualifiedName(configMapPluginName), sv.volName)
 }
 
 // configMapVolumeMounter handles retrieving secrets from the API server

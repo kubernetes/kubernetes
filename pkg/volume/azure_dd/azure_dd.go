@@ -121,6 +121,10 @@ func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
 }
 
+func (plugin *azureDataDiskPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
 	return false
 }
@@ -187,7 +191,7 @@ func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachine
 			continue
 		}
 		if strings.ToUpper(*size.Name) == vmsize {
-			klog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
+			klog.V(12).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
 			return int64(*size.MaxDataDiskCount)
 		}
 	}

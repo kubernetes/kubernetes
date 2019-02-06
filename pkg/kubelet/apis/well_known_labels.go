@@ -30,16 +30,19 @@ const (
 
 	LabelInstanceType = "beta.kubernetes.io/instance-type"
 
-	LabelOS   = "beta.kubernetes.io/os"
-	LabelArch = "beta.kubernetes.io/arch"
+	LabelOS   = "kubernetes.io/os"
+	LabelArch = "kubernetes.io/arch"
+	// The OS/Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta OS/Arch labels in Kubernetes 1.17.
+	LegacyLabelOS   = "beta.kubernetes.io/os"
+	LegacyLabelArch = "beta.kubernetes.io/arch"
 
 	// GA versions of the legacy beta labels.
 	// TODO: update kubelet and controllers to set both beta and GA labels, then export these constants
 	labelZoneFailureDomainGA = "failure-domain.kubernetes.io/zone"
 	labelZoneRegionGA        = "failure-domain.kubernetes.io/region"
 	labelInstanceTypeGA      = "kubernetes.io/instance-type"
-	labelOSGA                = "kubernetes.io/os"
-	labelArchGA              = "kubernetes.io/arch"
 
 	// LabelNamespaceSuffixKubelet is an allowed label namespace suffix kubelets can self-set ([*.]kubelet.kubernetes.io/*)
 	LabelNamespaceSuffixKubelet = "kubelet.kubernetes.io"
@@ -62,11 +65,12 @@ var kubeletLabels = sets.NewString(
 	LabelOS,
 	LabelArch,
 
+	LegacyLabelOS,
+	LegacyLabelArch,
+
 	labelZoneFailureDomainGA,
 	labelZoneRegionGA,
 	labelInstanceTypeGA,
-	labelOSGA,
-	labelArchGA,
 )
 
 var kubeletLabelNamespaces = sets.NewString(

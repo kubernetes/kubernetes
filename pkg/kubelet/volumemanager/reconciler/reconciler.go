@@ -36,15 +36,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	utilpath "k8s.io/utils/path"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
@@ -89,7 +89,7 @@ type Reconciler interface {
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
 // mounter - mounter passed in from kubelet, passed down unmount path
-// volumePluginMrg - volume plugin manager passed from kubelet
+// volumePluginMgr - volume plugin manager passed from kubelet
 func NewReconciler(
 	kubeClient clientset.Interface,
 	controllerAttachDetachEnabled bool,
@@ -455,6 +455,10 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
+	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create pod object
 	pod := &v1.Pod{
@@ -480,13 +484,13 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	var uniqueVolumeName v1.UniqueVolumeName
-	if attachablePlugin != nil {
+	if attachablePlugin != nil || deviceMountablePlugin != nil {
 		uniqueVolumeName, err = util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		uniqueVolumeName = util.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
+		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
 	}
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
 	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
@@ -669,12 +673,12 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			for _, volumeDir := range volumesDirInfo {
 				pluginName := volumeDir.Name()
 				volumePluginPath := path.Join(volumesDir, pluginName)
-				volumePluginDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
+				volumePluginDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 				if err != nil {
 					klog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
 					continue
 				}
-				unescapePluginName := utilstrings.UnescapeQualifiedNameForDisk(pluginName)
+				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
 					mountPath := path.Join(volumePluginPath, volumeName)
 					klog.V(5).Infof("podName: %v, mount path from volume plugin directory: %v, ", podName, mountPath)

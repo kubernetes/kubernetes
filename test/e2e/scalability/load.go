@@ -377,9 +377,13 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
 		})
+		config.WrapTransport = transportConfig.WrapTransport
+		config.Dial = transportConfig.Dial
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.
 		config.TLSClientConfig = restclient.TLSClientConfig{}
+		config.AuthProvider = nil
+		config.ExecProvider = nil
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
@@ -541,7 +545,7 @@ func GenerateConfigsForGroup(
 			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
-			Timeout:        10 * time.Minute,
+			Timeout:        UnreadyNodeToleration,
 			Image:          image,
 			Command:        command,
 			Replicas:       size,
@@ -551,6 +555,19 @@ func GenerateConfigsForGroup(
 			ConfigMapNames: configMapNames,
 			// Define a label to group every 2 RCs into one service.
 			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+			Tolerations: []v1.Toleration{
+				{
+					Key:               "node.kubernetes.io/not-ready",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				}, {
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				},
+			},
 		}
 
 		if kind == randomKind {
