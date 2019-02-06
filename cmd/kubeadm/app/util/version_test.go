@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestEmptyVersion(t *testing.T) {
@@ -149,6 +152,61 @@ func TestVersionFromNetwork(t *testing.T) {
 				t.Errorf("KubernetesReleaseVersion: unexpected result for key %q. Expected: %q Actual: %q", k, v.Expected, ver)
 			}
 		})
+	}
+}
+
+type timeoutError struct{}
+
+func (e *timeoutError) Timeout() bool {
+	return true
+}
+
+func (e *timeoutError) Error() string {
+	return "fake error"
+}
+
+func TestGetFallbackVersion(t *testing.T) {
+	tcases := []struct {
+		remoteVersion    string
+		remoteVersionErr error
+		clientVersion    string
+		clientVersionErr error
+		fallbackVersion  string
+		expectedErr      bool
+	}{
+		{
+			remoteVersionErr: errors.Wrap(&url.Error{
+				Err: &timeoutError{},
+			}, "fake timeout error"),
+			clientVersion:   "v1.13.4",
+			fallbackVersion: "v1.13.4",
+		},
+		{
+			remoteVersion: "v1.13.4",
+		},
+		{
+			remoteVersionErr: errors.New("fake non-timeout error"),
+			expectedErr:      true,
+		},
+		{
+			clientVersionErr: errors.New("fake client version error"),
+			remoteVersion:    "v1.13.4",
+			fallbackVersion:  "v1.13.4",
+		},
+	}
+	for _, tt := range tcases {
+		fallbackVersion, err := getFallbackVersion(tt.remoteVersion, tt.remoteVersionErr, tt.clientVersion, tt.clientVersionErr)
+
+		if tt.expectedErr && err == nil {
+			t.Error("Expected error hasn't been triggered")
+		}
+		if !tt.expectedErr && err != nil {
+			t.Errorf("Unexpected error: %+v", err)
+		}
+
+		if fallbackVersion != tt.fallbackVersion {
+			t.Errorf("Expected fallback version %s, but got %s", tt.fallbackVersion, fallbackVersion)
+		}
 	}
 }
 

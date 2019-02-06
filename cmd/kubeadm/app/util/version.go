@@ -90,21 +90,10 @@ func KubernetesReleaseVersion(version string) (string, error) {
 	// on individual packages.
 	clientVersion, clientVersionErr := kubeadmVersion(pkgversion.Get().String())
 	// Fetch version from the internet.
-	remoteVersion, err := resolveVersionLabel(bucketURL, versionLabel)
-	if err != nil {
-		if urlErr, ok := errors.Cause(err).(*url.Error); !(ok && urlErr.Timeout()) {
-			return "", errors.Wrapf(err, "failed to resolve version label while having good connectivity")
-		}
+	remoteVersion, remoteVersionErr := resolveVersionLabel(bucketURL, versionLabel)
 
-		// Handle air-gapped environments by falling back to the client version.
-		klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
-		klog.Warningf("falling back to the local client version: %s", clientVersion)
-		return clientVersion, nil
-	}
-
-	if clientVersionErr != nil {
-		klog.Warningf("could not obtain client version; using remote version: %s", remoteVersion)
-		return remoteVersion, nil
+	if fallbackVersion, err := getFallbackVersion(remoteVersion, remoteVersionErr, clientVersion, clientVersionErr); err != nil || fallbackVersion != "" {
+		return fallbackVersion, err
 	}
 
 	// both the client and the remote version are obtained; validate them and pick a stable version
@@ -118,6 +107,26 @@ func KubernetesReleaseVersion(version string) (string, error) {
 	}
 
 	return ver, nil
+}
+
+func getFallbackVersion(remoteVersion string, remoteVersionErr error, clientVersion string, clientVersionErr error) (string, error) {
+	if remoteVersionErr != nil {
+		if urlErr, ok := errors.Cause(remoteVersionErr).(*url.Error); !(ok && urlErr.Timeout()) {
+			return "", errors.Wrapf(remoteVersionErr, "failed to resolve version label while having good connectivity")
+		}
+
+		// Handle air-gapped environments by falling back to the client version.
+		klog.Warningf("could not fetch a Kubernetes version from the internet: %v", remoteVersionErr)
+		klog.Warningf("falling back to the local client version: %s", clientVersion)
+		return clientVersion, nil
+	}
+
+	if clientVersionErr != nil {
+		klog.Warningf("could not obtain client version; using remote version: %s", remoteVersion)
+		return remoteVersion, nil
+	}
+
+	return "", nil
 }
 
 // KubernetesVersionToImageTag is helper function that replaces all
