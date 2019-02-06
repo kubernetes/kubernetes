@@ -58,10 +58,11 @@ type InlineVolumeTestDriver interface {
 // PreprovisionedPVTestDriver represents an interface for a TestDriver that supports PreprovisionedPV
 type PreprovisionedPVTestDriver interface {
 	PreprovisionedVolumeTestDriver
-	// GetPersistentVolumeSource returns a PersistentVolumeSource for pre-provisioned Persistent Volume.
+	// GetPersistentVolumeSource returns a PersistentVolumeSource with volume node affinity for pre-provisioned Persistent Volume.
 	// It will set readOnly and fsType to the PersistentVolumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource
+	// Volume node affinity is optional, it will be nil for volumes which does not have volume node affinity.
+	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity)
 }
 
 // DynamicPVTestDriver represents an interface for a TestDriver that supports DynamicPV

@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -120,7 +121,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, testResource i
 	}
 }
 
-func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	ntr, ok := testResource.(*nfsTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to NFS Test Resource")
 	return &v1.PersistentVolumeSource{
@@ -129,7 +130,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, test
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
-	}
+	}, nil
 }
 
 func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -276,7 +277,7 @@ func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, testReso
 	}
 }
 
-func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gtr, ok := testResource.(*glusterTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Gluster Test Resource")
 
@@ -288,7 +289,7 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 			Path:     "test_vol",
 			ReadOnly: readOnly,
 		},
-	}
+	}, nil
 }
 
 func (g *glusterFSDriver) CreateDriver() {
@@ -402,7 +403,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, testResource
 	return &volSource
 }
 
-func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	itr, ok := testResource.(*iSCSITestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to iSCSI Test Resource")
 
@@ -417,7 +418,7 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, te
 	if fsType != "" {
 		pvSource.ISCSI.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (i *iSCSIDriver) CreateDriver() {
@@ -519,7 +520,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, testResource i
 	return &volSource
 }
 
-func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	f := r.driverInfo.Config.Framework
 	ns := f.Namespace
 
@@ -542,7 +543,7 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, test
 	if fsType != "" {
 		pvSource.RBD.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (r *rbdDriver) CreateDriver() {
@@ -637,7 +638,7 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, testResourc
 	}
 }
 
-func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	f := c.driverInfo.Config.Framework
 	ns := f.Namespace
 
@@ -654,7 +655,7 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, t
 			},
 			ReadOnly: readOnly,
 		},
-	}
+	}, nil
 }
 
 func (c *cephFSDriver) CreateDriver() {
@@ -1026,7 +1027,7 @@ func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, testResourc
 	return &volSource
 }
 
-func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	ctr, ok := testResource.(*cinderTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Cinder Test Resource")
 
@@ -1039,7 +1040,7 @@ func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, t
 	if fsType != "" {
 		pvSource.Cinder.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -1192,7 +1193,7 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, testResource
 	return &volSource
 }
 
-func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gtr, ok := testResource.(*gcePdTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to GCE PD Test Resource")
 	pvSource := v1.PersistentVolumeSource{
@@ -1204,7 +1205,7 @@ func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, te
 	if fsType != "" {
 		pvSource.GCEPersistentDisk.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -1315,14 +1316,14 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, testResour
 	return &volSource
 }
 
-func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	vtr, ok := testResource.(*vSphereTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to vSphere Test Resource")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
 	if readOnly {
-		return nil
+		return nil, nil
 	}
 	pvSource := v1.PersistentVolumeSource{
 		VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
@@ -1332,7 +1333,7 @@ func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, 
 	if fsType != "" {
 		pvSource.VsphereVolume.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -1440,7 +1441,7 @@ func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, testResource
 	return &volSource
 }
 
-func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	atr, ok := testResource.(*azureTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Azure Test Resource")
 
@@ -1456,7 +1457,7 @@ func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, te
 	if fsType != "" {
 		pvSource.AzureDisk.FSType = &fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
 
 func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -1558,7 +1559,7 @@ func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, testResource i
 	return &volSource
 }
 
-func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
+func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	pvSource := v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: a.volumeName,
@@ -1607,3 +1608,184 @@ func (a *awsDriver) DeleteVolume(volType testpatterns.TestVolType, testResource 
 	framework.DeletePDWithRetry(a.volumeName)
 }
 */
+
+// local
+type localDriver struct {
+	driverInfo testsuites.DriverInfo
+	node       *v1.Node
+	hostExec   utils.HostExec
+	// volumeType represents local volume type we are testing, e.g.  tmpfs,
+	// directory, block device.
+	volumeType utils.LocalVolumeType
+	ltrMgr     utils.LocalTestResourceManager
+}
+
+var (
+	// capabilities
+	defaultLocalVolumeCapabilities = map[testsuites.Capability]bool{
+		testsuites.CapPersistence: true,
+		testsuites.CapFsGroup:     true,
+		testsuites.CapBlock:       false,
+		testsuites.CapExec:        true,
+	}
+	localVolumeCapabitilies = map[utils.LocalVolumeType]map[testsuites.Capability]bool{
+		utils.LocalVolumeBlock: {
+			testsuites.CapPersistence: true,
+			testsuites.CapFsGroup:     true,
+			testsuites.CapBlock:       true,
+			testsuites.CapExec:        true,
+		},
+	}
+	// fstype
+	defaultLocalVolumeSupportedFsTypes = sets.NewString("")
+	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.String{
+		utils.LocalVolumeBlock: sets.NewString(
+			"", // Default fsType
+			"ext2",
+			"ext3",
+			"ext4",
+			"xfs",
+		),
+	}
+	// max file size
+	defaultLocalVolumeMaxFileSize = testpatterns.FileSizeSmall
+	localVolumeMaxFileSizes       = map[utils.LocalVolumeType]int64{}
+)
+
+var _ testsuites.TestDriver = &localDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &localDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &localDriver{}
+
+func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func(config testsuites.TestConfig) testsuites.TestDriver {
+	maxFileSize := defaultLocalVolumeMaxFileSize
+	if maxFileSizeByVolType, ok := localVolumeMaxFileSizes[volumeType]; ok {
+		maxFileSize = maxFileSizeByVolType
+	}
+	supportedFsTypes := defaultLocalVolumeSupportedFsTypes
+	if supportedFsTypesByType, ok := localVolumeSupportedFsTypes[volumeType]; ok {
+		supportedFsTypes = supportedFsTypesByType
+	}
+	capabilities := defaultLocalVolumeCapabilities
+	if capabilitiesByType, ok := localVolumeCapabitilies[volumeType]; ok {
+		capabilities = capabilitiesByType
+	}
+	return func(config testsuites.TestConfig) testsuites.TestDriver {
+		hostExec := utils.NewHostExec(config.Framework)
+		// custom tag to distinguish from tests of other volume types
+		featureTag := fmt.Sprintf("[LocalVolumeType: %s]", volumeType)
+		// For GCE Local SSD volumes, we must run serially
+		if volumeType == utils.LocalVolumeGCELocalSSD {
+			featureTag += " [Serial]"
+		}
+		return &localDriver{
+			driverInfo: testsuites.DriverInfo{
+				Name:            "local",
+				FeatureTag:      featureTag,
+				MaxFileSize:     maxFileSize,
+				SupportedFsType: supportedFsTypes,
+				Capabilities:    capabilities,
+				Config:          config,
+			},
+			hostExec:   hostExec,
+			volumeType: volumeType,
+			ltrMgr:     utils.NewLocalResourceManager("local-driver", hostExec, "/tmp"),
+		}
+	}
+}
+
+func (l *localDriver) GetDriverInfo() *testsuites.DriverInfo {
+	return &l.driverInfo
+}
+
+func (l *localDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+	if l.volumeType == utils.LocalVolumeGCELocalSSD {
+		ssdInterface := "scsi"
+		filesystemType := "fs"
+		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
+		res, err := l.hostExec.IssueCommandWithResult(ssdCmd, l.node)
+		Expect(err).NotTo(HaveOccurred())
+		num, err := strconv.Atoi(strings.TrimSpace(res))
+		Expect(err).NotTo(HaveOccurred())
+		if num < 1 {
+			framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
+		}
+	}
+}
+
+func (l *localDriver) CreateDriver() {
+	// choose a randome node to test against
+	l.node = l.randomNode()
+}
+
+func (l *localDriver) CleanupDriver() {
+	l.hostExec.Cleanup()
+}
+
+func (l *localDriver) randomNode() *v1.Node {
+	f := l.driverInfo.Config.Framework
+	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	node := nodes.Items[rand.Intn(len(nodes.Items))]
+	return &node
+}
+
+func (l *localDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
+	switch volType {
+	case testpatterns.PreprovisionedPV:
+		node := l.node
+		// assign this to schedule pod on this node
+		l.driverInfo.Config.ClientNodeName = node.Name
+		return l.ltrMgr.Create(node, l.volumeType, nil)
+	default:
+		framework.Failf("Unsupported volType: %v is specified", volType)
+	}
+	return nil
+}
+
+func (l *localDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
+	ltr, ok := testResource.(*utils.LocalTestResource)
+	Expect(ok).To(BeTrue(), "Failed to cast test resource to local Test Resource")
+	switch volType {
+	case testpatterns.PreprovisionedPV:
+		l.ltrMgr.Remove(ltr)
+	default:
+		framework.Failf("Unsupported volType: %v is specified", volType)
+	}
+	return
+}
+
+func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
+	nodeKey := "kubernetes.io/hostname"
+	if node.Labels == nil {
+		framework.Failf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[nodeKey]
+	if !found {
+		framework.Failf("Node does not have required label %q", nodeKey)
+	}
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      nodeKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	ltr, ok := testResource.(*utils.LocalTestResource)
+	Expect(ok).To(BeTrue(), "Failed to cast test resource to local Test Resource")
+	return &v1.PersistentVolumeSource{
+		Local: &v1.LocalVolumeSource{
+			Path:   ltr.Path,
+			FSType: &fsType,
+		},
+	}, l.nodeAffinityForNode(ltr.Node)
+}
