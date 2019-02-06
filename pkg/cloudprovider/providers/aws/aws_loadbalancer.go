@@ -582,7 +582,7 @@ func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName str
 	return response
 }
 
-func (c *Cloud) getVpcCidrBlock() (*string, error) {
+func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 	vpcs, err := c.ec2.DescribeVpcs(&ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(c.vpcID)},
 	})
@@ -592,7 +592,12 @@ func (c *Cloud) getVpcCidrBlock() (*string, error) {
 	if len(vpcs.Vpcs) != 1 {
 		return nil, fmt.Errorf("Error querying VPC for ELB, got %d vpcs for %s", len(vpcs.Vpcs), c.vpcID)
 	}
-	return vpcs.Vpcs[0].CidrBlock, nil
+
+	cidrBlocks := make([]string, 0, len(vpcs.Vpcs[0].CidrBlockAssociationSet))
+	for _, cidr := range vpcs.Vpcs[0].CidrBlockAssociationSet {
+		cidrBlocks = append(cidrBlocks, aws.StringValue(cidr.CidrBlock))
+	}
+	return cidrBlocks, nil
 }
 
 // abstraction for updating SG rules
@@ -805,7 +810,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 		return nil
 	}
 
-	vpcCidr, err := c.getVpcCidrBlock()
+	vpcCidrBlocks, err := c.getVpcCidrBlocks()
 	if err != nil {
 		return err
 	}
@@ -890,7 +895,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 	}
 
 	// Run once for health check traffic
-	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, []string{aws.StringValue(vpcCidr)}, false)
+	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, vpcCidrBlocks, false)
 	if err != nil {
 		return err
 	}
