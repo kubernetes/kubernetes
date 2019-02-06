@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -108,6 +109,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 	orphanRemovalErrors := []error{}
 	orphanVolumeErrors := []error{}
 
+PodLoop:
 	for _, uid := range found {
 		if allPods.Has(string(uid)) {
 			continue
@@ -127,8 +129,23 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 			continue
 		}
 		if len(volumePaths) > 0 {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but volume paths are still present on disk", uid))
-			continue
+			for _, volumePath := range volumePaths {
+				// IsNotLikelyMountPoint() not good enough here, volume mounts are frequently bind-mounted, also not on a hot path
+				isNotMounted, err := kl.mounter.IsNotMountPoint(volumePath)
+				if err != nil {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but unable to evaluate mountpoints: %v", uid, err))
+					continue PodLoop
+				}
+				if isNotMounted {
+					if err := os.Remove(volumePath); err != nil { // Attempt to remove volume, will fail if there is for example data in there or a permission problem
+						orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but volume paths are not removable: %v", uid, err))
+						continue PodLoop
+					}
+				} else {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but still has mounted volumes", uid))
+					continue PodLoop
+				}
+			}
 		}
 
 		// If there are any volume-subpaths, do not cleanup directories
