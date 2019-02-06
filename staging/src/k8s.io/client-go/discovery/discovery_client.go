@@ -392,7 +392,7 @@ func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	if err != nil {
 		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
 			// single endpoint not found/registered in old server, try to fetch old endpoint
-			// TODO(roycaihw): remove this in 1.11
+			// TODO: remove this when kubectl/client-go don't work with 1.9 server
 			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
 			if err != nil {
 				return nil, err
