@@ -20,10 +20,14 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["zones_test.go"],
+    srcs = [
+        "rounding_test.go",
+        "zones_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
