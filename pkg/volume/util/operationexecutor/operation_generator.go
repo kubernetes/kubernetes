@@ -803,7 +803,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 // After setup is done, create symbolic links on both global map path and pod
 // device map path. Once symbolic links are created, take fd lock by
 // loopback for the device to avoid silent volume replacement. This lock
-// will be realased once no one uses the device.
+// will be released once no one uses the device.
 // If all steps are completed, the volume is marked as mounted.
 func (og *operationGenerator) GenerateMapVolumeFunc(
 	waitForAttachTimeout time.Duration,
@@ -1033,7 +1033,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 
 // GenerateUnmapDeviceFunc marks device as unmounted based on following steps.
 // Check under globalMapPath dir if there isn't pod's symbolic links in it.
-// If symbolick link isn't there, the device isn't referenced from Pods.
+// If symbolic link isn't there, the device isn't referenced from Pods.
 // Call plugin TearDownDevice to clean-up device connection, stored data under
 // globalMapPath, these operations depend on plugin implementation.
 // Once TearDownDevice is completed, remove globalMapPath dir.
@@ -1064,7 +1064,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 
 	unmapDeviceFunc := func() (error, error) {
 		// Search under globalMapPath dir if all symbolic links from pods have been removed already.
-		// If symbolick links are there, pods may still refer the volume.
+		// If symbolic links are there, pods may still refer the volume.
 		globalMapPath := deviceToDetach.DeviceMountPath
 		refs, err := og.blkUtil.GetDeviceSymlinkRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
