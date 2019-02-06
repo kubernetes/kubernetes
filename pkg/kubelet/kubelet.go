@@ -59,6 +59,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/klog/glog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -2130,10 +2131,19 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
+		sidecarsStatus := status.GetSidecarsStatus(pod)
+
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		if status.NeedToReconcilePodReadiness(pod) {
 			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		} else if sidecarsStatus.ContainersWaiting {
+			// if containers aren't running and the sidecars are all ready trigger a sync so that the containers get started
+			if sidecarsStatus.SidecarsPresent && sidecarsStatus.SidecarsReady {
+				glog.Infof("Pod: %s: sidecars: sidecars are ready, dispatching work", format.Pod(pod))
+				mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+				kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			}
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/glog"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -738,4 +739,46 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// SidecarsStatus contains three bools, whether the pod has sidecars,
+// if the all the sidecars are ready and if the non sidecars are in a
+// waiting state.
+type SidecarsStatus struct {
+	SidecarsPresent   bool
+	SidecarsReady     bool
+	ContainersWaiting bool
+}
+
+// GetSidecarsStatus returns the SidecarsStatus for the given pod
+func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
+	if pod == nil {
+		glog.Infof("Pod was nil, returning empty sidecar status")
+		return SidecarsStatus{}
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		glog.Infof("Pod Containers or Container status was nil, returning empty sidecar status")
+		return SidecarsStatus{}
+	}
+	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
+	for _, container := range pod.Spec.Containers {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == container.Name {
+				if pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", container.Name)] == "Sidecar" {
+					sidecarsStatus.SidecarsPresent = true
+					if !status.Ready {
+						glog.Infof("Pod %s: %s: sidecar not ready", format.Pod(pod), container.Name)
+						sidecarsStatus.SidecarsReady = false
+					} else {
+						glog.Infof("Pod %s: %s: sidecar is ready", format.Pod(pod), container.Name)
+					}
+				} else if status.State.Waiting != nil {
+					// check if non-sidecars have started
+					glog.Infof("Pod: %s: %s: non-sidecar waiting", format.Pod(pod), container.Name)
+					sidecarsStatus.ContainersWaiting = true
+				}
+			}
+		}
+	}
+	return sidecarsStatus
 }

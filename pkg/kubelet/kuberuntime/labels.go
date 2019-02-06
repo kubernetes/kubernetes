@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -39,6 +39,7 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerSidecarLabel                  = "com.lyft.sidecars.container-lifecycle"
 )
 
 type labeledPodSandboxInfo struct {
@@ -64,6 +65,7 @@ type labeledContainerInfo struct {
 type annotatedContainerInfo struct {
 	Hash                      uint64
 	RestartCount              int
+	Sidecar                   bool
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
 	TerminationMessagePath    string
@@ -117,6 +119,11 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
+
+	annotations[containerSidecarLabel] = "Default"
+	if isSidecar(pod, container.Name) {
+		annotations[containerSidecarLabel] = "Sidecar"
+	}
 
 	if pod.DeletionGracePeriodSeconds != nil {
 		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
@@ -202,6 +209,9 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	}
 	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
 		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
+	}
+	if getStringValueFromLabel(annotations, containerSidecarLabel) == "Sidecar" {
+		containerInfo.Sidecar = true
 	}
 
 	preStopHandler := &v1.Handler{}
