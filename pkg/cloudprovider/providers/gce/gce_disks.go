@@ -32,7 +32,6 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
@@ -749,7 +748,7 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	}
 
 	// GCE resizes in chunks of GiBs
-	requestGIB := volumeutil.RoundUpToGiB(newSize)
+	requestGIB := volumehelpers.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return

@@ -62,7 +62,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 )
 
 // NLBHealthCheckRuleDescription is the comment used on a security group rule to
@@ -2604,7 +2604,7 @@ func (c *Cloud) ResizeDisk(
 		return oldSize, descErr
 	}
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpToGiB(newSize)
+	requestGiB := volumehelpers.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return

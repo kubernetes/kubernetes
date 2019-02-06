@@ -32,7 +32,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -413,7 +413,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 	}
 
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGiB, err := volumeutil.RoundUpToGiBInt(newSize)
+	volSizeGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
 	if err != nil {
 		return oldSize, err
 	}
