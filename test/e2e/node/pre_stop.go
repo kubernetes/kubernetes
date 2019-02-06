@@ -219,6 +219,67 @@ var _ = SIGDescribe("PreStop", func() {
 			return false, err
 		})
 	})
+
+	It("should block the Pod get terminated until preStop process finishes within termination grace period", func() {
+		gracefulTerminationPeriodSeconds := int64(60)
+		preStopProcessSec := 30
+		start := time.Now()
+		preStopFinish := start.Add(time.Second * time.Duration(preStopProcessSec))
+
+		By("creating the pod")
+		name := "pod-prestop-hook-" + string(uuid.NewUUID())
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:    name,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "sleep 10"},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.Handler{
+								Exec: &v1.ExecAction{
+									Command: []string{"sh", "-c", fmt.Sprintf("sleep %d", preStopProcessSec)},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		podClient.Create(pod)
+
+		By("waiting for pod running")
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		var err error
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to get scheduled preStop pod")
+
+		By("deleting the pod gracefully")
+		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+
+		By("verifying the pod running state while preStop completes during graceful termination period")
+		// On specified interval, get preStop-pod status and check container status
+		err = wait.Poll(time.Second*3, time.Second*time.Duration(gracefulTerminationPeriodSeconds), func() (bool, error) {
+			now := time.Now()
+			kubeletPod, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
+			Expect(err).ShouldNot(HaveOccurred(), "Pod MUST NOT be terminated without finishing preStop process wihtin graceful termination period")
+
+			By("Pod terminating gracefully")
+			Expect(kubeletPod.ObjectMeta.DeletionTimestamp).ToNot(BeNil())
+
+			framework.Logf("Expect Pod Phase : %v\nContainerCreatedAt: %v\npreStopFinishBy: %v\nNow: %v\nElapsed: %v", kubeletPod.Status.Phase, start, preStopFinish, now, time.Since(start))
+			if time.Since(preStopFinish) < time.Since(now) {
+				Expect(kubeletPod.Status.Phase).ToNot(Equal(v1.PodSucceeded), "Pod MUST NOT be in Succeeded phase without finishing preStop process within graceful termination period")
+				return false, nil
+			}
+			Expect(kubeletPod.Status.Phase).To(Equal(v1.PodSucceeded))
+			return true, nil
+		})
+	})
 })
 
 func getPodWithpreStopLifeCycle(name string) *v1.Pod {
