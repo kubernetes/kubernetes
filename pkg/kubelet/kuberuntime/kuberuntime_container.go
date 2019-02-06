@@ -289,7 +289,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 			// do not record the message in the event so that secrets won't leak from the server.
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, "PostStartHook failed")
 			if err := m.killContainer(ctx, pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
-				klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
+				klog.ErrorS(fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr), "Failed to kill container", "pod", klog.KObj(pod),
 					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			}
 			return msg, ErrPostStartHook
@@ -673,6 +673,12 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 
 	l := getContainerInfoFromLabels(s.Labels)
 	a := getContainerInfoFromAnnotations(s.Annotations)
+
+	annotations := make(map[string]string)
+	if a.Sidecar {
+		annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", l.ContainerName)] = "Sidecar"
+	}
+
 	// Notice that the followings are not full spec. The container killing code should not use
 	// un-restored fields.
 	pod = &v1.Pod{
@@ -681,6 +687,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 			Name:                       l.PodName,
 			Namespace:                  l.PodNamespace,
 			DeletionGracePeriodSeconds: a.PodDeletionGracePeriod,
+			Annotations:                annotations,
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: a.PodTerminationGracePeriod,
@@ -759,17 +766,54 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(runningPod.Containers))
+	// split out sidecars and non-sidecars
+	var (
+		sidecars    []*kubecontainer.Container
+		nonSidecars []*kubecontainer.Container
+	)
 	for _, container := range runningPod.Containers {
+		if isSidecar(pod, container.Name) {
+			sidecars = append(sidecars, container)
+		} else {
+			nonSidecars = append(nonSidecars, container)
+		}
+	}
+	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+	// non-sidecars first
+	start := time.Now()
+	klog.Infof("Pod: %s, killContainersWithSyncResult: killing %d non-sidecars, %s termination period", runningPod.Name, len(nonSidecars), gracePeriodOverride)
+	nonSidecarsWg := sync.WaitGroup{}
+	nonSidecarsWg.Add(len(nonSidecars))
+	for _, container := range nonSidecars {
+		go func(container *kubecontainer.Container) {
+			defer utilruntime.HandleCrash()
+			defer nonSidecarsWg.Done()
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
+			if err := m.killContainer(ctx, pod, container.ID, container.Name, "Need to kill Pod", reasonUnknown, gracePeriodOverride); err != nil {
+				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+			}
+			containerResults <- killContainerResult
+		}(container)
+	}
+	nonSidecarsWg.Wait()
+
+	gracePeriodDuration := (time.Duration(*gracePeriodOverride) * time.Second) - time.Since(start)
+	if gracePeriodDuration < 0 {
+		gracePeriodDuration = 0
+	}
+	gracePeriod := int64(gracePeriodDuration.Seconds())
+
+	// then sidecars
+	klog.Infof("Pod: %s, killContainersWithSyncResult: killing %d sidecars, %s left", runningPod.Name, len(sidecars), gracePeriodDuration.Seconds())
+	wg := sync.WaitGroup{}
+	wg.Add(len(sidecars))
+	for _, container := range sidecars {
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(ctx, pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride); err != nil {
+			if err := m.killContainer(ctx, pod, container.ID, container.Name, "", reasonUnknown, &gracePeriod); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				// Use runningPod for logging as the pod passed in could be *nil*.
 				klog.ErrorS(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,

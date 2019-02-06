@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -110,6 +110,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -2639,30 +2640,22 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
-		if wasMirror {
-			if pod == nil {
-				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
-			// Static pods should be reconciled the same way as regular pods
-		}
-
-		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
-		// extra syncs may no longer be necessary. Reevaluate whether Reconcile and Sync can be
-		// merged (after resolving the next two TODOs).
+		sidecarsStatus := status.GetSidecarsStatus(pod)
 
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		// TODO: this should be unnecessary today - determine what is the cause for this to
 		// be different than Sync, or if there is a better place for it. For instance, we have
 		// needsReconcile in kubelet/config, here, and in status_manager.
 		if status.NeedToReconcilePodReadiness(pod) {
-			kl.podWorkers.UpdatePod(UpdatePodOptions{
-				Pod:        pod,
-				MirrorPod:  mirrorPod,
-				UpdateType: kubetypes.SyncPodSync,
-				StartTime:  start,
-			})
+			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		} else if sidecarsStatus.ContainersWaiting {
+			// if containers aren't running and the sidecars are all ready trigger a sync so that the containers get started
+			if sidecarsStatus.SidecarsPresent && sidecarsStatus.SidecarsReady {
+				klog.Infof("Pod: %s: sidecars: sidecars are ready, dispatching work", format.Pod(pod))
+				mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+				kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			}
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
