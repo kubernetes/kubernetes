@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -243,4 +244,18 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	meta.SetAnnotations(existingMeta.GetAnnotations())
 	meta.SetFinalizers(existingMeta.GetFinalizers())
 	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
+	meta.SetManagedFields(existingMeta.GetManagedFields())
 }
+
+// MarshalJSON implements json.Marshaler
+func (f Fields) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&f.Map)
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (f *Fields) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &f.Map)
+}
+
+var _ json.Marshaler = Fields{}
+var _ json.Unmarshaler = &Fields{}

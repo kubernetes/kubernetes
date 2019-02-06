@@ -202,7 +202,8 @@ while true; do sleep 1; done
 				},
 			} {
 				testCase := testCase
-				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
+				It(fmt.Sprintf("should report termination message %s [LinuxOnly]", testCase.name), func() {
+					// Cannot mount files in Windows Containers.
 					testCase.container.Name = "termination-message-container"
 					c := ConformanceContainer{
 						PodClient:     f.PodClient(),
@@ -271,13 +272,14 @@ while true; do sleep 1; done
 					waiting:     true,
 				},
 				{
-					description: "should be able to pull image from gcr.io",
+					description: "should be able to pull image from gcr.io [LinuxOnly]",
 					image:       "gcr.io/google-containers/debian-base:0.4.0",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
-					description: "should be able to pull image from docker hub",
+					// TODO(claudiub): Remove the [LinuxOnly] tag when a Windows-friendly image is used instead of alpine.
+					description: "should be able to pull image from docker hub [LinuxOnly]",
 					image:       "alpine:3.7",
 					phase:       v1.PodRunning,
 					waiting:     false,
@@ -289,7 +291,7 @@ while true; do sleep 1; done
 					waiting:     true,
 				},
 				{
-					description: "should be able to pull from private registry with secret",
+					description: "should be able to pull from private registry with secret [LinuxOnly]",
 					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					secret:      true,
 					phase:       v1.PodRunning,

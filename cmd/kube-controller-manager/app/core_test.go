@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -34,8 +35,11 @@ type TestClientBuilder struct {
 	clientset clientset.Interface
 }
 
-func (TestClientBuilder) Config(name string) (*restclient.Config, error)  { return nil, nil }
-func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config      { return nil }
+func (TestClientBuilder) Config(name string) (*restclient.Config, error) { return nil, nil }
+func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
+	return &restclient.Config{}
+}
+
 func (TestClientBuilder) Client(name string) (clientset.Interface, error) { return nil, nil }
 func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
 	return m.clientset
@@ -62,6 +66,10 @@ func (c *FakeClientSet) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryObj
 }
 
+func (c *FakeClientSet) GetPossibleResources() []*metav1.APIResourceList {
+	return c.DiscoveryObj.PossibleResources
+}
+
 // Create a fake Clientset with its Discovery method overridden.
 func NewFakeClientset(fakeDiscovery FakeDiscoveryWithError) *FakeClientSet {
 	cs := &FakeClientSet{}
@@ -69,7 +77,30 @@ func NewFakeClientset(fakeDiscovery FakeDiscoveryWithError) *FakeClientSet {
 	return cs
 }
 
-func TestStartResourceQuotaController_DiscoveryError(t *testing.T) {
+func possibleDiscoveryResource() []*metav1.APIResourceList {
+	return []*metav1.APIResourceList{
+		{
+			GroupVersion: "create/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "jobs",
+					Verbs:      []string{"create", "list", "watch", "delete"},
+					ShortNames: []string{"jz"},
+					Categories: []string{"all"},
+				},
+			},
+		},
+	}
+}
+
+type controllerInitFunc func(ControllerContext) (http.Handler, bool, error)
+
+func TestController_DiscoveryError(t *testing.T) {
+	controllerInitFuncMap := map[string]controllerInitFunc{
+		"ResourceQuotaController":    startResourceQuotaController,
+		"GarbageCollectorController": startGarbageCollectorController,
+	}
+
 	tcs := map[string]struct {
 		discoveryError    error
 		expectedErr       bool
@@ -77,25 +108,13 @@ func TestStartResourceQuotaController_DiscoveryError(t *testing.T) {
 	}{
 		"No Discovery Error": {
 			discoveryError:    nil,
-			possibleResources: nil,
+			possibleResources: possibleDiscoveryResource(),
 			expectedErr:       false,
 		},
 		"Discovery Calls Partially Failed": {
-			discoveryError: new(discovery.ErrGroupDiscoveryFailed),
-			possibleResources: []*metav1.APIResourceList{
-				{
-					GroupVersion: "create/v1",
-					APIResources: []metav1.APIResource{
-						{
-							Name:       "jobs",
-							Verbs:      []string{"create", "list", "watch", "delete"},
-							ShortNames: []string{"jz"},
-							Categories: []string{"all"},
-						},
-					},
-				},
-			},
-			expectedErr: false,
+			discoveryError:    new(discovery.ErrGroupDiscoveryFailed),
+			possibleResources: possibleDiscoveryResource(),
+			expectedErr:       false,
 		},
 	}
 	for name, test := range tcs {
@@ -107,9 +126,16 @@ func TestStartResourceQuotaController_DiscoveryError(t *testing.T) {
 			InformerFactory:  informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1)),
 			InformersStarted: make(chan struct{}),
 		}
-		_, _, err := startResourceQuotaController(ctx)
+		for funcName, controllerInit := range controllerInitFuncMap {
+			_, _, err := controllerInit(ctx)
+			if test.expectedErr != (err != nil) {
+				t.Errorf("%v test failed for use case: %v", funcName, name)
+			}
+		}
+		_, _, err := startModifiedNamespaceController(
+			ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
 		if test.expectedErr != (err != nil) {
-			t.Errorf("test failed for use case: %v", name)
+			t.Errorf("Namespace Controller test failed for use case: %v", name)
 		}
 	}
 }

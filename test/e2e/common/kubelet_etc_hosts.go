@@ -57,8 +57,9 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.
 			2. The Pod with hostNetwork=false but the container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be managed by the Kubelet.
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
+		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
 		By("Setting up the test")
 		config.setup()
 

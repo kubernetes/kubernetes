@@ -139,6 +139,12 @@ func (a byPriority) Len() int      { return len(a.specs) }
 func (a byPriority) Swap(i, j int) { a.specs[i], a.specs[j] = a.specs[j], a.specs[i] }
 func (a byPriority) Less(i, j int) bool {
 	// All local specs will come first
+	if a.specs[i].apiService.Spec.Service == nil && a.specs[j].apiService.Spec.Service != nil {
+		return true
+	}
+	if a.specs[i].apiService.Spec.Service != nil && a.specs[j].apiService.Spec.Service == nil {
+		return false
+	}
 	// WARNING: This will result in not following priorities for local APIServices.
 	if a.specs[i].apiService.Spec.Service == nil {
 		// Sort local specs with their name. This is the order in the delegation chain (aggregator first).

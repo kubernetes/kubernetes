@@ -129,8 +129,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	createCmd.Flags().StringVar(&cfgPath,
-		"config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+
+	options.AddConfigFlag(createCmd.Flags(), &cfgPath)
 	createCmd.Flags().BoolVar(&printJoinCommand,
 		"print-join-command", false, "Instead of printing only the token, print the full 'kubeadm join' flag needed to join the cluster using the token.")
 	bto.AddTTLFlagWithName(createCmd.Flags(), "ttl")

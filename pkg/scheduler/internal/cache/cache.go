@@ -108,12 +108,12 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	nodes := make(map[string]*schedulernodeinfo.NodeInfo)
+	nodes := make(map[string]*schedulernodeinfo.NodeInfo, len(cache.nodes))
 	for k, v := range cache.nodes {
 		nodes[k] = v.Clone()
 	}
 
-	assumedPods := make(map[string]bool)
+	assumedPods := make(map[string]bool, len(cache.assumedPods))
 	for k, v := range cache.assumedPods {
 		assumedPods[k] = v
 	}

@@ -252,6 +252,19 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+
+	// ManagedFields maps workflow-id and version to the set of fields
+	// that are managed by that workflow. This is mostly for internal
+	// housekeeping, and users typically shouldn't need to set or
+	// understand this field. A workflow can be the user's name, a
+	// controller's name, or the name of a specific apply path like
+	// "ci-cd". The set of fields is always in the version that the
+	// workflow used when modifying the object.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
+	// +optional
+	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -494,7 +507,30 @@ type CreateOptions struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PatchOptions may be provided when patching an API object.
+// PatchOptions is meant to be a superset of UpdateOptions.
+type PatchOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// Force is going to "force" Apply requests. It means user will
+	// re-acquire conflicting fields owned by other people. Force
+	// flag must be unset for non-apply patch requests.
+	// +optional
+	Force *bool `json:"force,omitempty" protobuf:"varint,2,opt,name=force"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // UpdateOptions may be provided when updating an API object.
+// All fields in UpdateOptions should also be present in PatchOptions.
 type UpdateOptions struct {
 	TypeMeta `json:",inline"`
 
@@ -1009,3 +1045,49 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
+// that the fieldset applies to.
+type ManagedFieldsEntry struct {
+	// Manager is an identifier of the workflow managing these fields.
+	Manager string `json:"manager,omitempty" protobuf:"bytes,1,opt,name=manager"`
+	// Operation is the type of operation which lead to this ManagedFieldsEntry being created.
+	// The only valid values for this field are 'Apply' and 'Update'.
+	Operation ManagedFieldsOperationType `json:"operation,omitempty" protobuf:"bytes,2,opt,name=operation,casttype=ManagedFieldsOperationType"`
+	// APIVersion defines the version of this resource that this field set
+	// applies to. The format is "group/version" just like the top-level
+	// APIVersion field. It is necessary to track the version of a field
+	// set because it cannot be automatically converted.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+	// +optional
+	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
+	// Fields identifies a set of fields.
+	// +optional
+	Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
+}
+
+// ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
+type ManagedFieldsOperationType string
+
+const (
+	ManagedFieldsOperationApply  ManagedFieldsOperationType = "Apply"
+	ManagedFieldsOperationUpdate ManagedFieldsOperationType = "Update"
+)
+
+// Fields stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+type Fields struct {
+	// Map stores a set of fields in a data structure like a Trie.
+	//
+	// Each key is either a '.' representing the field itself, and will always map to an empty set,
+	// or a string representing a sub-field or item. The string will follow one of these four formats:
+	// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
+	// 'v:<value>', where <value> is the exact json formatted value of a list item
+	// 'i:<index>', where <index> is position of a item in a list
+	// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
+	// If a key maps to an empty Fields value, the field that key represents is part of the set.
+	//
+	// The exact format is defined in k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
+	Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
+}

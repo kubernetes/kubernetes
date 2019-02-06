@@ -1642,7 +1642,21 @@ func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
 	return c.predicate
 }
 
+func podHasPVCs(pod *v1.Pod) bool {
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	// If pod does not request any PVC, we don't need to do anything.
+	if !podHasPVCs(pod) {
+		return true, nil, nil
+	}
+
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")

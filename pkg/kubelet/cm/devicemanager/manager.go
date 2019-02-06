@@ -612,7 +612,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	devicesInUse := m.allocatedDevices[resource]
 	// Gets a list of available devices.
 	available := m.healthyDevices[resource].Difference(devicesInUse)
-	if int(available.Len()) < needed {
+	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
 	allocated := available.UnsortedList()[:needed]

@@ -1345,6 +1345,11 @@ EOF
 ADDON_MANAGER_LEADER_ELECTION: $(yaml-quote ${ADDON_MANAGER_LEADER_ELECTION})
 EOF
     fi
+    if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+API_SERVER_TEST_LOG_LEVEL: $(yaml-quote ${API_SERVER_TEST_LOG_LEVEL})
+EOF
+    fi
 
   else
     # Node-only env vars.
