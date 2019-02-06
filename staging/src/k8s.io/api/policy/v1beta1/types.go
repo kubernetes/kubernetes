@@ -244,6 +244,11 @@ type PodSecurityPolicySpec struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
+	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
+	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
+	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
+	// +optional
+	RuntimeClass *RuntimeClassStrategyOptions `json:"runtimeClass,omitempty" protobuf:"bytes,24,opt,name=runtimeClass"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -448,6 +453,25 @@ const (
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
+
+// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
+// for a pod.
+type RuntimeClassStrategyOptions struct {
+	// allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod.
+	// A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
+	// list. An empty list requires the RuntimeClassName field to be unset.
+	AllowedRuntimeClassNames []string `json:"allowedRuntimeClassNames" protobuf:"bytes,1,rep,name=allowedRuntimeClassNames"`
+	// defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
+	// The default MUST be allowed by the allowedRuntimeClassNames list.
+	// A value of nil does not mutate the Pod.
+	// +optional
+	DefaultRuntimeClassName *string `json:"defaultRuntimeClassName,omitempty" protobuf:"bytes,2,opt,name=defaultRuntimeClassName"`
+}
+
+// AllowAllRuntimeClassNames can be used as a value for the
+// RuntimeClassStrategyOptions.AllowedRuntimeClassNames field and means that any RuntimeClassName is
+// allowed.
+const AllowAllRuntimeClassNames = "*"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
