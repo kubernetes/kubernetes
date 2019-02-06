@@ -33,6 +33,7 @@ type DeleteFlags struct {
 	FieldSelector *string
 
 	All            *bool
+	AllNamespaces  *bool
 	Cascade        *bool
 	Force          *bool
 	GracePeriod    *int
@@ -67,6 +68,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 
 	if f.All != nil {
 		options.DeleteAll = *f.All
+	}
+	if f.AllNamespaces != nil {
+		options.DeleteAllNamespaces = *f.AllNamespaces
 	}
 	if f.Cascade != nil {
 		options.Cascade = *f.Cascade
@@ -104,6 +108,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.All != nil {
 		cmd.Flags().BoolVar(f.All, "all", *f.All, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	}
+	if f.AllNamespaces != nil {
+		cmd.Flags().BoolVarP(f.AllNamespaces, "all-namespaces", "A", *f.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	}
 	if f.Force != nil {
 		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
 	}
@@ -137,6 +144,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 
 	// setup command defaults
 	all := false
+	allNamespaces := false
 	force := false
 	ignoreNotFound := false
 	now := false
@@ -158,6 +166,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		GracePeriod: &gracePeriod,
 
 		All:            &all,
+		AllNamespaces:  &allNamespaces,
 		Force:          &force,
 		IgnoreNotFound: &ignoreNotFound,
 		Now:            &now,

@@ -35,6 +35,7 @@ source "${KUBE_ROOT}/test/cmd/certificate.sh"
 source "${KUBE_ROOT}/test/cmd/core.sh"
 source "${KUBE_ROOT}/test/cmd/crd.sh"
 source "${KUBE_ROOT}/test/cmd/create.sh"
+source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
@@ -497,6 +498,13 @@ runTests() {
     ######################
     if kube::test::if_supports_resource "${secrets}" ; then
       record_command run_create_secret_tests
+    fi
+
+    ######################
+    # Delete             #
+    ######################
+    if kube::test::if_supports_resource "${configmaps}" ; then
+      record_command run_kubectl_delete_allnamespaces_tests
     fi
 
     ##################

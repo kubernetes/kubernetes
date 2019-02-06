@@ -3,15 +3,17 @@
 	"GoVersion": "go1.11",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
-		"github.com/onsi/ginkgo/ginkgo",
-		"github.com/jteeuwen/go-bindata/go-bindata",
+		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+		"github.com/cespare/prettybench",
 		"github.com/client9/misspell/cmd/misspell",
 		"github.com/cloudflare/cfssl/cmd/cfssl",
 		"github.com/cloudflare/cfssl/cmd/cfssljson",
-		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+		"github.com/jstemmer/go-junit-report",
+		"github.com/jteeuwen/go-bindata/go-bindata",
+		"github.com/onsi/ginkgo/ginkgo",
+		"golang.org/x/lint/golint",
 		"k8s.io/kube-openapi/cmd/openapi-gen",
 		"k8s.io/repo-infra/kazel",
-		"golang.org/x/lint/golint",
 		"./..."
 	],
 	"Deps": [
@@ -487,6 +489,10 @@
 			"ImportPath": "github.com/blang/semver",
 			"Comment": "v3.5.0",
 			"Rev": "b38d23b8782a487059e8fc8773e9a5b228a77cb6"
+		},
+		{
+			"ImportPath": "github.com/cespare/prettybench",
+			"Rev": "03b8cfe5406ce67a0b0da46f0c9e78b3d915a2c1"
 		},
 		{
 			"ImportPath": "github.com/chai2010/gettext-go/gettext",
@@ -2375,6 +2381,18 @@
 			"Rev": "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
 		},
 		{
+			"ImportPath": "github.com/jstemmer/go-junit-report",
+			"Rev": "af01ea7f8024089b458d804d5cdf190f962a9a0c"
+		},
+		{
+			"ImportPath": "github.com/jstemmer/go-junit-report/formatter",
+			"Rev": "af01ea7f8024089b458d804d5cdf190f962a9a0c"
+		},
+		{
+			"ImportPath": "github.com/jstemmer/go-junit-report/parser",
+			"Rev": "af01ea7f8024089b458d804d5cdf190f962a9a0c"
+		},
+		{
 			"ImportPath": "github.com/jteeuwen/go-bindata",
 			"Comment": "v3.0.7-72-ga0ff2567cfb709",
 			"Rev": "a0ff2567cfb70903282db057e799fd826784d41d"
@@ -3624,31 +3642,59 @@
 		},
 		{
 			"ImportPath": "golang.org/x/tools/benchmark/parse",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/container/intsets",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/ast/astutil",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/gcexportdata",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
-			"ImportPath": "golang.org/x/tools/go/gcimporter15",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"ImportPath": "golang.org/x/tools/go/internal/cgo",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/gcimporter",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/packagesdriver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/packages",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/vcs",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/imports",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/fastwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/gopathwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/module",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/semver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "gonum.org/v1/gonum/blas",

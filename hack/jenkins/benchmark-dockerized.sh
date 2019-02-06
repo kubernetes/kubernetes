@@ -33,7 +33,7 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/cespare/prettybench
+go install k8s.io/kubernetes/vendor/github.com/cespare/prettybench
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
