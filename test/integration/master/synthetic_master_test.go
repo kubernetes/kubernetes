@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -48,6 +47,7 @@ import (
 	clientsetv1 "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
@@ -305,20 +305,20 @@ func TestObjectSizeResponses(t *testing.T) {
 	const finalizerString = "sample/sample"
 	// for given labelString and finalizerString, size of the object returned by constructBody is increased by factor*(size passed)
 	const factor = 16
-	Deployment1_5MegabyteSize := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
-	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
+	Deployment1_5MB := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
+	Deployment2MB := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
 	expectedMsgFor1_5MB := `etcdserver: request is too large`
 	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
 
-	deployment1 := constructBody(labelString, Deployment1_5MegabyteSize, "labels", t) // >1.5 MB file
-	deployment2 := constructBody(labelString, DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+	deployment1 := constructBody(labelString, Deployment1_5MB, "labels", t) // >1.5 MB file
+	deployment2 := constructBody(labelString, Deployment2MB, "labels", t)   // >2 MB file
 
-	deployment3 := constructBody(labelString, Deployment1_5MegabyteSize, "annotations", t)
+	deployment3 := constructBody(labelString, Deployment1_5MB, "annotations", t)
 
-	deployment4 := constructBody(finalizerString, Deployment1_5MegabyteSize, "finalizers", t) // >1.5 MB file
-	deployment5 := constructBody(finalizerString, DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+	deployment4 := constructBody(finalizerString, Deployment1_5MB, "finalizers", t) // >1.5 MB file
+	deployment5 := constructBody(finalizerString, Deployment2MB, "finalizers", t)   // >2 MB file
 
 	requests := []struct {
 		size             string
@@ -347,10 +347,6 @@ func TestObjectSizeResponses(t *testing.T) {
 }
 
 func TestConstructBody(t *testing.T) {
-
-	// Initial size of deploymentObject initialized in constructBody once converted to json
-	const deploymentObjectSize = 372
-
 	// For the following labelString, each additional label or annotation will add a string of the form
 	// ,"0000000001":""
 	// For the finalizerString, each additional finalizer will add
@@ -360,40 +356,25 @@ func TestConstructBody(t *testing.T) {
 	const finalizerString = "sample/sample"
 	const factor = 16
 
-	// Adding a label of size 1 appends the following data:
-	// ,"labels":{"0000000000":""}
-	// which has length 27
-	// This means the additional size for the first label is 27-factor = 27-16 = 11
-	// So for a label, expected size = base size + additional size for first label + factor*size, or 372 + 11 + 16*size
-	const baseLabelSize = deploymentObjectSize + 11
+	Deployment1_5MB := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
+	Deployment2MB := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
-	// Adding an annotation of size 1 will add
-	// ,"annotations":{"0000000000":""}
-	// which has length 32, so the first annotation has additional size of 32-16=16
-	const baseAnnotationsSize = deploymentObjectSize + 16
-
-	// Adding	an annotation of size 1 will add
-	// ,"finalizers":["sample/sample"]
-	// which has length 31, so the first finalizer has additional size of 31-16=15
-	const baseFinalizersSize = deploymentObjectSize + 15
-
-	Deployment1_5MegabyteSize := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
-	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
+	Bytes1_5MB := int(1.5 * (1 << 20))
+	Bytes2MB := int(2 * (1 << 20))
+	Bytes2_5MB := int(2.5 * (1 << 20))
 
 	requests := []struct {
-		val          string
-		size         int
-		field        string
-		expectedSize int
+		val     string
+		size    int
+		minSize int
+		maxSize int
+		field   string
 	}{
-		{labelString, 1, "labels", baseLabelSize + factor*1},
-		{labelString, Deployment1_5MegabyteSize, "labels", baseLabelSize + factor*Deployment1_5MegabyteSize},
-		{labelString, DeploymentTwoMegabyteSize, "labels", baseLabelSize + factor*DeploymentTwoMegabyteSize},
-		{labelString, 1, "annotations", baseAnnotationsSize + factor*1},
-		{labelString, Deployment1_5MegabyteSize, "annotations", baseAnnotationsSize + factor*Deployment1_5MegabyteSize},
-		{finalizerString, 1, "finalizers", baseFinalizersSize + factor*1},
-		{finalizerString, Deployment1_5MegabyteSize, "finalizers", baseFinalizersSize + factor*Deployment1_5MegabyteSize},
-		{finalizerString, DeploymentTwoMegabyteSize, "finalizers", baseFinalizersSize + factor*DeploymentTwoMegabyteSize},
+		{labelString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "labels"},
+		{labelString, Deployment2MB, Bytes2MB, Bytes2_5MB, "labels"},
+		{labelString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "annotations"},
+		{finalizerString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "finalizers"},
+		{finalizerString, Deployment2MB, Bytes2MB, Bytes2_5MB, "finalizers"},
 	}
 
 	for _, r := range requests {
@@ -403,8 +384,8 @@ func TestConstructBody(t *testing.T) {
 
 			if err != nil {
 				t.Errorf("could not encode deployment object: %s", err.Error())
-			} else if len(data) != r.expectedSize {
-				t.Errorf("expected size %d; got %d", r.expectedSize, len(data))
+			} else if len(data) < r.minSize || len(data) > r.maxSize {
+				t.Errorf("expected size between %d and %d; got %d", r.minSize, r.maxSize, len(data))
 			}
 		})
 	}

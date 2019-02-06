@@ -25,6 +25,7 @@ go_test(
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",
