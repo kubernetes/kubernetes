@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// This file is a copy of $GOROOT/src/go/internal/gcimporter/gcimporter.go,
+// This file is a modified copy of $GOROOT/src/go/internal/gcimporter/gcimporter.go,
 // but it also contains the original source-based importer code for Go1.6.
 // Once we stop supporting 1.6, we can remove that code.
 
-// Package gcimporter15 provides various functions for reading
+// Package gcimporter provides various functions for reading
 // gc-generated object files that can be used to implement the
 // Importer interface defined by the Go 1.5 standard library package.
-//
-// Deprecated: this package will be deleted in October 2017.
-// New code should use golang.org/x/tools/go/gcexportdata.
-//
 package gcimporter
 
 import (
@@ -20,7 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
-	exact "go/constant"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"io"
@@ -59,6 +55,7 @@ func FindPkg(path, srcDir string) (filename, id string) {
 		}
 		bp, _ := build.Import(path, srcDir, build.FindOnly|build.AllowBinary)
 		if bp.PkgObj == "" {
+			id = path // make sure we have an id to print in error message
 			return
 		}
 		noext = strings.TrimSuffix(bp.PkgObj, ".a")
@@ -131,51 +128,91 @@ func ImportData(packages map[string]*types.Package, filename, id string, data io
 // the corresponding package object to the packages map, and returns the object.
 // The packages map must contain all packages already imported.
 //
-func Import(packages map[string]*types.Package, path, srcDir string) (pkg *types.Package, err error) {
-	filename, id := FindPkg(path, srcDir)
-	if filename == "" {
+func Import(packages map[string]*types.Package, path, srcDir string, lookup func(path string) (io.ReadCloser, error)) (pkg *types.Package, err error) {
+	var rc io.ReadCloser
+	var filename, id string
+	if lookup != nil {
+		// With custom lookup specified, assume that caller has
+		// converted path to a canonical import path for use in the map.
 		if path == "unsafe" {
 			return types.Unsafe, nil
 		}
-		err = fmt.Errorf("can't find import: %s", id)
-		return
-	}
+		id = path
 
-	// no need to re-import if the package was imported completely before
-	if pkg = packages[id]; pkg != nil && pkg.Complete() {
-		return
-	}
-
-	// open file
-	f, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	defer func() {
-		f.Close()
-		if err != nil {
-			// add file name to error
-			err = fmt.Errorf("reading export data: %s: %v", filename, err)
+		// No need to re-import if the package was imported completely before.
+		if pkg = packages[id]; pkg != nil && pkg.Complete() {
+			return
 		}
-	}()
+		f, err := lookup(path)
+		if err != nil {
+			return nil, err
+		}
+		rc = f
+	} else {
+		filename, id = FindPkg(path, srcDir)
+		if filename == "" {
+			if path == "unsafe" {
+				return types.Unsafe, nil
+			}
+			return nil, fmt.Errorf("can't find import: %q", id)
+		}
+
+		// no need to re-import if the package was imported completely before
+		if pkg = packages[id]; pkg != nil && pkg.Complete() {
+			return
+		}
+
+		// open file
+		f, err := os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				// add file name to error
+				err = fmt.Errorf("%s: %v", filename, err)
+			}
+		}()
+		rc = f
+	}
+	defer rc.Close()
 
 	var hdr string
-	buf := bufio.NewReader(f)
+	buf := bufio.NewReader(rc)
 	if hdr, err = FindExportData(buf); err != nil {
 		return
 	}
 
 	switch hdr {
 	case "$$\n":
+		// Work-around if we don't have a filename; happens only if lookup != nil.
+		// Either way, the filename is only needed for importer error messages, so
+		// this is fine.
+		if filename == "" {
+			filename = path
+		}
 		return ImportData(packages, filename, id, buf)
+
 	case "$$B\n":
 		var data []byte
 		data, err = ioutil.ReadAll(buf)
-		if err == nil {
-			fset := token.NewFileSet()
-			_, pkg, err = BImportData(fset, packages, data, id)
-			return
+		if err != nil {
+			break
 		}
+
+		// TODO(gri): allow clients of go/importer to provide a FileSet.
+		// Or, define a new standard go/types/gcexportdata package.
+		fset := token.NewFileSet()
+
+		// The indexed export format starts with an 'i'; the older
+		// binary export format starts with a 'c', 'd', or 'v'
+		// (from "version"). Select appropriate importer.
+		if len(data) > 0 && data[0] == 'i' {
+			_, pkg, err = IImportData(fset, packages, data[1:], id)
+		} else {
+			_, pkg, err = BImportData(fset, packages, data, id)
+		}
+
 	default:
 		err = fmt.Errorf("unknown export data header: %q", hdr)
 	}
@@ -767,9 +804,9 @@ func (p *parser) parseInt() string {
 
 // number = int_lit [ "p" int_lit ] .
 //
-func (p *parser) parseNumber() (typ *types.Basic, val exact.Value) {
+func (p *parser) parseNumber() (typ *types.Basic, val constant.Value) {
 	// mantissa
-	mant := exact.MakeFromLiteral(p.parseInt(), token.INT, 0)
+	mant := constant.MakeFromLiteral(p.parseInt(), token.INT, 0)
 	if mant == nil {
 		panic("invalid mantissa")
 	}
@@ -782,14 +819,14 @@ func (p *parser) parseNumber() (typ *types.Basic, val exact.Value) {
 			p.error(err)
 		}
 		if exp < 0 {
-			denom := exact.MakeInt64(1)
-			denom = exact.Shift(denom, token.SHL, uint(-exp))
+			denom := constant.MakeInt64(1)
+			denom = constant.Shift(denom, token.SHL, uint(-exp))
 			typ = types.Typ[types.UntypedFloat]
-			val = exact.BinaryOp(mant, token.QUO, denom)
+			val = constant.BinaryOp(mant, token.QUO, denom)
 			return
 		}
 		if exp > 0 {
-			mant = exact.Shift(mant, token.SHL, uint(exp))
+			mant = constant.Shift(mant, token.SHL, uint(exp))
 		}
 		typ = types.Typ[types.UntypedFloat]
 		val = mant
@@ -820,7 +857,7 @@ func (p *parser) parseConstDecl() {
 
 	p.expect('=')
 	var typ types.Type
-	var val exact.Value
+	var val constant.Value
 	switch p.tok {
 	case scanner.Ident:
 		// bool_lit
@@ -828,7 +865,7 @@ func (p *parser) parseConstDecl() {
 			p.error("expected true or false")
 		}
 		typ = types.Typ[types.UntypedBool]
-		val = exact.MakeBool(p.lit == "true")
+		val = constant.MakeBool(p.lit == "true")
 		p.next()
 
 	case '-', scanner.Int:
@@ -852,18 +889,18 @@ func (p *parser) parseConstDecl() {
 		p.expectKeyword("i")
 		p.expect(')')
 		typ = types.Typ[types.UntypedComplex]
-		val = exact.BinaryOp(re, token.ADD, exact.MakeImag(im))
+		val = constant.BinaryOp(re, token.ADD, constant.MakeImag(im))
 
 	case scanner.Char:
 		// rune_lit
 		typ = types.Typ[types.UntypedRune]
-		val = exact.MakeFromLiteral(p.lit, token.CHAR, 0)
+		val = constant.MakeFromLiteral(p.lit, token.CHAR, 0)
 		p.next()
 
 	case scanner.String:
 		// string_lit
 		typ = types.Typ[types.UntypedString]
-		val = exact.MakeFromLiteral(p.lit, token.STRING, 0)
+		val = constant.MakeFromLiteral(p.lit, token.STRING, 0)
 		p.next()
 
 	default:

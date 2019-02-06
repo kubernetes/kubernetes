@@ -2,17 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "bexport.go",
-        "bimport.go",
-        "exportdata.go",
-        "gcimporter.go",
-        "isAlias18.go",
-        "isAlias19.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/go/gcimporter15",
-    importpath = "golang.org/x/tools/go/gcimporter15",
+    srcs = ["formatter.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/jstemmer/go-junit-report/formatter",
+    importpath = "github.com/jstemmer/go-junit-report/formatter",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/jstemmer/go-junit-report/parser:go_default_library"],
 )
 
 filegroup(
