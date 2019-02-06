@@ -203,12 +203,12 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 	}
 }
 
-// NodeNameTriggerFunc returns value spec.nodename of given object.
+// NodeNameTriggerFunc returns value of spec.nodename of a given object.
 func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
 }
 
-// NodeNameIndexFunc return value spec.nodename of given object.
+// NodeNameIndexFunc return value of spec.nodename of a given object.
 func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
@@ -217,11 +217,21 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
+// NamespaceIndexFunc returns value of metadata.namespace of a given object.
+func NamespaceIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Namespace}, nil
+}
+
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.SelectorIndex) {
 		return &cache.Indexers{
-			storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
+			storage.FieldIndex("spec.nodeName"):      NodeNameIndexFunc,
+			storage.FieldIndex("metadata.namespace"): NamespaceIndexFunc,
 		}
 	}
 	return nil

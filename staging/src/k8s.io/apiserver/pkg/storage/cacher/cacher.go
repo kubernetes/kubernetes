@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -717,7 +718,12 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	matchValues := pred.MatcherIndex()
+	// TODO: Is there any better way to retrieve namespace (other than parsing "key")?
+	if namespace, ok := request.NamespaceFrom(ctx); ok && len(namespace) > 0 {
+		matchValues = append(matchValues, storage.MatchValue{IndexName: storage.FieldIndex("metadata.namespace"), Value: namespace})
+	}
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, matchValues, trace)
 	if err != nil {
 		return err
 	}

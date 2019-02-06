@@ -463,6 +463,9 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
 		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+			if matchValue.IndexName == "f:metadata.namespace" {
+				klog.Errorf("AAA: listing by namespace")
+			}
 			return result, w.resourceVersion, nil
 		}
 	}
