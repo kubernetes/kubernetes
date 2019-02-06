@@ -359,9 +359,9 @@ func TestConstructBody(t *testing.T) {
 	Deployment1_5MB := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
 	Deployment2MB := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
-	Bytes1_5MB := int(1.5 * (1 << 20))
-	Bytes2MB := int(2 * (1 << 20))
-	Bytes2_5MB := int(2.5 * (1 << 20))
+	Size1_5MB := int(1.5 * (1 << 20))
+	Size2MB := int(2 * (1 << 20))
+	Size2_5MB := int(2.5 * (1 << 20))
 
 	requests := []struct {
 		val     string
@@ -370,11 +370,11 @@ func TestConstructBody(t *testing.T) {
 		maxSize int
 		field   string
 	}{
-		{labelString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "labels"},
-		{labelString, Deployment2MB, Bytes2MB, Bytes2_5MB, "labels"},
-		{labelString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "annotations"},
-		{finalizerString, Deployment1_5MB, Bytes1_5MB, Bytes2MB, "finalizers"},
-		{finalizerString, Deployment2MB, Bytes2MB, Bytes2_5MB, "finalizers"},
+		{labelString, Deployment1_5MB, Size1_5MB, Size2MB, "labels"},
+		{labelString, Deployment2MB, Size2MB, Size2_5MB, "labels"},
+		{labelString, Deployment1_5MB, Size1_5MB, Size2MB, "annotations"},
+		{finalizerString, Deployment1_5MB, Size1_5MB, Size2MB, "finalizers"},
+		{finalizerString, Deployment2MB, Size2MB, Size2_5MB, "finalizers"},
 	}
 
 	for _, r := range requests {
