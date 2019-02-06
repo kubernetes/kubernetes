@@ -57,11 +57,15 @@ func newGVKParser(models proto.Models) (*gvkParser, error) {
 	for _, modelName := range models.ListModels() {
 		model := models.LookupModel(modelName)
 		if model == nil {
-			panic("ListModels returns a model that can't be looked-up.")
+			panic(fmt.Sprintf("ListModels returns a model that can't be looked-up for: %v", modelName))
 		}
 		gvkList := parseGroupVersionKind(model)
 		for _, gvk := range gvkList {
 			if len(gvk.Kind) > 0 {
+				_, ok := parser.gvks[gvk]
+				if ok {
+					return nil, fmt.Errorf("duplicate entry for %v", gvk)
+				}
 				parser.gvks[gvk] = modelName
 			}
 		}
