@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/kubernetes/pkg/volume/configmap"
-	"k8s.io/kubernetes/pkg/volume/csi"
+	csiconsts "k8s.io/kubernetes/pkg/volume/csi/constants"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/fc"
@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/kubernetes/pkg/volume/volumefakes"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -88,7 +89,11 @@ func volumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+
+	fakeCSIPlugin := &volumefakes.FakeKubeletWatchableVolumePlugin{}
+	fakeCSIPlugin.GetPluginNameReturns(csiconsts.CSIPluginName)
+	allPlugins = append(allPlugins, fakeCSIPlugin)
+
 	return allPlugins
 }
 
@@ -101,6 +106,7 @@ func NewHollowKubelet(
 	imageService internalapi.ImageManagerService,
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
+
 	d := &kubelet.Dependencies{
 		KubeClient:           client,
 		HeartbeatClient:      heartbeatClient,

@@ -72,12 +72,15 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
+	"k8s.io/kubernetes/pkg/volume/csi"
+	csiconsts "k8s.io/kubernetes/pkg/volume/csi/constants"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/kubernetes/pkg/volume/volumefakes"
 )
 
 func init() {
@@ -135,14 +138,14 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, fakeVolumePlugins())
 }
 
 func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool,
-	initFakeVolumePlugin bool) *TestKubelet {
+	volumePlugins testPluginList) *TestKubelet {
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeRuntime.RuntimeType = "test"
 	fakeRuntime.VersionInfo = "1.5.0"
@@ -302,19 +305,9 @@ func newTestKubeletWithImageList(
 	// Add this as cleanup predicate pod admitter
 	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
-	allPlugins := []volume.VolumePlugin{}
-	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
-	if initFakeVolumePlugin {
-		allPlugins = append(allPlugins, plug)
-	} else {
-		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
-		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	}
-
 	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), allPlugins, prober)
+		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), volumePlugins, prober)
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.volumeManager = kubeletvolume.NewVolumeManager(
@@ -345,7 +338,8 @@ func newTestKubeletWithImageList(
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
-	return &TestKubelet{kubelet, fakeRuntime, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
+
+	return &TestKubelet{kubelet, fakeRuntime, fakeKubeClient, fakeMirrorClient, fakeClock, nil, volumePlugins.fakePlugin()}
 }
 
 func newTestPods(count int) []*v1.Pod {
@@ -362,6 +356,37 @@ func newTestPods(count int) []*v1.Pod {
 		}
 	}
 	return pods
+}
+
+type testPluginList []volume.VolumePlugin
+
+func (pl testPluginList) fakePlugin() *volumetest.FakeVolumePlugin {
+	for _, p := range pl {
+		if fp, ok := p.(*volumetest.FakeVolumePlugin); ok {
+			return fp
+		}
+	}
+
+	return nil
+}
+
+func fakeVolumePlugins() testPluginList {
+	fakeCSIPlugin := &volumefakes.FakeKubeletWatchableVolumePlugin{}
+	fakeCSIPlugin.GetPluginNameReturns(csiconsts.CSIPluginName)
+
+	return []volume.VolumePlugin{
+		fakeCSIPlugin,
+		&volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil},
+	}
+}
+
+func defaultVolumePlugins() testPluginList {
+	p := csi.ProbeVolumePlugins()
+	p = append(p, awsebs.ProbeVolumePlugins()...)
+	p = append(p, gcepd.ProbeVolumePlugins()...)
+	p = append(p, azure_dd.ProbeVolumePlugins()...)
+
+	return p
 }
 
 func TestSyncLoopAbort(t *testing.T) {

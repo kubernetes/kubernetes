@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi:go_default_library",
+        "//pkg/volume/csi/constants:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

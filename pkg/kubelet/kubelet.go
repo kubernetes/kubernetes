@@ -115,7 +115,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -170,6 +169,10 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// csiPluginHandlerRegistrationPollInterval is the interval that is used for
+	// retrying the registration of the CSI plugin as a volume plugin handler.
+	csiPluginHandlerRegistrationPollInterval = 10 * time.Second
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -1298,13 +1301,38 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
+
 	// Adding Registration Callback function for CSI Driver
-	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
+	kl.registerCSIPluginHandler(kl.volumePluginMgr.GetCSIKubeletPluginHandler, csiPluginHandlerRegistrationPollInterval)
+
 	// Adding Registration Callback function for Device Manager
 	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 	// Start the plugin manager
 	klog.V(4).Infof("starting plugin manager")
 	go kl.pluginManager.Run(kl.sourcesReady, wait.NeverStop)
+}
+
+func (kl *Kubelet) registerCSIPluginHandler(getHandler func() (plugincache.PluginHandler, error), pollInterval time.Duration) {
+	tryRegister := func() (bool, error) {
+		handler, err := getHandler()
+		if err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			klog.Warningf("failed to get CSI Plugin Handler: %v", err)
+			return false, nil
+		}
+
+		kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, handler)
+		klog.Info("CSI Plugin Handler successfully registered with the Plugin Manager")
+		return true, nil
+	}
+
+	// try sync once
+	if ok, _ := tryRegister(); ok {
+		return
+	}
+
+	// retry in the background
+	go wait.PollUntil(pollInterval, tryRegister, wait.NeverStop)
 }
 
 // Run starts the kubelet reacting to config updates

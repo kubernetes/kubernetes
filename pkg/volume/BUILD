@@ -18,6 +18,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/pluginmanager/cache:go_default_library",
+        "//pkg/volume/csi/constants:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
@@ -125,6 +127,7 @@ filegroup(
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
         "//pkg/volume/validation:all-srcs",
+        "//pkg/volume/volumefakes:all-srcs",
         "//pkg/volume/vsphere_volume:all-srcs",
     ],
     tags = ["automanaged"],

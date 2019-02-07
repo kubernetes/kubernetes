@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/constants"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -105,13 +106,13 @@ func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
 
 // log prepends log string with `kubernetes.io/csi`
 func log(msg string, parts ...interface{}) string {
-	return fmt.Sprintf(fmt.Sprintf("%s: %s", CSIPluginName, msg), parts...)
+	return fmt.Sprintf(fmt.Sprintf("%s: %s", constants.CSIPluginName, msg), parts...)
 }
 
 // getVolumePluginDir returns the path where CSI plugin keeps metadata for given volume
 func getVolumePluginDir(specVolID string, host volume.VolumeHost) string {
 	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
-	return filepath.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID)
+	return filepath.Join(host.GetVolumeDevicePluginDir(constants.CSIPluginName), sanitizedSpecVolID)
 }
 
 // getVolumeDevicePluginDir returns the path where the CSI plugin keeps the

@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/constants"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -89,7 +90,7 @@ func (c *csiMountMgr) GetPath() string {
 
 func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) string {
 	specVolID := utilstrings.EscapeQualifiedName(specVolumeID)
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(CSIPluginName), specVolID)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(constants.CSIPluginName), specVolID)
 }
 
 // volume.Mounter methods

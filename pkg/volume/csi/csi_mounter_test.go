@@ -40,6 +40,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/constants"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -77,7 +78,7 @@ func TestMounterGetPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV(tc.specVolumeName, 10, testDriver, testVol)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
@@ -169,7 +170,7 @@ func TestMounterSetUp(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
-			registerFakePlugin(test.driver, "endpoint", []string{"1.0.0"}, t)
+			registerFakePlugin(plug, test.driver, "endpoint", []string{"1.0.0"}, t)
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
 			pv.Spec.CSI.VolumeAttributes = test.volumeContext
 			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
@@ -204,7 +205,7 @@ func TestMounterSetUp(t *testing.T) {
 				},
 				Spec: storage.VolumeAttachmentSpec{
 					NodeName: "test-node",
-					Attacher: CSIPluginName,
+					Attacher: constants.CSIPluginName,
 					Source: storage.VolumeAttachmentSource{
 						PersistentVolumeName: &pvName,
 					},
@@ -315,7 +316,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -449,7 +450,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec("ext4", []string{}),
@@ -552,7 +553,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		fakeClient := fakeclient.NewSimpleClientset(driver)
 		plug, tmpDir := newTestPlugin(t, fakeClient)
 		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -784,7 +785,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, tc.driverFSGroupPolicy)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV("test-pv", 10, testDriver, volName)
 		pv.Spec.AccessModes = tc.accessModes
 		pvName := pv.GetName()
@@ -851,7 +852,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount

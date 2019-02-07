@@ -30,20 +30,25 @@ var _ volume.MetricsProvider = &metricsCsi{}
 // capacity information for volume using volume path.
 
 type metricsCsi struct {
-	// the directory path the volume is mounted to.
+	// targetPath is the directory path the volume is mounted to
 	targetPath string
 
-	// Volume handle or id
+	// volumeID is the volume's handle or ID
 	volumeID string
 
-	//csiClient with cache
+	// driverName is the CSI driver's name
+	// Currently onl used to enrich log messages
+	driverName string
+
+	// csiClientGetter is the nested struct to construct, retrieve and cache the
+	// CSI client
 	csiClientGetter
 }
 
 // NewMetricsCsi creates a new metricsCsi with the Volume ID and path.
-func NewMetricsCsi(volumeID string, targetPath string, driverName csiDriverName) volume.MetricsProvider {
-	mc := &metricsCsi{volumeID: volumeID, targetPath: targetPath}
-	mc.csiClientGetter.driverName = driverName
+func NewMetricsCsi(driverName, volumeID, targetPath string, clientCreator clientCreatorFunc) volume.MetricsProvider {
+	mc := &metricsCsi{volumeID: volumeID, targetPath: targetPath, driverName: driverName}
+	mc.csiClientGetter.clientCreator = clientCreator
 	return mc
 }
 
@@ -64,8 +69,7 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 
 	// if plugin doesnot support volume status, return.
 	if !volumeStatsSet {
-		return nil, volume.NewNotSupportedErrorWithDriverName(
-			string(mc.csiClientGetter.driverName))
+		return nil, volume.NewNotSupportedErrorWithDriverName(mc.driverName)
 	}
 	// Get Volumestatus
 	metrics, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)

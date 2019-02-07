@@ -52,7 +52,7 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 		return false, errors.New(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
 	}
 
-	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))
+	csClient, err := c.newCsiDriverClient(csiDriverName(csiSource.Driver))
 	if err != nil {
 		return false, err
 	}

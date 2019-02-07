@@ -267,7 +267,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// lets check if node/unstage is supported
 	if c.csiClient == nil {
-		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
+		c.csiClient, err = c.plugin.newCsiDriverClient(csiDriverName(csiSource.Driver))
 		if err != nil {
 			return errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
 		}
@@ -525,7 +525,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
+		c.csiClient, err = c.plugin.newCsiDriverClient(csiDriverName(driverName))
 		if err != nil {
 			return errors.New(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
 		}

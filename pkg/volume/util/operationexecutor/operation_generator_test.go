@@ -17,6 +17,9 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"os"
+	"testing"
+
 	"github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
@@ -32,8 +35,6 @@ import (
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"os"
-	"testing"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the

@@ -32,6 +32,7 @@ import (
 
 // PluginManager runs a set of asynchronous loops that figure out which plugins
 // need to be registered/deregistered and makes it so.
+//go:generate counterfeiter -header ../../../hack/boilerplate/boilerplate.generatego.txt . PluginManager
 type PluginManager interface {
 	// Starts the plugin manager and all the asynchronous loops that it controls
 	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})

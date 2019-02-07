@@ -38,6 +38,7 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	csiconsts "k8s.io/kubernetes/pkg/volume/csi/constants"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -315,7 +316,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		}
 		unescapePluginName := utilstrings.UnescapeQualifiedName(volumePluginName)
 
-		if unescapePluginName != csi.CSIPluginName {
+		if unescapePluginName != csiconsts.CSIPluginName {
 			for _, volumeDir := range volumeDirs {
 				volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
 			}

@@ -27,6 +27,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/csi/constants"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -64,9 +65,9 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 	)
 	plugMgr := host.GetPluginMgr()
 
-	plug, err := plugMgr.FindPluginByName(csi.CSIPluginName)
+	plug, err := plugMgr.FindPluginByName(constants.CSIPluginName)
 	if err != nil {
-		t.Fatalf("can't find plugin %v", csi.CSIPluginName)
+		t.Fatalf("can't find plugin %v", constants.CSIPluginName)
 	}
 
 	// Wait until the informer in CSI volume plugin has all CSIDrivers.

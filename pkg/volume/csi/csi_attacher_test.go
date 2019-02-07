@@ -47,6 +47,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/constants"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -1579,9 +1580,9 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	)
 	plugMgr := host.GetPluginMgr()
 
-	plug, err := plugMgr.FindPluginByName(CSIPluginName)
+	plug, err := plugMgr.FindPluginByName(constants.CSIPluginName)
 	if err != nil {
-		t.Fatalf("can't find plugin %v", CSIPluginName)
+		t.Fatalf("can't find plugin %v", constants.CSIPluginName)
 	}
 
 	csiPlug, ok := plug.(*csiPlugin)

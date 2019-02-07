@@ -133,24 +133,6 @@ func newV1NodeClient(addr csiAddr) (nodeClient csipbv1.NodeClient, closer io.Clo
 	return nodeClient, conn, nil
 }
 
-func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
-	if driverName == "" {
-		return nil, fmt.Errorf("driver name is empty")
-	}
-
-	existingDriver, driverExists := csiDrivers.Get(string(driverName))
-	if !driverExists {
-		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
-	}
-
-	nodeV1ClientCreator := newV1NodeClient
-	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-	}, nil
-}
-
 func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
@@ -529,9 +511,11 @@ func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
 // initialization until needed.
 type csiClientGetter struct {
 	sync.RWMutex
-	csiClient  csiClient
-	driverName csiDriverName
+	csiClient     csiClient
+	clientCreator clientCreatorFunc
 }
+
+type clientCreatorFunc func() (*csiDriverClient, error)
 
 func (c *csiClientGetter) Get() (csiClient, error) {
 	c.RLock()
@@ -546,7 +530,7 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 	if c.csiClient != nil {
 		return c.csiClient, nil
 	}
-	csi, err := newCsiDriverClient(c.driverName)
+	csi, err := c.clientCreator()
 	if err != nil {
 		return nil, err
 	}

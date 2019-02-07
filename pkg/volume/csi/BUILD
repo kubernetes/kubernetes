@@ -17,8 +17,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/pluginmanager/cache:go_default_library",
         "//pkg/util/removeall:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csi/constants:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -64,6 +66,7 @@ go_test(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csi/constants:go_default_library",
         "//pkg/volume/csi/fake:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -105,6 +108,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/volume/csi/constants:all-srcs",
         "//pkg/volume/csi/fake:all-srcs",
         "//pkg/volume/csi/nodeinfomanager:all-srcs",
         "//pkg/volume/csi/testing:all-srcs",

@@ -32,6 +32,7 @@ filegroup(
         "//pkg/kubelet/pluginmanager/cache:all-srcs",
         "//pkg/kubelet/pluginmanager/metrics:all-srcs",
         "//pkg/kubelet/pluginmanager/operationexecutor:all-srcs",
+        "//pkg/kubelet/pluginmanager/pluginmanagerfakes:all-srcs",
         "//pkg/kubelet/pluginmanager/pluginwatcher:all-srcs",
         "//pkg/kubelet/pluginmanager/reconciler:all-srcs",
     ],

@@ -39,6 +39,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	plugincache "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	csiconsts "k8s.io/kubernetes/pkg/volume/csi/constants"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -317,6 +319,19 @@ type BlockVolumePlugin interface {
 	// from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk.
 	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
+}
+
+// KubeletWatchableVolumePlugin is an extended interface of VolumePlugin and
+// describes plugins that can be used as plugin handlers.
+//
+// This is used by the kubelet (via VolumePluginMgr.GetCSIKubeletPluginHandler)
+// to discover the CSI plugin and register it as a handler for kubelet's plugin
+// watcher.
+//go:generate counterfeiter -header ../../hack/boilerplate/boilerplate.generatego.txt . KubeletWatchableVolumePlugin
+type KubeletWatchableVolumePlugin interface {
+	VolumePlugin
+	// GetWatcherHandler returns the plugin handler aspect of the volume plugin
+	GetWatcherHandler() plugincache.PluginHandler
 }
 
 // TODO(#14217)
@@ -1015,6 +1030,21 @@ func (pm *VolumePluginMgr) FindNodeExpandablePluginByName(name string) (NodeExpa
 	}
 
 	return nil, nil
+}
+
+// GetCSIKubeletPluginHandler fetches the CSI plugin and retruns its plugin handler
+func (pm *VolumePluginMgr) GetCSIKubeletPluginHandler() (plugincache.PluginHandler, error) {
+	volumePlugin, err := pm.FindPluginByName(csiconsts.CSIPluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeletWatchablePlugin, ok := volumePlugin.(KubeletWatchableVolumePlugin)
+	if !ok {
+		return nil, fmt.Errorf("The CSI plugin is not a KubeletWatchablePlugin")
+	}
+
+	return kubeletWatchablePlugin.GetWatcherHandler(), nil
 }
 
 func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
