@@ -63,7 +63,7 @@ func runCommand(command string, args ...string) error {
 }
 
 // RunTest implements TestSuite.RunTest
-func (n *CAdvisorE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName string, timeout time.Duration) (string, error) {
+func (n *CAdvisorE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 

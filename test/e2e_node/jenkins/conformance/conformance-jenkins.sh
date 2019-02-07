@@ -40,4 +40,5 @@ go run test/e2e_node/runner/remote/run_remote.go  --test-suite=conformance \
   --results-dir="$ARTIFACTS" --test-timeout="$TIMEOUT" \
   --test_args="--kubelet-flags=\"$KUBELET_ARGS\"" \
   --instance-metadata="$GCE_INSTANCE_METADATA" \
-  --system-spec-name="$SYSTEM_SPEC_NAME"
+  --system-spec-name="$SYSTEM_SPEC_NAME" \
+  --extra-envs="$EXTRA_ENVS"
