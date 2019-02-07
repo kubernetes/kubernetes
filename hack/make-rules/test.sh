@@ -188,6 +188,10 @@ if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
 
+if [[ -n "${FULL_LOG:-}" ]] ; then
+  go_test_grep_pattern=".*"
+fi
+
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
