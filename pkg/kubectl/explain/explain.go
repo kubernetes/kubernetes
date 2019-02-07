@@ -17,6 +17,7 @@ limitations under the License.
 package explain
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -62,6 +63,9 @@ func PrintModelDescription(fieldsPath []string, w io.Writer, schema proto.Schema
 	schema, err := LookupSchemaForField(schema, fieldsPath)
 	if err != nil {
 		return err
+	}
+	if schema == nil {
+		return fmt.Errorf("couldn't find %q for %q", strings.Join(fieldsPath, "."), gvk)
 	}
 	b := fieldsPrinterBuilder{Recursive: recursive}
 	f := &Formatter{Writer: w, Wrap: 80}
