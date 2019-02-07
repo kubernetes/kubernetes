@@ -182,7 +182,7 @@ data:
       <rule>
         key $['kubernetes']['namespace_name']
         pattern ^(.+)$
-       tag $1
+        tag $1
        </rule>
     </match>
 
