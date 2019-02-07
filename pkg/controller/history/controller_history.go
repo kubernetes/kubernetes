@@ -72,7 +72,7 @@ func NewControllerRevision(parent metav1.Object,
 	}
 	cr := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: labelMap,
+			Labels:          labelMap,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
 		},
 		Data:     data,
