@@ -311,10 +311,7 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
-// Allocate is the call that you can use to allocate a set of devices
-// from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	pod := attrs.Pod
+func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
 	devicesToReuse := make(map[string]sets.String)
 	for _, container := range pod.Spec.InitContainers {
 		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
@@ -327,6 +324,18 @@ func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycl
 			return err
 		}
 		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
+	}
+	return nil
+}
+
+// Allocate is the call that you can use to allocate a set of devices
+// from the registered device plugins.
+func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	pod := attrs.Pod
+	err := m.allocatePodResources(pod)
+	if err != nil {
+		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
+		return err
 	}
 
 	m.mutex.Lock()
@@ -717,6 +726,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
 	podUID := string(pod.UID)
 	contName := container.Name
+	needsReAllocate := false
 	for k := range container.Resources.Limits {
 		resource := string(k)
 		if !m.isDevicePluginResource(resource) {
@@ -726,6 +736,16 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		if err != nil {
 			return nil, err
 		}
+		// This is a device plugin resource yet we don't have cached
+		// resource state. This is likely due to a race during node
+		// restart. We re-issue allocate request to cover this race.
+		if m.podDevices.containerDevices(podUID, contName, resource) == nil {
+			needsReAllocate = true
+		}
+	}
+	if needsReAllocate {
+		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
+		m.allocatePodResources(pod)
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
