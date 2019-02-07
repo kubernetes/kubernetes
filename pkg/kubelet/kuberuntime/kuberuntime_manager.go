@@ -505,10 +505,19 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 	if !done {
 		if next != nil {
-			initFailed := initLastStatus != nil && isContainerFailed(initLastStatus)
+			initFailed := initLastStatus != nil && isInitContainerFailed(initLastStatus)
 			if initFailed && !shouldRestartOnFailure(pod) {
 				changes.KillPod = true
 			} else {
+				// Always try to stop containers in unknown state first.
+				if initLastStatus != nil && initLastStatus.State == kubecontainer.ContainerStateUnknown {
+					changes.ContainersToKill[initLastStatus.ID] = containerToKillInfo{
+						name:      next.Name,
+						container: next,
+						message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
+							initLastStatus.State),
+					}
+				}
 				changes.NextInitContainerToStart = next
 			}
 		}
@@ -540,6 +549,17 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				klog.V(3).Infof(message)
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
+				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
+					// If container is in unknown state, we don't know whether it
+					// is actually running or not, always try killing it before
+					// restart to avoid having 2 running instances of the same container.
+					changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+						name:      containerStatus.Name,
+						container: &pod.Spec.Containers[idx],
+						message: fmt.Sprintf("Container is in %q state, try killing it before restart",
+							containerStatus.State),
+					}
+				}
 			}
 			continue
 		}
