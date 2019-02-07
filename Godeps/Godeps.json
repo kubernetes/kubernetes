@@ -1679,7 +1679,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-sql-driver/mysql",
-			"Comment": "v1.3.0",
+			"Comment": "v1.3",
 			"Rev": "a0583e0143b1624142adab07e0e97fe106d99561"
 		},
 		{
@@ -2348,7 +2348,6 @@
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2430,10 +2429,12 @@
 		},
 		{
 			"ImportPath": "github.com/lib/pq",
+			"Comment": "go1.0-cutoff-203-g88edab0803230a",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
 		{
 			"ImportPath": "github.com/lib/pq/oid",
+			"Comment": "go1.0-cutoff-203-g88edab0803230a",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
 		{
@@ -2507,7 +2508,7 @@
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
-			"Comment": "v1.0.1",
+			"Comment": "v1.0.0-2-gc12348ce28de40",
 			"Rev": "c12348ce28de40eed0136aa2b644d0ee0650e56c"
 		},
 		{
@@ -3369,7 +3370,6 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
-			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
@@ -4159,55 +4159,63 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/io",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/keymutex",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/net",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/nsenter",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/path",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
+		},
+		{
+			"ImportPath": "k8s.io/utils/semantic",
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/strings",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
+		},
+		{
+			"ImportPath": "k8s.io/utils/third_party/forked/golang/reflect",
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "52ad7309af9f9a1a880bb380e9beaea54b4d05b4"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
