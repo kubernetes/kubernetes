@@ -40,7 +40,7 @@ const (
 	totalResizeWaitPeriod = 20 * time.Minute
 )
 
-var _ = utils.SIGDescribe("Volume expand [Slow]", func() {
+var _ = utils.SIGDescribe("Volume expand", func() {
 	var (
 		c           clientset.Interface
 		ns          string
@@ -78,9 +78,8 @@ var _ = utils.SIGDescribe("Volume expand [Slow]", func() {
 
 	It("should not allow expansion of pvcs without AllowVolumeExpansion property", func() {
 		test := testsuites.StorageClassTest{
-			Name:                 "no-expansion",
-			ClaimSize:            "2Gi",
-			AllowVolumeExpansion: false,
+			Name:      "no-expansion",
+			ClaimSize: "2Gi",
 		}
 		regularSC, err := createStorageClass(test, ns, "noexpand", c)
 		Expect(err).NotTo(HaveOccurred(), "Error creating non-expandable storage class")
@@ -88,9 +87,7 @@ var _ = utils.SIGDescribe("Volume expand [Slow]", func() {
 		defer func() {
 			framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(regularSC.Name, nil))
 		}()
-
-		Expect(regularSC.AllowVolumeExpansion).NotTo(BeNil())
-		Expect(*resizableSc.AllowVolumeExpansion).To(BeFalse())
+		Expect(regularSC.AllowVolumeExpansion).To(BeNil())
 
 		noExpandPVC := newClaim(test, ns, "noexpand")
 		noExpandPVC.Spec.StorageClassName = &regularSC.Name
@@ -108,7 +105,7 @@ var _ = utils.SIGDescribe("Volume expand [Slow]", func() {
 
 		By("Expanding non-expandable pvc")
 		newSize := resource.MustParse("6Gi")
-		pvc, err = expandPVCSize(noExpandPVC, newSize, c)
+		noExpandPVC, err = expandPVCSize(noExpandPVC, newSize, c)
 		Expect(err).To(HaveOccurred(), "While updating non-expandable PVC")
 	})
 
