@@ -143,7 +143,7 @@ func newV0NodeClient(addr csiAddr) (nodeClient csipbv0.NodeClient, closer io.Clo
 	return nodeClient, conn, nil
 }
 
-func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
+func newCsiDriverClient(driverName csiDriverName, drivers *DriversStore) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
 	}
@@ -151,7 +151,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	requiresV0Client := true
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := PluginHandler.drivers.Get(string(driverName))
+		existingDriver, driverExists := drivers.Get(string(driverName))
 		if !driverExists {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}
@@ -819,6 +819,7 @@ type csiClientGetter struct {
 	sync.RWMutex
 	csiClient  csiClient
 	driverName csiDriverName
+	drivers    *DriversStore
 }
 
 func (c *csiClientGetter) Get() (csiClient, error) {
@@ -834,7 +835,7 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 	if c.csiClient != nil {
 		return c.csiClient, nil
 	}
-	csi, err := newCsiDriverClient(c.driverName)
+	csi, err := newCsiDriverClient(c.driverName, c.drivers)
 	if err != nil {
 		return nil, err
 	}

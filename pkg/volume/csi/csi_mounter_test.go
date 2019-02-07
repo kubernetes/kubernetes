@@ -75,7 +75,7 @@ func TestMounterGetPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV(tc.specVolumeName, 10, testDriver, testVol)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
@@ -162,7 +162,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				})
 			}
 
-			registerFakePlugin(test.driver, "endpoint", []string{"1.0.0"}, t)
+			registerFakePlugin(plug, test.driver, "endpoint", []string{"1.0.0"}, t)
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
 			pv.Spec.CSI.VolumeAttributes = test.volumeContext
 			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
@@ -322,7 +322,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -446,7 +446,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -593,7 +593,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		t.Logf("Running test %s", tc.name)
 
 		volName := fmt.Sprintf("test-vol-%d", i)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV("test-pv", 10, testDriver, volName)
 		pv.Spec.AccessModes = tc.accessModes
 		pvName := pv.GetName()
@@ -655,7 +655,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount

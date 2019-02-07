@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -40,6 +41,10 @@ import (
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
+	// Only for the test cases, ensure we get a new plugin all the time
+	// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name are merged
+	once = sync.Once{}
+
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -66,6 +71,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}
+	csiPlug.drivers = &DriversStore{}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
@@ -113,14 +119,14 @@ func makeTestVol(name string, driverName string) *api.Volume {
 	}
 }
 
-func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
+func registerFakePlugin(plugin *csiPlugin, pluginName, endpoint string, versions []string, t *testing.T) {
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
 		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
 	}
 
-	PluginHandler.drivers.Clear()
-	PluginHandler.drivers.Set(pluginName, Driver{
+	plugin.drivers.Clear()
+	plugin.drivers.Set(pluginName, Driver{
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersions,
 	})
@@ -187,7 +193,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
+		registerFakePlugin(plug, tc.driverName, "endpoint", []string{"0.3.0"}, t)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -236,7 +242,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
+		registerFakePlugin(plug, tc.driverName, "endpoint", []string{"0.3.0"}, t)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -277,7 +283,7 @@ func TestPluginCanSupport(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -317,7 +323,7 @@ func TestPluginCanSupportWithInline(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -367,7 +373,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 		},
 	}
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -475,7 +481,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 		},
 	}
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -580,7 +586,7 @@ func TestPluginNewMounter(t *testing.T) {
 		plug, tmpDir := newTestPlugin(t, nil)
 		defer os.RemoveAll(tmpDir)
 
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.2.0"}, t)
 
 		t.Run(test.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
@@ -699,7 +705,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 		plug, tmpDir := newTestPlugin(t, nil)
 		defer os.RemoveAll(tmpDir)
 
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+		registerFakePlugin(plug, testDriver, "endpoint", []string{"1.2.0"}, t)
 
 		t.Run(test.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
@@ -780,7 +786,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -908,7 +914,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewBlockVolumeMapper(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -957,7 +963,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(plug, testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -980,11 +986,11 @@ func TestPluginNewUnmapper(t *testing.T) {
 
 	// test unmounter
 	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
-	csiUnmapper := unmapper.(*csiBlockMapper)
-
 	if err != nil {
 		t.Fatalf("Failed to make a new Unmounter: %v", err)
 	}
+
+	csiUnmapper := unmapper.(*csiBlockMapper)
 
 	if csiUnmapper == nil {
 		t.Fatal("failed to create CSI Unmounter")
@@ -1274,7 +1280,8 @@ func TestValidatePlugin(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions, tc.foundInDeprecatedDir)
+		pluginHandler := &csiPlugin{drivers: &DriversStore{}}
+		err := pluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions, tc.foundInDeprecatedDir)
 
 		// Assert
 		if tc.shouldFail && err == nil {
@@ -1376,14 +1383,14 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 			t.Fatalf("unexpected error parsing version for testcase: %#v", tc)
 		}
 
-		PluginHandler.drivers.Clear()
-		PluginHandler.drivers.Set(tc.pluginName1, Driver{
+		pluginHandler := &csiPlugin{drivers: &DriversStore{}}
+		pluginHandler.drivers.Set(tc.pluginName1, Driver{
 			endpoint:                tc.endpoint1,
 			highestSupportedVersion: highestSupportedVersions1,
 		})
 
 		// Arrange & Act
-		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)
+		err = pluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)
 
 		// Assert
 		if tc.shouldFail && err == nil {
