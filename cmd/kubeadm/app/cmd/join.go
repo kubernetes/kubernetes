@@ -463,6 +463,11 @@ func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitCon
 
 	// in case of local etcd
 	if initConfiguration.Etcd.External == nil {
+		// creates target folder if doesn't exist already
+		if err := os.MkdirAll(initConfiguration.Etcd.Local.DataDir, 0700); err != nil {
+			return errors.Wrapf(err, "failed to create etcd directory %q", initConfiguration.Etcd.Local.DataDir)
+		}
+
 		// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
 		// the existing etcd members before being created.
 		// This operation must be executed after kubelet is already started in order to minimize the time
