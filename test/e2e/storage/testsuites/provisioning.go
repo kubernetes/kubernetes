@@ -41,16 +41,17 @@ import (
 // StorageClassTest represents parameters to be used by provisioning tests.
 // Not all parameters are used by all tests.
 type StorageClassTest struct {
-	Name             string
-	CloudProviders   []string
-	Provisioner      string
-	StorageClassName string
-	Parameters       map[string]string
-	DelayBinding     bool
-	ClaimSize        string
-	ExpectedSize     string
-	PvCheck          func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume)
-	VolumeMode       *v1.PersistentVolumeMode
+	Name                 string
+	CloudProviders       []string
+	Provisioner          string
+	StorageClassName     string
+	Parameters           map[string]string
+	DelayBinding         bool
+	ClaimSize            string
+	ExpectedSize         string
+	PvCheck              func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume)
+	VolumeMode           *v1.PersistentVolumeMode
+	AllowVolumeExpansion bool
 }
 
 type provisioningTestSuite struct {

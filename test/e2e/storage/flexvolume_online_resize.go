@@ -18,6 +18,8 @@ package storage
 
 import (
 	"fmt"
+	"path"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
@@ -26,20 +28,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"path"
 )
-
-func createStorageClass(ns string, c clientset.Interface) (*storage.StorageClass, error) {
-	bindingMode := storage.VolumeBindingImmediate
-	stKlass := getStorageClass("flex-expand", map[string]string{}, &bindingMode, ns, "resizing")
-	allowExpansion := true
-	stKlass.AllowVolumeExpansion = &allowExpansion
-
-	var err error
-	stKlass, err = c.StorageV1().StorageClasses().Create(stKlass)
-	return stKlass, err
-}
 
 var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
 	var (
@@ -82,7 +73,14 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			isNodeLabeled = true
 		}
 
-		resizableSc, err = createStorageClass(ns, c)
+		test := testsuites.StorageClassTest{
+			Name:                 "flexvolume-resize",
+			ClaimSize:            "2Gi",
+			AllowVolumeExpansion: true,
+			Provisioner:          "flex-expand",
+		}
+
+		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
