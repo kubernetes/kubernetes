@@ -94,18 +94,18 @@ var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
+	drivers *DriversStore
 }
 
-// TODO (verult) consider using a struct instead of global variables
-// csiDrivers map keep track of all registered CSI drivers on the node and their
-// corresponding sockets
-var csiDrivers = &DriversStore{}
-
+// TODO(hoegaarden) remove global
 var nim nodeinfomanager.Interface
 
 // PluginHandler is the plugin registration handler interface passed to the
 // pluginwatcher module in kubelet
-var PluginHandler = &RegistrationHandler{}
+// TODO(hoegaarden) remove global
+var PluginHandler = &RegistrationHandler{
+	drivers: &DriversStore{},
+}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
@@ -140,7 +140,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
 	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-	csiDrivers.Set(pluginName, Driver{
+	h.drivers.Set(pluginName, Driver{
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
 	})
@@ -188,7 +188,7 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 		return nil, err
 	}
 
-	existingDriver, driverExists := csiDrivers.Get(pluginName)
+	existingDriver, driverExists := h.drivers.Get(pluginName)
 	if driverExists {
 		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
 			err := fmt.Errorf("%s for CSI driver %q failed. Another driver with the same name is already registered with a higher supported version: %q", callerName, pluginName, existingDriver.highestSupportedVersion)
@@ -819,7 +819,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 }
 
 func unregisterDriver(driverName string) error {
-	csiDrivers.Delete(driverName)
+	PluginHandler.drivers.Delete(driverName)
 
 	if err := nim.UninstallCSIDriver(driverName); err != nil {
 		klog.Errorf("Error uninstalling CSI driver: %v", err)

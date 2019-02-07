@@ -151,7 +151,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	requiresV0Client := true
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := csiDrivers.Get(string(driverName))
+		existingDriver, driverExists := PluginHandler.drivers.Get(string(driverName))
 		if !driverExists {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}
