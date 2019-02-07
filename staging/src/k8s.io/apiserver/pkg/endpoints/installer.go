@@ -507,6 +507,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Kind:        fqKindToRegister,
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
+
+		MaxRequestBodyBytes: a.group.MaxRequestBodyBytes,
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
