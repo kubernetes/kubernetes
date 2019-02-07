@@ -70,21 +70,10 @@ func NewControllerRevision(parent metav1.Object,
 	for k, v := range templateLabels {
 		labelMap[k] = v
 	}
-	blockOwnerDeletion := true
-	isController := true
 	cr := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labelMap,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         parentKind.GroupVersion().String(),
-					Kind:               parentKind.Kind,
-					Name:               parent.GetName(),
-					UID:                parent.GetUID(),
-					BlockOwnerDeletion: &blockOwnerDeletion,
-					Controller:         &isController,
-				},
-			},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
 		},
 		Data:     data,
 		Revision: revision,
@@ -417,8 +406,6 @@ func (fh *fakeHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 }
 
 func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
-	blockOwnerDeletion := true
-	isController := true
 	if owner := metav1.GetControllerOf(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
@@ -434,16 +421,8 @@ func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 		return nil, errors.NewNotFound(apps.Resource("controllerrevisions"), revision.Name)
 	}
 	clone := revision.DeepCopy()
-	clone.OwnerReferences = append(clone.OwnerReferences, metav1.OwnerReference{
-		APIVersion:         parentKind.GroupVersion().String(),
-		Kind:               parentKind.Kind,
-		Name:               parent.GetName(),
-		UID:                parent.GetUID(),
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	})
+	clone.OwnerReferences = append(clone.OwnerReferences, *metav1.NewControllerRef(parent, parentKind))
 	return clone, fh.indexer.Update(clone)
-
 }
 
 func (fh *fakeHistory) ReleaseControllerRevision(parent metav1.Object, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
