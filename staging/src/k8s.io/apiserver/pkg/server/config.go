@@ -163,6 +163,9 @@ type Config struct {
 	// patch may cause.
 	// This affects all places that applies json patch in the binary.
 	JSONPatchMaxCopyBytes int64
+	// The limit on the request body size that would be accepted and decoded in a write request.
+	// 0 means no limit.
+	MaxRequestBodyBytes int64
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
@@ -272,7 +275,13 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// on the size increase the "copy" operations in a json patch
 		// can cause.  See
 		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
-		JSONPatchMaxCopyBytes:        int64(10 * 1024 * 1024),
+		JSONPatchMaxCopyBytes: int64(10 * 1024 * 1024),
+		// 10MB is the recommended maximum client request size in bytes
+		// the etcd server should accept. Thus, we set it as the
+		// maximum bytes accepted to be decoded in a resource write
+		// request.  See
+		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		MaxRequestBodyBytes:          int64(10 * 1024 * 1024),
 		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
@@ -490,6 +499,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
+		maxRequestBodyBytes:          c.MaxRequestBodyBytes,
 	}
 
 	for {
