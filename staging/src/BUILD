@@ -65,7 +65,6 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/watch:all-srcs",
         "//staging/src/k8s.io/apimachinery/third_party/forked/golang/json:all-srcs",
         "//staging/src/k8s.io/apimachinery/third_party/forked/golang/netutil:all-srcs",
-        "//staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:all-srcs",

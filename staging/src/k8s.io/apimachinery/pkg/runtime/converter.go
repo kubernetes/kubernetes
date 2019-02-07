@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/semantic"
 
 	"k8s.io/klog"
 )
@@ -80,7 +81,7 @@ var (
 	// DefaultUnstructuredConverter performs unstructured to Go typed object conversions.
 	DefaultUnstructuredConverter = &unstructuredConverter{
 		mismatchDetection: parseBool(os.Getenv("KUBE_PATCH_CONVERSION_DETECTOR")),
-		comparison: conversion.EqualitiesOrDie(
+		comparison: semantic.EqualitiesOrDie(
 			func(a, b time.Time) bool {
 				return a.UTC() == b.UTC()
 			},

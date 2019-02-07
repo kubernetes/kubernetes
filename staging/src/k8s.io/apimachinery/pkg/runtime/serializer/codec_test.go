@@ -26,11 +26,11 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilssemantic "k8s.io/utils/semantic"
 
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
@@ -92,7 +92,7 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 	return s, codec
 }
 
-var semantic = conversion.EqualitiesOrDie(
+var semantic = utilssemantic.EqualitiesOrDie(
 	func(a, b serializertesting.MyWeirdCustomEmbeddedVersionKindField) bool {
 		a.APIVersion, a.ObjectKind = "", ""
 		b.APIVersion, b.ObjectKind = "", ""

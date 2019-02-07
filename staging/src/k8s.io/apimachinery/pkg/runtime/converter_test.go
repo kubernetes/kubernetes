@@ -29,16 +29,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/utils/semantic"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var simpleEquality = conversion.EqualitiesOrDie(
+var simpleEquality = semantic.EqualitiesOrDie(
 	func(a, b time.Time) bool {
 		return a.UTC() == b.UTC()
 	},

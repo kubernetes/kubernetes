@@ -30,7 +30,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/conversion",
     importpath = "k8s.io/apimachinery/pkg/conversion",
-    deps = ["//staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],
+    deps = ["//vendor/k8s.io/utils/third_party/forked/golang/reflect:go_default_library"],
 )
 
 filegroup(

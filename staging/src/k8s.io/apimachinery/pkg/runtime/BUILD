@@ -31,6 +31,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/semantic:go_default_library",
     ],
 )
 
@@ -69,6 +70,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/semantic:go_default_library",
     ],
 )
 

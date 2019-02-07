@@ -23,13 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/semantic"
 )
 
 // IsHugePageResourceName returns true if the resource name has the huge page
@@ -76,7 +76,7 @@ func NonConvertibleFields(annotations map[string]string) map[string]string {
 
 // Semantic can do semantic deep equality checks for core objects.
 // Example: apiequality.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
-var Semantic = conversion.EqualitiesOrDie(
+var Semantic = semantic.EqualitiesOrDie(
 	func(a, b resource.Quantity) bool {
 		// Ignore formatting, only care that numeric value stayed the same.
 		// TODO: if we decide it's important, it should be safe to start comparing the format.
