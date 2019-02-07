@@ -234,6 +234,9 @@ func (o *RolloutStatusOptions) Run() error {
 
 				shouldWatch := o.Watch
 				if !shouldWatch {
+					if !done {
+						return true, cmdutil.ErrExit
+					}
 					return true, nil
 				}
 
