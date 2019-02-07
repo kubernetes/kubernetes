@@ -274,17 +274,21 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
 		// 10MB is the recommended maximum client request size in bytes
-		// the etcd server should accept. Thus, we set it as the limit
-		// on the size increase the "copy" operations in a json patch
-		// can cause.  See
+		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
-		JSONPatchMaxCopyBytes: int64(10 * 1024 * 1024),
+		// A request body might be encoded in json, and is converted to
+		// proto when persisted in etcd. Assuming the upper bound of
+		// the size ratio is 10:1, we set 100MB as the largest size
+		// increase the "copy" operations in a json patch may cause.
+		JSONPatchMaxCopyBytes: int64(100 * 1024 * 1024),
 		// 10MB is the recommended maximum client request size in bytes
-		// the etcd server should accept. Thus, we set it as the
-		// maximum bytes accepted to be decoded in a resource write
-		// request.  See
+		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
-		MaxRequestBodyBytes:          int64(10 * 1024 * 1024),
+		// A request body might be encoded in json, and is converted to
+		// proto when persisted in etcd. Assuming the upper bound of
+		// the size ratio is 10:1, we set 100MB as the largest request
+		// body size to be accepted and decoded in a write request.
+		MaxRequestBodyBytes:          int64(100 * 1024 * 1024),
 		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
