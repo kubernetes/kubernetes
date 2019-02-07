@@ -134,6 +134,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	requiresUpdate := false
 	for k := range node.Status.Capacity {
 		if v1helper.IsExtendedResourceName(k) {
+			klog.Infof("Zero out resource %s capacity in existing node.", k)
 			node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			requiresUpdate = true
