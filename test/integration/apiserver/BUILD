@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "apiserver_test.go",
         "main_test.go",
+        "max_request_body_bytes_test.go",
         "patch_test.go",
         "print_test.go",
     ],
@@ -19,6 +20,7 @@ go_test(
         "integration",
     ],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
