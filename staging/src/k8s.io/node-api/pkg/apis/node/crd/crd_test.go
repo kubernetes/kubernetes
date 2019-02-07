@@ -24,26 +24,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodev1alpha1 "k8s.io/node-api/pkg/apis/node/v1alpha1"
 )
 
 const (
-	RuntimeClassCRD = "runtimeclass_crd.yaml"
-	AddonsRoot      = "../../../../../../../../cluster/addons"
+	runtimeClassCRD = "runtimeclass_crd.yaml"
+	addonsRoot      = "../../../../../../../../cluster/addons"
 
-	AddonManagerModeLabelKey = "addonmanager.kubernetes.io/mode"
+	addonManagerModeLabelKey = "addonmanager.kubernetes.io/mode"
 )
 
 func TestRuntimeClassCRD(t *testing.T) {
-	crd, err := loadCRD(RuntimeClassCRD)
+	crd, err := loadCRD(runtimeClassCRD)
 	require.NoError(t, err)
 
 	runtimeClass := reflect.TypeOf(nodev1alpha1.RuntimeClass{})
@@ -56,31 +55,45 @@ func TestRuntimeClassCRD(t *testing.T) {
 	require.NoError(t, errs.ToAggregate())
 }
 
-// TestAddonCRD verifies that the required CRDs are synced to the addons directory.
-func TestAddonCRD(t *testing.T) {
-	addons := []struct {
+// TestCRDSources verifies that all the CRD sources are in sync. The sources include:
+// - CRD yaml here (the source of truth)
+// - The CRD loaded from bindata, generated from the source of truth
+// - The CRD copied into the addons directory
+func TestCRDSources(t *testing.T) {
+	srcs := []struct {
 		truth, addon string
+		generator    func() (*apiextensionsv1beta1.CustomResourceDefinition, error)
 	}{
-		{RuntimeClassCRD, filepath.Join(AddonsRoot, "runtimeclass", RuntimeClassCRD)},
+		{
+			truth:     runtimeClassCRD,
+			addon:     filepath.Join(addonsRoot, "runtimeclass", runtimeClassCRD),
+			generator: RuntimeClassCRD,
+		},
 	}
 
-	for _, addon := range addons {
-		t.Run(addon.truth, func(t *testing.T) {
-			addonCRD, err := loadCRD(addon.addon)
-			require.NoError(t, err, "Failed to load addon CRD")
-
-			trueCRD, err := loadCRD(addon.truth)
+	for _, src := range srcs {
+		t.Run(src.truth, func(t *testing.T) {
+			trueCRD, err := loadCRD(src.truth)
 			require.NoError(t, err, "Failed to load source-of-truth CRD")
 
+			generatedCRD, err := src.generator()
+			require.NoError(t, err, "Failed to load generated CRD")
+
+			assert.Equal(t, trueCRD, generatedCRD, "Generated CRD mismatch")
+
+			addonCRD, err := loadCRD(src.addon)
+			require.NoError(t, err, "Failed to load addon CRD")
+
 			// Copy the addon manager label over to the source of truth, to enable direct comparison.
-			mode, ok := addonCRD.Labels[AddonManagerModeLabelKey]
+			mode, ok := addonCRD.Labels[addonManagerModeLabelKey]
 			require.True(t, ok, "Missing addon manager mode label")
 			if trueCRD.Labels == nil {
 				trueCRD.Labels = map[string]string{}
 			}
-			trueCRD.Labels[AddonManagerModeLabelKey] = mode
+			trueCRD.Labels[addonManagerModeLabelKey] = mode
 
-			require.Equal(t, trueCRD, addonCRD)
+			assert.Equal(t, trueCRD, addonCRD, "Addon CRD mismatch")
+
 		})
 	}
 }
@@ -94,16 +107,16 @@ func loadCRD(filename string) (*apiextensionsv1beta1.CustomResourceDefinition, e
 		return nil, fmt.Errorf("failed to read file %q: %v", filename, err)
 	}
 
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{}
-
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), raw, crd); err != nil {
+	crd, err := decodeCRD(raw)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode %q into CRD: %v", filename, err)
 	}
-	apiserver.Scheme.Default(crd)
 
 	// Validate the loaded CRD.
+	copy := crd.DeepCopy()
+	apiserver.Scheme.Default(copy) // Validation requires a defaulted object.
 	internal := &apiextensions.CustomResourceDefinition{}
-	if err := apiserver.Scheme.Convert(crd, internal, nil); err != nil {
+	if err := apiserver.Scheme.Convert(copy, internal, nil); err != nil {
 		return nil, fmt.Errorf("failed to convert external CRD to internal version: %v", err)
 	}
 

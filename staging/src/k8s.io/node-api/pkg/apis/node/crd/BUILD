@@ -4,7 +4,7 @@ go_test(
     name = "go_default_test",
     srcs = ["crd_test.go"],
     data = [
-        "runtimeclass_crd.yaml",
+        ":manifests",
         "//cluster/addons:addon-srcs",
     ],
     deps = [
@@ -32,4 +32,10 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "manifests",
+    srcs = [ "runtimeclass_crd.yaml" ],
+    visibility = ["//visibility:private"],
 )
