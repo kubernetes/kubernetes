@@ -223,6 +223,10 @@ verifyAndSuggestPackagePath() {
   local original_package_path="$3"
   local suggestion_package_path="$4"
 
+  if [[ "${specified_package_path}" =~ '/...'$ ]]; then
+    specified_package_path=${specified_package_path::-4}
+  fi
+
   if ! [ -d "${specified_package_path}" ]; then
     # Because k8s sets a localized $GOPATH for testing, seeing the actual
     # directory can be confusing. Instead, just show $GOPATH if it exists in the
