@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -679,4 +680,92 @@ func TestBootstrapping(t *testing.T) {
 		t.Error(err)
 	}
 	t.Errorf("error bootstrapping roles: %s", string(healthBytes))
+}
+
+// TestDiscoveryUpgradeBootstrapping is primarily meant to test the behavior of
+// primePublicInfoClusterRoleBinding in storage_rbac.go during cluster upgrades.
+func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
+	var tearDownFn func()
+	defer func() {
+		if tearDownFn != nil {
+			tearDownFn()
+		}
+	}()
+
+	superUser := "admin/system:masters"
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+	}))
+	_, s, tearDownFn := framework.RunAMaster(masterConfig)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+
+	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
+	// existed prior to v1.14, but with user modifications.
+	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
+	discRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	discRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
+	discRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
+	discRoleBinding.Subjects = []rbacapi.Subject{
+		{
+			Name:     "system:authenticated",
+			Kind:     "Group",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	if discRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(discRoleBinding); err != nil {
+		t.Fatalf("Failed to update `system:discovery` ClusterRoleBinding: %v", err)
+	}
+	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
+	basicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
+	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
+	if basicUserRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {
+		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
+	}
+	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")
+	if err = client.Rbac().ClusterRoleBindings().Delete("system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("Failed to delete `system:public-info-viewer` ClusterRoleBinding: %v", err)
+	}
+
+	// Stop the first API server.
+	tearDownFn()
+	tearDownFn = nil
+
+	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
+	// `system:discovery`, and respect auto-reconciliation annotations.
+	_, s, tearDownFn = framework.RunAMaster(masterConfig)
+
+	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+
+	newDiscRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
+	}
+	if !reflect.DeepEqual(newDiscRoleBinding, discRoleBinding) {
+		t.Errorf("`system:discovery` should have been unmodified. Wanted: %v, got %v", discRoleBinding, newDiscRoleBinding)
+	}
+	newBasicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
+	}
+	if !reflect.DeepEqual(newBasicUserRoleBinding, basicUserRoleBinding) {
+		t.Errorf("`system:basic-user` should have been unmodified. Wanted: %v, got %v", basicUserRoleBinding, newBasicUserRoleBinding)
+	}
+	publicInfoViewerRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:public-info-viewer", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:public-info-viewer` ClusterRoleBinding: %v", err)
+	}
+	if publicInfoViewerRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] != "false" {
+		t.Errorf("publicInfoViewerRoleBinding.Annotations[\"rbac.authorization.kubernetes.io/autoupdate\"] should be %v, got %v", publicInfoViewerRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"], "false")
+	}
+	if publicInfoViewerRoleBinding.Annotations["rbac-discovery-upgrade-test"] != "pass" {
+		t.Errorf("publicInfoViewerRoleBinding.Annotations[\"rbac-discovery-upgrade-test\"] should be %v, got %v", publicInfoViewerRoleBinding.Annotations["rbac-discovery-upgrade-test"], "pass")
+	}
+	if !reflect.DeepEqual(publicInfoViewerRoleBinding.Subjects, newDiscRoleBinding.Subjects) {
+		t.Errorf("`system:public-info-viewer` should have inherited Subjects from `system:discovery` Wanted: %v, got %v", newDiscRoleBinding.Subjects, publicInfoViewerRoleBinding.Subjects)
+	}
 }
