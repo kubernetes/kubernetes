@@ -26,8 +26,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 	"k8s.io/klog"
@@ -153,6 +155,10 @@ type Config struct {
 	// If specified, long running requests such as watch will be allocated a random timeout between this value, and
 	// twice this value.  Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
+	// The limit on the total size increase all "copy" operations in a json
+	// patch may cause.
+	// This affects all places that applies json patch in the binary.
+	JSONPatchMaxCopyBytes int64
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
@@ -243,20 +249,26 @@ type AuthorizationInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
-		Serializer:                   codecs,
-		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
-		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
-		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:       sets.NewString(),
-		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
-		EnableIndex:                  true,
-		EnableDiscovery:              true,
-		EnableProfiling:              true,
-		EnableMetrics:                true,
-		MaxRequestsInFlight:          400,
-		MaxMutatingRequestsInFlight:  200,
-		RequestTimeout:               time.Duration(60) * time.Second,
-		MinRequestTimeout:            1800,
+		Serializer:                  codecs,
+		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
+		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
+		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:      sets.NewString(),
+		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
+		EnableIndex:                 true,
+		EnableDiscovery:             true,
+		EnableProfiling:             true,
+		EnableMetrics:               true,
+		MaxRequestsInFlight:         400,
+		MaxMutatingRequestsInFlight: 200,
+		RequestTimeout:              time.Duration(60) * time.Second,
+		MinRequestTimeout:           1800,
+		// 10MB is the recommended maximum client request size in bytes
+		// the etcd server should accept. Thus, we set it as the limit
+		// on the size increase the "copy" operations in a json patch
+		// can cause.  See
+		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		JSONPatchMaxCopyBytes:        int64(10 * 1024 * 1024),
 		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
@@ -449,6 +461,19 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
+	}
+
+	for {
+		if c.JSONPatchMaxCopyBytes <= 0 {
+			break
+		}
+		existing := atomic.LoadInt64(&jsonpatch.AccumulatedCopySizeLimit)
+		if existing > 0 && existing < c.JSONPatchMaxCopyBytes {
+			break
+		}
+		if atomic.CompareAndSwapInt64(&jsonpatch.AccumulatedCopySizeLimit, existing, c.JSONPatchMaxCopyBytes) {
+			break
+		}
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
