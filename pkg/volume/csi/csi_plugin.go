@@ -95,10 +95,8 @@ var _ volume.VolumePlugin = &csiPlugin{}
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
 	drivers *DriversStore
+	nim     nodeinfomanager.Interface
 }
-
-// TODO(hoegaarden) remove global
-var nim nodeinfomanager.Interface
 
 // PluginHandler is the plugin registration handler interface passed to the
 // pluginwatcher module in kubelet
@@ -162,7 +160,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	err = PluginHandler.nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
@@ -238,7 +236,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	}
 
 	// Initializing the label management channels
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
+	PluginHandler.nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
@@ -280,7 +278,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 		}
 		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
 			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
-			err := nim.InitializeCSINodeWithAnnotation()
+			err := PluginHandler.nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
 				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
@@ -821,7 +819,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 func unregisterDriver(driverName string) error {
 	PluginHandler.drivers.Delete(driverName)
 
-	if err := nim.UninstallCSIDriver(driverName); err != nil {
+	if err := PluginHandler.nim.UninstallCSIDriver(driverName); err != nil {
 		klog.Errorf("Error uninstalling CSI driver: %v", err)
 		return err
 	}
