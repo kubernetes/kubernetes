@@ -70,7 +70,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			return
 		}
 
-		body, err := readBody(req)
+		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
