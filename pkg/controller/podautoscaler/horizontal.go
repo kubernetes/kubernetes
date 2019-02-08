@@ -52,7 +52,7 @@ import (
 )
 
 var (
-	scaleUpLimitFactor  = 2.0
+//	scaleUpLimitFactor  = 2.0
 	scaleUpLimitMinimum = 4.0
 )
 
@@ -729,7 +729,7 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 }
 
 func calculateScaleUpLimit(currentReplicas int32) int32 {
-	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
+	return int32(math.Max(*float64(currentReplicas), scaleUpLimitMinimum))
 }
 
 // scaleForResourceMappings attempts to fetch the scale for the
