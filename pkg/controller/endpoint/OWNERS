@@ -10,3 +10,5 @@ reviewers:
 - MrHohn
 - thockin
 - matchstick
+labels:
+- sig/network

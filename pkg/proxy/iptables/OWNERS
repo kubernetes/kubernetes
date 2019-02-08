@@ -7,3 +7,5 @@ reviewers:
 - freehan
 - dcbw
 - danwinship
+labels:
+- sig/network

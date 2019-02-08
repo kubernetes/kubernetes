@@ -8,3 +8,5 @@ reviewers:
 - dineshgovindasamy
 - madhanrm
 - feiskyer
+labels:
+- sig/network

@@ -5,3 +5,5 @@ reviewers:
 - lavalamp
 - smarterclayton
 - freehan
+labels:
+- sig/network

@@ -9,3 +9,5 @@ approvers:
   - dcbw
   - thockin
   - eparis
+labels:
+- sig/network
