@@ -273,7 +273,7 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should be able to pull image from gcr.io [LinuxOnly]",
-					image:       "gcr.io/google-containers/debian-base:0.4.0",
+					image:       "gcr.io/google-containers/debian-base:0.4.1",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
