@@ -20,11 +20,14 @@ import (
 	"strings"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -422,6 +425,45 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 		}
 		if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
 			t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
+		}
+	}
+}
+
+func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		manifest string
+		data     interface{}
+	}{
+		{
+			manifest: KubeDNSDeployment,
+			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
+				DeploymentName: "foo",
+				KubeDNSImage:   "foo",
+				DNSMasqImage:   "foo",
+				SidecarImage:   "foo",
+				DNSBindAddr:    "foo",
+				DNSProbeAddr:   "foo",
+				DNSDomain:      "foo",
+				MasterTaintKey: "foo",
+			},
+		},
+		{
+			manifest: CoreDNSDeployment,
+			data: struct{ DeploymentName, Image, MasterTaintKey string }{
+				DeploymentName: "foo",
+				Image:          "foo",
+				MasterTaintKey: "foo",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		deploymentBytes, _ := kubeadmutil.ParseTemplate(testCase.manifest, testCase.data)
+		deployment := &apps.Deployment{}
+		if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, deployment); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if deployment.Spec.Template.Spec.PriorityClassName != "system-cluster-critical" {
+			t.Errorf("expected to see system-cluster-critical priority class name. Got %q instead", deployment.Spec.Template.Spec.PriorityClassName)
 		}
 	}
 }

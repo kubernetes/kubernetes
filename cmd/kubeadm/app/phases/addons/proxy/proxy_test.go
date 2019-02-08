@@ -21,10 +21,13 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -252,6 +255,32 @@ func TestEnsureProxyAddon(t *testing.T) {
 				tc.name,
 				tc.expClusterCIDR,
 				intMaster.ComponentConfigs.KubeProxy.ClusterCIDR)
+		}
+	}
+}
+
+func TestDaemonSetsHaveSystemNodeCriticalPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		manifest string
+		data     interface{}
+	}{
+		{
+			manifest: KubeProxyDaemonSet19,
+			data: struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
+				Image:             "foo",
+				ProxyConfigMap:    "foo",
+				ProxyConfigMapKey: "foo",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		daemonSetBytes, _ := kubeadmutil.ParseTemplate(testCase.manifest, testCase.data)
+		daemonSet := &apps.DaemonSet{}
+		if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetBytes, daemonSet); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if daemonSet.Spec.Template.Spec.PriorityClassName != "system-node-critical" {
+			t.Errorf("expected to see system-node-critical priority class name. Got %q instead", daemonSet.Spec.Template.Spec.PriorityClassName)
 		}
 	}
 }
