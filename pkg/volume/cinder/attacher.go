@@ -406,6 +406,10 @@ func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error 
 	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
+func (plugin *cinderPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {
 	instances, res := attacher.cinderProvider.Instances()
 	if !res {

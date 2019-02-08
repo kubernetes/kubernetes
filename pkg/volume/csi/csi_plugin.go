@@ -439,6 +439,29 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
+func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
+	if spec.PersistentVolume == nil {
+		klog.Error(log("plugin.CanAttach test failed, spec missing PersistentVolume"))
+		return false
+	}
+
+	var driverName string
+	if spec.PersistentVolume.Spec.CSI != nil {
+		driverName = spec.PersistentVolume.Spec.CSI.Driver
+	} else {
+		klog.Error(log("plugin.CanAttach test failed, spec missing CSIPersistentVolume"))
+		return false
+	}
+
+	skipAttach, err := p.skipAttach(driverName)
+
+	if err != nil {
+		klog.Error(log("plugin.CanAttach error when calling plugin.skipAttach for driver %s: %s", driverName, err))
+	}
+
+	return !skipAttach
+}
+
 func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return p.NewDetacher()
 }
