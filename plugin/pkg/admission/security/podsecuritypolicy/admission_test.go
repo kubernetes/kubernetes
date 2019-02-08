@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -473,7 +474,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 func TestFailClosedOnInvalidPod(t *testing.T) {
 	plugin := NewTestAdmission(nil, nil)
 	pod := &v1.Pod{}
-	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{})
+	attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{})
 
 	err := plugin.Admit(attrs)
 	if err == nil {
@@ -1776,7 +1777,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
-	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, false, userInfo)
+	attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
 	err := plugin.Admit(attrs)
@@ -2240,7 +2241,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			pod.Spec.SecurityContext.HostPID = true
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{Name: userName})
+			attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{Name: userName})
 
 			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
@@ -2333,7 +2334,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &allowPrivilegeEscalation
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, false, &user.DefaultInfo{Name: "test"})
+			attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, false, &user.DefaultInfo{Name: "test"})
 
 			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)

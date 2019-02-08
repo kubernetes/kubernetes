@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -99,7 +100,7 @@ func TestAdmission(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -119,7 +120,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -139,7 +140,7 @@ func TestAdmissionDryRun(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
+	err = handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -160,7 +161,7 @@ func TestIgnoreAdmission(t *testing.T) {
 	chainHandler := admission.NewChainHandler(handler)
 
 	pod := newPod(namespace)
-	err = chainHandler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
+	err = chainHandler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -182,7 +183,7 @@ func TestAdmissionWithLatentCache(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}

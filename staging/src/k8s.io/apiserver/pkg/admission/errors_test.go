@@ -22,12 +22,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 // makes sure that we never get:
 // Internal error occurred: [some error, object does not implement the Object interfaces]
 func TestNewForbidden(t *testing.T) {
-	attributes := NewAttributesRecord(
+	attributes := webhooktesting.NewAttributesRecordWithDefaultScheme(
 		&fakeObj{},
 		nil,
 		schema.GroupVersionKind{Group: "foo", Version: "bar", Kind: "Baz"},

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -122,7 +123,7 @@ func TestAdmit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, test.featureEnabled)()
 			obj := test.object.DeepCopyObject()
-			attrs := admission.NewAttributesRecord(
+			attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(
 				obj,                  // new object
 				obj.DeepCopyObject(), // old object, copy to be sure it's not modified
 				schema.GroupVersionKind{},

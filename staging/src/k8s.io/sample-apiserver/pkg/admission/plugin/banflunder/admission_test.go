@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
@@ -127,7 +128,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 			informersFactory.WaitForCacheSync(stop)
 
 			// act
-			err = target.Admit(admission.NewAttributesRecord(
+			err = target.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(
 				&scenario.admissionInput,
 				nil,
 				scenario.admissionInputKind,

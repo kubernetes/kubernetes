@@ -20,6 +20,9 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/api/admission/v1beta1"
 	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +85,28 @@ func NewFakeDataSource(name string, webhooks []registrationv1beta1.Webhook, muta
 	return client, informerFactory
 }
 
-func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind schema.GroupVersionKind, namespace string, name string, resource string, labels map[string]string, dryRun bool) admission.Attributes {
+func NewAttributesRecordWithDefaultScheme(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, dryRun bool, userInfo user.Info) Attributes {
+	scheme := runtime.NewScheme()
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	return &attributesRecord{
+		kind:        kind,
+		namespace:   namespace,
+		name:        name,
+		resource:    resource,
+		subresource: subresource,
+		operation:   operation,
+		dryRun:      dryRun,
+		object:      object,
+		oldObject:   oldObject,
+		userInfo:    userInfo,
+		creator:     scheme,
+		converter:   scheme,
+	}
+}
+
+func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind schema.GroupVersionKind, namespace string, name string, resource string, labels map[string]string, dryRun bool, creator runtime.ObjectCreater, converter runtime.ObjectConvertor) admission.Attributes {
 	object.SetName(name)
 	object.SetNamespace(namespace)
 	objectLabels := map[string]string{resource + ".name": name}
@@ -102,7 +126,7 @@ func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind sch
 	}
 
 	return &FakeAttributes{
-		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo),
+		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo, creator, converter),
 	}
 }
 
@@ -135,7 +159,7 @@ func (f *FakeAttributes) GetAnnotations() map[string]string {
 }
 
 // NewAttribute returns static admission Attributes for testing.
-func NewAttribute(namespace string, labels map[string]string, dryRun bool) admission.Attributes {
+func NewAttribute(namespace string, labels map[string]string, dryRun bool, creator runtime.ObjectCreater, converter runtime.ObjectConvertor) admission.Attributes {
 	// Set up a test object for the call
 	object := corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -147,11 +171,11 @@ func NewAttribute(namespace string, labels map[string]string, dryRun bool) admis
 	kind := corev1.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
 
-	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "pod", labels, dryRun)
+	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "pod", labels, dryRun, creator, converter)
 }
 
 // NewAttributeUnstructured returns static admission Attributes for testing with custom resources.
-func NewAttributeUnstructured(namespace string, labels map[string]string, dryRun bool) admission.Attributes {
+func NewAttributeUnstructured(namespace string, labels map[string]string, dryRun bool, creator runtime.ObjectCreater, converter runtime.ObjectConvertor) admission.Attributes {
 	// Set up a test object for the call
 	object := unstructured.Unstructured{}
 	object.SetKind("TestCRD")
@@ -162,7 +186,7 @@ func NewAttributeUnstructured(namespace string, labels map[string]string, dryRun
 	kind := object.GroupVersionKind()
 	name := "my-test-crd"
 
-	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "crd", labels, dryRun)
+	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "crd", labels, dryRun, creator, converter)
 }
 
 type urlConfigGenerator struct {

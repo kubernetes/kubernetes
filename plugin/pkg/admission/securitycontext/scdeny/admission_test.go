@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -82,7 +83,7 @@ func TestAdmission(t *testing.T) {
 		p.Spec.SecurityContext = tc.podSc
 		p.Spec.Containers[0].SecurityContext = tc.sc
 
-		err := handler.Validate(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {
@@ -96,7 +97,7 @@ func TestAdmission(t *testing.T) {
 		p.Spec.InitContainers = p.Spec.Containers
 		p.Spec.Containers = nil
 
-		err = handler.Validate(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err = handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(p, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 		if err != nil && !tc.expectError {
 			t.Errorf("%v: unexpected error: %v", tc.name, err)
 		} else if err == nil && tc.expectError {
@@ -140,7 +141,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.Spec.SecurityContext = &test.securityContext
-		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for security context %+v but did not get an error", test.securityContext)

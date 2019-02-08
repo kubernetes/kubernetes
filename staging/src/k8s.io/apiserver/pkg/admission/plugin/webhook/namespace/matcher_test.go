@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 type fakeNamespaceLister struct {
@@ -75,27 +76,27 @@ func TestGetNamespaceLabels(t *testing.T) {
 	}{
 		{
 			name:           "request is for creating namespace, the labels should be from the object itself",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, false, nil),
+			attr:           webhooktesting.NewAttributesRecordWithDefaultScheme(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, false, nil),
 			expectedLabels: namespace2Labels,
 		},
 		{
 			name:           "request is for updating namespace, the labels should be from the new object",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, false, nil),
+			attr:           webhooktesting.NewAttributesRecordWithDefaultScheme(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, false, nil),
 			expectedLabels: namespace2Labels,
 		},
 		{
 			name:           "request is for deleting namespace, the labels should be from the cache",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, false, nil),
+			attr:           webhooktesting.NewAttributesRecordWithDefaultScheme(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 		{
 			name:           "request is for namespace/finalizer",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, false, nil),
+			attr:           webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 		{
 			name:           "request is for pod",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, false, nil),
+			attr:           webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 	}
@@ -117,7 +118,7 @@ func TestNotExemptClusterScopedResource(t *testing.T) {
 	hook := &registrationv1beta1.Webhook{
 		NamespaceSelector: &metav1.LabelSelector{},
 	}
-	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, false, nil)
+	attr := webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, false, nil)
 	matcher := Matcher{}
 	matches, err := matcher.MatchNamespaceSelector(hook, attr)
 	if err != nil {

@@ -24,6 +24,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
@@ -199,7 +200,7 @@ func TestAdmission(t *testing.T) {
 		for _, c := range test.classes {
 			informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(c)
 		}
-		attrs := admission.NewAttributesRecord(
+		attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(
 			claim, // new object
 			nil,   // old object
 			api.Kind("PersistentVolumeClaim").WithVersion("version"),

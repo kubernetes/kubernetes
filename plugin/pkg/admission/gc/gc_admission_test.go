@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	fakediscovery "k8s.io/client-go/discovery/fake"
@@ -306,7 +307,7 @@ func TestGCAdmission(t *testing.T) {
 				operation = admission.Update
 			}
 			user := &user.DefaultInfo{Name: tc.username}
-			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
+			attributes := webhooktesting.NewAttributesRecordWithDefaultScheme(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
 			err = gcAdmit.Validate(attributes)
 			if !tc.checkError(err) {
@@ -609,7 +610,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			operation = admission.Update
 		}
 		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
+		attributes := webhooktesting.NewAttributesRecordWithDefaultScheme(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
 		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {

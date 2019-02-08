@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -254,7 +255,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 
 	for _, tc := range tests {
 		operation := admission.Update
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, nil)
+		attributes := webhooktesting.NewAttributesRecordWithDefaultScheme(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, nil)
 
 		err := ctrl.Validate(attributes)
 		if !tc.checkError(err) {

@@ -22,6 +22,7 @@ import (
 	adreg "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 type ruleTest struct {
@@ -32,7 +33,7 @@ type ruleTest struct {
 type tests map[string]ruleTest
 
 func a(group, version, resource, subresource, name string, operation admission.Operation) admission.Attributes {
-	return admission.NewAttributesRecord(
+	return webhooktesting.NewAttributesRecordWithDefaultScheme(
 		nil, nil,
 		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
 		"ns", name,

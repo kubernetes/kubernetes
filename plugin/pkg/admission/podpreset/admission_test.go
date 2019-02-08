@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -810,7 +811,7 @@ func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	store := informerFactory.Settings().V1alpha1().PodPresets().Informer().GetStore()
 	store.Add(pip)
 	plugin := NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister())
-	attrs := kadmission.NewAttributesRecord(
+	attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(
 		pod,
 		nil,
 		api.Kind("Pod").WithVersion("version"),

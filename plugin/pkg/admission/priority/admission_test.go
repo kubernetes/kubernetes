@@ -24,6 +24,7 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
@@ -146,7 +147,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
 		// Now add the new class.
-		attrs := admission.NewAttributesRecord(
+		attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(
 			test.newClass,
 			nil,
 			scheduling.Kind("PriorityClass").WithVersion("version"),
@@ -200,7 +201,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                      "add a default class",
 			classesBefore:             []*scheduling.PriorityClass{nondefaultClass1},
 			classesAfter:              []*scheduling.PriorityClass{nondefaultClass1, defaultClass1},
-			attributes:                admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, false, nil),
+			attributes:                webhooktesting.NewAttributesRecordWithDefaultScheme(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, false, nil),
 			expectedDefaultBefore:     scheduling.DefaultPriorityWhenNoDefaultClassExists,
 			expectedDefaultNameBefore: "",
 			expectedDefaultAfter:      defaultClass1.Value,
@@ -210,7 +211,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                      "multiple default classes resolves to the minimum value among them",
 			classesBefore:             []*scheduling.PriorityClass{defaultClass1, defaultClass2},
 			classesAfter:              []*scheduling.PriorityClass{defaultClass2},
-			attributes:                admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
+			attributes:                webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
 			expectedDefaultBefore:     defaultClass1.Value,
 			expectedDefaultNameBefore: defaultClass1.Name,
 			expectedDefaultAfter:      defaultClass2.Value,
@@ -220,7 +221,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                      "delete default priority class",
 			classesBefore:             []*scheduling.PriorityClass{defaultClass1},
 			classesAfter:              []*scheduling.PriorityClass{},
-			attributes:                admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
+			attributes:                webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
 			expectedDefaultBefore:     defaultClass1.Value,
 			expectedDefaultNameBefore: defaultClass1.Name,
 			expectedDefaultAfter:      scheduling.DefaultPriorityWhenNoDefaultClassExists,
@@ -230,7 +231,7 @@ func TestDefaultPriority(t *testing.T) {
 			name:                      "update default class and remove its global default",
 			classesBefore:             []*scheduling.PriorityClass{defaultClass1},
 			classesAfter:              []*scheduling.PriorityClass{&updatedDefaultClass1},
-			attributes:                admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, false, nil),
+			attributes:                webhooktesting.NewAttributesRecordWithDefaultScheme(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, false, nil),
 			expectedDefaultBefore:     defaultClass1.Value,
 			expectedDefaultNameBefore: defaultClass1.Name,
 			expectedDefaultAfter:      scheduling.DefaultPriorityWhenNoDefaultClassExists,
@@ -591,7 +592,7 @@ func TestPodAdmission(t *testing.T) {
 		}
 
 		// Create pod.
-		attrs := admission.NewAttributesRecord(
+		attrs := webhooktesting.NewAttributesRecordWithDefaultScheme(
 			&test.pod,
 			nil,
 			api.Kind("Pod").WithVersion("version"),

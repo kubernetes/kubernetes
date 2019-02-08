@@ -20,12 +20,13 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestAdmissionNonNilAttribute(t *testing.T) {
 	handler := NewAlwaysAdmit()
-	err := handler.(*alwaysAdmit).Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, false, nil))
+	err := handler.(*alwaysAdmit).Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
@@ -123,7 +124,7 @@ func TestDispatch(t *testing.T) {
 				},
 			}
 			attr := generic.VersionedAttributes{
-				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), false, nil),
+				Attributes:         webhooktesting.NewAttributesRecordWithDefaultScheme(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), false, nil, scheme, scheme),
 				VersionedOldObject: nil,
 				VersionedObject:    test.in,
 			}

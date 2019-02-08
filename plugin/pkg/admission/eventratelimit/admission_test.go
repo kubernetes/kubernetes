@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
@@ -37,7 +38,7 @@ const (
 
 // attributesForRequest generates the admission.Attributes that for the specified request
 func attributesForRequest(rq request) admission.Attributes {
-	return admission.NewAttributesRecord(
+	return webhooktesting.NewAttributesRecordWithDefaultScheme(
 		rq.event,
 		nil,
 		api.Kind(rq.kind).WithVersion("version"),

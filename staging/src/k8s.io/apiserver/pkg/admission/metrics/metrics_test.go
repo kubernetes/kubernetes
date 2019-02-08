@@ -23,12 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 var (
 	kind     = schema.GroupVersionKind{Group: "kgroup", Version: "kversion", Kind: "kind"}
 	resource = schema.GroupVersionResource{Group: "rgroup", Version: "rversion", Resource: "resource"}
-	attr     = admission.NewAttributesRecord(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, false, nil)
+	attr     = webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, false, nil)
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
@@ -144,7 +145,7 @@ func TestWithMetrics(t *testing.T) {
 		h := WithMetrics(test.handler, Metrics.ObserveAdmissionController, test.name)
 
 		// test mutation
-		err := h.(admission.MutationInterface).Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
+		err := h.(admission.MutationInterface).Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
 		if test.admit && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -169,7 +170,7 @@ func TestWithMetrics(t *testing.T) {
 		}
 
 		// test validation
-		err = h.(admission.ValidationInterface).Validate(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
+		err = h.(admission.ValidationInterface).Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
 		if test.validate && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue

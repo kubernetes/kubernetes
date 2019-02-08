@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/api/imagepolicy/v1alpha1"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -482,7 +483,7 @@ func TestTLSConfig(t *testing.T) {
 				return
 			}
 			pod := goodPod(strconv.Itoa(rand.Intn(1000)))
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			attr := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			// Allow all and see if we get an error.
 			service.Allow()
@@ -571,7 +572,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
 
-	attr := admission.NewAttributesRecord(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+	attr := webhooktesting.NewAttributesRecordWithDefaultScheme(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	serv.allow = true
 
@@ -583,7 +584,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
-	attr = admission.NewAttributesRecord(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+	attr = webhooktesting.NewAttributesRecordWithDefaultScheme(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	testWebhookCacheCases(t, serv, wh, attr, tests)
 }
@@ -757,7 +758,7 @@ func TestContainerCombinations(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			attr := webhooktesting.NewAttributesRecordWithDefaultScheme(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if tt.wantAllowed {
@@ -851,7 +852,7 @@ func TestDefaultAllow(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			attr := webhooktesting.NewAttributesRecordWithDefaultScheme(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 
@@ -961,7 +962,7 @@ func TestAnnotationFiltering(t *testing.T) {
 			pod := goodPod("test")
 			pod.Annotations = tt.annotations
 
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			attr := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if err != nil {
@@ -1051,7 +1052,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 
 			pod := tt.pod
 
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			attr := webhooktesting.NewAttributesRecordWithDefaultScheme(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 

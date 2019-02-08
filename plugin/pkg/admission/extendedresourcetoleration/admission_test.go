@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -354,7 +355,7 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		err := plugin.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, core.Kind("Pod").WithVersion("version"), "foo", "name", core.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := plugin.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&test.requestedPod, nil, core.Kind("Pod").WithVersion("version"), "foo", "name", core.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 		if err != nil {
 			t.Errorf("[%d: %s] unexpected error %v for pod %+v", i, test.description, err, test.requestedPod)
 		}

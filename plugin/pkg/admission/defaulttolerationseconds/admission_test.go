@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -395,7 +396,7 @@ func TestForgivenessAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}

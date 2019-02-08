@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -179,7 +180,7 @@ func TestAdmitUpdate(t *testing.T) {
 		oldObj.Initializers = tc.oldInitializers
 		newObj := &v1.Pod{}
 		newObj.Initializers = tc.newInitializers
-		a := admission.NewAttributesRecord(newObj, oldObj, schema.GroupVersionKind{}, "", "foo", schema.GroupVersionResource{}, "", admission.Update, false, nil)
+		a := webhooktesting.NewAttributesRecordWithDefaultScheme(newObj, oldObj, schema.GroupVersionKind{}, "", "foo", schema.GroupVersionResource{}, "", admission.Update, false, nil)
 		err := plugin.Admit(a)
 		switch {
 		case tc.err == "" && err != nil:

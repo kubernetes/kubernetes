@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -88,7 +89,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -108,7 +109,7 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		actions := ""
 		for _, action := range mockClient.Actions() {

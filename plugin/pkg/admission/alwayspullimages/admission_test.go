@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -47,7 +48,7 @@ func TestAdmission(t *testing.T) {
 			},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -84,7 +85,7 @@ func TestValidate(t *testing.T) {
 		},
 	}
 	expectedError := `pods "123" is forbidden: spec.initContainers[0].imagePullPolicy: Unsupported value: "": supported values: "Always"`
-	err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(webhooktesting.NewAttributesRecordWithDefaultScheme(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Fatal("missing expected error")
 	}
@@ -139,7 +140,7 @@ func TestOtherResources(t *testing.T) {
 	for _, tc := range tests {
 		handler := &AlwaysPullImages{}
 
-		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, false, nil))
+		err := handler.Admit(webhooktesting.NewAttributesRecordWithDefaultScheme(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, false, nil))
 
 		if tc.expectError {
 			if err == nil {

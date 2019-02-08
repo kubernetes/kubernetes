@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 // fakeHandler implements Interface
@@ -64,7 +65,7 @@ func (h fakeHandler) Handles(o Operation) bool {
 }
 
 func attributes() Attributes {
-	return NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", false, nil)
+	return webhooktesting.NewAttributesRecordWithDefaultScheme(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", false, nil)
 }
 
 func TestWithAudit(t *testing.T) {
