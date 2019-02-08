@@ -212,7 +212,15 @@ func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
 func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
-	return 0, fmt.Errorf("unimplemented")
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return 0, err
+	}
+	version := accessor.GetResourceVersion()
+	if len(version) == 0 {
+		return 0, nil
+	}
+	return strconv.ParseUint(version, 10, 64)
 }
 func (testVersioner) ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 	return strconv.ParseUint(resourceVersion, 10, 64)
@@ -351,5 +359,84 @@ func TestGetToListWithLimitAndRV0(t *testing.T) {
 	err = cacher.GetToList(context.TODO(), "pods/ns", "", pred, result)
 	if err != errDummy {
 		t.Errorf("List with Limit without RV=0 should bypass cacher: %v", err)
+	}
+}
+
+func TestWatcherNotGoingBackInTime(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	// Ensure there is some budget for slowing down processing.
+	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
+
+	makePod := func(i int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", 1000+i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", 1000+i),
+			},
+		}
+	}
+	if err := cacher.watchCache.Add(makePod(0)); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	totalPods := 100
+
+	// Create watcher that will be slowing down reading.
+	w1, err := cacher.Watch(context.TODO(), "pods/ns", "999", Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w1.Stop()
+	go func() {
+		a := 0
+		for range w1.ResultChan() {
+			time.Sleep(time.Millisecond)
+			a++
+			if a == 100 {
+				break
+			}
+		}
+	}()
+
+	// Now push a ton of object to cache.
+	for i := 1; i < totalPods; i++ {
+		cacher.watchCache.Add(makePod(i))
+	}
+
+	// Create fast watcher and ensure it will get each object exactly once.
+	w2, err := cacher.Watch(context.TODO(), "pods/ns", "999", Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w2.Stop()
+
+	shouldContinue := true
+	currentRV := uint64(0)
+	for shouldContinue {
+		select {
+		case event, ok := <-w2.ResultChan():
+			if !ok {
+				shouldContinue = false
+				break
+			}
+			rv, err := testVersioner{}.ParseListResourceVersion(event.Object.(*examplev1.Pod).ResourceVersion)
+			if err != nil {
+				t.Errorf("unexpected parsing error: %v", err)
+			} else {
+				if rv < currentRV {
+					t.Errorf("watcher going back in time")
+				}
+				currentRV = rv
+			}
+		case <-time.After(time.Second):
+			w2.Stop()
+		}
 	}
 }
