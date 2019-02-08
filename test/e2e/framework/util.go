@@ -186,6 +186,9 @@ const (
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 
+	// How long for snapshot to create snapshotContent
+	SnapshotCreateTimeout = 5 * time.Minute
+
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
 	gcThroughput = 10

@@ -19,6 +19,7 @@ package testsuites
 import (
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -79,6 +80,14 @@ type DynamicPVTestDriver interface {
 	GetClaimSize() string
 }
 
+// SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
+type SnapshottableTestDriver interface {
+	TestDriver
+	// GetSnapshotClass returns a SnapshotClass to create snapshot.
+	// It will return nil, if the TestDriver doesn't support it.
+	GetSnapshotClass() *unstructured.Unstructured
+}
+
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
@@ -87,6 +96,7 @@ const (
 	CapBlock       Capability = "block"       // raw block mode
 	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
 	CapExec        Capability = "exec"        // exec a file in the volume
+	CapDataSource  Capability = "dataSource"  // support populate data from snapshot
 )
 
 // DriverInfo represents a combination of parameters to be used in implementation of TestDriver

@@ -62,6 +62,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
+	testsuites.InitSnapshottableTestSuite,
 }
 
 func csiTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
