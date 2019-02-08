@@ -17,6 +17,7 @@ reviewers:
   - madhusudancs
   - marun
   - mikedanese
+  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
@@ -49,6 +50,7 @@ approvers:
   - madhusudancs
   - marun
   - mikedanese
+  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
