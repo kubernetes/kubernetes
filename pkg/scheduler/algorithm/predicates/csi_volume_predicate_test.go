@@ -77,6 +77,20 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 		},
 	}
 
+	pendingVolumePod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "csi-ebs-4",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		newPod       *v1.Pod
 		existingPods []*v1.Pod
@@ -101,6 +115,15 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 			fits:         false,
 			test:         "doesn't when node capacity <= pods CSI volume",
 		},
+		// should count pending PVCs
+		{
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{pendingVolumePod, twoVolPod},
+			filterName:   "csi-ebs",
+			maxVols:      2,
+			fits:         false,
+			test:         "doesn't when node capacity <= pods CSI volume",
+		},
 	}
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
@@ -108,7 +131,7 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node := getNodeWithPodAndVolumeLimits(test.existingPods, int64(test.maxVols), test.filterName)
-		pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo("csi-ebs", "csi-ebs"), getFakeCSIPVCInfo("csi-ebs"))
+		pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo("csi-ebs", "csi-ebs"), getFakeCSIPVCInfo("csi-ebs", "csi-ebs-gp2"), getFakeCSIStorageClassInfo("csi-ebs-gp2", "csi-ebs"))
 		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -160,7 +183,7 @@ func getFakeCSIPVInfo(volumeName, driverName string) FakePersistentVolumeInfo {
 	}
 }
 
-func getFakeCSIPVCInfo(volumeName string) FakePersistentVolumeClaimInfo {
+func getFakeCSIPVCInfo(volumeName, scName string) FakePersistentVolumeClaimInfo {
 	return FakePersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: volumeName},
@@ -173,6 +196,19 @@ func getFakeCSIPVCInfo(volumeName string) FakePersistentVolumeClaimInfo {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-3"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: volumeName + "-3"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-4"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName},
+		},
+	}
+}
+
+func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClassInfo {
+	return FakeStorageClassInfo{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: scName},
+			Provisioner: provisionerName,
 		},
 	}
 }
