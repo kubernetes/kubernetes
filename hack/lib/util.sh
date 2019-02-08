@@ -775,6 +775,23 @@ function kube::util::ensure-gnu-sed {
   fi
 }
 
+# kube::util::check-file-in-alphabetical-order <file>
+# Check that the file is in alphabetical order
+#
+function kube::util::check-file-in-alphabetical-order {
+  local failure_file="$1"
+  if ! diff -u "${failure_file}" <(LC_ALL=C sort "${failure_file}"); then
+    {
+      echo
+      echo "${failure_file} is not in alphabetical order. Please sort it:"
+      echo
+      echo "  LC_ALL=C sort -o ${failure_file} ${failure_file}"
+      echo
+    } >&2
+    false
+  fi
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
