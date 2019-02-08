@@ -157,7 +157,7 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        325,
+		totalInitialCPUUsage:        375,
 		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,
