@@ -60,3 +60,17 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 		t.Errorf("Expected VolumeBindingMode to be defaulted to: %+v, got: %+v", defaultMode, outMode)
 	}
 }
+
+func TestSetDefaultAttachRequired(t *testing.T) {
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should be defaulted
+	defaultMode := true
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outMode := output.Spec.AttachRequired
+	if outMode == nil {
+		t.Errorf("Expected AttachRequired to be defaulted to: %+v, got: nil", defaultMode)
+	} else if *outMode != defaultMode {
+		t.Errorf("Expected AttachRequired to be defaulted to: %+v, got: %+v", defaultMode, outMode)
+	}
+}

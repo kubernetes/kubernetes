@@ -37,3 +37,10 @@ func SetDefaults_StorageClass(obj *storagev1beta1.StorageClass) {
 		*obj.VolumeBindingMode = storagev1beta1.VolumeBindingImmediate
 	}
 }
+
+func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
+	if obj.Spec.AttachRequired == nil {
+		obj.Spec.AttachRequired = new(bool)
+		*(obj.Spec.AttachRequired) = true
+	}
+}
