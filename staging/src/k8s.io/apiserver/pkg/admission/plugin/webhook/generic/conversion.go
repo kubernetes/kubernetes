@@ -17,39 +17,24 @@ limitations under the License.
 package generic
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// convertor converts objects to the desired version.
-type convertor struct {
-	Scheme *runtime.Scheme
-}
-
 // ConvertToGVK converts object to the desired gvk.
-func (c *convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
+func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, creator runtime.ObjectCreater, converter runtime.ObjectConvertor) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
 	// if obj is a custom resource, it should not need conversion.
 	if obj.GetObjectKind().GroupVersionKind() == gvk {
 		return obj, nil
 	}
-	out, err := c.Scheme.New(gvk)
+	out, err := creator.New(gvk)
 	if err != nil {
 		return nil, err
 	}
-	err = c.Scheme.Convert(obj, out, nil)
+	err = converter.Convert(obj, out, nil)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
-}
-
-// Validate checks if the conversion has a scheme.
-func (c *convertor) Validate() error {
-	if c.Scheme == nil {
-		return fmt.Errorf("the convertor requires a scheme")
-	}
-	return nil
 }

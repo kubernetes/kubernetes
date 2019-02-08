@@ -69,7 +69,6 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *Plugin) SetScheme(scheme *runtime.Scheme) {
-	a.Webhook.SetScheme(scheme)
 	if scheme != nil {
 		a.scheme = scheme
 		a.jsonSerializer = json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)

@@ -38,6 +38,8 @@ type attributesRecord struct {
 	object      runtime.Object
 	oldObject   runtime.Object
 	userInfo    user.Info
+	creator     runtime.ObjectCreater
+	converter   runtime.ObjectConvertor
 
 	// other elements are always accessed in single goroutine.
 	// But ValidatingAdmissionWebhook add annotations concurrently.
@@ -45,7 +47,7 @@ type attributesRecord struct {
 	annotationsLock sync.RWMutex
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, dryRun bool, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, dryRun bool, userInfo user.Info, creator runtime.ObjectCreater, converter runtime.ObjectConvertor) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -57,6 +59,8 @@ func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind s
 		object:      object,
 		oldObject:   oldObject,
 		userInfo:    userInfo,
+		creator:     creator,
+		converter:   converter,
 	}
 }
 
@@ -98,6 +102,14 @@ func (record *attributesRecord) GetOldObject() runtime.Object {
 
 func (record *attributesRecord) GetUserInfo() user.Info {
 	return record.userInfo
+}
+
+func (record *attributesRecord) GetObjectCreator() runtime.ObjectCreater {
+	return record.creator
+}
+
+func (record *attributesRecord) GetObjectConverter() runtime.ObjectConvertor {
+	return record.converter
 }
 
 // getAnnotations implements privateAnnotationsGetter.It's a private method used

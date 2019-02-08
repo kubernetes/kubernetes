@@ -174,6 +174,8 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetOperation(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
+			staticAttributes.GetObjectCreator(),
+			staticAttributes.GetObjectConverter(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil

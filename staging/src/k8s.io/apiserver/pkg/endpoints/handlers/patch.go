@@ -142,6 +142,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			admission.Update,
 			dryrun.IsDryRun(options.DryRun),
 			userInfo,
+			scope.Creater,
+			scope.Convertor,
 		)
 		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			// if we allow create-on-patch, we have this TODO: call the mutating admission chain with the CREATE verb instead of UPDATE
@@ -157,6 +159,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 					admission.Update,
 					dryrun.IsDryRun(options.DryRun),
 					userInfo,
+					scope.Creater,
+					scope.Convertor,
 				))
 			}
 			return nil
