@@ -23,7 +23,6 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,10 +43,8 @@ import (
 )
 
 func TestDynamic(t *testing.T) {
-	eventList1 := &atomic.Value{}
-	eventList1.Store(auditinternal.EventList{})
-	eventList2 := &atomic.Value{}
-	eventList2.Store(auditinternal.EventList{})
+	eventList1 := newLockedEventList()
+	eventList2 := newLockedEventList()
 
 	// start test servers
 	server1 := httptest.NewServer(buildTestHandler(t, eventList1))
@@ -55,25 +52,39 @@ func TestDynamic(t *testing.T) {
 	server2 := httptest.NewServer(buildTestHandler(t, eventList2))
 	defer server2.Close()
 
-	testPolicy := auditregv1alpha1.Policy{
+	testPolicy1 := auditregv1alpha1.Policy{
+		Level: auditregv1alpha1.LevelRequest,
+		Stages: []auditregv1alpha1.Stage{
+			auditregv1alpha1.StageResponseComplete,
+		},
+	}
+	testPolicy2 := auditregv1alpha1.Policy{
 		Level: auditregv1alpha1.LevelMetadata,
 		Stages: []auditregv1alpha1.Stage{
 			auditregv1alpha1.StageResponseStarted,
 		},
 	}
-	testEvent := auditinternal.Event{
+
+	testEvent1 := auditinternal.Event{
+		Level:      auditinternal.LevelRequest,
+		Stage:      auditinternal.StageResponseComplete,
+		Verb:       "get",
+		RequestURI: "/test/path",
+	}
+	testEvent2 := auditinternal.Event{
 		Level:      auditinternal.LevelMetadata,
 		Stage:      auditinternal.StageResponseStarted,
 		Verb:       "get",
 		RequestURI: "/test/path",
 	}
+
 	testConfig1 := &auditregv1alpha1.AuditSink{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test1",
 			UID:  types.UID("test1"),
 		},
 		Spec: auditregv1alpha1.AuditSinkSpec{
-			Policy: testPolicy,
+			Policy: testPolicy1,
 			Webhook: auditregv1alpha1.Webhook{
 				ClientConfig: auditregv1alpha1.WebhookClientConfig{
 					URL: &server1.URL,
@@ -87,7 +98,7 @@ func TestDynamic(t *testing.T) {
 			UID:  types.UID("test2"),
 		},
 		Spec: auditregv1alpha1.AuditSinkSpec{
-			Policy: testPolicy,
+			Policy: testPolicy2,
 			Webhook: auditregv1alpha1.Webhook{
 				ClientConfig: auditregv1alpha1.WebhookClientConfig{
 					URL: &server2.URL,
@@ -103,7 +114,7 @@ func TestDynamic(t *testing.T) {
 			UID:  types.UID("bad"),
 		},
 		Spec: auditregv1alpha1.AuditSinkSpec{
-			Policy: testPolicy,
+			Policy: testPolicy1,
 			Webhook: auditregv1alpha1.Webhook{
 				ClientConfig: auditregv1alpha1.WebhookClientConfig{
 					URL: &badURL,
@@ -133,14 +144,15 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, testConfig1, delegates["test1"].configuration)
 
 		// send event and check that it arrives
-		b.ProcessEvents(&testEvent)
-		err := checkForEvent(eventList1, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink")
+		b.ProcessEvents(&testEvent1)
+		require.NoError(t, eventList1.checkForEvent(testEvent1), "unable to find events sent to sink")
+		require.NoError(t, eventList1.checkForLength(1))
 	})
 	require.True(t, success) // propagate failure
 
 	// test that a bad webhook configuration can be recovered from
 	success = t.Run("bad config", func(t *testing.T) {
+		eventList1.reset()
 		d.addSink(badConfig)
 		delegates := d.GetDelegates()
 		require.Len(t, delegates, 2)
@@ -148,7 +160,7 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, badConfig, delegates["bad"].configuration)
 
 		// send events to the buffer
-		b.ProcessEvents(&testEvent, &testEvent)
+		b.ProcessEvents(&testEvent1, &testEvent1)
 
 		// event is in the buffer see if the sink can be deleted
 		// this will hang and fail if not handled properly
@@ -158,11 +170,12 @@ func TestDynamic(t *testing.T) {
 		require.Len(t, delegates, 1)
 		require.Contains(t, delegates, types.UID("test1"))
 		require.Equal(t, testConfig1, delegates["test1"].configuration)
+		require.NoError(t, eventList1.checkForLength(2))
 	})
 	require.True(t, success) // propagate failure
 
 	success = t.Run("find two", func(t *testing.T) {
-		eventList1.Store(auditinternal.EventList{})
+		eventList1.reset()
 		d.addSink(testConfig2)
 		delegates := d.GetDelegates()
 		require.Len(t, delegates, 2)
@@ -172,34 +185,37 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, testConfig2, delegates["test2"].configuration)
 
 		// send event to both delegates and check that it arrives in both places
-		b.ProcessEvents(&testEvent)
-		err := checkForEvent(eventList1, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink 1")
-		err = checkForEvent(eventList2, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink 2")
+		b.ProcessEvents(&testEvent1, &testEvent2)
 
-		// test that backends don't race
-		var wg sync.WaitGroup
-		numTestEvents := 100
+		require.NoError(t, eventList1.checkForLength(1), "expected only one event in sink 1")
+		require.NoError(t, eventList1.checkForEvent(testEvent1), "unable to find events sent to sink 1")
+
+		require.NoError(t, eventList2.checkForLength(1), "expected only one event in sink 2")
+		require.NoError(t, eventList2.checkForEvent(testEvent2), "unable to find events sent to sink 2")
+
+		// reset event lists
+		eventList1.reset()
+		eventList2.reset()
+
+		// test that backends don't race or overwrite
+		wg := &sync.WaitGroup{}
+		numTestEvents := 50
 		wg.Add(2)
-		go func() {
-			for i := 0; i < numTestEvents; i++ {
-				b.ProcessEvents(&testEvent)
-			}
-			wg.Done()
-		}()
-		go func() {
-			for i := 0; i < numTestEvents; i++ {
-				b.ProcessEvents(&testEvent)
-			}
-			wg.Done()
-		}()
+
+		go asyncProcess(wg, numTestEvents, testEvent1, b)
+		go asyncProcess(wg, numTestEvents, testEvent2, b)
 		wg.Wait()
+
+		require.NoError(t, eventList1.checkForLength(numTestEvents), "expected %v events in sink 1", numTestEvents)
+		require.NoError(t, eventList1.checkConsistency(testEvent1), "expected consistent events in sink 1")
+
+		require.NoError(t, eventList2.checkForLength(numTestEvents), "expected %v events in sink 2", numTestEvents)
+		require.NoError(t, eventList2.checkConsistency(testEvent2), "expected events in sink 2 to be consistent")
 	})
 	require.True(t, success) // propagate failure
 
 	success = t.Run("delete one", func(t *testing.T) {
-		eventList2.Store(auditinternal.EventList{})
+		eventList2.reset()
 		d.deleteSink(testConfig1)
 		delegates := d.GetDelegates()
 		require.Len(t, delegates, 1)
@@ -207,14 +223,13 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, testConfig2, delegates["test2"].configuration)
 
 		// send event and check that it arrives to remaining sink
-		b.ProcessEvents(&testEvent)
-		err := checkForEvent(eventList2, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink")
+		b.ProcessEvents(&testEvent2)
+		require.NoError(t, eventList2.checkForEvent(testEvent2), "unable to find events sent to sink")
 	})
 	require.True(t, success) // propagate failure
 
 	success = t.Run("update one", func(t *testing.T) {
-		eventList1.Store(auditinternal.EventList{})
+		eventList1.reset()
 		oldConfig := *testConfig2
 		testConfig2.Spec.Webhook.ClientConfig.URL = &server1.URL
 		testConfig2.UID = types.UID("test2.1")
@@ -225,14 +240,13 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, testConfig2, delegates["test2.1"].configuration)
 
 		// send event and check that it arrives to updated sink
-		b.ProcessEvents(&testEvent)
-		err := checkForEvent(eventList1, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink")
+		b.ProcessEvents(&testEvent2)
+		require.NoError(t, eventList1.checkForEvent(testEvent2), "unable to find events sent to sink")
 	})
 	require.True(t, success) // propagate failure
 
 	success = t.Run("update meta only", func(t *testing.T) {
-		eventList1.Store(auditinternal.EventList{})
+		eventList1.reset()
 		oldConfig := *testConfig2
 		testConfig2.UID = types.UID("test2.2")
 		testConfig2.Labels = map[string]string{"my": "label"}
@@ -242,9 +256,8 @@ func TestDynamic(t *testing.T) {
 		require.Contains(t, delegates, types.UID("test2.2"))
 
 		// send event and check that it arrives to same sink
-		b.ProcessEvents(&testEvent)
-		err := checkForEvent(eventList1, testEvent)
-		require.NoError(t, err, "unable to find events sent to sink")
+		b.ProcessEvents(&testEvent2)
+		require.NoError(t, eventList1.checkForEvent(testEvent2), "unable to find events sent to sink")
 	})
 	require.True(t, success) // propagate failure
 
@@ -276,17 +289,69 @@ func TestDynamic(t *testing.T) {
 	require.True(t, success) // propagate failure
 }
 
-// checkForEvent will poll to check for an audit event in an atomic event list
-func checkForEvent(a *atomic.Value, evSent auditinternal.Event) error {
-	return wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		el := a.Load().(auditinternal.EventList)
-		if len(el.Items) != 1 {
+// lockedEventList provides concurrent access to an audit event list
+type lockedEventList struct {
+	sync.RWMutex
+	el auditinternal.EventList
+}
+
+// newLockedEventList returns a new locked event list
+func newLockedEventList() *lockedEventList {
+	return &lockedEventList{
+		el: auditinternal.EventList{},
+	}
+}
+
+// reset event list to be empty
+func (l *lockedEventList) reset() {
+	l.Lock()
+	defer l.Unlock()
+	l.el = auditinternal.EventList{}
+}
+
+// append safely appends events
+func (l *lockedEventList) append(el auditinternal.EventList) {
+	l.Lock()
+	defer l.Unlock()
+	l.el.Items = append(l.el.Items, el.Items...)
+}
+
+// checkForLength will poll to check that the list is a certain length
+func (l *lockedEventList) checkForLength(length int) error {
+	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+		l.RLock()
+		defer l.RUnlock()
+		itemLen := len(l.el.Items)
+		if itemLen != length {
 			return false, nil
 		}
-		evFound := el.Items[0]
-		eq := reflect.DeepEqual(evSent, evFound)
+		return true, nil
+	})
+}
+
+// checkConsistency checks that all events in the list are the same event
+func (l *lockedEventList) checkConsistency(evSent auditinternal.Event) error {
+	l.RLock()
+	defer l.RUnlock()
+	for _, ev := range l.el.Items {
+		eq := reflect.DeepEqual(evSent, ev)
 		if !eq {
-			return false, fmt.Errorf("event mismatch -- sent: %+v found: %+v", evSent, evFound)
+			return fmt.Errorf("event mismatch -- sent: %+v found: %+v", evSent, ev)
+		}
+	}
+	return nil
+}
+
+// checkForEvent will poll to check for an audit event in an atomic event list
+func (l *lockedEventList) checkForEvent(evSent auditinternal.Event) error {
+	return wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
+		l.RLock()
+		defer l.RUnlock()
+		for _, evFound := range l.el.Items {
+			eq := reflect.DeepEqual(evSent, evFound)
+			if !eq {
+				return false, nil
+			}
 		}
 		return true, nil
 	})
@@ -294,7 +359,7 @@ func checkForEvent(a *atomic.Value, evSent auditinternal.Event) error {
 
 // buildTestHandler returns a handler that will update the atomic value passed in
 // with the event list it receives
-func buildTestHandler(t *testing.T, a *atomic.Value) http.HandlerFunc {
+func buildTestHandler(t *testing.T, l *lockedEventList) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -306,7 +371,7 @@ func buildTestHandler(t *testing.T, a *atomic.Value) http.HandlerFunc {
 			t.Fatalf("failed decoding buf: %b, apiVersion: %s", body, auditv1.SchemeGroupVersion)
 		}
 		defer r.Body.Close()
-		a.Store(el)
+		l.append(el)
 		w.WriteHeader(200)
 	})
 }
@@ -335,4 +400,13 @@ func defaultTestConfig() (*Config, chan struct{}) {
 			ServiceResolver:         webhook.NewDefaultServiceResolver(),
 		},
 	}, stop
+}
+
+// asyncProcess sends the given event the given number of iterations to the backend and is meant to be
+// run concurrently
+func asyncProcess(wg *sync.WaitGroup, numIterations int, event auditinternal.Event, b audit.Backend) {
+	for i := 0; i < numIterations; i++ {
+		b.ProcessEvents(&event)
+	}
+	wg.Done()
 }
