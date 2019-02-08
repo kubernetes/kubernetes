@@ -93,6 +93,21 @@ func NewDeviceAllocator() DeviceAllocator {
 	}
 }
 
+// NewNVMeDeviceAllocator allocates device names according to scheme 1-26
+// it moves along the ring and always picks next device until device list is
+// exhausted.
+func NewNVMeDeviceAllocator() DeviceAllocator {
+	possibleDevices := make(map[mountDevice]int)
+	for i := 1; i <= 26; i++ {
+		dev := mountDevice([]rune{string(i)})
+		possibleDevices[dev] = 0
+	}
+	return &deviceAllocator{
+		possibleDevices: possibleDevices,
+		counter:         0,
+	}
+}
+
 // GetNext gets next available device from the pool, this function assumes that caller
 // holds the necessary lock on deviceAllocator
 func (d *deviceAllocator) GetNext(existingDevices ExistingDevices) (mountDevice, error) {

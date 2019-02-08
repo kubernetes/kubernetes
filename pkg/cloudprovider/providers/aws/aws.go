@@ -1727,6 +1727,16 @@ func (c *Cloud) getMountDevice(
 		if strings.HasPrefix(name, "/dev/xvd") {
 			name = name[8:]
 		}
+		// EBS volumes are exposed as NVMe block devices on Nitro-based instances
+		// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
+		// Example: /dev/nvme[0-26]n1
+		if strings.HasPrefix(name, "/dev/nvme") {
+			if len(name) == 13 {
+				name = name[9:11]
+			} else {
+				name = name[9:10]
+			}
+		}
 		if len(name) < 1 || len(name) > 2 {
 			klog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
@@ -1761,9 +1771,15 @@ func (c *Cloud) getMountDevice(
 	deviceAllocator := c.deviceAllocators[i.nodeName]
 	if deviceAllocator == nil {
 		// we want device names with two significant characters, starting with /dev/xvdbb
-		// the allowed range is /dev/xvd[b-c][a-z]
+		// the allowed range is /dev/xvd[b-c][a-z] unless it's nitro based system in
+		// which case it is /dev/nvme[1-26]n1. Use rootDevice to confirm if system is nitro based
 		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-		deviceAllocator = NewDeviceAllocator()
+		rootDeviceName := aws.StringValue(info.rootDeviceName)
+		if strings.HasPrefix(rootDeviceName, "/dev/nvme") {
+			deviceAllocator = NewNVMeDeviceAllocator()
+		} else {
+			deviceAllocator = NewDeviceAllocator()
+		}
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
 	// We need to lock deviceAllocator to prevent possible race with Deprioritize function
