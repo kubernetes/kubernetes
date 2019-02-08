@@ -3444,7 +3444,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": true,
 				"nodeB": true,
 			},
-			name: "Test incoming pod's anti-affinity: even if lableSelector matches, we still check if topologyKey matches",
+			name: "Test incoming pod's anti-affinity: even if labelSelector matches, we still check if topologyKey matches",
 		},
 		{
 			pod: &v1.Pod{
