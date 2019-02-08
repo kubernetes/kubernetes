@@ -97,7 +97,7 @@ func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
 	)
 	decoder := opts.StorageSerializer.DecoderToVersion(
 		recognizer.NewDecoder(decoders...),
-		runtime.NewMultiGroupVersioner(
+		runtime.NewCoercingMultiGroupVersioner(
 			opts.MemoryVersion,
 			schema.GroupKind{Group: opts.MemoryVersion.Group},
 			schema.GroupKind{Group: opts.StorageVersion.Group},
