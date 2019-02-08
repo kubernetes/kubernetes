@@ -321,7 +321,7 @@ func TestSync(t *testing.T) {
 			presentAtStart[k] = v
 		}
 
-		c := &autoRegisterController{
+		c := &Controller{
 			apiServiceClient:  fakeClient.Apiregistration(),
 			apiServiceLister:  listers.NewAPIServiceLister(apiServiceIndexer),
 			apiServicesToSync: map[string]*apiregistration.APIService{},

@@ -56,6 +56,7 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
+// ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -70,6 +71,7 @@ type ExtraConfig struct {
 	ServiceResolver ServiceResolver
 }
 
+// Config represents the configuration needed to create an APIAggregator.
 type Config struct {
 	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
@@ -80,6 +82,7 @@ type completedConfig struct {
 	ExtraConfig   *ExtraConfig
 }
 
+// CompletedConfig same as Config, just to swap private object.
 type CompletedConfig struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
@@ -131,11 +134,11 @@ func (cfg *Config) Complete() CompletedConfig {
 	return CompletedConfig{&c}
 }
 
-// New returns a new instance of APIAggregator from the given config.
+// NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	// Prevent generic API server to install OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
-	openApiConfig := c.GenericConfig.OpenAPIConfig
+	openAPIConfig := c.GenericConfig.OpenAPIConfig
 	c.GenericConfig.OpenAPIConfig = nil
 
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
@@ -202,13 +205,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 
-	if openApiConfig != nil {
+	if openAPIConfig != nil {
 		specDownloader := openapicontroller.NewDownloader()
 		openAPIAggregator, err := openapicontroller.BuildAndRegisterAggregator(
 			&specDownloader,
 			delegationTarget,
 			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
-			openApiConfig,
+			openAPIConfig,
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return nil, err
@@ -305,6 +308,7 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	// We don't need this right away because the handler properly delegates when no versions are present
 }
 
+// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
