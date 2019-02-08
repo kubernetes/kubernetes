@@ -80,6 +80,10 @@ func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (s *snapshottableTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapDataSource] {
+		framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+	}
 }
 
 func createSnapshottableTestInput(driver TestDriver, pattern testpatterns.TestPattern) (snapshottableTestResource, snapshottableTestInput) {
@@ -187,10 +191,7 @@ type snapshottableTestInput struct {
 }
 
 func testSnapshot(input *snapshottableTestInput) {
-	It("should create snapshot with defaults", func() {
-		if input.dInfo.Name == "csi-hostpath-v0" {
-			framework.Skipf("skip test when using driver csi-hostpath-v0 - skipping")
-		}
+	It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
 		TestCreateSnapshot(input.testCase, input.cs, input.dc, input.pvc, input.sc, input.vsc)
 	})
 }
