@@ -201,7 +201,7 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta1.JoinConfiguration{
 		Discovery: kubeadmapiv1beta1.Discovery{
 			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),

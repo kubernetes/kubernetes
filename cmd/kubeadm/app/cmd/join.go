@@ -334,7 +334,7 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 		klog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
-	cfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
+	cfg, err := configutil.LoadOrDefaultJoinConfiguration(options.cfgPath, options.externalcfg)
 	if err != nil {
 		return nil, err
 	}
