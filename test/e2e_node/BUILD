@@ -1,6 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load(
+    "//build:go.bzl",
+    go_test = "go_test_conditional_pure",
+)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -106,6 +110,7 @@ go_test(
         "summary_test.go",
         "volume_manager_test.go",
     ],
+    out = "e2e_node.test",
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
@@ -178,15 +183,6 @@ go_test(
         ],
         "//conditions:default": [],
     }),
-)
-
-genrule(
-    name = "gen_e2e_node.test",
-    testonly = 1,
-    srcs = [":go_default_test"],
-    outs = ["e2e_node.test"],
-    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
-    output_to_bindir = 1,
 )
 
 filegroup(
