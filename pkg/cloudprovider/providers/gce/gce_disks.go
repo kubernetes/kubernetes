@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -510,7 +509,7 @@ func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone := pv.Labels[kubeletapis.LabelZoneFailureDomain]
+	zone := pv.Labels[v1.LabelZoneFailureDomain]
 
 	labels, err := g.GetAutoLabelsForPD(pv.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
@@ -845,16 +844,16 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD did not have zone/region information: %v", disk)
 		}
-		labels[kubeletapis.LabelZoneFailureDomain] = zoneInfo.zone
-		labels[kubeletapis.LabelZoneRegion] = disk.Region
+		labels[v1.LabelZoneFailureDomain] = zoneInfo.zone
+		labels[v1.LabelZoneRegion] = disk.Region
 	case multiZone:
 		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
 		}
-		labels[kubeletapis.LabelZoneFailureDomain] =
+		labels[v1.LabelZoneFailureDomain] =
 			volumeutil.ZonesSetToLabelValue(zoneInfo.replicaZones)
-		labels[kubeletapis.LabelZoneRegion] = disk.Region
+		labels[v1.LabelZoneRegion] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check
 		return nil, fmt.Errorf("PD did not have ZoneInfo: %v", disk)

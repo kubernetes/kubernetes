@@ -20,15 +20,19 @@ import (
 	"net"
 	"strconv"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
+
+// When the --failure-domains scheduler flag is not specified,
+// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
+var defaultFailureDomains string = v1.LabelHostname + "," + v1.LabelZoneFailureDomain + "," + v1.LabelZoneRegion
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -82,7 +86,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 	}
 
 	if len(obj.FailureDomains) == 0 {
-		obj.FailureDomains = kubeletapis.DefaultFailureDomains
+		obj.FailureDomains = defaultFailureDomains
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {

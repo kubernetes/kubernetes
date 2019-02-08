@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
@@ -1093,7 +1092,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 			ObjectMeta: metav1.ObjectMeta{
 				Name: vmName,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: vmName,
+					v1.LabelHostname: vmName,
 				},
 			},
 		}

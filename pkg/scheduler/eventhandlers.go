@@ -29,7 +29,6 @@ import (
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -268,11 +267,6 @@ func assignedPod(pod *v1.Pod) bool {
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
 func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
 	return schedulerName == pod.Spec.SchedulerName
-}
-
-// isZoneRegionLabel check if given key of label is zone or region label.
-func isZoneRegionLabel(k string) bool {
-	return k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion
 }
 
 // skipPodUpdate checks whether the specified pod update should be ignored.
