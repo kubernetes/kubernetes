@@ -32,9 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
 
@@ -141,39 +139,6 @@ func newV0NodeClient(addr csiAddr) (nodeClient csipbv0.NodeClient, closer io.Clo
 
 	nodeClient = csipbv0.NewNodeClient(conn)
 	return nodeClient, conn, nil
-}
-
-func newCsiDriverClient(driverName csiDriverName, drivers *DriversStore) (*csiDriverClient, error) {
-	if driverName == "" {
-		return nil, fmt.Errorf("driver name is empty")
-	}
-
-	addr := fmt.Sprintf(csiAddrTemplate, driverName)
-	requiresV0Client := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := drivers.Get(string(driverName))
-		if !driverExists {
-			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
-		}
-
-		addr = existingDriver.endpoint
-		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
-	}
-
-	nodeV1ClientCreator := newV1NodeClient
-	nodeV0ClientCreator := newV0NodeClient
-	if requiresV0Client {
-		nodeV1ClientCreator = nil
-	} else {
-		nodeV0ClientCreator = nil
-	}
-
-	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(addr),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-		nodeV0ClientCreator: nodeV0ClientCreator,
-	}, nil
 }
 
 func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
@@ -817,9 +782,9 @@ func versionRequiresV0Client(version *utilversion.Version) bool {
 // initialization until needed.
 type csiClientGetter struct {
 	sync.RWMutex
-	csiClient  csiClient
-	driverName csiDriverName
-	drivers    *DriversStore
+	csiClient     csiClient
+	driverName    csiDriverName
+	clientCreator func(csiDriverName) (*csiDriverClient, error)
 }
 
 func (c *csiClientGetter) Get() (csiClient, error) {
@@ -835,7 +800,7 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 	if c.csiClient != nil {
 		return c.csiClient, nil
 	}
-	csi, err := newCsiDriverClient(c.driverName, c.drivers)
+	csi, err := c.clientCreator(c.driverName)
 	if err != nil {
 		return nil, err
 	}

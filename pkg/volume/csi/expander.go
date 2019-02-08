@@ -48,7 +48,7 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 		return false, err
 	}
 
-	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver), c.drivers)
+	csClient, err := c.newCsiDriverClient(csiDriverName(csiSource.Driver))
 	if err != nil {
 		return false, err
 	}
