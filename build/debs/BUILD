@@ -1,8 +1,15 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_k8s_repo_infra//defs:deb.bzl", "k8s_deb", "deb_data")
+load("@io_k8s_repo_infra//defs:deb.bzl", "deb_data", "k8s_deb")
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
+load(
+    "//build:platforms.bzl",
+    "CLIENT_PLATFORMS",
+    "NODE_PLATFORMS",
+    "SERVER_PLATFORMS",
+    "for_platforms",
+)
 load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 # We do not include kube-scheduler, kube-controller-manager,
@@ -12,16 +19,54 @@ load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 # images.
 release_filegroup(
     name = "debs",
-    srcs = [
-        ":cri-tools.deb",
-        ":kubeadm.deb",
-        ":kubectl.deb",
-        ":kubelet.deb",
-        ":kubernetes-cni.deb",
-    ],
+    conditioned_srcs = for_platforms(
+        default = [],
+        for_client = [":kubectl-{ARCH}.deb"],
+        for_node = [
+            ":cri-tools-{ARCH}.deb",
+            ":kubeadm-{ARCH}.deb",
+            ":kubelet-{ARCH}.deb",
+            ":kubernetes-cni-{ARCH}.deb",
+        ],
+        only_os = "linux",
+    ),
 )
 
+# Create aliases from the non-arch names to the arch-specific names for backwards compatibility
+alias(
+    name = "kubectl",
+    actual = select(for_platforms(
+        for_client = ":kubectl-{ARCH}",
+        only_os = "linux",
+    )),
+)
+
+[alias(
+    name = pkg,
+    actual = select(for_platforms(
+        for_node = ":%s-{ARCH}" % pkg,
+        only_os = "linux",
+    )),
+) for pkg in [
+    "cri-tools",
+    "kubeadm",
+    "kubelet",
+    "kubernetes-cni",
+]]
+
 [deb_data(
+    name = "kubectl",
+    data = [
+        {
+            "files": ["//cmd/kubectl"],
+            "mode": "0755",
+            "dir": "/usr/bin",
+        },
+    ],
+    goarch = arch,
+) for arch in CLIENT_PLATFORMS["linux"]]
+
+[[deb_data(
     name = binary,
     data = [
         {
@@ -30,26 +75,16 @@ release_filegroup(
             "dir": "/usr/bin",
         },
     ],
+    goarch = arch,
 ) for binary in [
     "cloud-controller-manager",
-    "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-]]
+    "kube-scheduler",
+]] for arch in SERVER_PLATFORMS["linux"]]
 
-deb_data(
-    name = "kube-scheduler",
-    data = [
-        {
-            "files": ["//cmd/kube-scheduler"],
-            "mode": "0755",
-            "dir": "/usr/bin",
-        },
-    ],
-)
-
-deb_data(
+[deb_data(
     name = "kubelet",
     data = [
         {
@@ -63,9 +98,10 @@ deb_data(
             "dir": "/lib/systemd/system",
         },
     ],
-)
+    goarch = arch,
+) for arch in NODE_PLATFORMS["linux"]]
 
-deb_data(
+[deb_data(
     name = "kubeadm",
     data = [
         {
@@ -89,63 +125,70 @@ deb_data(
             "dir": "/etc/sysctl.d",
         },
     ],
-)
+    goarch = arch,
+) for arch in NODE_PLATFORMS["linux"]]
 
-pkg_tar(
-    name = "kubernetes-cni-data",
+[pkg_tar(
+    name = "kubernetes-cni-data-%s" % goarch,
     package_dir = "/opt/cni/bin",
-    deps = ["@kubernetes_cni//file"],
-)
+    deps = ["@kubernetes_cni_%s//file" % goarch],
+) for goarch in NODE_PLATFORMS["linux"]]
 
-pkg_tar(
-    name = "cri-tools-data",
+[pkg_tar(
+    name = "cri-tools-data-%s" % goarch,
     package_dir = "/usr/bin",
-    deps = ["@cri_tools//file"],
-)
+    deps = ["@cri_tools_%s//file" % goarch],
+) for goarch in NODE_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "cloud-controller-manager",
     description = "Kubernetes Cloud Controller Manager",
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in SERVER_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kubectl",
     description = """Kubernetes Command Line Tool
 The Kubernetes command line tool for interacting with the Kubernetes API.
 """,
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in CLIENT_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kube-apiserver",
     description = "Kubernetes API Server",
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in SERVER_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kube-controller-manager",
     description = "Kubernetes Controller Manager",
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in SERVER_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kube-scheduler",
     description = "Kubernetes Scheduler",
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in SERVER_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kube-proxy",
     depends = [
         "iptables (>= 1.4.21)",
         "iproute2",
     ],
     description = "Kubernetes Service Proxy",
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in NODE_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kubelet",
     depends = [
         "conntrack",
@@ -161,10 +204,11 @@ k8s_deb(
     description = """Kubernetes Node Agent
 The node agent of Kubernetes, the container cluster manager
 """,
+    goarch = arch,
     version_file = "//build:os_package_version",
-)
+) for arch in NODE_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kubeadm",
     depends = [
         "kubelet (>= 1.8.0)",
@@ -175,23 +219,26 @@ k8s_deb(
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    goarch = arch,
     postinst = "postinst",
     version_file = "//build:os_package_version",
-)
+) for arch in NODE_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "kubernetes-cni",
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
+    goarch = arch,
     version = CNI_VERSION,
-)
+) for arch in NODE_PLATFORMS["linux"]]
 
-k8s_deb(
+[k8s_deb(
     name = "cri-tools",
     description = """Container Runtime Interface tools (crictl)""",
+    goarch = arch,
     version = CRI_TOOLS_VERSION,
-)
+) for arch in NODE_PLATFORMS["linux"]]
 
 filegroup(
     name = "package-srcs",

@@ -73,3 +73,39 @@ TEST_PLATFORMS = {
         "amd64",
     ],
 }
+
+def go_platform_constraint(os, arch):
+    return "@io_bazel_rules_go//go/platform:%s_%s" % (os, arch)
+
+def _update_dict_for_platform_category(d, value, platforms, only_os = None):
+    if not value:
+        return
+    for os, arches in platforms.items():
+        if only_os and os != only_os:
+            continue
+        for arch in arches:
+            constraint = go_platform_constraint(os, arch)
+            if type(value) == "list":
+                d.setdefault(constraint, []).extend(
+                    [v.format(OS = os, ARCH = arch) for v in value],
+                )
+            else:
+                if constraint in d:
+                    fail("duplicate entry for constraint %s", constraint)
+                d[constraint] = value.format(OS = os, ARCH = arch)
+
+def for_platforms(
+        for_client = None,
+        for_node = None,
+        for_server = None,
+        for_test = None,
+        default = None,
+        only_os = None):
+    d = {}
+    if default != None:
+        d["//conditions:default"] = default
+    _update_dict_for_platform_category(d, for_client, CLIENT_PLATFORMS, only_os)
+    _update_dict_for_platform_category(d, for_node, NODE_PLATFORMS, only_os)
+    _update_dict_for_platform_category(d, for_server, SERVER_PLATFORMS, only_os)
+    _update_dict_for_platform_category(d, for_test, TEST_PLATFORMS, only_os)
+    return d

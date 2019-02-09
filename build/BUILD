@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load(":code_generation_test.bzl", "code_generation_test_suite")
+load(":platforms.bzl", "for_platforms")
 
 code_generation_test_suite(
     name = "code_generation_tests",
@@ -30,23 +31,38 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": "@debian-base-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@debian-base-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@debian-base-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@debian-base-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": "@debian-iptables-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-iptables-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
@@ -55,9 +71,10 @@ DOCKERIZED_BINARIES = {
     name = binary + "-internal",
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = [
-        "//build/debs:%s.deb" % binary,
-    ],
+    debs = select(for_platforms(
+        for_node = ["//build/debs:%s-{ARCH}.deb" % binary],
+        only_os = "linux",
+    )),
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
