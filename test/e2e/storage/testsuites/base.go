@@ -91,7 +91,7 @@ func skipUnsupportedTest(suite TestSuite, driver TestDriver, pattern testpattern
 	var isSupported bool
 
 	// 1. Check if Whether SnapshotType is supported by driver from its interface
-	// if isSupported, so it must be a snapshot test case, we just return.
+	// if isSupported, we still execute the driver and suite tests
 	if len(pattern.SnapshotType) > 0 {
 		switch pattern.SnapshotType {
 		case testpatterns.DynamicCreatedSnapshot:
@@ -102,31 +102,30 @@ func skipUnsupportedTest(suite TestSuite, driver TestDriver, pattern testpattern
 		if !isSupported {
 			framework.Skipf("Driver %s doesn't support snapshot type %v -- skipping", dInfo.Name, pattern.SnapshotType)
 		}
-		return
-	}
+	} else {
+		// 2. Check if Whether volType is supported by driver from its interface
+		switch pattern.VolType {
+		case testpatterns.InlineVolume:
+			_, isSupported = driver.(InlineVolumeTestDriver)
+		case testpatterns.PreprovisionedPV:
+			_, isSupported = driver.(PreprovisionedPVTestDriver)
+		case testpatterns.DynamicPV:
+			_, isSupported = driver.(DynamicPVTestDriver)
+		default:
+			isSupported = false
+		}
 
-	// 2. Check if Whether volType is supported by driver from its interface
-	switch pattern.VolType {
-	case testpatterns.InlineVolume:
-		_, isSupported = driver.(InlineVolumeTestDriver)
-	case testpatterns.PreprovisionedPV:
-		_, isSupported = driver.(PreprovisionedPVTestDriver)
-	case testpatterns.DynamicPV:
-		_, isSupported = driver.(DynamicPVTestDriver)
-	default:
-		isSupported = false
-	}
+		if !isSupported {
+			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		}
 
-	if !isSupported {
-		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-	}
-
-	// 3. Check if fsType is supported
-	if !dInfo.SupportedFsType.Has(pattern.FsType) {
-		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
-	}
-	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci") {
-		framework.Skipf("Distro doesn't support xfs -- skipping")
+		// 3. Check if fsType is supported
+		if !dInfo.SupportedFsType.Has(pattern.FsType) {
+			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
+		}
+		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci") {
+			framework.Skipf("Distro doesn't support xfs -- skipping")
+		}
 	}
 
 	// 4. Check with driver specific logic
