@@ -119,19 +119,19 @@ release_filegroup(
 # KUBE_CLIENT_TARGETS
 release_filegroup(
     name = "client-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_client = [
         "//cmd/kubectl",
-    ],
+    ]),
 )
 
 # KUBE_NODE_TARGETS
 release_filegroup(
     name = "node-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_node = [
         "//cmd/kube-proxy",
         "//cmd/kubeadm",
         "//cmd/kubelet",
-    ],
+    ]),
 )
 
 # KUBE_SERVER_TARGETS
@@ -139,31 +139,35 @@ release_filegroup(
 # since we include them in the actual build rule.
 release_filegroup(
     name = "server-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
-    ],
+    ]),
 )
 
 # kube::golang::test_targets
 filegroup(
     name = "test-targets",
-    srcs = [
-        "//cmd/gendocs",
-        "//cmd/genkubedocs",
-        "//cmd/genman",
-        "//cmd/genswaggertypedocs",
-        "//cmd/genyaml",
-        "//cmd/kubemark",  # TODO: server platforms only
-        "//cmd/linkcheck",
-        "//test/e2e:e2e.test_binary",
-        "//test/e2e_node:e2e_node.test_binary",  # TODO: server platforms only
-        "//vendor/github.com/onsi/ginkgo/ginkgo",
-    ],
+    srcs = select(for_platforms(
+        for_server = [
+            "//cmd/kubemark",
+            "//test/e2e_node:e2e_node.test_binary",
+        ],
+        for_test = [
+            "//cmd/gendocs",
+            "//cmd/genkubedocs",
+            "//cmd/genman",
+            "//cmd/genswaggertypedocs",
+            "//cmd/genyaml",
+            "//cmd/linkcheck",
+            "//test/e2e:e2e.test_binary",
+            "//vendor/github.com/onsi/ginkgo/ginkgo",
+        ],
+    )),
 )
 
 # KUBE_TEST_PORTABLE

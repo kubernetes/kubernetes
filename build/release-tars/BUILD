@@ -1,5 +1,14 @@
 package(default_visibility = ["//visibility:public"])
 
+load(
+    "//build:platforms.bzl",
+    "CLIENT_PLATFORMS",
+    "NODE_PLATFORMS",
+    "SERVER_PLATFORMS",
+    "TEST_PLATFORMS",
+    "for_platforms",
+    "go_platform_constraint",
+)
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 
@@ -51,9 +60,6 @@ pkg_tar(
     tags = ["no-cache"],
 )
 
-# FIXME: this should be configurable/auto-detected
-PLATFORM_ARCH_STRING = "linux-amd64"
-
 # Included in node and server tarballs.
 filegroup(
     name = "license-targets",
@@ -73,15 +79,13 @@ pkg_tar(
     visibility = ["//visibility:private"],
 )
 
-pkg_tar(
-    name = "kubernetes-client-%s" % PLATFORM_ARCH_STRING,
+[[pkg_tar(
+    name = "kubernetes-client-%s-%s" % (os, arch),
     extension = "tar.gz",
     package_dir = "kubernetes",
     tags = ["no-cache"],
-    deps = [
-        ":_client-bin",
-    ],
-)
+    deps = select({go_platform_constraint(os, arch): [":_client-bin"]}),
+) for arch in archs] for os, archs in CLIENT_PLATFORMS.items()]
 
 pkg_tar(
     name = "_node-bin",
@@ -95,17 +99,15 @@ pkg_tar(
     visibility = ["//visibility:private"],
 )
 
-pkg_tar(
-    name = "kubernetes-node-%s" % PLATFORM_ARCH_STRING,
+[[pkg_tar(
+    name = "kubernetes-node-%s-%s" % (os, arch),
     srcs = [":license-targets"],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
     tags = ["no-cache"],
-    deps = [
-        ":_node-bin",
-    ],
-)
+    deps = select({go_platform_constraint(os, arch): [":_node-bin"]}),
+) for arch in archs] for os, archs in NODE_PLATFORMS.items()]
 
 pkg_tar(
     name = "_server-bin",
@@ -139,27 +141,30 @@ pkg_tar(
     visibility = ["//visibility:private"],
 )
 
-pkg_tar(
-    name = "kubernetes-server-%s" % PLATFORM_ARCH_STRING,
+[[pkg_tar(
+    name = "kubernetes-server-%s-%s" % (os, arch),
     srcs = [":license-targets"],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
     tags = ["no-cache"],
-    deps = [
-        ":_server-addons",
-        ":_server-bin",
-    ],
-)
+    deps = select({
+        go_platform_constraint(os, arch): [
+            ":_server-addons",
+            ":_server-bin",
+        ],
+    }),
+) for arch in archs] for os, archs in SERVER_PLATFORMS.items()]
 
 # The mondo test tarball is deprecated.
 pkg_tar(
     name = "_test-mondo-bin",
     srcs = ["//build:test-targets"],
     mode = "0755",
-    package_dir = "platforms/" + PLATFORM_ARCH_STRING.replace("-", "/"),
+    package_dir = select(for_platforms(
+        for_test = "platforms/{OS}/{ARCH}",
+    )),
     tags = ["no-cache"],
-    # TODO: how to make this multiplatform?
     visibility = ["//visibility:private"],
 )
 
@@ -197,10 +202,9 @@ pkg_tar(
     },
     strip_prefix = "//",
     tags = ["no-cache"],
-    deps = [
-        # TODO: how to make this multiplatform?
-        ":_test-mondo-bin",
-    ],
+    deps = select(for_platforms(
+        for_test = [":_test-mondo-bin"],
+    )),
 )
 
 pkg_tar(
@@ -221,17 +225,14 @@ pkg_tar(
     visibility = ["//visibility:private"],
 )
 
-pkg_tar(
-    name = "kubernetes-test-%s" % PLATFORM_ARCH_STRING,
+[[pkg_tar(
+    name = "kubernetes-test-%s-%s" % (os, arch),
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
     tags = ["no-cache"],
-    deps = [
-        # TODO: how to make this multiplatform?
-        ":_test-bin",
-    ],
-)
+    deps = select({go_platform_constraint(os, arch): [":_test-bin"]}),
+) for arch in archs] for os, archs in TEST_PLATFORMS.items()]
 
 pkg_tar(
     name = "_full_server",
@@ -275,13 +276,21 @@ release_filegroup(
     name = "release-tars",
     srcs = [
         ":kubernetes.tar.gz",
-        ":kubernetes-client-%s.tar.gz" % PLATFORM_ARCH_STRING,
-        ":kubernetes-node-%s.tar.gz" % PLATFORM_ARCH_STRING,
-        ":kubernetes-server-%s.tar.gz" % PLATFORM_ARCH_STRING,
-        ":kubernetes-manifests.tar.gz",
         ":kubernetes-src.tar.gz",
-        ":kubernetes-test-%s.tar.gz" % PLATFORM_ARCH_STRING,
-        ":kubernetes-test.tar.gz",
-        ":kubernetes-test-portable.tar.gz",
     ],
+    conditioned_srcs = for_platforms(
+        for_all = [
+        ],
+        for_client = [":kubernetes-client-{OS}-{ARCH}.tar.gz"],
+        for_node = [":kubernetes-node-{OS}-{ARCH}.tar.gz"],
+        for_server = [
+            ":kubernetes-server-{OS}-{ARCH}.tar.gz",
+            ":kubernetes-manifests.tar.gz",
+        ],
+        for_test = [
+            ":kubernetes-test-portable.tar.gz",
+            ":kubernetes-test-{OS}-{ARCH}.tar.gz",
+            ":kubernetes-test.tar.gz",  # FIXME
+        ],
+    ),
 )
