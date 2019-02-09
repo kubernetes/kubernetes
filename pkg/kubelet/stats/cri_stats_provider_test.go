@@ -645,3 +645,110 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 	m.InodesUsed = resource.NewQuantity(int64(seed+offsetInodeUsage), resource.BinarySI)
 	return m
 }
+
+func TestGetContainerUsageNanoCores(t *testing.T) {
+	var value0 uint64
+	var value1 uint64 = 10000000000
+
+	tests := []struct {
+		desc          string
+		cpuUsageCache map[string]*runtimeapi.CpuUsage
+		stats         *runtimeapi.ContainerStats
+		expected      *uint64
+	}{
+		{
+			desc:          "should return nil if stats is nil",
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+		},
+		{
+			desc:          "should return nil if cpu stats is nil",
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: nil,
+			},
+		},
+		{
+			desc:          "should return nil if usageCoreNanoSeconds is nil",
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp:            1,
+					UsageCoreNanoSeconds: nil,
+				},
+			},
+		},
+		{
+			desc:          "should return nil if cpu stats is not cached yet",
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: 1,
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 10000000000,
+					},
+				},
+			},
+		},
+		{
+			desc: "should return zero value if cached cpu stats is equal to current value",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: 1,
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 10000000000,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{
+				"1": {
+					Timestamp: 0,
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 10000000000,
+					},
+				},
+			},
+			expected: &value0,
+		},
+		{
+			desc: "should return correct value if cached cpu stats is not equal to current value",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: int64(time.Second / time.Nanosecond),
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 20000000000,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*runtimeapi.CpuUsage{
+				"1": {
+					Timestamp: 0,
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 10000000000,
+					},
+				},
+			},
+			expected: &value1,
+		},
+	}
+
+	for _, test := range tests {
+		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
+		real := provider.getContainerUsageNanoCores(test.stats)
+		assert.Equal(t, test.expected, real, test.desc)
+	}
+}
