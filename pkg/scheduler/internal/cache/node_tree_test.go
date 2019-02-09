@@ -146,22 +146,22 @@ func TestNodeTree_AddNode(t *testing.T) {
 			name:       "mix of nodes with and without proper labels",
 			nodesToAdd: allNodes[:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3"}, 0},
+				"":                 {[]string{"node-0"}, 0},
+				"region-1::":       {[]string{"node-1"}, 0},
+				"::zone-2":         {[]string{"node-2"}, 0},
+				"region-1::zone-2": {[]string{"node-3"}, 0},
 			},
 		},
 		{
 			name:       "mix of nodes with and without proper labels and some zones with multiple nodes",
 			nodesToAdd: allNodes[:7],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"":                 {[]string{"node-0"}, 0},
+				"region-1::":       {[]string{"node-1"}, 0},
+				"::zone-2":         {[]string{"node-2"}, 0},
+				"region-1::zone-2": {[]string{"node-3", "node-4"}, 0},
+				"region-1::zone-3": {[]string{"node-5"}, 0},
+				"region-2::zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 	}
@@ -190,11 +190,11 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[:1],
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"region-1::":       {[]string{"node-1"}, 0},
+				"::zone-2":         {[]string{"node-2"}, 0},
+				"region-1::zone-2": {[]string{"node-3", "node-4"}, 0},
+				"region-1::zone-3": {[]string{"node-5"}, 0},
+				"region-2::zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -202,10 +202,10 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[1:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"":                 {[]string{"node-0"}, 0},
+				"region-1::zone-2": {[]string{"node-4"}, 0},
+				"region-1::zone-3": {[]string{"node-5"}, 0},
+				"region-2::zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -257,11 +257,11 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"region-1::":       {[]string{"node-1"}, 0},
+				"::zone-2":         {[]string{"node-2"}, 0},
+				"region-1::zone-2": {[]string{"node-3", "node-4", "node-0"}, 0},
+				"region-1::zone-3": {[]string{"node-5"}, 0},
+				"region-2::zone-2": {[]string{"node-6"}, 0},
 			},
 		},
 		{
@@ -277,7 +277,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:zone-2": {[]string{"node-0"}, 0},
+				"region-1::zone-2": {[]string{"node-0"}, 0},
 			},
 		},
 		{
@@ -293,8 +293,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-new"}, 0},
+				"":                 {[]string{"node-0"}, 0},
+				"region-1::zone-2": {[]string{"node-new"}, 0},
 			},
 		},
 	}

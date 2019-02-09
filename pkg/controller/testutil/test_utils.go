@@ -490,7 +490,7 @@ func GetZones(nodeHandler *FakeNodeHandler) []string {
 
 // CreateZoneID returns a single zoneID for a given region and zone.
 func CreateZoneID(region, zone string) string {
-	return region + ":\x00:" + zone
+	return region + "::" + zone
 }
 
 // GetKey is a helper function used by controllers unit tests to get the

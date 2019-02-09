@@ -152,10 +152,7 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	// We include the null character just in case region or failureDomain has a colon
-	// (We do assume there's no null characters in a region or failureDomain)
-	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + failureDomain
+	return region + "::" + failureDomain
 }
 
 // SetNodeCondition updates specific node condition with patch operation.
