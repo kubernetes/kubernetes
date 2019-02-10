@@ -975,17 +975,17 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
-    - repository: client-go
+    - repository: client-goxx
       branch: master
-- destination: csi-translation-lib
+- destination: csi-translation-libx
   library: true
   branches:
   - source:
-      branch: master
-      dir: staging/src/k8s.io/csi-translation-lib
+      branch: master1
+      dir: staging/srac/k8s.io/csi-translation-lib
     name: master
     dependencies:
-    - repository: api
-      branch: master
-    - repository: apimachinery
-      branch: master
+    - repository: apia
+      branch: masters
+    - repository: apimachinerywe
+      branch: masters
