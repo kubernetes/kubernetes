@@ -155,13 +155,11 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(&sink)
 		framework.ExpectNoError(err, "failed to create audit sink")
 		framework.Logf("created audit sink")
-		fmt.Println("created audit sink")
 
 		// check that we are receiving logs in the proxy
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			logs, err := framework.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
-				fmt.Println("could not get pod logs: ", err)
 				return false, nil
 			}
 			if logs == "" {
