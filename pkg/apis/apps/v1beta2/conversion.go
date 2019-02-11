@@ -410,10 +410,9 @@ func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, o
 	if revision, _ := in.Annotations[appsv1beta2.DeprecatedRollbackTo]; revision != "" {
 		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
 			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1beta2.DeprecatedRollbackTo, revision, err)
-		} else {
-			out.Spec.RollbackTo = new(apps.RollbackConfig)
-			out.Spec.RollbackTo.Revision = revision64
 		}
+		out.Spec.RollbackTo = new(apps.RollbackConfig)
+		out.Spec.RollbackTo.Revision = revision64
 		out.Annotations = deepCopyStringMap(out.Annotations)
 		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
 	} else {
@@ -513,11 +512,10 @@ func Convert_v1beta2_DaemonSet_To_apps_DaemonSet(in *appsv1beta2.DaemonSet, out 
 	if value, ok := in.Annotations[appsv1beta2.DeprecatedTemplateGeneration]; ok {
 		if value64, err := strconv.ParseInt(value, 10, 64); err != nil {
 			return err
-		} else {
-			out.Spec.TemplateGeneration = value64
-			out.Annotations = deepCopyStringMap(out.Annotations)
-			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
 		}
+		out.Spec.TemplateGeneration = value64
+		out.Annotations = deepCopyStringMap(out.Annotations)
+		delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
 	}
 	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 		return err
