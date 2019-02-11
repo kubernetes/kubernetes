@@ -113,9 +113,7 @@ func CreateTestClient() *fake.Clientset {
 			}
 			obj.Items = append(obj.Items, pod)
 		}
-		for _, pod := range extraPods.Items {
-			obj.Items = append(obj.Items, pod)
-		}
+		obj.Items = append(obj.Items, extraPods.Items...)
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
