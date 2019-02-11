@@ -19,8 +19,6 @@
 				"k8s.io/kubernetes/pkg/cloudprovider",
 				"k8s.io/kubernetes/pkg/credentialprovider",
 				"k8s.io/kubernetes/pkg/features",
-				"k8s.io/kubernetes/pkg/kubelet/apis",
-				"k8s.io/kubernetes/pkg/master/ports",
 				"k8s.io/kubernetes/pkg/util/mount",
 				"k8s.io/kubernetes/pkg/util/resizefs",
 				"k8s.io/kubernetes/pkg/version",
