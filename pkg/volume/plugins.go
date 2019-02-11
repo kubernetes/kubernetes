@@ -219,17 +219,18 @@ type DeviceMountableVolumePlugin interface {
 }
 
 // ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
-// expanded
+// expanded via control-plane ExpandVolumeDevice call.
 type ExpandableVolumePlugin interface {
 	VolumePlugin
 	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error)
 	RequiresFSResize() bool
 }
 
-// NodeExpandableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
-// that require extra steps on nodes for expansion to complete
+// NodeExpandableVolumePlugin is an expanded interface of VolumePlugin and is used for volumes that
+// require expansion on the node via NodeExpand call.
 type NodeExpandableVolumePlugin interface {
-	ExpandableVolumePlugin
+	VolumePlugin
+	RequiresFSResize() bool
 	// NodeExpand expands volume on given deviceMountPath and returns true if resize is successful.
 	// devicePath can be set to empty string if unavailable.
 	NodeExpand(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) (bool, error)
@@ -965,8 +966,8 @@ func (pm *VolumePluginMgr) FindNodeExpandablePluginBySpec(spec *Spec) (NodeExpan
 	return nil, nil
 }
 
-// FindFSResizablePluginByName fetches a persistent volume plugin by name
-func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (NodeExpandableVolumePlugin, error) {
+// FindNodeExpandablePluginByName fetches a persistent volume plugin by name
+func (pm *VolumePluginMgr) FindNodeExpandablePluginByName(name string) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
