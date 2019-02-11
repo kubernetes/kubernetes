@@ -7,8 +7,6 @@ cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/util/config
 cmd/kubeadm/app/util/system
-cmd/kubelet/app
-cmd/kubelet/app/options
 pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admission/v1beta1

@@ -19,7 +19,7 @@ package options
 
 import (
 	"fmt"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // Enable pprof HTTP handlers.
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -47,10 +47,11 @@ import (
 
 const defaultRootDir = "/var/lib/kubelet"
 
+// KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
-// - its value will never, or cannot safely be changed during the lifetime of a node
-// - its value cannot be safely shared between nodes at the same time (e.g. a hostname)
-//   KubeletConfiguration is intended to be shared between nodes
+// - its value will never, or cannot safely be changed during the lifetime of a node, or
+// - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
+//   KubeletConfiguration is intended to be shared between nodes.
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletFlags struct {
@@ -245,6 +246,7 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 }
 
+// ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
 	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
@@ -336,7 +338,7 @@ func NewKubeletServer() (*KubeletServer, error) {
 	}, nil
 }
 
-// validateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid
+// ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
 func ValidateKubeletServer(s *KubeletServer) error {
 	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
 	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
