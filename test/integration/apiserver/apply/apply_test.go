@@ -61,32 +61,62 @@ func TestApplyAlsoCreates(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-		Namespace("default").
-		Resource("pods").
-		Name("test-pod").
-		Body([]byte(`{
-			"apiVersion": "v1",
-			"kind": "Pod",
-			"metadata": {
-				"name": "test-pod"
-			},
-			"spec": {
-				"containers": [{
-					"name":  "test-container",
-					"image": "test-image"
-				}]
-			}
-		}`)).
-		Do().
-		Get()
-	if err != nil {
-		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	testCases := []struct {
+		resource string
+		name     string
+		body     string
+	}{
+		{
+			resource: "pods",
+			name:     "test-pod",
+			body: `{
+				"apiVersion": "v1",
+				"kind": "Pod",
+				"metadata": {
+					"name": "test-pod"
+				},
+				"spec": {
+					"containers": [{
+						"name":  "test-container",
+						"image": "test-image"
+					}]
+				}
+			}`,
+		}, {
+			resource: "services",
+			name:     "test-svc",
+			body: `{
+				"apiVersion": "v1",
+				"kind": "Service",
+				"metadata": {
+					"name": "test-svc"
+				},
+				"spec": {
+					"ports": [{
+						"port": 8080,
+						"protocol": "UDP"
+					}]
+				}
+			}`,
+		},
 	}
 
-	_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test-pod").Do().Get()
-	if err != nil {
-		t.Fatalf("Failed to retrieve object: %v", err)
+	for _, tc := range testCases {
+		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+			Namespace("default").
+			Resource(tc.resource).
+			Name(tc.name).
+			Body([]byte(tc.body)).
+			Do().
+			Get()
+		if err != nil {
+			t.Fatalf("Failed to create object using Apply patch: %v", err)
+		}
+
+		_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource(tc.resource).Name(tc.name).Do().Get()
+		if err != nil {
+			t.Fatalf("Failed to retrieve object: %v", err)
+		}
 	}
 }
 
