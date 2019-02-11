@@ -211,12 +211,12 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	// of the version from the internet when executing LoadOrDefaultInitConfiguration
 	phaseutil.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
 	if err != nil {
 		return err
 	}

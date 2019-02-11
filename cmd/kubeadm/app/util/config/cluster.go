@@ -20,7 +20,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -39,54 +38,26 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-// FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
-	// Load the configuration from a file or the cluster
-	initcfg, err := loadConfiguration(client, w, logPrefix, cfgPath, newControlPlane)
+// FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
+func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
+	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+
+	// Fetch the actual config from cluster
+	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply dynamic defaults
-	if err := SetInitDynamicDefaults(initcfg); err != nil {
-		return nil, err
-	}
-	return initcfg, err
-}
-
-// loadConfiguration loads the configuration byte slice from either a file or the cluster ConfigMap
-func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
-	// The config file has the highest priority
-	if cfgPath != "" {
-		fmt.Fprintf(w, "[%s] Reading configuration options from a file: %s\n", logPrefix, cfgPath)
-		return loadInitConfigurationFromFile(cfgPath)
-	}
-
-	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
-	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
-}
-
-func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
-	configBytes, err := ioutil.ReadFile(cfgPath)
-	if err != nil {
+	if err := SetInitDynamicDefaults(cfg); err != nil {
 		return nil, err
 	}
 
-	// Unmarshal the versioned configuration populated from the file,
-	// convert it to the internal API types, then default and validate
-	// NB the file contains multiple YAML, with a combination of
-	// 	- a YAML with a InitConfiguration object
-	// 	- a YAML with a ClusterConfiguration object (without embedded component configs)
-	//	- separated YAML for components configs
-	initcfg, err := BytesToInternalConfig(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return initcfg, nil
+	return cfg, nil
 }
 
+// getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
 	// Also, the config map really should be KubeadmConfigConfigMap...
@@ -124,7 +95,6 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
 	}
-
 	return initcfg, nil
 }
 

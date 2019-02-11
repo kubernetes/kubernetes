@@ -71,7 +71,14 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// Fetch the configuration from a file or ConfigMap and validate it
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath, false)
+
+	var cfg *kubeadmapi.InitConfiguration
+	if flags.cfgPath != "" {
+		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
+	} else {
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
+	}
+
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)

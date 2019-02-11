@@ -154,7 +154,7 @@ func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
 
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		o, err := ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+		o, err := LoadInitConfigurationFromFile(cfgPath)
 		if err != nil {
 			return []byte{}, err
 		}

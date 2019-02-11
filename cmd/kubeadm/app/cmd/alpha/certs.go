@@ -135,7 +135,7 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 
 func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfg *renewConfig) func() {
 	return func() {
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
+		internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfg.cfgPath, &cfg.cfg)
 		kubeadmutil.CheckErr(err)
 
 		if cfg.useCSR {
