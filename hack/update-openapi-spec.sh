@@ -25,6 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::require-jq
 kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
@@ -83,7 +84,7 @@ fi
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S . > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

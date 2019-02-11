@@ -89,18 +89,18 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 			},
 			VendorExtensible: openapi.VendorExtensible{
 				Extensions: openapi.Extensions{
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
 							"group":   "",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "batch",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "extensions",
 							"version": "v1",
 							"kind":    "Getter",
