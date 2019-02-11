@@ -595,7 +595,10 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
 	wrapperDecoder := wrapperDecoderFn(resp.Body)
-	return watch.NewStreamWatcher(restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder)), nil
+	return watch.NewStreamWatcher(
+		restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder),
+		errors.NewClientErrorReporter(http.StatusUnsupportedMediaType, r.verb),
+	), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
