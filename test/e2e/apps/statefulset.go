@@ -275,7 +275,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
 		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
-			By("Creating a new StaefulSet")
+			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
@@ -475,7 +475,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			}
 			Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revison %s on update completion",
+				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 					ss.Namespace,
 					ss.Name,
 					ss.Status.CurrentRevision,
