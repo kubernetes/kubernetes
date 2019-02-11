@@ -17,6 +17,7 @@ limitations under the License.
 package watch_test
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"testing"
@@ -27,9 +28,13 @@ import (
 
 type fakeDecoder struct {
 	items chan Event
+	err   error
 }
 
 func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err error) {
+	if f.err != nil {
+		return "", nil, f.err
+	}
 	item, open := <-f.items
 	if !open {
 		return action, nil, io.EOF
@@ -38,7 +43,18 @@ func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err erro
 }
 
 func (f fakeDecoder) Close() {
-	close(f.items)
+	if f.items != nil {
+		close(f.items)
+	}
+}
+
+type fakeReporter struct {
+	err error
+}
+
+func (f *fakeReporter) AsObject(err error) runtime.Object {
+	f.err = err
+	return runtime.Unstructured(nil)
 }
 
 func TestStreamWatcher(t *testing.T) {
@@ -46,8 +62,8 @@ func TestStreamWatcher(t *testing.T) {
 		{Type: Added, Object: testType("foo")},
 	}
 
-	fd := fakeDecoder{make(chan Event, 5)}
-	sw := NewStreamWatcher(fd)
+	fd := fakeDecoder{items: make(chan Event, 5)}
+	sw := NewStreamWatcher(fd, nil)
 
 	for _, item := range table {
 		fd.items <- item
@@ -64,5 +80,28 @@ func TestStreamWatcher(t *testing.T) {
 	_, open := <-sw.ResultChan()
 	if open {
 		t.Errorf("Unexpected failure to close")
+	}
+}
+
+func TestStreamWatcherError(t *testing.T) {
+	fd := fakeDecoder{err: fmt.Errorf("test error")}
+	fr := &fakeReporter{}
+	sw := NewStreamWatcher(fd, fr)
+	evt, ok := <-sw.ResultChan()
+	if !ok {
+		t.Fatalf("unexpected close")
+	}
+	if evt.Type != Error || evt.Object != runtime.Unstructured(nil) {
+		t.Fatalf("unexpected object: %#v", evt)
+	}
+	_, ok = <-sw.ResultChan()
+	if ok {
+		t.Fatalf("unexpected open channel")
+	}
+
+	sw.Stop()
+	_, ok = <-sw.ResultChan()
+	if ok {
+		t.Fatalf("unexpected open channel")
 	}
 }
