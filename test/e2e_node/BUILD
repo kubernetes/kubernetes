@@ -202,6 +202,7 @@ filegroup(
         "//test/e2e_node/runner/local:all-srcs",
         "//test/e2e_node/runner/remote:all-srcs",
         "//test/e2e_node/services:all-srcs",
+        "//test/e2e_node/system:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
