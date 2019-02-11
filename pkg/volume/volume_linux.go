@@ -33,20 +33,37 @@ const (
 	execMask = os.FileMode(0110)
 )
 
+// calculateMask starts with a read+write mask and opens them further as needed.
+func calculateMask(mounter Mounter, mode os.FileMode, dir bool) os.FileMode {
+	mask := rwMask
+	if mounter.GetAttributes().ReadOnly {
+		mask = roMask
+	}
+	if dir {
+		mask |= os.ModeSetgid
+		mask |= execMask
+	}
+	// Set all bits that are on in either the mode or the mask.
+	return mode | mask
+}
+
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
+	path := mounter.GetPath()
+	klog.Infof("Setting volume ownership for %v to %v", path, fsGroup)
 
 	if fsGroup == nil {
+		klog.Infof("No fsGroup specified! No permissions fixing will occur.")
 		return nil
 	}
 
+	klog.Infof("Fixing all permissions under %v file chmod/chown for group %v.", path, fsGroup)
 	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
 		// chown and chmod pass through to the underlying file for symlinks.
 		// Symlinks have a mode of 777 but this really doesn't mean anything.
 		// The permissions of the underlying file are what matter.
@@ -73,17 +90,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			klog.Errorf("Chown failed on %v: %v", path, err)
 		}
 
-		mask := rwMask
-		if mounter.GetAttributes().ReadOnly {
-			mask = roMask
-		}
-
-		if info.IsDir() {
-			mask |= os.ModeSetgid
-			mask |= execMask
-		}
-
-		err = os.Chmod(path, info.Mode()|mask)
+		err = os.Chmod(path, calculateMask(mounter, info.Mode(), info.IsDir()))
 		if err != nil {
 			klog.Errorf("Chmod failed on %v: %v", path, err)
 		}

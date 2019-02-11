@@ -160,7 +160,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", dir))
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI.
 	accessMode := api.ReadWriteOnce
 	if c.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
@@ -314,35 +314,24 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 // 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 // 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
 func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
+	klog.Infof("Applying fsGroup %v to %v for volume %v ...", fsGroup, fsType, c.volumeID)
 	if fsGroup != nil {
 		if fsType == "" {
 			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
 			return nil
 		}
-
-		accessModes := c.spec.PersistentVolume.Spec.AccessModes
-		if c.spec.PersistentVolume.Spec.AccessModes == nil {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-			return nil
+		if supportsVolumeOwnership(c.readOnly, c.spec) {
+			klog.Infof("Setting ownership for %v (driver = %v)", c.volumeID, c.driverName)
+			err := volume.SetVolumeOwnership(c, fsGroup)
+			if err != nil {
+				return err
+			}
+			klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+		} else {
+			klog.Infof("mounter.SetupAt Skipped setting fsGroup (%v doesn't support ownership setting).", c.driverName)
 		}
-		if !hasReadWriteOnce(accessModes) {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-			return nil
-		}
-
-		if c.readOnly {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
-			return nil
-		}
-
-		err := volume.SetVolumeOwnership(c, fsGroup)
-		if err != nil {
-			return err
-		}
-
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
 	}
-
+	klog.Infof("...Done applying fsGroup %v to %v for volume %v", fsGroup, fsType, c.volumeID)
 	return nil
 }
 
