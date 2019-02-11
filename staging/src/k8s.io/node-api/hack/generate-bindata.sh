@@ -44,8 +44,8 @@ gofmt -s -w "${BINDATA_OUTPUT}.tmp"
 # Here we compare and overwrite only if different to avoid updating the
 # timestamp and triggering a rebuild. The 'cat' redirect trick to preserve file
 # permissions of the target file.
-if ! cmp -s "${BINDATA_OUTPUT}.tmp" "${BINDATA_OUTPUT}" ; then
-	cat "${BINDATA_OUTPUT}.tmp" > "${BINDATA_OUTPUT}"
+if ! cmp -i 0:$(wc -c "hack/boilerplate.go.txt" | cut -d' ' -f1) -s "${BINDATA_OUTPUT}.tmp" "${BINDATA_OUTPUT}" ; then
+	cat "hack/boilerplate.go.txt" "${BINDATA_OUTPUT}.tmp" > "${BINDATA_OUTPUT}"
 fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
