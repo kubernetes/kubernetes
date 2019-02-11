@@ -16,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/util/pluginwatcher:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi/csiv0:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
