@@ -59,9 +59,9 @@ type AutoAPIServiceRegistration interface {
 	RemoveAPIServiceToSync(name string)
 }
 
-// Controller is used to keep a particular set of APIServices present in the API.  It is useful
+// autoRegisterController is used to keep a particular set of APIServices present in the API.  It is useful
 // for cases where you want to auto-register APIs like TPRs or groups from the core kube-apiserver
-type Controller struct {
+type autoRegisterController struct {
 	apiServiceLister listers.APIServiceLister
 	apiServiceSynced cache.InformerSynced
 	apiServiceClient apiregistrationclient.APIServicesGetter
@@ -82,9 +82,9 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewAutoRegisterController creates a new Controller.
-func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, apiServiceClient apiregistrationclient.APIServicesGetter) *Controller {
-	c := &Controller{
+// NewAutoRegisterController creates a new autoRegisterController.
+func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, apiServiceClient apiregistrationclient.APIServicesGetter) *autoRegisterController {
+	c := &autoRegisterController{
 		apiServiceLister:  apiServiceInformer.Lister(),
 		apiServiceSynced:  apiServiceInformer.Informer().HasSynced,
 		apiServiceClient:  apiServiceClient,
@@ -130,7 +130,7 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 }
 
 // Run starts the autoregister controller in a loop which syncs API services until stopCh is closed.
-func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
 	// don't let panics crash the process
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
@@ -162,7 +162,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (c *Controller) runWorker() {
+func (c *autoRegisterController) runWorker() {
 	// hot loop until we're told to stop.  processNextWorkItem will automatically wait until there's work
 	// available, so we don't worry about secondary waits
 	for c.processNextWorkItem() {
@@ -170,7 +170,7 @@ func (c *Controller) runWorker() {
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *Controller) processNextWorkItem() bool {
+func (c *autoRegisterController) processNextWorkItem() bool {
 	// pull the next work item from queue.  It should be a key we use to lookup something in a cache
 	key, quit := c.queue.Get()
 	if quit {
@@ -210,7 +210,7 @@ func (c *Controller) processNextWorkItem() bool {
 // 4. current: sync on start, not present at start | -                     | -                         | -
 // 5. current: sync on start, present at start     | delete once           | update once               | update once
 // 6. current: sync always                         | delete                | update once               | update
-func (c *Controller) checkAPIService(name string) (err error) {
+func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	desired := c.GetAPIServiceToSync(name)
 	curr, err := c.apiServiceLister.Get(name)
 
@@ -271,7 +271,7 @@ func (c *Controller) checkAPIService(name string) (err error) {
 }
 
 // GetAPIServiceToSync gets a single API service to sync.
-func (c *Controller) GetAPIServiceToSync(name string) *apiregistration.APIService {
+func (c *autoRegisterController) GetAPIServiceToSync(name string) *apiregistration.APIService {
 	c.apiServicesToSyncLock.RLock()
 	defer c.apiServicesToSyncLock.RUnlock()
 
@@ -279,16 +279,16 @@ func (c *Controller) GetAPIServiceToSync(name string) *apiregistration.APIServic
 }
 
 // AddAPIServiceToSyncOnStart registers an API service to sync only when the controller starts.
-func (c *Controller) AddAPIServiceToSyncOnStart(in *apiregistration.APIService) {
+func (c *autoRegisterController) AddAPIServiceToSyncOnStart(in *apiregistration.APIService) {
 	c.addAPIServiceToSync(in, manageOnStart)
 }
 
 // AddAPIServiceToSync registers an API service to sync continuously.
-func (c *Controller) AddAPIServiceToSync(in *apiregistration.APIService) {
+func (c *autoRegisterController) AddAPIServiceToSync(in *apiregistration.APIService) {
 	c.addAPIServiceToSync(in, manageContinuously)
 }
 
-func (c *Controller) addAPIServiceToSync(in *apiregistration.APIService, syncType string) {
+func (c *autoRegisterController) addAPIServiceToSync(in *apiregistration.APIService, syncType string) {
 	c.apiServicesToSyncLock.Lock()
 	defer c.apiServicesToSyncLock.Unlock()
 
@@ -303,7 +303,7 @@ func (c *Controller) addAPIServiceToSync(in *apiregistration.APIService, syncTyp
 }
 
 // RemoveAPIServiceToSync deletes a registered APIService.
-func (c *Controller) RemoveAPIServiceToSync(name string) {
+func (c *autoRegisterController) RemoveAPIServiceToSync(name string) {
 	c.apiServicesToSyncLock.Lock()
 	defer c.apiServicesToSyncLock.Unlock()
 
@@ -311,13 +311,13 @@ func (c *Controller) RemoveAPIServiceToSync(name string) {
 	c.queue.Add(name)
 }
 
-func (c *Controller) hasSyncedSuccessfully(name string) bool {
+func (c *autoRegisterController) hasSyncedSuccessfully(name string) bool {
 	c.syncedSuccessfullyLock.RLock()
 	defer c.syncedSuccessfullyLock.RUnlock()
 	return c.syncedSuccessfully[name]
 }
 
-func (c *Controller) setSyncedSuccessfully(name string) {
+func (c *autoRegisterController) setSyncedSuccessfully(name string) {
 	c.syncedSuccessfullyLock.Lock()
 	defer c.syncedSuccessfullyLock.Unlock()
 	c.syncedSuccessfully[name] = true
