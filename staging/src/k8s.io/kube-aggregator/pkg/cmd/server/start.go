@@ -36,6 +36,7 @@ import (
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
+// AggregatorOptions contains everything necessary to create and run an API Aggregator.
 type AggregatorOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
@@ -99,6 +100,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	return o
 }
 
+// Validate validates all the required options.
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
@@ -106,10 +108,12 @@ func (o AggregatorOptions) Validate(args []string) error {
 	return utilerrors.NewAggregate(errors)
 }
 
+// Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
+// RunAggregator runs the API Aggregator.
 func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {

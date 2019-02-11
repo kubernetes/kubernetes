@@ -647,16 +647,7 @@ staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/component-base/config/v1alpha1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation
-staging/src/k8s.io/kube-aggregator/pkg/apiserver
-staging/src/k8s.io/kube-aggregator/pkg/cmd/server
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
-staging/src/k8s.io/kube-aggregator/pkg/controllers/status
-staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice
-staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubelet/config/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
