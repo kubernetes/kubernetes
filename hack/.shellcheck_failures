@@ -119,7 +119,6 @@
 ./hack/verify-test-images.sh
 ./hack/verify-test-owners.sh
 ./hack/verify-typecheck.sh
-./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
