@@ -21,7 +21,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -139,7 +139,7 @@ func (l *Lifecycle) Admit(a admission.Attributes) error {
 			exists = true
 		}
 		if exists {
-			glog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
+			klog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
 		}
 	}
 
@@ -160,7 +160,7 @@ func (l *Lifecycle) Admit(a admission.Attributes) error {
 		case err != nil:
 			return errors.NewInternalError(err)
 		}
-		glog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
+		klog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
 	}
 
 	// ensure that we're not trying to create objects in terminating namespaces

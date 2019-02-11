@@ -19,8 +19,8 @@ package convert
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	convert_long = templates.LongDesc(i18n.T(`
+	convertLong = templates.LongDesc(i18n.T(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -48,7 +48,7 @@ var (
 		The default output will be printed to stdout in YAML format. One can use -o option
 		to change to output destination.`))
 
-	convert_example = templates.Examples(i18n.T(`
+	convertExample = templates.Examples(i18n.T(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -93,8 +93,8 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Use:                   "convert -f FILENAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Convert config files between different API versions"),
-		Long:                  convert_long,
-		Example:               convert_example,
+		Long:                  convertLong,
+		Example:               convertExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.RunConvert())
@@ -134,6 +134,14 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
+
+	// Convert must be removed from kubectl, since kubectl can not depend on
+	// Kubernetes "internal" dependencies. These "internal" dependencies can
+	// not be removed from convert. Another way to convert a resource is to
+	// "kubectl apply" it to the cluster, then "kubectl get" at the desired version.
+	// Another possible solution is to make convert a plugin.
+	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
+
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
@@ -218,7 +226,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 		if len(actualVersion.Version) > 0 {
 			defaultVersionInfo = fmt.Sprintf("Defaulting to %q", actualVersion.Version)
 		}
-		glog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
+		klog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
 	}
 	return object, nil
 }

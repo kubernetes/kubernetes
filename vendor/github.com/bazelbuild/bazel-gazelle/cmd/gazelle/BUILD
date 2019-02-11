@@ -28,6 +28,7 @@ go_library(
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/rule:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/version:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/walk:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
     ],
 )
 

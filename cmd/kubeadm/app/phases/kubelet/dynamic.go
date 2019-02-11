@@ -31,7 +31,6 @@ import (
 
 // EnableDynamicConfigForNode updates the Node's ConfigSource to enable Dynamic Kubelet Configuration, depending on what version the kubelet is
 // Used at "kubeadm init", "kubeadm join" and "kubeadm upgrade" time
-// This func is ONLY run if the user enables the `DynamicKubeletConfig` feature gate, which is by default off
 func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kubeletVersion *version.Version) error {
 
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)

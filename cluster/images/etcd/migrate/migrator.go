@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // EtcdMigrateCfg provides all configuration required to perform etcd data upgrade/downgrade migrations.
@@ -63,7 +63,7 @@ type Migrator struct {
 
 // MigrateIfNeeded upgrades or downgrades the etcd data directory to the given target version.
 func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
-	glog.Infof("Starting migration to %s", target)
+	klog.Infof("Starting migration to %s", target)
 	err := m.dataDirectory.Initialize(target)
 	if err != nil {
 		return fmt.Errorf("failed to initialize data directory %s: %v", m.dataDirectory.path, err)
@@ -84,28 +84,28 @@ func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
 	}
 
 	for {
-		glog.Infof("Converging current version '%s' to target version '%s'", current, target)
+		klog.Infof("Converging current version '%s' to target version '%s'", current, target)
 		currentNextMinorVersion := &EtcdVersion{Version: semver.Version{Major: current.version.Major, Minor: current.version.Minor + 1}}
 		switch {
 		case current.version.MajorMinorEquals(target.version) || currentNextMinorVersion.MajorMinorEquals(target.version):
-			glog.Infof("current version '%s' equals or is one minor version previous of target version '%s' - migration complete", current, target)
+			klog.Infof("current version '%s' equals or is one minor version previous of target version '%s' - migration complete", current, target)
 			err = m.dataDirectory.versionFile.Write(target)
 			if err != nil {
 				return fmt.Errorf("failed to write version.txt to '%s': %v", m.dataDirectory.path, err)
 			}
 			return nil
 		case current.storageVersion == storageEtcd2 && target.storageVersion == storageEtcd3:
-			glog.Infof("upgrading from etcd2 storage to etcd3 storage")
+			klog.Infof("upgrading from etcd2 storage to etcd3 storage")
 			current, err = m.etcd2ToEtcd3Upgrade(current, target)
 		case current.version.Major == 3 && target.version.Major == 2:
-			glog.Infof("downgrading from etcd 3.x to 2.x")
+			klog.Infof("downgrading from etcd 3.x to 2.x")
 			current, err = m.rollbackToEtcd2(current, target)
 		case current.version.Major == target.version.Major && current.version.Minor < target.version.Minor:
 			stepVersion := m.cfg.supportedVersions.NextVersionPair(current)
-			glog.Infof("upgrading etcd from %s to %s", current, stepVersion)
+			klog.Infof("upgrading etcd from %s to %s", current, stepVersion)
 			current, err = m.minorVersionUpgrade(current, stepVersion)
 		case current.version.Major == 3 && target.version.Major == 3 && current.version.Minor > target.version.Minor:
-			glog.Infof("rolling etcd back from %s to %s", current, target)
+			klog.Infof("rolling etcd back from %s to %s", current, target)
 			current, err = m.rollbackEtcd3MinorVersion(current, target)
 		}
 		if err != nil {
@@ -116,13 +116,13 @@ func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
 
 func (m *Migrator) backupEtcd2(current *EtcdVersion) error {
 	backupDir := fmt.Sprintf("%s/%s", m.dataDirectory, "migration-backup")
-	glog.Infof("Backup etcd before starting migration")
+	klog.Infof("Backup etcd before starting migration")
 	err := os.Mkdir(backupDir, 0666)
 	if err != nil {
 		return fmt.Errorf("failed to create backup directory before starting migration: %v", err)
 	}
 	m.client.Backup(current, backupDir)
-	glog.Infof("Backup done in %s", backupDir)
+	klog.Infof("Backup done in %s", backupDir)
 	return nil
 }
 
@@ -131,7 +131,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 		return nil, fmt.Errorf("rollback from %s to %s not supported, only rollbacks to the previous minor version are supported", current.version, target.version)
 	}
 
-	glog.Infof("Performing etcd %s -> %s rollback", current.version, target.version)
+	klog.Infof("Performing etcd %s -> %s rollback", current.version, target.version)
 	err := m.dataDirectory.Backup()
 	if err != nil {
 		return nil, err
@@ -145,14 +145,14 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 
 	// Start current version of etcd.
 	runner := m.newServer()
-	glog.Infof("Starting etcd version %s to capture rollback snapshot.", current.version)
+	klog.Infof("Starting etcd version %s to capture rollback snapshot.", current.version)
 	err = runner.Start(current.version)
 	if err != nil {
-		glog.Fatalf("Unable to automatically downgrade etcd: starting etcd version %s to capture rollback snapshot failed: %v", current.version, err)
+		klog.Fatalf("Unable to automatically downgrade etcd: starting etcd version %s to capture rollback snapshot failed: %v", current.version, err)
 		return nil, err
 	}
 
-	glog.Infof("Snapshotting etcd %s to %s", current.version, snapshotFilename)
+	klog.Infof("Snapshotting etcd %s to %s", current.version, snapshotFilename)
 	err = m.client.Snapshot(current.version, snapshotFilename)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 		return nil, err
 	}
 
-	glog.Infof("Backing up data before rolling back")
+	klog.Infof("Backing up data before rolling back")
 	backupDir := fmt.Sprintf("%s.bak", m.dataDirectory)
 	err = os.RemoveAll(backupDir)
 	if err != nil {
@@ -178,7 +178,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 		return nil, err
 	}
 
-	glog.Infof("Restoring etcd %s from %s", target.version, snapshotFilename)
+	klog.Infof("Restoring etcd %s from %s", target.version, snapshotFilename)
 	err = m.client.Restore(target.version, snapshotFilename)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (m *Migrator) rollbackToEtcd2(current *EtcdVersionPair, target *EtcdVersion
 	if !(current.version.Major == 3 && current.version.Minor == 0 && target.version.Major == 2 && target.version.Minor == 2) {
 		return nil, fmt.Errorf("etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.x, got current %s target %s", current, target)
 	}
-	glog.Infof("Backup and remove all existing v2 data")
+	klog.Infof("Backup and remove all existing v2 data")
 	err := m.dataDirectory.Backup()
 	if err != nil {
 		return nil, err
@@ -214,12 +214,12 @@ func (m *Migrator) etcd2ToEtcd3Upgrade(current *EtcdVersionPair, target *EtcdVer
 	}
 	runner := m.newServer()
 
-	glog.Infof("Performing etcd2 -> etcd3 migration")
+	klog.Infof("Performing etcd2 -> etcd3 migration")
 	err := m.client.Migrate(target.version)
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("Attaching leases to TTL entries")
+	klog.Infof("Attaching leases to TTL entries")
 
 	// Now attach lease to all keys.
 	// To do it, we temporarily start etcd on a random port (so that

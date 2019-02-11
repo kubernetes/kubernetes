@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
@@ -61,13 +60,13 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []algorithm.PredicateFailureReason{}
+	nonResourceReasons := []predicates.PredicateFailureReason{}
 	resourceReasons := []*admissionRequirement{}
 	for _, reason := range failureReasons {
 		if r, ok := reason.(*predicates.InsufficientResourceError); ok {
@@ -96,7 +95,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -110,7 +109,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		if err != nil {
 			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
 		}
-		glog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
 	return nil
 }

@@ -21,9 +21,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
@@ -38,41 +37,16 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
-type AdmissionConfig struct {
+// Config holds the configuration needed to for initialize the admission plugins
+type Config struct {
 	CloudConfigFile      string
 	LoopbackClientConfig *rest.Config
 	ExternalInformers    externalinformers.SharedInformerFactory
 }
 
-func (c *AdmissionConfig) buildAuthnInfoResolver(proxyTransport *http.Transport) webhook.AuthenticationInfoResolverWrapper {
-	webhookAuthResolverWrapper := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
-		return &webhook.AuthenticationInfoResolverDelegator{
-			ClientConfigForFunc: func(server string) (*rest.Config, error) {
-				if server == "kubernetes.default.svc" {
-					return c.LoopbackClientConfig, nil
-				}
-				return delegate.ClientConfigFor(server)
-			},
-			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
-				if serviceName == "kubernetes" && serviceNamespace == v1.NamespaceDefault {
-					return c.LoopbackClientConfig, nil
-				}
-				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)
-				if err != nil {
-					return nil, err
-				}
-				if proxyTransport != nil && proxyTransport.DialContext != nil {
-					ret.Dial = proxyTransport.DialContext
-				}
-				return ret, err
-			},
-		}
-	}
-	return webhookAuthResolverWrapper
-}
-
-func (c *AdmissionConfig) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, server.PostStartHookFunc, error) {
-	webhookAuthResolverWrapper := c.buildAuthnInfoResolver(proxyTransport)
+// New sets up the plugins and admission start hooks needed for admission
+func (c *Config) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, server.PostStartHookFunc, error) {
+	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, c.LoopbackClientConfig)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	var cloudConfig []byte
@@ -80,7 +54,7 @@ func (c *AdmissionConfig) New(proxyTransport *http.Transport, serviceResolver we
 		var err error
 		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
 		if err != nil {
-			glog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
+			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
 	}
 	internalClient, err := internalclientset.NewForConfig(c.LoopbackClientConfig)

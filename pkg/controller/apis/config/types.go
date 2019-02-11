@@ -17,9 +17,8 @@ limitations under the License.
 package config
 
 import (
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // GroupResource describes an group resource.
@@ -112,11 +111,11 @@ type GenericControllerManagerConfiguration struct {
 	MinResyncPeriod metav1.Duration
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfig.LeaderElectionConfiguration
+	LeaderElection componentbaseconfig.LeaderElectionConfiguration
 	// Controllers is the list of controllers to enable or disable
 	// '*' means "all enabled by default controllers"
 	// 'foo' means "enable 'foo'"
@@ -124,7 +123,7 @@ type GenericControllerManagerConfiguration struct {
 	// first item for a particular name wins
 	Controllers []string
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfig.DebuggingConfiguration
+	Debugging componentbaseconfig.DebuggingConfiguration
 }
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager

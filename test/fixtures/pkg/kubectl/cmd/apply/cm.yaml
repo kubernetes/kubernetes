@@ -3,13 +3,13 @@ items:
 - kind: ConfigMap
   apiVersion: v1
   metadata:
-    name: test
+    name: test0
   data:
     key1: apple
 - kind: ConfigMap
   apiVersion: v1
   metadata:
-    name: test2
+    name: test1
   data:
     key2: apple
 kind: ConfigMapList

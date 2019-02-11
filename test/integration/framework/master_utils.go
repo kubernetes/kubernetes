@@ -17,16 +17,16 @@ limitations under the License.
 package framework
 
 import (
+	"flag"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
-
 	apps "k8s.io/api/apps/v1beta1"
 	auditreg "k8s.io/api/auditregistration/v1alpha1"
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -53,6 +53,8 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -107,10 +109,35 @@ func (h *MasterHolder) SetMaster(m *master.Master) {
 	close(h.Initialized)
 }
 
+func DefaultOpenAPIConfig() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+
+	return openAPIConfig
+}
+
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
 func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	var m *master.Master
 	var s *httptest.Server
+
+	// Ensure we log at least level 4
+	v := flag.Lookup("v").Value
+	level, _ := strconv.Atoi(v.String())
+	if level < 4 {
+		v.Set("4")
+	}
 
 	if incomingServer != nil {
 		s = incomingServer
@@ -129,20 +156,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
-		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Kubernetes",
-				Version: "unversioned",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
-			ResponseProps: spec.ResponseProps{
-				Description: "Default Response.",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
-		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+		masterConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	}
 
 	// set the loopback client config
@@ -178,14 +192,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	clientset, err := clientset.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
-		glog.Fatalf("error in bringing up the master: %v", err)
+		klog.Fatalf("error in bringing up the master: %v", err)
 	}
 	if masterReceiver != nil {
 		masterReceiver.SetMaster(m)
@@ -202,7 +216,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
 		closeFn()
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -217,8 +231,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	})
 	if err != nil {
 		closeFn()
-		glog.Errorf("last health content: %q", string(lastHealthContent))
-		glog.Fatal(err)
+		klog.Errorf("last health content: %q", string(lastHealthContent))
+		klog.Fatal(err)
 	}
 
 	return m, s, closeFn
@@ -242,7 +256,7 @@ func NewMasterConfig() *master.Config {
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
-	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURL()}
+	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
@@ -341,7 +355,7 @@ func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, mast
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
-	cfg.ServerList = []string{GetEtcdURL()}
+	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }
 

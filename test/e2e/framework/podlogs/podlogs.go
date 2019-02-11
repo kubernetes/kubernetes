@@ -99,9 +99,15 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 			}
 
 			for _, pod := range pods.Items {
-				for _, c := range pod.Spec.Containers {
+				for i, c := range pod.Spec.Containers {
 					name := pod.ObjectMeta.Name + "/" + c.Name
-					if logging[name] {
+					if logging[name] ||
+						// sanity check, array should have entry for each container
+						len(pod.Status.ContainerStatuses) <= i ||
+						// Don't attempt to get logs for a container unless it is running or has terminated.
+						// Trying to get a log would just end up with an error that we would have to suppress.
+						(pod.Status.ContainerStatuses[i].State.Running == nil &&
+							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
 						continue
 					}
 					readCloser, err := LogsForPod(ctx, cs, ns, pod.ObjectMeta.Name,

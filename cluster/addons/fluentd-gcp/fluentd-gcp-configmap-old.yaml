@@ -61,16 +61,18 @@ data:
       # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
       tag reform.*
       read_from_head true
-      format multi_format
-      <pattern>
-        format json
-        time_key time
-        time_format %Y-%m-%dT%H:%M:%S.%NZ
-      </pattern>
-      <pattern>
-        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
-        time_format %Y-%m-%dT%H:%M:%S.%N%:z
-      </pattern>
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
     </source>
 
     <filter reform.**>
@@ -251,7 +253,7 @@ data:
 
     <source>
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      filters [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       pos_file /var/log/gcp-journald-container-runtime.pos
       read_from_head true
       tag container-runtime
@@ -287,7 +289,7 @@ data:
       @type grep
       <exclude>
         key _SYSTEMD_UNIT
-        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+        pattern ^(docker|{{ fluentd_container_runtime_service }}|kubelet|node-problem-detector)\.service$
       </exclude>
     </filter>
     # END_NODE_JOURNAL

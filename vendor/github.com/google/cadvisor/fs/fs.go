@@ -33,11 +33,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/mount"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/utils"
 	dockerutil "github.com/google/cadvisor/utils/docker"
 	zfs "github.com/mistifyio/go-zfs"
+	"k8s.io/klog"
 )
 
 const (
@@ -114,9 +114,9 @@ func NewFsInfo(context Context) (FsInfo, error) {
 
 	fsUUIDToDeviceName, err := getFsUUIDToDeviceNameMap()
 	if err != nil {
-		// UUID is not always avaiable across different OS distributions.
+		// UUID is not always available across different OS distributions.
 		// Do not fail if there is an error.
-		glog.Warningf("Failed to get disk UUID mapping, getting disk info by uuid will not work: %v", err)
+		klog.Warningf("Failed to get disk UUID mapping, getting disk info by uuid will not work: %v", err)
 	}
 
 	// Avoid devicemapper container mounts - these are tracked by the ThinPoolWatcher
@@ -139,8 +139,8 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	fsInfo.addDockerImagesLabel(context, mounts)
 	fsInfo.addCrioImagesLabel(context, mounts)
 
-	glog.V(1).Infof("Filesystem UUIDs: %+v", fsInfo.fsUUIDToDeviceName)
-	glog.V(1).Infof("Filesystem partitions: %+v", fsInfo.partitions)
+	klog.V(1).Infof("Filesystem UUIDs: %+v", fsInfo.fsUUIDToDeviceName)
+	klog.V(1).Infof("Filesystem partitions: %+v", fsInfo.partitions)
 	fsInfo.addSystemRootLabel(mounts)
 	return fsInfo, nil
 }
@@ -165,7 +165,7 @@ func getFsUUIDToDeviceNameMap() (map[string]string, error) {
 		path := filepath.Join(dir, file.Name())
 		target, err := os.Readlink(path)
 		if err != nil {
-			glog.Warningf("Failed to resolve symlink for %q", path)
+			klog.Warningf("Failed to resolve symlink for %q", path)
 			continue
 		}
 		device, err := filepath.Abs(filepath.Join(dir, target))
@@ -213,7 +213,7 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 		if mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
 			major, minor, err := getBtrfsMajorMinorIds(mount)
 			if err != nil {
-				glog.Warningf("%s", err)
+				klog.Warningf("%s", err)
 			} else {
 				mount.Major = major
 				mount.Minor = minor
@@ -278,7 +278,7 @@ func (self *RealFsInfo) addSystemRootLabel(mounts []*mount.Info) {
 func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []*mount.Info) {
 	dockerDev, dockerPartition, err := self.getDockerDeviceMapperInfo(context.Docker)
 	if err != nil {
-		glog.Warningf("Could not get Docker devicemapper device: %v", err)
+		klog.Warningf("Could not get Docker devicemapper device: %v", err)
 	}
 	if len(dockerDev) > 0 && dockerPartition != nil {
 		self.partitions[dockerDev] = *dockerPartition
@@ -405,7 +405,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 			switch partition.fsType {
 			case DeviceMapper.String():
 				fs.Capacity, fs.Free, fs.Available, err = getDMStats(device, partition.blockSize)
-				glog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
+				klog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
 				fs.Type = DeviceMapper
 			case ZFS.String():
 				fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
@@ -418,11 +418,11 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 					fs.InodesFree = &inodesFree
 					fs.Type = VFS
 				} else {
-					glog.V(4).Infof("unable to determine file system type, partition mountpoint does not exist: %v", partition.mountpoint)
+					klog.V(4).Infof("unable to determine file system type, partition mountpoint does not exist: %v", partition.mountpoint)
 				}
 			}
 			if err != nil {
-				glog.V(4).Infof("Stat fs failed. Error: %v", err)
+				klog.V(4).Infof("Stat fs failed. Error: %v", err)
 			} else {
 				deviceSet[device] = struct{}{}
 				fs.DeviceInfo = DeviceInfo{
@@ -445,7 +445,7 @@ func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 	file, err := os.Open(diskStatsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			glog.Warningf("Not collecting filesystem statistics because file %q was not found", diskStatsFile)
+			klog.Warningf("Not collecting filesystem statistics because file %q was not found", diskStatsFile)
 			return diskStatsMap, nil
 		}
 		return nil, err
@@ -551,7 +551,7 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	if found && mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
 		major, minor, err := getBtrfsMajorMinorIds(mount)
 		if err != nil {
-			glog.Warningf("%s", err)
+			klog.Warningf("%s", err)
 		} else {
 			return &DeviceInfo{mount.Source, uint(major), uint(minor)}, nil
 		}
@@ -583,12 +583,12 @@ func GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 		return 0, fmt.Errorf("failed to exec du - %v", err)
 	}
 	timer := time.AfterFunc(timeout, func() {
-		glog.Warningf("Killing cmd %v due to timeout(%s)", cmd.Args, timeout.String())
+		klog.Warningf("Killing cmd %v due to timeout(%s)", cmd.Args, timeout.String())
 		cmd.Process.Kill()
 	})
 	stdoutb, souterr := ioutil.ReadAll(stdoutp)
 	if souterr != nil {
-		glog.Errorf("Failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
+		klog.Errorf("Failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
 	}
 	stderrb, _ := ioutil.ReadAll(stderrp)
 	err = cmd.Wait()
@@ -622,7 +622,7 @@ func GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
 		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
 	}
 	timer := time.AfterFunc(timeout, func() {
-		glog.Warningf("Killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
+		klog.Warningf("Killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
 		findCmd.Process.Kill()
 	})
 	err := findCmd.Wait()
@@ -763,7 +763,7 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 		return 0, 0, err
 	}
 
-	glog.V(4).Infof("btrfs mount %#v", mount)
+	klog.V(4).Infof("btrfs mount %#v", mount)
 	if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
 		err := syscall.Stat(mount.Mountpoint, buf)
 		if err != nil {
@@ -771,8 +771,8 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 			return 0, 0, err
 		}
 
-		glog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
-		glog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+		klog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
+		klog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
 
 		return int(major(buf.Dev)), int(minor(buf.Dev)), nil
 	} else {

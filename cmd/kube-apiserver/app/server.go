@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -50,13 +49,14 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/globalflag"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	openapi "k8s.io/kube-openapi/pkg/common"
@@ -64,7 +64,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -78,13 +77,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
-
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
+	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 const etcdRetryLimit = 60
@@ -120,6 +118,9 @@ cluster's shared state through which all other components interact.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
+	verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -142,7 +143,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
 	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
@@ -165,7 +166,8 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount)
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount,
+		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +287,8 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	if _, port, err := net.SplitHostPort(s.Etcd.StorageConfig.ServerList[0]); err == nil && port != "0" && len(port) != 0 {
-		if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.ServerList}.CheckEtcdServers); err != nil {
+	if _, port, err := net.SplitHostPort(s.Etcd.StorageConfig.Transport.ServerList[0]); err == nil && port != "0" && len(port) != 0 {
+		if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.Transport.ServerList}.CheckEtcdServers); err != nil {
 			lastErr = fmt.Errorf("error waiting for etcd connection: %v", err)
 			return
 		}
@@ -315,50 +317,6 @@ func CreateKubeAPIServerConfig(
 	requestHeaderProxyCA, lastErr := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
 	if lastErr != nil {
 		return
-	}
-
-	var (
-		issuer        serviceaccount.TokenGenerator
-		apiAudiences  []string
-		maxExpiration time.Duration
-	)
-
-	if s.ServiceAccountSigningKeyFile != "" ||
-		s.Authentication.ServiceAccounts.Issuer != "" ||
-		len(s.Authentication.APIAudiences) > 0 {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-			lastErr = fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --service-account-api-audiences flags were passed")
-			return
-		}
-		if s.ServiceAccountSigningKeyFile == "" ||
-			s.Authentication.ServiceAccounts.Issuer == "" ||
-			len(s.Authentication.APIAudiences) == 0 ||
-			len(s.Authentication.ServiceAccounts.KeyFiles) == 0 {
-			lastErr = fmt.Errorf("service-account-signing-key-file, service-account-issuer, service-account-api-audiences and service-account-key-file should be specified together")
-			return
-		}
-		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
-			return
-		}
-		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
-			lowBound := time.Hour
-			upBound := time.Duration(1<<32) * time.Second
-			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
-				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
-				lastErr = fmt.Errorf("the serviceaccount max expiration is out of range, must be between 1 hour to 2^32 seconds")
-				return
-			}
-		}
-
-		issuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to build token generator: %v", err)
-			return
-		}
-		apiAudiences = s.Authentication.APIAudiences
-		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
 	config = &master.Config{
@@ -392,9 +350,8 @@ func CreateKubeAPIServerConfig(
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
 
-			ServiceAccountIssuer:        issuer,
-			APIAudiences:                apiAudiences,
-			ServiceAccountMaxExpiration: maxExpiration,
+			ServiceAccountIssuer:        s.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: s.ServiceAccountTokenMaxExpiration,
 
 			VersionedInformers: versionedInformers,
 		},
@@ -438,9 +395,6 @@ func buildGenericConfig(
 	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Audit.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -451,7 +405,6 @@ func buildGenericConfig(
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
-	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
@@ -504,12 +457,28 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	admissionConfig := &kubeapiserveradmission.AdmissionConfig{
+	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+
+	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)
+
+	lastErr = s.Audit.ApplyTo(
+		genericConfig,
+		genericConfig.LoopbackClientConfig,
+		versionedInformers,
+		serveroptions.NewProcessInfo("kube-apiserver", "kube-system"),
+		&serveroptions.WebhookOptions{
+			AuthInfoResolverWrapper: authInfoResolverWrapper,
+			ServiceResolver:         serviceResolver,
+		},
+	)
+	if lastErr != nil {
+		return
+	}
 
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
 	if err != nil {
@@ -534,7 +503,12 @@ func buildGenericConfig(
 func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+		)
 	}
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
@@ -584,7 +558,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
-		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
+		klog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
@@ -600,13 +574,34 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
 				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 			} else {
-				glog.Warning("No TLS key provided, service account token authentication disabled")
+				klog.Warning("No TLS key provided, service account token authentication disabled")
 			}
 		}
 	}
 
+	if s.ServiceAccountSigningKeyFile != "" && s.Authentication.ServiceAccounts.Issuer != "" {
+		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
+		if err != nil {
+			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
+		}
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
+			}
+		}
+
+		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		if err != nil {
+			return options, fmt.Errorf("failed to build token generator: %v", err)
+		}
+		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
+	}
+
 	if s.Etcd.EnableWatchCache {
-		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		klog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
 			for resource, size := range userSpecified {
@@ -694,7 +689,6 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStatus":                               "io.k8s.api.extensions.v1beta1.DeploymentStatus",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1beta1.RoleRef":                                              "io.k8s.api.rbac.v1beta1.RoleRef",
 		"io.k8s.kubernetes.pkg.apis.apps.v1beta1.Scale":                                                "io.k8s.api.apps.v1beta1.Scale",
-		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.InitializerConfiguration":           "io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration",
 		"io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource":                                "io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource",
 		"io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm":                                         "io.k8s.api.core.v1.PreferredSchedulingTerm",
 		"io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec":                                                  "io.k8s.api.batch.v1.JobSpec",
@@ -732,7 +726,6 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.api.v1.Volume":                                                          "io.k8s.api.core.v1.Volume",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1alpha1.RoleBindingList":                                     "io.k8s.api.rbac.v1alpha1.RoleBindingList",
 		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.Rule":                               "io.k8s.api.admissionregistration.v1alpha1.Rule",
-		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.InitializerConfigurationList":       "io.k8s.api.admissionregistration.v1alpha1.InitializerConfigurationList",
 		"io.k8s.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicy":                                  "io.k8s.api.extensions.v1beta1.NetworkPolicy",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1alpha1.ClusterRoleList":                                     "io.k8s.api.rbac.v1alpha1.ClusterRoleList",
 		"io.k8s.kubernetes.pkg.api.v1.ObjectFieldSelector":                                             "io.k8s.api.core.v1.ObjectFieldSelector",

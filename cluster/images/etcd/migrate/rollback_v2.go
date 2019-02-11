@@ -42,7 +42,7 @@ import (
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
 	"github.com/coreos/go-semver/semver"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const rollbackVersion = "2.2.0"
@@ -50,7 +50,7 @@ const rollbackVersion = "2.2.0"
 // RollbackV3ToV2 rolls back an etcd 3.0.x data directory to the 2.x.x version specified by rollbackVersion.
 func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
 	dbpath := path.Join(migrateDatadir, "member", "snap", "db")
-	glog.Infof("Rolling db file %s back to etcd 2.x", dbpath)
+	klog.Infof("Rolling db file %s back to etcd 2.x", dbpath)
 
 	// etcd3 store backend. We will use it to parse v3 data files and extract information.
 	be := backend.NewDefaultBackend(dbpath)
@@ -139,7 +139,7 @@ func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
 				v = rollbackVersion
 			}
 			if _, err := st.Set(n.Key, n.Dir, v, store.TTLOptionSet{}); err != nil {
-				glog.Error(err)
+				klog.Error(err)
 			}
 
 			// update nodes
@@ -147,7 +147,7 @@ func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
 			if len(fields) == 4 && fields[2] == "members" {
 				nodeID, err := strconv.ParseUint(fields[3], 16, 64)
 				if err != nil {
-					glog.Fatalf("failed to parse member ID (%s): %v", fields[3], err)
+					klog.Fatalf("failed to parse member ID (%s): %v", fields[3], err)
 				}
 				nodes = append(nodes, nodeID)
 			}
@@ -172,7 +172,7 @@ func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
 	if err := snapshotter.SaveSnap(raftSnap); err != nil {
 		return err
 	}
-	glog.Infof("Finished successfully")
+	klog.Infof("Finished successfully")
 	return nil
 }
 
@@ -214,7 +214,7 @@ func traverseAndDeleteEmptyDir(st store.Store, dir string) error {
 	}
 	for _, node := range e.Node.Nodes {
 		if !node.Dir {
-			glog.V(2).Infof("key: %s", node.Key[len(etcdserver.StoreKeysPrefix):])
+			klog.V(2).Infof("key: %s", node.Key[len(etcdserver.StoreKeysPrefix):])
 		} else {
 			err := traverseAndDeleteEmptyDir(st, node.Key)
 			if err != nil {
@@ -344,6 +344,6 @@ func applyRequest(r *pb.Request, applyV2 etcdserver.ApplierV2) {
 	case "POST", "QGET", "SYNC":
 		return
 	default:
-		glog.Fatal("unknown command")
+		klog.Fatal("unknown command")
 	}
 }

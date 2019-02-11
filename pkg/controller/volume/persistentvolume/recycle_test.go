@@ -229,6 +229,16 @@ func TestRecycleSync(t *testing.T) {
 			// recycler simulates one recycle() call that succeeds.
 			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
 		},
+		{
+			// volume is used by a completed pod, pod using claim with the same name bound to different pv is running, should recycle
+			"6-14 - seemingly used by running pod",
+			newVolumeArray("volume6-14", "1Gi", "uid6-14", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-14", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newClaimArray("completedClaim", "uid6-14-x", "10Gi", "", v1.ClaimBound, nil),
+			newClaimArray("completedClaim", "uid6-14-x", "10Gi", "", v1.ClaimBound, nil),
+			noevents, noerrors,
+			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
+		},
 	}
 	runSyncTests(t, tests, []*storage.StorageClass{}, pods)
 }

@@ -23,15 +23,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -40,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/utils/exec"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -60,23 +65,43 @@ var (
 		cat service.yaml | kubectl diff -f -`))
 )
 
+// Number of times we try to diff before giving-up
+const maxRetries = 4
+
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
+
+	ServerSideApply bool
+	ForceConflicts  bool
+
+	OpenAPISchema    openapi.Resources
+	DiscoveryClient  discovery.DiscoveryInterface
+	DynamicClient    dynamic.Interface
+	DryRunVerifier   *apply.DryRunVerifier
+	CmdNamespace     string
+	EnforceNamespace bool
+	Builder          *resource.Builder
+	Diff             *DiffProgram
 }
 
-func checkDiffArgs(cmd *cobra.Command, args []string) error {
+func validateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 	return nil
 }
 
-func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	var options DiffOptions
-	diff := DiffProgram{
-		Exec:      exec.New(),
-		IOStreams: streams,
+func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
+	return &DiffOptions{
+		Diff: &DiffProgram{
+			Exec:      exec.New(),
+			IOStreams: ioStreams,
+		},
 	}
+}
+
+func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	options := NewDiffOptions(streams)
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
@@ -84,13 +109,15 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(checkDiffArgs(cmd, args))
-			cmdutil.CheckErr(RunDiff(f, &diff, &options))
+			cmdutil.CheckErr(options.Complete(f, cmd))
+			cmdutil.CheckErr(validateArgs(cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddServerSideApplyFlags(cmd)
 	cmd.MarkFlagRequired("filename")
 
 	return cmd
@@ -224,10 +251,13 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	LocalObj runtime.Object
-	Info     *resource.Info
-	Encoder  runtime.Encoder
-	OpenAPI  openapi.Resources
+	LocalObj        runtime.Object
+	Info            *resource.Info
+	Encoder         runtime.Encoder
+	OpenAPI         openapi.Resources
+	Force           bool
+	ServerSideApply bool
+	ForceConflicts  bool
 }
 
 var _ Object = &InfoObject{}
@@ -240,6 +270,24 @@ func (obj InfoObject) Live() runtime.Object {
 // Returns the "merged" object, as it would look like if applied or
 // created.
 func (obj InfoObject) Merged() (runtime.Object, error) {
+	if obj.ServerSideApply {
+		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
+		if err != nil {
+			return nil, err
+		}
+		options := metav1.PatchOptions{
+			Force:  &obj.ForceConflicts,
+			DryRun: []string{metav1.DryRunAll},
+		}
+		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Patch(
+			obj.Info.Namespace,
+			obj.Info.Name,
+			types.ApplyPatchType,
+			data,
+			&options,
+		)
+	}
+
 	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
 	if obj.Live() == nil {
 		// Dry-run create if the object doesn't exist.
@@ -251,6 +299,16 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		)
 	}
 
+	var resourceVersion *string
+	if !obj.Force {
+		accessor, err := meta.Accessor(obj.Info.Object)
+		if err != nil {
+			return nil, err
+		}
+		str := accessor.GetResourceVersion()
+		resourceVersion = &str
+	}
+
 	modified, err := kubectl.GetModifiedConfiguration(obj.LocalObj, false, unstructured.UnstructuredJSONScheme)
 	if err != nil {
 		return nil, err
@@ -259,12 +317,13 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// This is using the patcher from apply, to keep the same behavior.
 	// We plan on replacing this with server-side apply when it becomes available.
 	patcher := &apply.Patcher{
-		Mapping:       obj.Info.Mapping,
-		Helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		Overwrite:     true,
-		BackOff:       clockwork.NewRealClock(),
-		ServerDryRun:  true,
-		OpenapiSchema: obj.OpenAPI,
+		Mapping:         obj.Info.Mapping,
+		Helper:          resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Overwrite:       true,
+		BackOff:         clockwork.NewRealClock(),
+		ServerDryRun:    true,
+		OpenapiSchema:   obj.OpenAPI,
+		ResourceVersion: resourceVersion,
 	}
 
 	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
@@ -272,7 +331,17 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 }
 
 func (obj InfoObject) Name() string {
-	return obj.Info.Name
+	group := ""
+	if obj.Info.Mapping.GroupVersionKind.Group != "" {
+		group = fmt.Sprintf("%v.", obj.Info.Mapping.GroupVersionKind.Group)
+	}
+	return group + fmt.Sprintf(
+		"%v.%v.%v.%v",
+		obj.Info.Mapping.GroupVersionKind.Version,
+		obj.Info.Mapping.GroupVersionKind.Kind,
+		obj.Info.Namespace,
+		obj.Info.Name,
+	)
 }
 
 // Differ creates two DiffVersion and diffs them.
@@ -319,30 +388,54 @@ func (d *Differ) TearDown() {
 	d.To.Dir.Delete()   // Ignore error
 }
 
+func isConflict(err error) bool {
+	return err != nil && errors.IsConflict(err)
+}
+
+func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
+
+	if !o.ServerSideApply {
+		o.OpenAPISchema, err = f.OpenAPISchema()
+		if err != nil {
+			return err
+		}
+	}
+
+	o.DiscoveryClient, err = f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.DryRunVerifier = &apply.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		OpenAPIGetter: o.DiscoveryClient,
+	}
+
+	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	o.Builder = f.NewBuilder()
+	return nil
+}
+
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
-func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
-	schema, err := f.OpenAPISchema()
-	if err != nil {
-		return err
-	}
-
-	discovery, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
-	dynamic, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	dryRunVerifier := &apply.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamic)),
-		OpenAPIGetter: discovery,
-	}
-
+func (o *DiffOptions) Run() error {
 	differ, err := NewDiffer("LIVE", "MERGED")
 	if err != nil {
 		return err
@@ -351,15 +444,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 
 	printer := Printer{}
 
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	r := f.NewBuilder().
+	r := o.Builder.
 		Unstructured().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		NamespaceParam(o.CmdNamespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -371,30 +459,47 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 			return err
 		}
 
-		if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 			return err
 		}
 
 		local := info.Object.DeepCopyObject()
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
+		for i := 1; i <= maxRetries; i++ {
+			if err = info.Get(); err != nil {
+				if !errors.IsNotFound(err) {
+					return err
+				}
+				info.Object = nil
 			}
-			info.Object = nil
-		}
 
-		obj := InfoObject{
-			LocalObj: local,
-			Info:     info,
-			Encoder:  scheme.DefaultJSONEncoder(),
-			OpenAPI:  schema,
-		}
+			force := i == maxRetries
+			if force {
+				klog.Warningf(
+					"Object (%v: %v) keeps changing, diffing without lock",
+					info.Object.GetObjectKind().GroupVersionKind(),
+					info.Name,
+				)
+			}
+			obj := InfoObject{
+				LocalObj:        local,
+				Info:            info,
+				Encoder:         scheme.DefaultJSONEncoder(),
+				OpenAPI:         o.OpenAPISchema,
+				Force:           force,
+				ServerSideApply: o.ServerSideApply,
+				ForceConflicts:  o.ForceConflicts,
+			}
 
-		return differ.Diff(obj, printer)
+			err = differ.Diff(obj, printer)
+			if !isConflict(err) {
+				break
+			}
+		}
+		return err
 	})
 	if err != nil {
 		return err
 	}
 
-	return differ.Run(diff)
+	return differ.Run(o.Diff)
 }

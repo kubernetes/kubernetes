@@ -37,6 +37,7 @@ const (
 
 	// owner: @tallclair
 	// alpha: v1.10
+	// beta: v1.14
 	//
 	// ValidateProxyRedirects controls whether the apiserver should validate that redirects are only
 	// followed to the same host. Only used if StreamingProxyRedirects is enabled.
@@ -52,18 +53,18 @@ const (
 	// audited.
 	AdvancedAuditing utilfeature.Feature = "AdvancedAuditing"
 
+	// owner: @pbarker
+	// alpha: v1.13
+	//
+	// DynamicAuditing enables configuration of audit policy and webhook backends through an
+	// AuditSink API object.
+	DynamicAuditing utilfeature.Feature = "DynamicAuditing"
+
 	// owner: @ilackams
 	// alpha: v1.7
 	//
 	// Enables compression of REST responses (GET and LIST only)
 	APIResponseCompression utilfeature.Feature = "APIResponseCompression"
-
-	// owner: @smarterclayton
-	// alpha: v1.7
-	//
-	// Allow asynchronous coordination of object creation.
-	// Auto-enabled by the Initializers admission plugin.
-	Initializers utilfeature.Feature = "Initializers"
 
 	// owner: @smarterclayton
 	// alpha: v1.8
@@ -81,10 +82,16 @@ const (
 	// validation, merging, mutation can be tested without
 	// committing.
 	DryRun utilfeature.Feature = "DryRun"
+
+	// owner: @apelisse, @lavalamp
+	// alpha: v1.14
+	//
+	// Server-side apply. Merging happens on the server.
+	ServerSideApply utilfeature.Feature = "ServerSideApply"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -92,10 +99,11 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	ValidateProxyRedirects:  {Default: false, PreRelease: utilfeature.Alpha},
+	ValidateProxyRedirects:  {Default: true, PreRelease: utilfeature.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
+	DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 }

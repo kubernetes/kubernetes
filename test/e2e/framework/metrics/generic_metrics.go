@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+	"k8s.io/klog"
 )
 
 type Metrics map[string]model.Samples
@@ -88,7 +88,7 @@ func parseMetrics(data string, output *Metrics) error {
 				// Expected loop termination condition.
 				return nil
 			}
-			glog.Warningf("Invalid Decode. Skipping.")
+			klog.Warningf("Invalid Decode. Skipping.")
 			continue
 		}
 		for _, metric := range v {

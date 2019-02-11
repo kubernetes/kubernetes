@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/klog"
 )
 
 // GroupVersionRegistry provides access to registered group versions.
@@ -94,13 +95,20 @@ func MergeAPIResourceConfigs(
 		}
 
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 {
+		if len(tokens) < 2 {
 			continue
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
+		}
+
+		// individual resource enablement/disablement is only supported in the extensions/v1beta1 API group for legacy reasons.
+		// all other API groups are expected to contain coherent sets of resources that are enabled/disabled together.
+		if len(tokens) > 2 && (groupVersion != schema.GroupVersion{Group: "extensions", Version: "v1beta1"}) {
+			klog.Warningf("ignoring invalid key %s, individual resource enablement/disablement is not supported in %s, and will prevent starting in future releases", key, groupVersion.String())
+			continue
 		}
 
 		// Exclude group not registered into the registry.
@@ -117,9 +125,21 @@ func MergeAPIResourceConfigs(
 			return nil, err
 		}
 		if enabled {
+			// enable the groupVersion for "group/version=true" and "group/version/resource=true"
 			resourceConfig.EnableVersions(groupVersion)
-		} else {
+		} else if len(tokens) == 2 {
+			// disable the groupVersion only for "group/version=false", not "group/version/resource=false"
 			resourceConfig.DisableVersions(groupVersion)
+		}
+
+		if len(tokens) < 3 {
+			continue
+		}
+		groupVersionResource := groupVersion.WithResource(tokens[2])
+		if enabled {
+			resourceConfig.EnableResources(groupVersionResource)
+		} else {
+			resourceConfig.DisableResources(groupVersionResource)
 		}
 	}
 

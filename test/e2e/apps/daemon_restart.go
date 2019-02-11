@@ -281,7 +281,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-scheduler", ports.SchedulerPort, restartPollInterval, restartTimeout)
+			framework.GetMasterHost(), "kube-scheduler", ports.InsecureSchedulerPort, restartPollInterval, restartTimeout)
 
 		// Create pods while the scheduler is down and make sure the scheduler picks them up by
 		// scaling the rc to the same size.

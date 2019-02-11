@@ -21,7 +21,7 @@ import (
 	"hash/fnv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,13 +75,13 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+		klog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+			klog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
 			return false
 		}
 	}
@@ -311,7 +311,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		// Protect against exposing the same protocol-port more than once in a container.
 		if _, ok := names[pm.Name]; ok {
-			glog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
+			klog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
 			continue
 		}
 		ports = append(ports, pm)

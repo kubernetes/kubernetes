@@ -85,8 +85,12 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
-		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("kube-aggregator", "kube-system"),
+		),
+		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: err,

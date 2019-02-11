@@ -86,7 +86,7 @@ func newRc(replicas int, desired int) *corev1.ReplicationController {
 		Name:      "foo-v2",
 		Annotations: map[string]string{
 			desiredReplicasAnnotation: fmt.Sprintf("%d", desired),
-			sourceIdAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
+			sourceIDAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
 		},
 	}
 	return rc
@@ -812,7 +812,7 @@ Scaling foo-v2 up to 2
 					rc.Status.Replicas = *rc.Spec.Replicas
 					return rc, nil
 				},
-				getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+				getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 					// Simulate a create vs. update of an existing controller.
 					return tt.newRc, tt.newRcExists, nil
 				},
@@ -865,7 +865,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			// Do nothing.
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
 		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
@@ -909,7 +909,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
 		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
@@ -1244,7 +1244,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "bar:1234",
+				sourceIDAnnotation: "bar:1234",
 			},
 		},
 	}
@@ -1253,7 +1253,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "bar",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "foo:12345",
+				sourceIDAnnotation: "foo:12345",
 			},
 		},
 	}
@@ -1262,7 +1262,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "baz",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "baz:45667",
+				sourceIDAnnotation: "baz:45667",
 			},
 		},
 	}

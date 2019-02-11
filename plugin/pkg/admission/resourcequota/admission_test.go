@@ -31,12 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
@@ -452,15 +454,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
-		return
-	}
-
-	defer func() {
-		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
-	}()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
@@ -491,7 +485,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 		},
 	}
 
-	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -515,15 +509,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
-		return
-	}
-
-	defer func() {
-		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
-	}()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 
 	// start up quota system
 	stopCh := make(chan struct{})
@@ -558,7 +544,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		},
 	}
 
-	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

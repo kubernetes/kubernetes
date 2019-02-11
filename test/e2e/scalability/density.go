@@ -500,8 +500,9 @@ var _ = SIGDescribe("Density", func() {
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
-		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue()
-		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value()
+		// Compute node capacity, leaving some slack for addon pods.
+		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
+		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value() - 100*1024*1024
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
@@ -637,7 +638,11 @@ var _ = SIGDescribe("Density", func() {
 			// Since all RCs are created at the same time, timeout for each config
 			// has to assume that it will be run at the very end.
 			podThroughput := 20
-			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
+			timeout := time.Duration(totalPods/podThroughput) * time.Second
+			if timeout < UnreadyNodeToleration {
+				timeout = UnreadyNodeToleration
+			}
+			timeout += 3 * time.Minute
 			// createClients is defined in load.go
 			clients, internalClients, scalesClients, err := createClients(numberOfCollections)
 			framework.ExpectNoError(err)
@@ -688,6 +693,19 @@ var _ = SIGDescribe("Density", func() {
 					SecretNames:                    secretNames,
 					ConfigMapNames:                 configMapNames,
 					ServiceAccountTokenProjections: itArg.svcacctTokenProjectionsPerPod,
+					Tolerations: []v1.Toleration{
+						{
+							Key:               "node.kubernetes.io/not-ready",
+							Operator:          v1.TolerationOpExists,
+							Effect:            v1.TaintEffectNoExecute,
+							TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+						}, {
+							Key:               "node.kubernetes.io/unreachable",
+							Operator:          v1.TolerationOpExists,
+							Effect:            v1.TaintEffectNoExecute,
+							TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+						},
+					},
 				}
 				switch itArg.kind {
 				case api.Kind("ReplicationController"):
@@ -728,6 +746,8 @@ var _ = SIGDescribe("Density", func() {
 					})
 			}
 			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
+			defer cleanupDensityTest(dConfig, testPhaseDurations)
+
 			if itArg.runLatencyTest {
 				// Pick latencyPodsIterations so that:
 				// latencyPodsIterations * nodeCount >= MinPodStartupMeasurements.
@@ -969,7 +989,6 @@ var _ = SIGDescribe("Density", func() {
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 			}
-			cleanupDensityTest(dConfig, testPhaseDurations)
 		})
 	}
 })

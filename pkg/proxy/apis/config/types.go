@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -108,7 +108,7 @@ type KubeProxyConfiguration struct {
 	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
 	// ipvs contains ipvs-related configuration options.
@@ -172,7 +172,7 @@ type IPVSSchedulerMethod string
 const (
 	// RoundRobin distributes jobs equally amongst the available real servers.
 	RoundRobin IPVSSchedulerMethod = "rr"
-	// WeightedRoundRobin assigns jobs to real servers proportionally to there real servers' weight.
+	// WeightedRoundRobin assigns jobs to real servers proportionally to their real servers' weight.
 	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
 	// Servers with equal weights get an equal distribution of new jobs.
 	WeightedRoundRobin IPVSSchedulerMethod = "wrr"

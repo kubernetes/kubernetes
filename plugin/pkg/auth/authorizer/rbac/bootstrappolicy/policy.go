@@ -107,7 +107,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-		rbacv1helpers.NewRule("update", "patch", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
 		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
@@ -199,11 +199,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
 					"/healthz", "/version", "/version/",
-					// remove once swagger 1.2 support is removed
-					"/swaggerapi", "/swaggerapi/*",
-					// do not expand this pattern for openapi discovery docs
-					// move to a single openapi endpoint that takes accept/accept-encoding headers
-					"/swagger.json", "/swagger-2.0.0.pb-v1",
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
@@ -306,6 +301,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
+					"controllerrevisions",
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
 					"deployments", "deployments/scale",
@@ -406,6 +402,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				// Needed to check API access.  These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 				// Needed for all shared informers
 				rbacv1helpers.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
 			},
@@ -433,6 +430,9 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// things that pods use or applies to them
 				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+				// Needed to check API access.  These creates are non-mutating
+				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			},
 		},
 		{
@@ -488,17 +488,14 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create").Groups(certificatesGroup).Resources("certificatesigningrequests/selfnodeclient").RuleOrDie(),
 			},
 		},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		roles = append(roles, rbacv1.ClusterRole{
+		{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			},
-		})
+		},
 	}
 
 	externalProvisionerRules := []rbacv1.PolicyRule{
@@ -534,6 +531,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 		rbacv1helpers.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:aws-cloud-provider").SAs("kube-system", "aws-cloud-provider").BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:volume-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 
 		// This default binding of the system:node role to the system:nodes group is deprecated in 1.7 with the availability of the Node authorizer.
 		// This leaves the binding, but with an empty set of subjects, so that tightening reconciliation can remove the subject.
@@ -541,10 +539,6 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
 			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: systemNodeRoleName},
 		},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		rolebindings = append(rolebindings, rbacv1helpers.NewClusterBinding("system:volume-scheduler").Users(user.KubeScheduler).BindingOrDie())
 	}
 
 	addClusterRoleBindingLabel(rolebindings)

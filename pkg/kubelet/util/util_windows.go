@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Microsoft/go-winio"
@@ -102,4 +103,25 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	} else {
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
+}
+
+// LocalEndpoint returns the full path to a windows named pipe
+func LocalEndpoint(path, file string) string {
+	u := url.URL{
+		Scheme: npipeProtocol,
+		Path:   path,
+	}
+	return u.String() + "//./pipe/" + file
+}
+
+var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
+
+// GetBootTime returns the time at which the machine was started, truncated to the nearest second
+func GetBootTime() (time.Time, error) {
+	currentTime := time.Now()
+	output, _, err := tickCount.Call()
+	if errno, ok := err.(syscall.Errno); !ok || errno != 0 {
+		return time.Time{}, err
+	}
+	return currentTime.Add(-time.Duration(output) * time.Millisecond).Truncate(time.Second), nil
 }

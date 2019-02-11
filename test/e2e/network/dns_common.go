@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -494,7 +494,7 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 // createTargetedProbeCommand returns a command line that performs a DNS lookup for a specific record type
 func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePrefix string) (string, string) {
 	fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, nameToResolve)
-	probeCmd := fmt.Sprintf("dig +short +tries=12 +norecurse %s %s > /results/%s", nameToResolve, lookup, fileName)
+	probeCmd := fmt.Sprintf("dig +short +tries=12 %s %s > /results/%s", nameToResolve, lookup, fileName)
 	return probeCmd, fileName
 }
 

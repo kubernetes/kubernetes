@@ -25,9 +25,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -178,6 +180,9 @@ const (
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 2 * time.Minute
 
+	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
+	DefaultControlPlaneTimeout = 4 * time.Minute
+
 	// MinimumAddressesInServiceSubnet defines minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
 	MinimumAddressesInServiceSubnet = 10
@@ -245,7 +250,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.2.24"
+	DefaultEtcdVersion = "3.3.10"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -260,6 +265,8 @@ const (
 	KubeScheduler = "kube-scheduler"
 	// KubeProxy defines variable used internally when referring to kube-proxy component
 	KubeProxy = "kube-proxy"
+	// HyperKube defines variable used internally when referring to the hyperkube image
+	HyperKube = "hyperkube"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"
@@ -276,10 +283,29 @@ const (
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 
-	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
-	CoreDNS = "coredns"
-	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
-	KubeDNS = "kube-dns"
+	// CoreDNSConfigMap specifies in what ConfigMap in the kube-system namespace the CoreDNS config should be stored
+	CoreDNSConfigMap = "coredns"
+
+	// CoreDNSDeploymentName specifies the name of the Deployment for CoreDNS add-on
+	CoreDNSDeploymentName = "coredns"
+
+	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
+	CoreDNSImageName = "coredns"
+
+	// KubeDNSConfigMap specifies in what ConfigMap in the kube-system namespace the kube-dns config should be stored
+	KubeDNSConfigMap = "kube-dns"
+
+	// KubeDNSDeploymentName specifies the name of the Deployment for kube-dns add-on
+	KubeDNSDeploymentName = "kube-dns"
+
+	// KubeDNSKubeDNSImageName specifies the name of the image for the kubedns container in the kube-dns add-on
+	KubeDNSKubeDNSImageName = "k8s-dns-kube-dns"
+
+	// KubeDNSSidecarImageName specifies the name of the image for the sidecar container in the kube-dns add-on
+	KubeDNSSidecarImageName = "k8s-dns-sidecar"
+
+	// KubeDNSDnsMasqNannyImageName specifies the name of the image for the dnsmasq container in the kube-dns add-on
+	KubeDNSDnsMasqNannyImageName = "k8s-dns-dnsmasq-nanny"
 
 	// CRICtlPackage defines the go package that installs crictl
 	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
@@ -306,7 +332,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.2.4"
+	CoreDNSVersion = "1.3.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -351,16 +377,21 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.11.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.12.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.12.0")
+
+	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.13.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
 		11: "3.2.18",
 		12: "3.2.24",
+		13: "3.2.24",
+		14: "3.3.10",
 	}
 )
 
@@ -379,7 +410,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, fmt.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -417,12 +448,12 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
-		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}
 	return tempDir, nil
 }
@@ -432,13 +463,13 @@ func CreateTimestampDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
 	timestampDir := path.Join(tempDir, timestampDirName)
 	if err := os.Mkdir(timestampDir, 0700); err != nil {
-		return "", fmt.Errorf("could not create timestamp directory: %v", err)
+		return "", errors.Wrap(err, "could not create timestamp directory")
 	}
 
 	return timestampDir, nil
@@ -449,13 +480,13 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	// Get the service subnet CIDR
 	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
+		return nil, errors.Wrapf(err, "couldn't parse service subnet CIDR %q", svcSubnet)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
+		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
 	}
 
 	return dnsIP, nil
@@ -467,12 +498,12 @@ func GetStaticPodAuditPolicyFile() string {
 }
 
 // GetDNSVersion is a handy function that returns the DNS version by DNS type
-func GetDNSVersion(dnsType string) string {
+func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
 	switch dnsType {
-	case CoreDNS:
-		return CoreDNSVersion
-	default:
+	case kubeadmapi.KubeDNS:
 		return KubeDNSVersion
+	default:
+		return CoreDNSVersion
 	}
 }
 

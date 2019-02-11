@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -173,11 +173,11 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 	}
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
-		glog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
+		klog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	glog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
+	klog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
@@ -225,7 +225,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)
-			glog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
+			klog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
 		}
 
 		// track the monitor
@@ -240,7 +240,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		}
 	}
 
-	glog.V(4).Infof("quota synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
+	klog.V(4).Infof("quota synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
 }
@@ -272,7 +272,7 @@ func (qm *QuotaMonitor) StartMonitors() {
 			started++
 		}
 	}
-	glog.V(4).Infof("QuotaMonitor started %d new monitors, %d currently running", started, len(monitors))
+	klog.V(4).Infof("QuotaMonitor started %d new monitors, %d currently running", started, len(monitors))
 }
 
 // IsSynced returns true if any monitors exist AND all those monitors'
@@ -298,8 +298,8 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
-	glog.Infof("QuotaMonitor running")
-	defer glog.Infof("QuotaMonitor stopping")
+	klog.Infof("QuotaMonitor running")
+	defer klog.Infof("QuotaMonitor stopping")
 
 	// Set up the stop channel.
 	qm.monitorLock.Lock()
@@ -323,7 +323,7 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
-	glog.Infof("QuotaMonitor stopped %d of %d monitors", stopped, len(monitors))
+	klog.Infof("QuotaMonitor stopped %d of %d monitors", stopped, len(monitors))
 }
 
 func (qm *QuotaMonitor) runProcessResourceChanges() {
@@ -349,7 +349,7 @@ func (qm *QuotaMonitor) processResourceChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	glog.V(4).Infof("QuotaMonitor process object: %s, namespace %s, name %s, uid %s, event type %v", event.gvr.String(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	klog.V(4).Infof("QuotaMonitor process object: %s, namespace %s, name %s, uid %s, event type %v", event.gvr.String(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	qm.replenishmentFunc(event.gvr.GroupResource(), accessor.GetNamespace())
 	return true
 }

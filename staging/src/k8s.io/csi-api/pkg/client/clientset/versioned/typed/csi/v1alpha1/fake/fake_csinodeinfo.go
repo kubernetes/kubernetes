@@ -94,6 +94,17 @@ func (c *FakeCSINodeInfos) Update(cSINodeInfo *v1alpha1.CSINodeInfo) (result *v1
 	return obj.(*v1alpha1.CSINodeInfo), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCSINodeInfos) UpdateStatus(cSINodeInfo *v1alpha1.CSINodeInfo) (*v1alpha1.CSINodeInfo, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(csinodeinfosResource, "status", cSINodeInfo), &v1alpha1.CSINodeInfo{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.CSINodeInfo), err
+}
+
 // Delete takes name of the cSINodeInfo and deletes it. Returns an error if one occurs.
 func (c *FakeCSINodeInfos) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.

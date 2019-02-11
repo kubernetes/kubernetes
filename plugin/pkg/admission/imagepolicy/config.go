@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -72,13 +72,13 @@ func normalizeWebhookConfig(config *imagePolicyWebhookConfig) (err error) {
 func normalizeConfigDuration(name string, scale, value, min, max, defaultValue time.Duration) (time.Duration, error) {
 	// disable with -1 sentinel
 	if value == disableTTL {
-		glog.V(2).Infof("image policy webhook %s disabled", name)
+		klog.V(2).Infof("image policy webhook %s disabled", name)
 		return time.Duration(0), nil
 	}
 
 	// use default with 0 sentinel
 	if value == useDefault {
-		glog.V(2).Infof("image policy webhook %s using default value", name)
+		klog.V(2).Infof("image policy webhook %s using default value", name)
 		return defaultValue, nil
 	}
 

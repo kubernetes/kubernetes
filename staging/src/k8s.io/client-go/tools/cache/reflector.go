@@ -31,7 +31,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/glog"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +40,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog"
+	"k8s.io/utils/trace"
 )
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -128,7 +129,7 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // Run starts a watch and handles watch events. Will restart the watch if it is closed.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	glog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedType, r.resyncPeriod, r.name)
 	wait.Until(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			utilruntime.HandleError(err)
@@ -166,7 +167,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
-	glog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
+	klog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 
 	// Explicitly set "0" as resource version - it's fine for the List()
@@ -175,25 +176,57 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	options := metav1.ListOptions{ResourceVersion: "0"}
 	r.metrics.numberOfLists.Inc()
 	start := r.clock.Now()
-	list, err := r.listerWatcher.List(options)
-	if err != nil {
-		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
+
+	if err := func() error {
+		initTrace := trace.New("Reflector " + r.name + " ListAndWatch")
+		defer initTrace.LogIfLong(10 * time.Second)
+		var list runtime.Object
+		var err error
+		listCh := make(chan struct{}, 1)
+		panicCh := make(chan interface{}, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panicCh <- r
+				}
+			}()
+			list, err = r.listerWatcher.List(options)
+			close(listCh)
+		}()
+		select {
+		case <-stopCh:
+			return nil
+		case r := <-panicCh:
+			panic(r)
+		case <-listCh:
+		}
+		if err != nil {
+			return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
+		}
+		initTrace.Step("Objects listed")
+		r.metrics.listDuration.Observe(time.Since(start).Seconds())
+		listMetaInterface, err := meta.ListAccessor(list)
+		if err != nil {
+			return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
+		}
+		resourceVersion = listMetaInterface.GetResourceVersion()
+		initTrace.Step("Resource version extracted")
+		items, err := meta.ExtractList(list)
+		if err != nil {
+			return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
+		}
+		initTrace.Step("Objects extracted")
+		r.metrics.numberOfItemsInList.Observe(float64(len(items)))
+		if err := r.syncWith(items, resourceVersion); err != nil {
+			return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
+		}
+		initTrace.Step("SyncWith done")
+		r.setLastSyncResourceVersion(resourceVersion)
+		initTrace.Step("Resource version updated")
+		return nil
+	}(); err != nil {
+		return err
 	}
-	r.metrics.listDuration.Observe(time.Since(start).Seconds())
-	listMetaInterface, err := meta.ListAccessor(list)
-	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
-	}
-	resourceVersion = listMetaInterface.GetResourceVersion()
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
-	}
-	r.metrics.numberOfItemsInList.Observe(float64(len(items)))
-	if err := r.syncWith(items, resourceVersion); err != nil {
-		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
-	}
-	r.setLastSyncResourceVersion(resourceVersion)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
@@ -212,7 +245,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				return
 			}
 			if r.ShouldResync == nil || r.ShouldResync() {
-				glog.V(4).Infof("%s: forcing resync", r.name)
+				klog.V(4).Infof("%s: forcing resync", r.name)
 				if err := r.store.Resync(); err != nil {
 					resyncerrc <- err
 					return
@@ -246,7 +279,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			case io.EOF:
 				// watch closed normally
 			case io.ErrUnexpectedEOF:
-				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
+				klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
 			}
@@ -267,7 +300,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
-				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
+				klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
 			return nil
 		}
@@ -354,7 +387,7 @@ loop:
 		r.metrics.numberOfShortWatches.Inc()
 		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
 	}
-	glog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.expectedType, eventCount)
+	klog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.expectedType, eventCount)
 	return nil
 }
 

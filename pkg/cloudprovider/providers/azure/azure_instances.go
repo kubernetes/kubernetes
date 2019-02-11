@@ -23,10 +23,9 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	cloudprovider "k8s.io/cloud-provider"
-
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
 const (
@@ -43,14 +42,14 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 		return nil, err
 	}
 	if unmanaged {
-		glog.V(4).Infof("NodeAddresses: omitting unmanaged node %q", name)
+		klog.V(4).Infof("NodeAddresses: omitting unmanaged node %q", name)
 		return nil, nil
 	}
 
 	addressGetter := func(nodeName types.NodeName) ([]v1.NodeAddress, error) {
-		ip, publicIP, err := az.GetIPForMachineWithRetry(nodeName)
+		ip, publicIP, err := az.getIPForMachine(nodeName)
 		if err != nil {
-			glog.V(2).Infof("NodeAddresses(%s) abort backoff: %v", nodeName, err)
+			klog.V(2).Infof("NodeAddresses(%s) abort backoff: %v", nodeName, err)
 			return nil, err
 		}
 
@@ -96,7 +95,8 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 		addresses := []v1.NodeAddress{
 			{Type: v1.NodeHostName, Address: string(name)},
 		}
-		for _, address := range ipAddress.IPV4.IPAddress {
+		if len(ipAddress.IPV4.IPAddress) > 0 && len(ipAddress.IPV4.IPAddress[0].PrivateIP) > 0 {
+			address := ipAddress.IPV4.IPAddress[0]
 			addresses = append(addresses, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,
 				Address: address.PrivateIP,
@@ -108,7 +108,8 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 				})
 			}
 		}
-		for _, address := range ipAddress.IPV6.IPAddress {
+		if len(ipAddress.IPV6.IPAddress) > 0 && len(ipAddress.IPV6.IPAddress[0].PrivateIP) > 0 {
+			address := ipAddress.IPV6.IPAddress[0]
 			addresses = append(addresses, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,
 				Address: address.PrivateIP,
@@ -120,6 +121,13 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 				})
 			}
 		}
+
+		if len(addresses) == 1 {
+			// No IP addresses is got from instance metadata service, clean up cache and report errors.
+			az.metadata.imsCache.Delete(metadataCacheKey)
+			return nil, fmt.Errorf("get empty IP addresses from instance metadata service")
+		}
+
 		return addresses, nil
 	}
 
@@ -132,7 +140,7 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
-		glog.V(4).Infof("NodeAddressesByProviderID: omitting unmanaged node %q", providerID)
+		klog.V(4).Infof("NodeAddressesByProviderID: omitting unmanaged node %q", providerID)
 		return nil, nil
 	}
 
@@ -149,12 +157,15 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	// Returns true for unmanaged nodes because azure cloud provider always assumes them exists.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
-		glog.V(4).Infof("InstanceExistsByProviderID: assuming unmanaged node %q exists", providerID)
+		klog.V(4).Infof("InstanceExistsByProviderID: assuming unmanaged node %q exists", providerID)
 		return true, nil
 	}
 
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -180,7 +191,7 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	if err != nil {
 		return false, err
 	}
-	glog.V(5).Infof("InstanceShutdownByProviderID gets power status %q for node %q", powerStatus, nodeName)
+	klog.V(5).Infof("InstanceShutdownByProviderID gets power status %q for node %q", powerStatus, nodeName)
 
 	return strings.ToLower(powerStatus) == vmPowerStateStopped || strings.ToLower(powerStatus) == vmPowerStateDeallocated, nil
 }
@@ -210,7 +221,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 	}
 	if unmanaged {
 		// InstanceID is same with nodeName for unmanaged nodes.
-		glog.V(4).Infof("InstanceID: getting ID %q for unmanaged node %q", name, name)
+		klog.V(4).Infof("InstanceID: getting ID %q for unmanaged node %q", name, name)
 		return nodeName, nil
 	}
 
@@ -264,7 +275,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
-		glog.V(4).Infof("InstanceTypeByProviderID: omitting unmanaged node %q", providerID)
+		klog.V(4).Infof("InstanceTypeByProviderID: omitting unmanaged node %q", providerID)
 		return "", nil
 	}
 
@@ -287,7 +298,7 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 		return "", err
 	}
 	if unmanaged {
-		glog.V(4).Infof("InstanceType: omitting unmanaged node %q", name)
+		klog.V(4).Infof("InstanceType: omitting unmanaged node %q", name)
 		return "", nil
 	}
 

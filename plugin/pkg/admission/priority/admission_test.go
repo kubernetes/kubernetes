@@ -17,16 +17,16 @@ limitations under the License.
 package priority
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -138,7 +138,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
+		klog.V(4).Infof("starting test %q", test.name)
 
 		ctrl := newPlugin()
 		// Add existing priority classes.
@@ -159,7 +159,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			test.userInfo,
 		)
 		err := ctrl.Validate(attrs)
-		glog.Infof("Got %v", err)
+		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 		}
@@ -239,7 +239,7 @@ func TestDefaultPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
+		klog.V(4).Infof("starting test %q", test.name)
 		ctrl := newPlugin()
 		if err := addPriorityClasses(ctrl, test.classesBefore); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
@@ -468,9 +468,9 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Enable ExperimentalCriticalPodAnnotation feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExperimentalCriticalPodAnnotation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
@@ -582,7 +582,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
+		klog.V(4).Infof("starting test %q", test.name)
 
 		ctrl := newPlugin()
 		// Add existing priority classes.
@@ -604,7 +604,7 @@ func TestPodAdmission(t *testing.T) {
 			nil,
 		)
 		err := ctrl.Admit(attrs)
-		glog.Infof("Got %v", err)
+		klog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)

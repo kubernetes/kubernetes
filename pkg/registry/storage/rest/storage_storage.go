@@ -54,8 +54,8 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// volumeattachments
-	volumeAttachmentStorage := volumeattachmentstore.NewREST(restOptionsGetter)
-	storage["volumeattachments"] = volumeAttachmentStorage
+	volumeAttachmentStorage := volumeattachmentstore.NewStorage(restOptionsGetter)
+	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
 	return storage
 }
@@ -67,17 +67,24 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	storage["storageclasses"] = storageClassStorage
 
 	// volumeattachments
-	volumeAttachmentStorage := volumeattachmentstore.NewREST(restOptionsGetter)
-	storage["volumeattachments"] = volumeAttachmentStorage
+	volumeAttachmentStorage := volumeattachmentstore.NewStorage(restOptionsGetter)
+	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
 	return storage
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
-	// storageclasses
 	storageClassStorage := storageclassstore.NewREST(restOptionsGetter)
-	storage["storageclasses"] = storageClassStorage
+	volumeAttachmentStorage := volumeattachmentstore.NewStorage(restOptionsGetter)
+
+	storage := map[string]rest.Storage{
+		// storageclasses
+		"storageclasses": storageClassStorage,
+
+		// volumeattachments
+		"volumeattachments":        volumeAttachmentStorage.VolumeAttachment,
+		"volumeattachments/status": volumeAttachmentStorage.Status,
+	}
 
 	return storage
 }

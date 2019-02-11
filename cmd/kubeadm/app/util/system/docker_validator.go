@@ -38,7 +38,7 @@ func (d *DockerValidator) Name() string {
 
 const (
 	dockerConfigPrefix           = "DOCKER_"
-	latestValidatedDockerVersion = "18.06"
+	latestValidatedDockerVersion = "18.09"
 )
 
 // TODO(random-liu): Add more validating items.
@@ -73,7 +73,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 	if !matched {
 		// If it's of the new Docker version scheme but didn't match above, it
 		// must be a newer version than the most recently validated one.
-		ver := `\d{2}\.\d+\.\d+-[a-z]{2}`
+		ver := `\d{2}\.\d+\.\d+(?:-[a-z]{2})?`
 		r := regexp.MustCompile(ver)
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)

@@ -22,9 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -134,29 +135,29 @@ func TestRepairWithExisting(t *testing.T) {
 	}
 
 	fakeClient := fake.NewSimpleClientset(
-		&api.Service{
+		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
+			Spec:       corev1.ServiceSpec{ClusterIP: "192.168.1.1"},
 		},
-		&api.Service{
+		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.100"},
+			Spec:       corev1.ServiceSpec{ClusterIP: "192.168.1.100"},
 		},
-		&api.Service{ // outside CIDR, will be dropped
+		&corev1.Service{ // outside CIDR, will be dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.0.1"},
+			Spec:       corev1.ServiceSpec{ClusterIP: "192.168.0.1"},
 		},
-		&api.Service{ // empty, ignored
+		&corev1.Service{ // empty, ignored
 			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
-			Spec:       api.ServiceSpec{ClusterIP: ""},
+			Spec:       corev1.ServiceSpec{ClusterIP: ""},
 		},
-		&api.Service{ // duplicate, dropped
+		&corev1.Service{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
+			Spec:       corev1.ServiceSpec{ClusterIP: "192.168.1.1"},
 		},
-		&api.Service{ // headless
+		&corev1.Service{ // headless
 			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
-			Spec:       api.ServiceSpec{ClusterIP: "None"},
+			Spec:       corev1.ServiceSpec{ClusterIP: "None"},
 		},
 	)
 

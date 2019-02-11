@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
@@ -133,7 +133,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	glog.V(1).Infof("Registering containerd factory")
+	klog.V(1).Infof("Registering containerd factory")
 	f := &containerdFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,

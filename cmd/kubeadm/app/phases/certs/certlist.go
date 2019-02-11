@@ -69,10 +69,11 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 		caCert,
 		cert,
 		key,
+		cfg,
 	)
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to write certificate %q", k.Name)
+		return errors.Wrapf(err, "failed to write or validate certificate %q", k.Name)
 	}
 
 	return nil
@@ -236,7 +237,7 @@ var (
 	// KubeadmCertRootCA is the definition of the Kubernetes Root CA for the API Server and kubelet.
 	KubeadmCertRootCA = KubeadmCert{
 		Name:     "ca",
-		LongName: "self-signed Kubernetes CA to provision identities for other Kubernets components",
+		LongName: "self-signed Kubernetes CA to provision identities for other Kubernetes components",
 		BaseName: kubeadmconstants.CACertAndKeyBaseName,
 		config: certutil.Config{
 			CommonName: "kubernetes",

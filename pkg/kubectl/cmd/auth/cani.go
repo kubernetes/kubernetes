@@ -80,6 +80,7 @@ var (
 		kubectl auth can-i get /logs/`)
 )
 
+// NewCmdCanI returns an initialized Command for 'auth can-i' sub command
 func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
@@ -106,12 +107,13 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, check the specified action in all namespaces.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
 	cmd.Flags().StringVar(&o.Subresource, "subresource", o.Subresource, "SubResource such as pod/log or deployment/scale")
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	if o.Quiet {
 		o.Out = ioutil.Discard
@@ -155,6 +157,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	return nil
 }
 
+// Validate makes sure provided values for CanIOptions are valid
 func (o *CanIOptions) Validate() error {
 	if o.NonResourceURL != "" {
 		if o.Subresource != "" {
@@ -167,6 +170,7 @@ func (o *CanIOptions) Validate() error {
 	return nil
 }
 
+// RunAccessCheck checks if user has access to a certain resource or non resource URL
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	var sar *authorizationv1.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {

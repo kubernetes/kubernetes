@@ -59,8 +59,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -78,7 +78,6 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/configuration:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:all-srcs",

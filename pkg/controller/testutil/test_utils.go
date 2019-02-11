@@ -46,7 +46,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -299,12 +299,12 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 
 	originalObjJS, err := json.Marshal(nodeCopy)
 	if err != nil {
-		glog.Errorf("Failed to marshal %v", nodeCopy)
+		klog.Errorf("Failed to marshal %v", nodeCopy)
 		return nil, nil
 	}
 	var originalNode v1.Node
 	if err = json.Unmarshal(originalObjJS, &originalNode); err != nil {
-		glog.Errorf("Failed to unmarshal original object: %v", err)
+		klog.Errorf("Failed to unmarshal original object: %v", err)
 		return nil, nil
 	}
 
@@ -313,31 +313,31 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(data)
 		if err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.MergePatchType:
 		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.StrategicMergePatchType:
 		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	default:
-		glog.Errorf("unknown Content-Type header for patch: %v", pt)
+		klog.Errorf("unknown Content-Type header for patch: %v", pt)
 		return nil, nil
 	}
 
 	var updatedNode v1.Node
 	if err = json.Unmarshal(patchedObjJS, &updatedNode); err != nil {
-		glog.Errorf("Failed to unmarshal patched object: %v", err)
+		klog.Errorf("Failed to unmarshal patched object: %v", err)
 		return nil, nil
 	}
 
@@ -382,7 +382,7 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	defer f.Unlock()
 	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
 	if err != nil {
-		glog.Errorf("Encountered error while getting reference: %v", err)
+		klog.Errorf("Encountered error while getting reference: %v", err)
 		return
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)

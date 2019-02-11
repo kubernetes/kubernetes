@@ -143,7 +143,7 @@ type Subpath struct {
 
 // Exec executes command where mount utilities are. This can be either the host,
 // container where kubelet runs or even a remote pod with mount utilities.
-// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// Usual k8s.io/utils/exec interface is not used because kubelet.RunInContainer does
 // not provide stdin/stdout/stderr streams.
 type Exec interface {
 	// Run executes a command and returns its stdout + stderr combined in one
@@ -245,12 +245,9 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-// IsNotMountPoint determines if a directory is a mountpoint.
-// It should return ErrNotExist when the directory does not exist.
-// This method uses the List() of all mountpoints
-// It is more extensive than IsLikelyNotMountPoint
-// and it detects bind mounts in linux
-func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+// isNotMountPoint implements Mounter.IsNotMountPoint and is shared by mounter
+// implementations.
+func isNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)

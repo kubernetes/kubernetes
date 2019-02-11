@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 )
 
 // PreconditionFunc returns true if the condition has been reached, false if it has not been reached yet,
@@ -108,7 +108,10 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 // The most frequent usage would be a command that needs to watch the "state of the world" and should't fail, like:
 // waiting for object reaching a state, "small" controllers, ...
 func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition PreconditionFunc, conditions ...ConditionFunc) (*watch.Event, error) {
-	indexer, informer, watcher := NewIndexerInformerWatcher(lw, objType)
+	indexer, informer, watcher, done := NewIndexerInformerWatcher(lw, objType)
+	// We need to wait for the internal informers to fully stop so it's easier to reason about
+	// and it works with non-thread safe clients.
+	defer func() { <-done }()
 	// Proxy watcher can be stopped multiple times so it's fine to use defer here to cover alternative branches and
 	// let UntilWithoutRetry to stop it
 	defer watcher.Stop()
@@ -135,7 +138,7 @@ func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.
 func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout < 0 {
 		// This should be handled in validation
-		glog.Errorf("Timeout for context shall not be negative!")
+		klog.Errorf("Timeout for context shall not be negative!")
 		timeout = 0
 	}
 

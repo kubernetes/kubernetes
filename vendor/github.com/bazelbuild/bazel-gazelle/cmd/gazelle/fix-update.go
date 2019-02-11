@@ -16,6 +16,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -38,11 +39,16 @@ import (
 // update commands. This includes everything in config.Config, but it also
 // includes some additional fields that aren't relevant to other packages.
 type updateConfig struct {
-	emit  emitFunc
-	repos []repos.Repo
+	dirs        []string
+	emit        emitFunc
+	repos       []repos.Repo
+	useIndex    bool
+	walkMode    walk.Mode
+	patchPath   string
+	patchBuffer bytes.Buffer
 }
 
-type emitFunc func(path string, data []byte) error
+type emitFunc func(c *config.Config, f *rule.File) error
 
 var modeFromName = map[string]emitFunc{
 	"print": printFile,
@@ -57,7 +63,8 @@ func getUpdateConfig(c *config.Config) *updateConfig {
 }
 
 type updateConfigurer struct {
-	mode string
+	mode      string
+	recursive bool
 }
 
 func (ucr *updateConfigurer) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
@@ -67,33 +74,49 @@ func (ucr *updateConfigurer) RegisterFlags(fs *flag.FlagSet, cmd string, c *conf
 	c.ShouldFix = cmd == "fix"
 
 	fs.StringVar(&ucr.mode, "mode", "fix", "print: prints all of the updated BUILD files\n\tfix: rewrites all of the BUILD files in place\n\tdiff: computes the rewrite but then just does a diff")
+	fs.BoolVar(&uc.useIndex, "index", true, "when true, gazelle will build an index of libraries in the workspace for dependency resolution")
+	fs.BoolVar(&ucr.recursive, "r", true, "when true, gazelle will update subdirectories recursively")
+	fs.StringVar(&uc.patchPath, "patch", "", "when set with -mode=diff, gazelle will write to a file instead of stdout")
 }
 
 func (ucr *updateConfigurer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 	uc := getUpdateConfig(c)
+
 	var ok bool
 	uc.emit, ok = modeFromName[ucr.mode]
 	if !ok {
 		return fmt.Errorf("unrecognized emit mode: %q", ucr.mode)
 	}
-
-	c.Dirs = fs.Args()
-	if len(c.Dirs) == 0 {
-		c.Dirs = []string{"."}
+	if uc.patchPath != "" && ucr.mode != "diff" {
+		return fmt.Errorf("-patch set but -mode is %s, not diff", ucr.mode)
 	}
-	for i := range c.Dirs {
-		dir, err := filepath.Abs(c.Dirs[i])
+
+	dirs := fs.Args()
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
+	uc.dirs = make([]string, len(dirs))
+	for i := range dirs {
+		dir, err := filepath.Abs(dirs[i])
 		if err != nil {
-			return fmt.Errorf("%s: failed to find absolute path: %v", c.Dirs[i], err)
+			return fmt.Errorf("%s: failed to find absolute path: %v", dirs[i], err)
 		}
 		dir, err = filepath.EvalSymlinks(dir)
 		if err != nil {
-			return fmt.Errorf("%s: failed to resolve symlinks: %v", c.Dirs[i], err)
+			return fmt.Errorf("%s: failed to resolve symlinks: %v", dirs[i], err)
 		}
 		if !isDescendingDir(dir, c.RepoRoot) {
 			return fmt.Errorf("dir %q is not a subdirectory of repo root %q", dir, c.RepoRoot)
 		}
-		c.Dirs[i] = dir
+		uc.dirs[i] = dir
+	}
+
+	if ucr.recursive {
+		uc.walkMode = walk.VisitAllUpdateSubdirsMode
+	} else if uc.useIndex {
+		uc.walkMode = walk.VisitAllUpdateDirsMode
+	} else {
+		uc.walkMode = walk.UpdateDirsMode
 	}
 
 	return nil
@@ -134,8 +157,12 @@ var genericLoads = []rule.LoadInfo{
 }
 
 func runFixUpdate(cmd command, args []string) error {
-	cexts := make([]config.Configurer, 0, len(languages)+2)
-	cexts = append(cexts, &config.CommonConfigurer{}, &updateConfigurer{})
+	cexts := make([]config.Configurer, 0, len(languages)+3)
+	cexts = append(cexts,
+		&config.CommonConfigurer{},
+		&updateConfigurer{},
+		&walk.Configurer{},
+		&resolve.Configurer{})
 	kindToResolver := make(map[string]resolve.Resolver)
 	kinds := make(map[string]rule.KindInfo)
 	loads := genericLoads
@@ -163,11 +190,12 @@ func runFixUpdate(cmd command, args []string) error {
 
 	// Visit all directories in the repository.
 	var visits []visitRecord
-	walk.Walk(c, cexts, func(dir, rel string, c *config.Config, update bool, f *rule.File, subdirs, regularFiles, genFiles []string) {
+	uc := getUpdateConfig(c)
+	walk.Walk(c, cexts, uc.dirs, uc.walkMode, func(dir, rel string, c *config.Config, update bool, f *rule.File, subdirs, regularFiles, genFiles []string) {
 		// If this file is ignored or if Gazelle was not asked to update this
 		// directory, just index the build file and move on.
 		if !update {
-			if f != nil {
+			if uc.useIndex && f != nil {
 				for _, r := range f.Rules {
 					ruleIndex.AddRule(c, r, f)
 				}
@@ -215,8 +243,6 @@ func runFixUpdate(cmd command, args []string) error {
 		}
 	})
 
-	uc := getUpdateConfig(c)
-
 	// Finish building the index for dependency resolution.
 	ruleIndex.Finish()
 
@@ -233,12 +259,16 @@ func runFixUpdate(cmd command, args []string) error {
 	// Emit merged files.
 	for _, v := range visits {
 		merger.FixLoads(v.file, loads)
-		content := v.file.Format()
-		outputPath := findOutputPath(c, v.file)
-		if err := uc.emit(outputPath, content); err != nil {
+		if err := uc.emit(c, v.file); err != nil {
 			log.Print(err)
 		}
 	}
+	if uc.patchPath != "" {
+		if err := ioutil.WriteFile(uc.patchPath, uc.patchBuffer.Bytes(), 0666); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -338,7 +368,7 @@ func fixWorkspace(c *config.Config, workspace *rule.File, loads []rule.LoadInfo)
 		return nil
 	}
 	shouldFix := false
-	for _, d := range c.Dirs {
+	for _, d := range uc.dirs {
 		if d == c.RepoRoot {
 			shouldFix = true
 		}
@@ -352,7 +382,7 @@ func fixWorkspace(c *config.Config, workspace *rule.File, loads []rule.LoadInfo)
 	if err := merger.CheckGazelleLoaded(workspace); err != nil {
 		return err
 	}
-	return uc.emit(workspace.Path, workspace.Format())
+	return uc.emit(c, workspace)
 }
 
 func findWorkspaceName(f *rule.File) string {

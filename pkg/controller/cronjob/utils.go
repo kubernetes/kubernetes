@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/robfig/cron"
+	"k8s.io/klog"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -64,7 +64,7 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 	}
 
 	if controllerRef.Kind != "CronJob" {
-		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
+		klog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
 		return types.UID(""), false
 	}
 
@@ -78,7 +78,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
-			glog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
+			klog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
 			continue
 		}
 		jobsBySj[parentUID] = append(jobsBySj[parentUID], job)

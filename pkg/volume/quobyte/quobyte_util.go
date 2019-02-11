@@ -25,8 +25,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/golang/glog"
 	quobyteapi "github.com/quobyte/api"
+	"k8s.io/klog"
 )
 
 type quobyteVolumeManager struct {
@@ -63,7 +63,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		}
 	}
 
-	glog.V(4).Infof("Created Quobyte volume %s", provisioner.volume)
+	klog.V(4).Infof("Created Quobyte volume %s", provisioner.volume)
 	return &v1.QuobyteVolumeSource{
 		Registry: provisioner.registry,
 		Volume:   provisioner.volume,
@@ -96,7 +96,7 @@ func (mounter *quobyteMounter) pluginDirIsMounted(pluginDir string) (bool, error
 		}
 
 		if mountPoint.Path == pluginDir {
-			glog.V(4).Infof("quobyte: found mountpoint %s in /proc/mounts", mountPoint.Path)
+			klog.V(4).Infof("quobyte: found mountpoint %s in /proc/mounts", mountPoint.Path)
 			return true, nil
 		}
 	}

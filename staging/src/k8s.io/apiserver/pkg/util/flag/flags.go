@@ -20,8 +20,8 @@ import (
 	goflag "flag"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 // WordSepNormalizeFunc changes all flags that contain "_" separators
@@ -36,7 +36,7 @@ func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
 		nname := strings.Replace(name, "_", "-", -1)
-		glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", name, nname)
+		klog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", name, nname)
 
 		return pflag.NormalizedName(nname)
 	}
@@ -49,6 +49,6 @@ func InitFlags() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
-		glog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+		klog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
 }

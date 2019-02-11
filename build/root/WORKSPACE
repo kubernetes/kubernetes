@@ -1,11 +1,11 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//build:workspace_mirror.bzl", "mirror")
-load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "7519e9e1c716ae3c05bd2d984a42c3b02e690c5df728dc0a84b23f90c355c5a1",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.15.4/rules_go-0.15.4.tar.gz"),
+    sha256 = "ade51a315fa17347e5c31201fdc55aa5ffb913377aa315dceb56ee9725e620ee",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.6/rules_go-0.16.6.tar.gz"),
 )
 
 http_archive(
@@ -22,12 +22,12 @@ http_archive(
     urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"),
 )
 
-ETCD_VERSION = "3.2.24"
+ETCD_VERSION = "3.3.10"
 
 http_archive(
     name = "com_coreos_etcd",
     build_file = "@//third_party:etcd.BUILD",
-    sha256 = "947849dbcfa13927c81236fb76a7c01d587bbab42ab1e807184cd91b026ebed7",
+    sha256 = "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = mirror("https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)),
 )
@@ -41,7 +41,7 @@ http_archive(
 
 load("@bazel_skylib//:lib.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.16.0")
+versions.check(minimum_bazel_version = "0.17.2")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_repositories")
@@ -49,7 +49,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_reposit
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.11.1",
+    go_version = "1.11.5",
 )
 
 docker_repositories()
@@ -58,7 +58,7 @@ http_file(
     name = "kubernetes_cni",
     downloaded_file_path = "kubernetes_cni.tgz",
     sha256 = "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
-    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz"),
+    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v%s.tgz" % CNI_VERSION),
 )
 
 http_file(
@@ -70,26 +70,26 @@ http_file(
 
 docker_pull(
     name = "debian-base-amd64",
-    digest = "sha256:86176bc8ccdc4d8ea7fbf6ba4b57fcefc2cb61ff7413114630940474ff9bf751",
+    digest = "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
     registry = "k8s.gcr.io",
     repository = "debian-base-amd64",
-    tag = "0.4.0",  # ignored, but kept here for documentation
+    tag = "0.4.1",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:d4ff8136b9037694a3165a7fff6a91e7fc828741b8ea1eda226d4d9ea5d23abb",
+    digest = "sha256:9c41b4c326304b94eb96fdd2e181aa6e9995cc4642fcdfb570cedd73a419ba39",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
-    tag = "v11.0",  # ignored, but kept here for documentation
+    tag = "v11.0.1",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
-    digest = "sha256:4a77bc882f7d629c088a11ff144a2e86660268fddf63b61f52b6a93d16ab83f0",
+    digest = "sha256:5d4ea2fb5fbe9a9a9da74f67cf2faefc881968bc39f2ac5d62d9167e575812a1",
     registry = "k8s.gcr.io",
     repository = "debian-hyperkube-base-amd64",
-    tag = "0.12.0",  # ignored, but kept here for documentation
+    tag = "0.12.1",  # ignored, but kept here for documentation
 )
 
 docker_pull(

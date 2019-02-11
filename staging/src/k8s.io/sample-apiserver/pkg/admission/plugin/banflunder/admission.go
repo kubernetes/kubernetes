@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
-	listers "k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
+	listers "k8s.io/sample-apiserver/pkg/client/listers/wardle/v1alpha1"
 )
 
 // Register registers a plugin
@@ -85,11 +85,11 @@ func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 // SetInternalWardleInformerFactory gets Lister from SharedInformerFactory.
 // The lister knows how to lists Fischers.
 func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
-	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
-	d.SetReadyFunc(f.Wardle().InternalVersion().Fischers().Informer().HasSynced)
+	d.lister = f.Wardle().V1alpha1().Fischers().Lister()
+	d.SetReadyFunc(f.Wardle().V1alpha1().Fischers().Informer().HasSynced)
 }
 
-// ValidaValidateInitializationte checks whether the plugin was correctly initialized.
+// ValidateInitialization checks whether the plugin was correctly initialized.
 func (d *DisallowFlunder) ValidateInitialization() error {
 	if d.lister == nil {
 		return fmt.Errorf("missing fischer lister")

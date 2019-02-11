@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -39,9 +39,25 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
+	utiltrace "k8s.io/utils/trace"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	initCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_init_events_total",
+			Help: "Counter of init events processed in watchcache broken by resource type",
+		},
+		[]string{"resource"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(initCounter)
+}
 
 // Config contains the configuration for a given Cache.
 type Config struct {
@@ -62,8 +78,8 @@ type Config struct {
 	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
-	// GetAttrsFunc is used to get object labels, fields, and the uninitialized bool
-	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error)
+	// GetAttrsFunc is used to get object labels, fields
+	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, err error)
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -122,7 +138,7 @@ func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool
 
 func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
-		glog.Warningf("Terminating all watchers from cacher %v", objectType)
+		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
 	i.allWatchers.terminateAll()
 	for index, watchers := range i.valueWatchers {
@@ -131,7 +147,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -186,6 +202,9 @@ type Cacher struct {
 	stopped  bool
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
+
+	// Used to avoid unnecessary allocations in underlying watchers.
+	timer *time.Timer
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -227,6 +246,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
 		stopCh: stopCh,
+		timer:  time.NewTimer(time.Duration(0)),
 	}
 	watchCache.SetOnEvent(cacher.processEvent)
 	go cacher.dispatchEvents()
@@ -242,6 +262,14 @@ func NewCacherFromConfig(config Config) *Cacher {
 			}, time.Second, stopCh,
 		)
 	}()
+
+	// Ensure that timer is stopped.
+	if !cacher.timer.Stop() {
+		// Consume triggered (but not yet received) timer event
+		// so that future reuse does not get a spurious timeout.
+		<-cacher.timer.C
+	}
+
 	return cacher
 }
 
@@ -269,7 +297,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
 	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
-		glog.Errorf("unexpected ListAndWatch error: %v", err)
+		klog.Errorf("unexpected ListAndWatch error: %v", err)
 	}
 }
 
@@ -333,6 +361,13 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		// TODO: We should tune this value and ideally make it dependent on the
 		// number of objects of a given type and/or their churn.
 		chanSize = 1000
+	}
+
+	// With some events already sent, update resourceVersion so that
+	// events that were buffered and not yet processed won't be delivered
+	// to this watcher second time causing going back in time.
+	if len(initEvents) > 0 {
+		watchRV = initEvents[len(initEvents)-1].ResourceVersion
 	}
 
 	c.Lock()
@@ -404,10 +439,15 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 // GetToList implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
+	hasContinuation := pagingEnabled && len(pred.Continue) > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	if resourceVersion == "" || hasContinuation || hasLimit {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation or limit is
+		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
+		// Limits are only sent to storage when resourceVersion is non-zero
+		// since the watch cache isn't able to perform continuations, and
+		// limits are ignored when resource version is zero
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
@@ -453,7 +493,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
+		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -527,7 +567,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
+		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -547,7 +587,7 @@ func (c *Cacher) GuaranteedUpdate(
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
-		glog.Errorf("GetByKey returned error: %v", err)
+		klog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
 		currObj := elem.(*storeElement).Object.DeepCopyObject()
 		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
@@ -590,7 +630,7 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 func (c *Cacher) processEvent(event *watchCacheEvent) {
 	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
 		// Monitor if this gets backed up, and how much.
-		glog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
+		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
 	c.incoming <- *event
 }
@@ -616,13 +656,13 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	defer c.Unlock()
 	// Iterate over "allWatchers" no matter what the trigger function is.
 	for _, watcher := range c.watchers.allWatchers {
-		watcher.add(event, c.dispatchTimeoutBudget)
+		watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 	}
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
 			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
-				watcher.add(event, c.dispatchTimeoutBudget)
+				watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 			}
 		}
 	} else {
@@ -635,7 +675,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// Iterate over watchers interested in exact values for all values.
 		for _, watchers := range c.watchers.valueWatchers {
 			for _, watcher := range watchers {
-				watcher.add(event, c.dispatchTimeoutBudget)
+				watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 			}
 		}
 	}
@@ -679,7 +719,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 			// false is currently passed only if we are forcing watcher to close due
 			// to its unresponsiveness and blocking other watchers.
 			// TODO: Get this information in cleaner way.
-			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
+			klog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
@@ -688,11 +728,11 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 }
 
 func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesObjectAttributes(label, field, uninitialized)
+		return p.MatchesObjectAttributes(label, field)
 	}
 	return filterFunc
 }
@@ -821,9 +861,7 @@ func (c *cacheWatcher) stop() {
 	}
 }
 
-var timerPool sync.Pool
-
-func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
+func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer, budget *timeBudget) {
 	// Try to send the event immediately, without blocking.
 	select {
 	case c.input <- event:
@@ -837,23 +875,16 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 	startTime := time.Now()
 	timeout := budget.takeAvailable()
 
-	t, ok := timerPool.Get().(*time.Timer)
-	if ok {
-		t.Reset(timeout)
-	} else {
-		t = time.NewTimer(timeout)
-	}
-	defer timerPool.Put(t)
+	timer.Reset(timeout)
 
 	select {
 	case c.input <- event:
-		stopped := t.Stop()
-		if !stopped {
+		if !timer.Stop() {
 			// Consume triggered (but not yet received) timer event
 			// so that future reuse does not get a spurious timeout.
-			<-t.C
+			<-timer.C
 		}
-	case <-t.C:
+	case <-timer.C:
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
@@ -866,10 +897,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.ObjUninitialized)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObjUninitialized)
+		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
@@ -936,13 +967,17 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}
+	if len(initEvents) > 0 {
+		objType := reflect.TypeOf(initEvents[0].Object).String()
+		initCounter.WithLabelValues(objType).Add(float64(len(initEvents)))
+	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		objType := "<null>"
 		if len(initEvents) > 0 {
 			objType = reflect.TypeOf(initEvents[0].Object).String()
 		}
-		glog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
+		klog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
 	}
 
 	defer close(c.result)

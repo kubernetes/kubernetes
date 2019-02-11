@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - dineshgovindasamy
 - madhanrm
@@ -6,3 +8,5 @@ reviewers:
 - dineshgovindasamy
 - madhanrm
 - feiskyer
+labels:
+- sig/network

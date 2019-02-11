@@ -17,18 +17,16 @@ limitations under the License.
 package storage
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() drivers.TestDriver{
+var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -42,6 +40,14 @@ var testDrivers = []func() drivers.TestDriver{
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDriver,
 	drivers.InitAwsDriver,
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLinkBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeTmpfs),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlock),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlockFS),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeGCELocalSSD),
 }
 
 // List of testSuites to be executed in below loop
@@ -53,40 +59,41 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 }
 
+func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
+	return patterns
+}
+
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	f := framework.NewDefaultFramework("volumes")
 
 	var (
-		ns     *v1.Namespace
-		config framework.VolumeTestConfig
+		// Common configuration options for all drivers.
+		config = testsuites.TestConfig{
+			Framework: f,
+			Prefix:    "in-tree",
+		}
 	)
 
-	BeforeEach(func() {
-		ns = f.Namespace
-		config = framework.VolumeTestConfig{
-			Namespace: ns.Name,
-			Prefix:    "volume",
-		}
-	})
-
 	for _, initDriver := range testDrivers {
-		curDriver := initDriver()
-		Context(fmt.Sprintf(drivers.GetDriverNameWithFeatureTags(curDriver)), func() {
-			driver := curDriver
-
+		curDriver := initDriver(config)
+		curConfig := curDriver.GetDriverInfo().Config
+		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			BeforeEach(func() {
+				// Reset config. The driver might have modified its copy
+				// in a previous test.
+				curDriver.GetDriverInfo().Config = curConfig
+
 				// setupDriver
-				drivers.SetCommonDriverParameters(driver, f, config)
-				driver.CreateDriver()
+				curDriver.CreateDriver()
 			})
 
 			AfterEach(func() {
 				// Cleanup driver
-				driver.CleanupDriver()
+				curDriver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, config, driver, testSuites)
+			testsuites.RunTestSuite(f, curDriver, testSuites, intreeTunePattern)
 		})
 	}
 })

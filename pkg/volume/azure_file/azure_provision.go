@@ -21,16 +21,16 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -56,7 +56,7 @@ type azureFileDeleter struct {
 func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
+		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 
@@ -92,7 +92,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
+		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 	if len(options.PVC.Spec.AccessModes) == 0 {
@@ -116,11 +116,11 @@ var _ volume.Deleter = &azureFileDeleter{}
 
 func (f *azureFileDeleter) GetPath() string {
 	name := azureFilePluginName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
+	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedName(name), f.volName)
 }
 
 func (f *azureFileDeleter) Delete() error {
-	glog.V(4).Infof("deleting volume %s", f.shareName)
+	klog.V(4).Infof("deleting volume %s", f.shareName)
 	return f.azureProvider.DeleteFileShare(f.accountName, f.accountKey, f.shareName)
 }
 

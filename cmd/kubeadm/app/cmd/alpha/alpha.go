@@ -20,12 +20,11 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 )
 
 // NewCmdAlpha returns "kubeadm alpha" command.
-func NewCmdAlpha(out io.Writer) *cobra.Command {
+func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: "Kubeadm experimental sub-commands",
@@ -34,7 +33,7 @@ func NewCmdAlpha(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdCertsUtility())
 	cmd.AddCommand(newCmdKubeletUtility())
 	cmd.AddCommand(newCmdKubeConfigUtility(out))
-	cmd.AddCommand(newCmdPreFlightUtility())
+	cmd.AddCommand(NewCmdSelfhosting(in))
 
 	// TODO: This command should be removed as soon as the kubeadm init phase refactoring is completed.
 	//		 current phases implemented as cobra.Commands should become workflow.Phases, while other utilities
@@ -50,12 +49,6 @@ func newCmdPhase(out io.Writer) *cobra.Command {
 		Short: "Invoke subsets of kubeadm functions separately for a manual install",
 		Long:  cmdutil.MacroCommandLongDescription,
 	}
-
-	cmd.AddCommand(phases.NewCmdAddon())
-	cmd.AddCommand(phases.NewCmdBootstrapToken())
-	cmd.AddCommand(phases.NewCmdMarkMaster())
-	cmd.AddCommand(phases.NewCmdSelfhosting())
-	cmd.AddCommand(phases.NewCmdUploadConfig())
 
 	return cmd
 }

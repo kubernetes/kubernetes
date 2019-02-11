@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -213,8 +213,8 @@ func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 	return c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 }
 
-func getKubeProxyDaemonSet(c clientset.Interface) (*extensions.DaemonSetList, error) {
+func getKubeProxyDaemonSet(c clientset.Interface) (*apps.DaemonSetList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterAddonLabelKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
+	return c.AppsV1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
 }

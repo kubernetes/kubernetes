@@ -23,7 +23,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/google.golang.org/grpc/balancer/base:all-srcs",
+        "//vendor/google.golang.org/grpc/balancer/roundrobin:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

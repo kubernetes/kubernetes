@@ -60,7 +60,7 @@ go_library(
         "//third_party/forked/gonum/graph:go_default_library",
         "//third_party/forked/gonum/graph/simple:go_default_library",
         "//third_party/forked/gonum/graph/traverse:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

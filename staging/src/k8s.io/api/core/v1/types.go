@@ -191,7 +191,7 @@ type PersistentVolumeSource struct {
 	// exposed to the pod. Provisioned by an admin.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	// +optional
-	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,4,opt,name=glusterfs"`
+	Glusterfs *GlusterfsPersistentVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,4,opt,name=glusterfs"`
 	// NFS represents an NFS mount on the host. Provisioned by an admin.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
 	// +optional
@@ -326,7 +326,7 @@ type PersistentVolumeSpec struct {
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -455,7 +455,7 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
@@ -467,7 +467,7 @@ type PersistentVolumeClaimSpec struct {
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
 	// +optional
-	DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,7,opt,name=dataSource"`
+	DataSource *TypedLocalObjectReference `json:"dataSource,omitempty" protobuf:"bytes,7,opt,name=dataSource"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
@@ -634,6 +634,30 @@ type GlusterfsVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
+type GlusterfsPersistentVolumeSource struct {
+	// EndpointsName is the endpoint name that details Glusterfs topology.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
+
+	// Path is the Glusterfs volume path.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
+
+	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+	// Defaults to false.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+
+	// EndpointsNamespace is the namespace that contains Glusterfs endpoint.
+	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	EndpointsNamespace *string `json:"endpointsNamespace,omitempty" protobuf:"bytes,4,opt,name=endpointsNamespace"`
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
@@ -931,6 +955,11 @@ type QuobyteVolumeSource struct {
 	// Default is no group
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,5,opt,name=group"`
+
+	// Tenant owning the given Quobyte volume in the Backend
+	// Used with dynamically provisioned Quobyte volumes, value is set by the plugin
+	// +optional
+	Tenant string `json:"tenant,omitempty" protobuf:"bytes,6,opt,name=tenant"`
 }
 
 // FlexPersistentVolumeSource represents a generic persistent volume resource that is
@@ -2090,7 +2119,7 @@ type Container struct {
 	// +patchStrategy=merge
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional
@@ -2896,6 +2925,7 @@ type PodSpec struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
+	// Optional: Defaults to true.
 	// +optional
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty" protobuf:"varint,30,opt,name=enableServiceLinks"`
 }
@@ -3426,6 +3456,9 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +patchMergeKey=port
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
 	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this

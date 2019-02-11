@@ -26,11 +26,11 @@ import (
 
 func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	username, password, email, server := "test-user", "test-password", "test-user@example.org", "https://index.docker.io/v1/"
-	secretData, err := handleDockerCfgJsonContent(username, password, email, server)
+	secretData, err := handleDockerCfgJSONContent(username, password, email, server)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	secretDataNoEmail, err := handleDockerCfgJsonContent(username, password, "", server)
+	secretDataNoEmail, err := handleDockerCfgJSONContent(username, password, "", server)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-7566tc6mgc",
+					Name: "foo-548cm7fgdh",
 				},
 				Data: map[string][]byte{
 					v1.DockerConfigJsonKey: secretData,

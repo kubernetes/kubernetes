@@ -22,7 +22,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -67,7 +67,7 @@ func (n *CAdvisorE2ERemote) RunTest(host, workspace, results, imageDesc, junitFi
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 
-	glog.V(2).Infof("Starting tests on %q", host)
+	klog.V(2).Infof("Starting tests on %q", host)
 	return SSH(host, "sh", "-c", getSSHCommand(" && ",
 		fmt.Sprintf("cd %s/cadvisor", workspace),
 		fmt.Sprintf("timeout -k 30s %fs ./build/integration.sh ../results/cadvisor.log",

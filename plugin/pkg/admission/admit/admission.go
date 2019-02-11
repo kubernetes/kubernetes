@@ -19,8 +19,8 @@ package admit
 import (
 	"io"
 
-	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/klog"
 )
 
 // PluginName indicates name of admission plugin.
@@ -58,7 +58,7 @@ func (alwaysAdmit) Handles(operation admission.Operation) bool {
 // NewAlwaysAdmit creates a new always admit admission handler
 func NewAlwaysAdmit() admission.Interface {
 	// DEPRECATED: AlwaysAdmit admit all admission request, it is no use.
-	glog.Warningf("%s admission controller is deprecated. "+
+	klog.Warningf("%s admission controller is deprecated. "+
 		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysAdmit)
 }

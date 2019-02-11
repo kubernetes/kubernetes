@@ -24,18 +24,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudfeatures "k8s.io/cloud-provider/features"
+	"k8s.io/klog"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -79,12 +79,12 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 	}
 
 	if err = cloud.DeleteDisk(d.pdName); err != nil {
-		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
+		klog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
 		// GCE cloud provider returns volume.deletedVolumeInUseError when
 		// necessary, no handling needed here.
 		return err
 	}
-	glog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)
+	klog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)
 	return nil
 }
 
@@ -126,10 +126,10 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 				return "", 0, nil, "", err
 			}
 		case "replication-type":
-			if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
+			if !utilfeature.DefaultFeatureGate.Enabled(cloudfeatures.GCERegionalPersistentDisk) {
 				return "", 0, nil, "",
 					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
-						k, c.plugin.GetPluginName(), features.GCERegionalPersistentDisk)
+						k, c.plugin.GetPluginName(), cloudfeatures.GCERegionalPersistentDisk)
 			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
@@ -154,7 +154,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	case replicationTypeRegionalPD:
 		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
 		if err != nil {
-			glog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
+			klog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
 		if err = cloud.CreateRegionalDisk(
@@ -163,10 +163,10 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			selectedZones,
 			int64(requestGB),
 			*c.options.CloudTags); err != nil {
-			glog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
+			klog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-		glog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
+		klog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
 
 	case replicationTypeNone:
 		selectedZone, err := volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
@@ -179,10 +179,10 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			selectedZone,
 			int64(requestGB),
 			*c.options.CloudTags); err != nil {
-			glog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
+			klog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-		glog.V(2).Infof("Successfully created single-zone GCE PD volume %s", name)
+		klog.V(2).Infof("Successfully created single-zone GCE PD volume %s", name)
 
 	default:
 		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
@@ -191,7 +191,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
 	if err != nil {
 		// We don't really want to leak the volume here...
-		glog.Errorf("error getting labels for volume %q: %v", name, err)
+		klog.Errorf("error getting labels for volume %q: %v", name, err)
 	}
 
 	return name, int(requestGB), labels, fstype, nil
@@ -203,11 +203,11 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 		// It's possible udevadm was called on other disks so it should not block this
 		// call. If it did fail on this disk, then the devicePath will either
 		// not exist or be wrong. If it's wrong, then the scsi_id check below will fail.
-		glog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
+		klog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
+		if pathExists, err := mount.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			// validate that the path actually resolves to the correct disk
@@ -219,7 +219,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 				// The device link is not pointing to the correct device
 				// Trigger udev on this device to try to fix the link
 				if udevErr := udevadmChangeToDrive(path); udevErr != nil {
-					glog.Errorf("udevadmChangeToDrive %q failed with: %v", path, err)
+					klog.Errorf("udevadmChangeToDrive %q failed with: %v", path, err)
 				}
 
 				// Return error to retry WaitForAttach and verifyDevicePath
@@ -235,13 +235,13 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 
 // Calls scsi_id on the given devicePath to get the serial number reported by that device.
 func getScsiSerial(devicePath, diskName string) (string, error) {
-	exists, err := utilfile.FileExists("/lib/udev/scsi_id")
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, "/lib/udev/scsi_id")
 	if err != nil {
 		return "", fmt.Errorf("failed to check scsi_id existence: %v", err)
 	}
 
 	if !exists {
-		glog.V(6).Infof("scsi_id doesn't exist; skipping check for %v", devicePath)
+		klog.V(6).Infof("scsi_id doesn't exist; skipping check for %v", devicePath)
 		return diskName, nil
 	}
 
@@ -290,7 +290,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.Cloud, e
 		gceCloudProvider, ok := cloudProvider.(*gcecloud.Cloud)
 		if !ok || gceCloudProvider == nil {
 			// Retry on error. See issue #11321
-			glog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
+			klog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
 			time.Sleep(errorSleepDuration)
 			continue
 		}
@@ -324,14 +324,14 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 // drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
 func udevadmChangeToDrive(drivePath string) error {
-	glog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
+	klog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
 
 	// Evaluate symlink, if any
 	drive, err := filepath.EvalSymlinks(drivePath)
 	if err != nil {
 		return fmt.Errorf("udevadmChangeToDrive: filepath.EvalSymlinks(%q) failed with %v", drivePath, err)
 	}
-	glog.V(5).Infof("udevadmChangeToDrive: symlink path is %q", drive)
+	klog.V(5).Infof("udevadmChangeToDrive: symlink path is %q", drive)
 
 	// Check to make sure input is "/dev/sd*"
 	if !strings.Contains(drive, diskSDPath) {
@@ -353,8 +353,8 @@ func udevadmChangeToDrive(drivePath string) error {
 // Checks whether the given GCE PD volume spec is associated with a regional PD.
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
-		zonesLabel := spec.PersistentVolume.Labels[kubeletapis.LabelZoneFailureDomain]
-		zones := strings.Split(zonesLabel, kubeletapis.LabelMultiZoneDelimiter)
+		zonesLabel := spec.PersistentVolume.Labels[v1.LabelZoneFailureDomain]
+		zones := strings.Split(zonesLabel, volumeutil.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
 	return false

@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
@@ -308,14 +308,14 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
 				return err
 			}
-			glog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
+			klog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
 		} else {
 			tlsCert, err := tls.X509KeyPair(cert, key)
 			if err != nil {
 				return fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
 			s.ServerCert.GeneratedCert = &tlsCert
-			glog.Infof("Generated self-signed cert in-memory")
+			klog.Infof("Generated self-signed cert in-memory")
 		}
 	}
 

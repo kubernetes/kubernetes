@@ -464,7 +464,17 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 		out.Validation = nil
 	}
 	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
-	out.Versions = *(*[]apiextensions.CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]apiextensions.CustomResourceDefinitionVersion, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
+	}
 	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	out.Conversion = (*apiextensions.CustomResourceConversion)(unsafe.Pointer(in.Conversion))
 	return nil
@@ -492,7 +502,17 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 		out.Validation = nil
 	}
 	out.Subresources = (*CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
-	out.Versions = *(*[]CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]CustomResourceDefinitionVersion, len(*in))
+		for i := range *in {
+			if err := Convert_apiextensions_CustomResourceDefinitionVersion_To_v1beta1_CustomResourceDefinitionVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
+	}
 	out.AdditionalPrinterColumns = *(*[]CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	out.Conversion = (*CustomResourceConversion)(unsafe.Pointer(in.Conversion))
 	return nil
@@ -535,6 +555,17 @@ func autoConvert_v1beta1_CustomResourceDefinitionVersion_To_apiextensions_Custom
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	if in.Schema != nil {
+		in, out := &in.Schema, &out.Schema
+		*out = new(apiextensions.CustomResourceValidation)
+		if err := Convert_v1beta1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Schema = nil
+	}
+	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
+	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	return nil
 }
 
@@ -547,6 +578,17 @@ func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1beta1_Custom
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	if in.Schema != nil {
+		in, out := &in.Schema, &out.Schema
+		*out = new(CustomResourceValidation)
+		if err := Convert_apiextensions_CustomResourceValidation_To_v1beta1_CustomResourceValidation(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Schema = nil
+	}
+	out.Subresources = (*CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
+	out.AdditionalPrinterColumns = *(*[]CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	return nil
 }
 

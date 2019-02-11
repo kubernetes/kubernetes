@@ -18,7 +18,6 @@ package common
 
 import (
 	"fmt"
-	"os"
 	"path"
 
 	. "github.com/onsi/ginkgo"
@@ -46,8 +45,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, without mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of ‘0x400’
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -61,8 +61,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
+		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
@@ -83,8 +84,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of ‘0x400’
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
@@ -93,8 +95,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
+		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
@@ -540,6 +543,26 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		})
 
 	})
+
+	//The pod is in pending during volume creation until the configMap objects are available
+	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
@@ -622,17 +645,14 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
-	} else {
-		mode := int32(0644)
-		defaultMode = &mode
 	}
 
-	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+	fileModeRegexp := framework.GetFileModeRegex("/etc/configmap-volume/data-1", defaultMode)
 	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-		"mode of file \"/etc/configmap-volume/data-1\": " + modeString,
+		fileModeRegexp,
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
@@ -708,9 +728,6 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 
 	if itemMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
-	} else {
-		mode := int32(0644)
-		itemMode = &mode
 	}
 
 	// Just check file mode if fsGroup is not set. If fsGroup is set, the
@@ -719,8 +736,120 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
 	}
 	if fsGroup == 0 {
-		modeString := fmt.Sprintf("%v", os.FileMode(*itemMode))
-		output = append(output, "mode of file \"/etc/configmap-volume/path/to/data-2\": "+modeString)
+		fileModeRegexp := framework.GetFileModeRegex("/etc/configmap-volume/path/to/data-2", itemMode)
+		output = append(output, fileModeRegexp)
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
+}
+
+func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "createcm-volume-test"
+	createVolumeName := "createcm-volume"
+
+	//creating a pod without configMap object created, by mentioning the configMap volume source's local reference name
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: createName,
+							},
+							Optional: &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
+}
+
+func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "createcm-volume-test"
+	createVolumeName := "createcm-volume"
+	configMap := newConfigMap(f, createName)
+
+	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	var err error
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+	}
+	//creating a pod with configMap object, but with different key which is not present in configMap object.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: createName,
+							},
+							Items: []v1.KeyToPath{
+								{
+									Key:  "data-4",
+									Path: "path/to/data-4",
+								},
+							},
+							Optional: &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
 }

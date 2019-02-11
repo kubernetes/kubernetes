@@ -45,6 +45,14 @@ type FakeUpdateBalancerCall struct {
 	Hosts   []*v1.Node
 }
 
+var _ cloudprovider.Interface = (*FakeCloud)(nil)
+var _ cloudprovider.Instances = (*FakeCloud)(nil)
+var _ cloudprovider.LoadBalancer = (*FakeCloud)(nil)
+var _ cloudprovider.Routes = (*FakeCloud)(nil)
+var _ cloudprovider.Zones = (*FakeCloud)(nil)
+var _ cloudprovider.PVLabeler = (*FakeCloud)(nil)
+var _ cloudprovider.Clusters = (*FakeCloud)(nil)
+
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists bool
@@ -228,6 +236,8 @@ func (f *FakeCloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
 // It adds an entry "node-addresses-by-provider-id" into the internal method call record.
 func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses-by-provider-id")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
 	return f.Addresses, f.Err
 }
 

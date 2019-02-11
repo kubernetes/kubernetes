@@ -28,9 +28,12 @@ import (
 	"k8s.io/kube-openapi/pkg/generators"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/klog"
 )
 
 func main() {
+	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	genericArgs.AddFlags(pflag.CommandLine)

@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - bowei
   - rramkumar1
@@ -26,6 +28,8 @@ reviewers:
   - timothysc
   - zmerlynn
   - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
+  - oomichi
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
@@ -56,5 +60,6 @@ approvers:
   - timothysc
   - zmerlynn
   - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
 labels:
 - sig/testing

@@ -2,11 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["describe.go"],
+    srcs = ["interface.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/describe",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
     ],

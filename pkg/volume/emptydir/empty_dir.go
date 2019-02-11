@@ -21,16 +21,16 @@ import (
 	"os"
 	"path"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
-	stringsutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -59,7 +59,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(emptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -86,6 +86,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
+	return false
+}
+
+func (plugin *emptyDirPlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -253,7 +257,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
+	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
 }
 
@@ -281,7 +285,7 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 		return err
 	}
 
-	glog.V(3).Infof("pod %v: mounting hugepages for volume %v", ed.pod.UID, ed.volName)
+	klog.V(3).Infof("pod %v: mounting hugepages for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{pageSizeMountOption})
 }
 
@@ -349,7 +353,7 @@ func (ed *emptyDir) setupDir(dir string) error {
 		}
 
 		if fileinfo.Mode().Perm() != perm.Perm() {
-			glog.Errorf("Expected directory %q permissions to be: %s; got: %s", dir, perm.Perm(), fileinfo.Mode().Perm())
+			klog.Errorf("Expected directory %q permissions to be: %s; got: %s", dir, perm.Perm(), fileinfo.Mode().Perm())
 		}
 	}
 
@@ -367,10 +371,10 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
-	if pathExists, pathErr := volumeutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
@@ -416,7 +420,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

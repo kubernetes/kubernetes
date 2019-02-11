@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	rbacapiv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -180,11 +180,11 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					}
 					switch {
 					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						glog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+						klog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
 					case result.Operation == reconciliation.ReconcileUpdate:
-						glog.Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+						klog.Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
 					case result.Operation == reconciliation.ReconcileCreate:
-						glog.Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+						klog.Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
 					}
 					return nil
 				})
@@ -208,13 +208,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					}
 					switch {
 					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						glog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+						klog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
 					case result.Operation == reconciliation.ReconcileUpdate:
-						glog.Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+						klog.Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
 					case result.Operation == reconciliation.ReconcileCreate:
-						glog.Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+						klog.Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
 					case result.Operation == reconciliation.ReconcileRecreate:
-						glog.Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+						klog.Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
 					}
 					return nil
 				})
@@ -239,11 +239,11 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						}
 						switch {
 						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							glog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							klog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileUpdate:
-							glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							klog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
+							klog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
 						}
 						return nil
 					})
@@ -269,13 +269,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						}
 						switch {
 						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							glog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							klog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
 						case result.Operation == reconciliation.ReconcileUpdate:
-							glog.Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							klog.Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							klog.Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
 						case result.Operation == reconciliation.ReconcileRecreate:
-							glog.Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							klog.Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
 						}
 						return nil
 					})
@@ -324,7 +324,7 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 			// the old role already moved to an aggregated role, so there are no custom rules to migrate at this point
 			return nil
 		}
-		glog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
+		klog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
 		existingRole.Name = newName
 		existingRole.ResourceVersion = "" // clear this so the object can be created.
 		if _, err := clusterRoleClient.ClusterRoles().Create(existingRole); err != nil && !apierrors.IsAlreadyExists(err) {

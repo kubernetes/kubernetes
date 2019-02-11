@@ -33,6 +33,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
@@ -62,7 +63,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
 	baseKubeConfig, err := fetchKubeConfigWithTimeout(cfg.Discovery.BootstrapToken.APIServerEndpoint, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
-		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.ClusterName)
+		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1beta1.DefaultClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 		insecureClient, err := kubeconfigutil.ToClientSet(insecureBootstrapConfig)

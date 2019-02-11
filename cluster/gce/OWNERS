@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - bowei
   - gmarek
@@ -6,6 +8,7 @@ reviewers:
   - mwielgus
   - MaciekPytel
   - jingax10
+  - yujuhong
 approvers:
   - bowei
   - gmarek
@@ -14,3 +17,4 @@ approvers:
   - mwielgus
   - MaciekPytel
   - jingax10
+  - yujuhong

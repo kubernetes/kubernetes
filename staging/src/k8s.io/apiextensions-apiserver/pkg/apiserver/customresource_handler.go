@@ -28,8 +28,17 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
-	"github.com/golang/glog"
-
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,29 +53,22 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
-	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
-	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
-	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+	"k8s.io/klog"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -93,6 +95,11 @@ type crdHandler struct {
 	// MasterCount is used to implement sleep to improve
 	// CRD establishing process for HA clusters.
 	masterCount int
+
+	converterFactory *conversion.CRConverterFactory
+
+	// so that we can do create on update.
+	authorizer authorizer.Authorizer
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -129,7 +136,10 @@ func NewCustomResourceDefinitionHandler(
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
 	establishingController *establish.EstablishingController,
-	masterCount int) *crdHandler {
+	serviceResolver webhook.ServiceResolver,
+	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	masterCount int,
+	authorizer authorizer.Authorizer) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -140,6 +150,7 @@ func NewCustomResourceDefinitionHandler(
 		admission:               admission,
 		establishingController:  establishingController,
 		masterCount:             masterCount,
+		authorizer:              authorizer,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -147,10 +158,15 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
+	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
+	if err != nil {
+		return nil, err
+	}
+	ret.converterFactory = crConverterFactory
 
 	ret.customStorage.Store(crdStorageMap{})
 
-	return ret
+	return ret, nil
 }
 
 func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -218,12 +234,21 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		string(types.JSONPatchType),
 		string(types.MergePatchType),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+	}
 
 	var handler http.HandlerFunc
+	subresources, err := getSubresourcesForVersion(crd, requestInfo.APIVersion)
+	if err != nil {
+		utilruntime.HandleError(err)
+		http.Error(w, "the server could not properly serve the CR subresources", http.StatusInternalServerError)
+		return
+	}
 	switch {
-	case subresource == "status" && crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil:
+	case subresource == "status" && subresources != nil && subresources.Status != nil:
 		handler = r.serveStatus(w, req, requestInfo, crdInfo, terminating, supportedTypes)
-	case subresource == "scale" && crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil:
+	case subresource == "scale" && subresources != nil && subresources.Scale != nil:
 		handler = r.serveScale(w, req, requestInfo, crdInfo, terminating, supportedTypes)
 	case len(subresource) == 0:
 		handler = r.serveResource(w, req, requestInfo, crdInfo, terminating, supportedTypes)
@@ -232,7 +257,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if handler != nil {
-		handler = metrics.InstrumentHandlerFunc(verb, resource, subresource, scope, handler)
+		handler = metrics.InstrumentHandlerFunc(verb, requestInfo.APIGroup, requestInfo.APIVersion, resource, subresource, scope, metrics.APIServerComponent, handler)
 		handler(w, req)
 		return
 	}
@@ -334,11 +359,11 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		return
 	}
 	if apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
-		glog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
+		klog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
 		return
 	}
 
-	glog.V(4).Infof("Updating customresourcedefinition %s", oldCRD.Name)
+	klog.V(4).Infof("Updating customresourcedefinition %s", oldCRD.Name)
 
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere.
@@ -378,7 +403,7 @@ func (r *crdHandler) removeDeadStorage() {
 			}
 		}
 		if !found {
-			glog.V(4).Infof("Removing dead CRD storage for %s/%s", s.spec.Group, s.spec.Names.Kind)
+			klog.V(4).Infof("Removing dead CRD storage for %s/%s", s.spec.Group, s.spec.Names.Kind)
 			for _, storage := range s.storages {
 				// destroy only the main storage. Those for the subresources share cacher and etcd clients.
 				storage.CustomResource.DestroyFunc()
@@ -427,7 +452,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	scaleScopes := map[string]handlers.RequestScope{}
 
 	for _, v := range crd.Spec.Versions {
-		safeConverter, unsafeConverter := conversion.NewCRDConverter(crd)
+		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
+		if err != nil {
+			return nil, err
+		}
 		// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
 		// decode unversioned Options objects, so we delegate to parameterScheme for such types.
 		parameterScheme := runtime.NewScheme()
@@ -443,19 +471,28 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		validator, _, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
+		validationSchema, err := getSchemaForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		}
+		validator, _, err := apiservervalidation.NewSchemaValidator(validationSchema)
 		if err != nil {
 			return nil, err
 		}
 
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
 		var statusValidator *validate.SchemaValidator
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil {
-			statusSpec = crd.Spec.Subresources.Status
-
+		subresources, err := getSubresourcesForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Status != nil {
+			statusSpec = subresources.Status
 			// for the status subresource, validate only against the status schema
-			if crd.Spec.Validation != nil && crd.Spec.Validation.OpenAPIV3Schema != nil && crd.Spec.Validation.OpenAPIV3Schema.Properties != nil {
-				if statusSchema, ok := crd.Spec.Validation.OpenAPIV3Schema.Properties["status"]; ok {
+			if validationSchema != nil && validationSchema.OpenAPIV3Schema != nil && validationSchema.OpenAPIV3Schema.Properties != nil {
+				if statusSchema, ok := validationSchema.OpenAPIV3Schema.Properties["status"]; ok {
 					openapiSchema := &spec.Schema{}
 					if err := apiservervalidation.ConvertJSONSchemaProps(&statusSchema, openapiSchema); err != nil {
 						return nil, err
@@ -466,13 +503,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		}
 
 		var scaleSpec *apiextensions.CustomResourceSubresourceScale
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil {
-			scaleSpec = crd.Spec.Subresources.Scale
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Scale != nil {
+			scaleSpec = subresources.Scale
 		}
 
-		table, err := tableconvertor.New(crd.Spec.AdditionalPrinterColumns)
+		columns, err := getColumnsForVersion(crd, v.Name)
 		if err != nil {
-			glog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR columns")
+		}
+		table, err := tableconvertor.New(columns)
+		if err != nil {
+			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
 		}
 
 		storages[v.Name] = customresource.NewStorage(
@@ -532,6 +574,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			MetaGroupVersion: metav1.SchemeGroupVersion,
 
 			TableConvertor: storages[v.Name].CustomResource,
+
+			Authorizer: r.authorizer,
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			reqScope := requestScopes[v.Name]
+			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
+				reqScope.Convertor,
+				reqScope.Defaulter,
+				reqScope.Kind.GroupVersion(),
+				reqScope.HubGroupVersion,
+			)
+			requestScopes[v.Name] = reqScope
 		}
 
 		// override scaleSpec subresource values

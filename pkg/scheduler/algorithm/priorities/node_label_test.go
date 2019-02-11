@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 func TestNewNodeLabelPriority(t *testing.T) {
@@ -108,7 +108,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
 			labelPrioritizer := &NodeLabelPrioritizer{
 				label:    test.label,
 				presence: test.presence,

@@ -20,9 +20,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
     deps = [
-        "//pkg/api/v1/service:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -34,7 +31,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/helpers:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:go_default_library",
@@ -62,6 +60,7 @@ go_library(
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

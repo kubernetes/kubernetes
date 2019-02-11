@@ -27,19 +27,19 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
+	"k8s.io/kubernetes/pkg/kubectl/describe"
+	versioneddescribe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
@@ -67,11 +67,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
@@ -99,11 +99,11 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -140,11 +140,11 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -167,11 +167,11 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -193,11 +193,11 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := describe.DescriberFn
+	oldFn := versioneddescribe.DescriberFn
 	defer func() {
-		describe.DescriberFn = oldFn
+		versioneddescribe.DescriberFn = oldFn
 	}()
-	describe.DescriberFn = d.describerFor
+	versioneddescribe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -247,16 +247,16 @@ func TestDescribeHelpMessage(t *testing.T) {
 
 type testDescriber struct {
 	Name, Namespace string
-	Settings        printers.DescriberSettings
+	Settings        describe.DescriberSettings
 	Output          string
 	Err             error
 }
 
-func (t *testDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
+func (t *testDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (output string, err error) {
 	t.Namespace, t.Name = namespace, name
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
-func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
+func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.Describer, error) {
 	return t, nil
 }

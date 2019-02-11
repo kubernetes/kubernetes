@@ -25,8 +25,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +39,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -50,13 +52,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true); err != nil {
 		return err
 	}
-	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress, cfg.APIEndpoint.BindPort); err != nil {
-		return err
-	}
-	return nil
+	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort)
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
@@ -96,6 +95,14 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
 	if masterTaint && cfg.Taints == nil {
 		cfg.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
+
+	if cfg.CRISocket == "" {
+		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()
+		if err != nil {
+			return err
+		}
+		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
 	}
 
 	return nil
@@ -150,7 +157,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 	}
 
 	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
-	LowercaseSANs(cfg.APIServerCertSANs)
+	LowercaseSANs(cfg.APIServer.CertSANs)
 	return nil
 }
 
@@ -165,7 +172,7 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags
-		glog.V(1).Infoln("loading configuration from the given file")
+		klog.V(1).Infoln("loading configuration from the given file")
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -201,20 +208,23 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	var clustercfg *kubeadmapi.ClusterConfiguration
 	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
 
-	if err := DetectUnsupportedVersion(b); err != nil {
-		return nil, err
-	}
-
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 	if err != nil {
 		return nil, err
 	}
 
 	for gvk, fileContent := range gvkmap {
+		// first, check if this GVK is supported one
+		if err := ValidateSupportedVersion(gvk.GroupVersion()); err != nil {
+			return nil, err
+		}
+
+		// verify the validity of the YAML
+		strict.VerifyUnmarshalStrict(fileContent, gvk)
+
 		// Try to get the registration for the ComponentConfig based on the kind
 		regKind := componentconfigs.RegistrationKind(gvk.Kind)
-		registration, found := componentconfigs.Known[regKind]
-		if found {
+		if registration, found := componentconfigs.Known[regKind]; found {
 			// Unmarshal the bytes from the YAML document into a runtime.Object containing the ComponentConfiguration struct
 			obj, err := registration.Unmarshal(fileContent)
 			if err != nil {
@@ -268,8 +278,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 	// Save the loaded ComponentConfig objects in the initcfg object
 	for kind, obj := range decodedComponentConfigObjects {
-		registration, found := componentconfigs.Known[kind]
-		if found {
+		if registration, found := componentconfigs.Known[kind]; found {
 			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
 				return nil, errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 			}

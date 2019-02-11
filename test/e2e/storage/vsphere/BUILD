@@ -53,7 +53,6 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/utils/image:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
@@ -65,6 +64,7 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

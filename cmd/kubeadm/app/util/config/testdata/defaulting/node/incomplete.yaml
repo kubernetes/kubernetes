@@ -1,5 +1,3 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
 apiVersion: kubeadm.k8s.io/v1alpha3
 discoveryToken: abcdef.0123456789abcdef
 discoveryTokenAPIServers:

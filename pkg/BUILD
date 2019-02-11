@@ -12,7 +12,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/endpoints:all-srcs",
-        "//pkg/api/events:all-srcs",
         "//pkg/api/legacyscheme:all-srcs",
         "//pkg/api/persistentvolume:all-srcs",
         "//pkg/api/persistentvolumeclaim:all-srcs",
@@ -20,6 +19,7 @@ filegroup(
         "//pkg/api/podsecuritypolicy:all-srcs",
         "//pkg/api/ref:all-srcs",
         "//pkg/api/resource:all-srcs",
+        "//pkg/api/resourcequota:all-srcs",
         "//pkg/api/service:all-srcs",
         "//pkg/api/testapi:all-srcs",
         "//pkg/api/testing:all-srcs",

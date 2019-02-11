@@ -229,7 +229,7 @@ var _ = SIGDescribe("Watchers", func() {
 		By("creating a new watch on configmaps from the last resource version observed by the first watch")
 		lastEventConfigMap, ok := lastEvent.Object.(*v1.ConfigMap)
 		if !ok {
-			framework.Failf("Expected last notfication to refer to a configmap but got: %v", lastEvent)
+			framework.Failf("Expected last notification to refer to a configmap but got: %v", lastEvent)
 		}
 		testWatchRestarted, err := watchConfigMaps(f, lastEventConfigMap.ObjectMeta.ResourceVersion, watchRestartedLabelValue)
 		Expect(err).NotTo(HaveOccurred(), "failed to create a new watch on configmaps from the last resource version %s observed by the first watch", lastEventConfigMap.ObjectMeta.ResourceVersion)
@@ -345,7 +345,7 @@ var _ = SIGDescribe("Watchers", func() {
 		resourceVersion := "0"
 		for i := 0; i < iterations; i++ {
 			wc, err := c.CoreV1().ConfigMaps(ns).Watch(metav1.ListOptions{ResourceVersion: resourceVersion})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to watch configmaps in the namespace %s", ns)
 			wcs = append(wcs, wc)
 			resourceVersion = waitForNextConfigMapEvent(wcs[0]).ResourceVersion
 			for _, wc := range wcs[1:] {
@@ -472,18 +472,18 @@ func produceConfigMapEvents(f *framework.Framework, stopc <-chan struct{}, minWa
 		case createEvent:
 			cm.Name = name(i)
 			_, err := c.CoreV1().ConfigMaps(ns).Create(cm)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to create configmap %s in namespace %s", cm.Name, ns)
 			existing = append(existing, i)
 			i += 1
 		case updateEvent:
 			idx := rand.Intn(len(existing))
 			cm.Name = name(existing[idx])
 			_, err := c.CoreV1().ConfigMaps(ns).Update(cm)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %s in namespace %s", cm.Name, ns)
 		case deleteEvent:
 			idx := rand.Intn(len(existing))
 			err := c.CoreV1().ConfigMaps(ns).Delete(name(existing[idx]), &metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to delete configmap %s in namespace %s", name(existing[idx]), ns)
 			existing = append(existing[:idx], existing[idx+1:]...)
 		default:
 			framework.Failf("Unsupported event operation: %d", op)

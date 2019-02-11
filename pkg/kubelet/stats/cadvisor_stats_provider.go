@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -47,6 +48,8 @@ type cadvisorStatsProvider struct {
 	resourceAnalyzer stats.ResourceAnalyzer
 	// imageService is used to get the stats of the image filesystem.
 	imageService kubecontainer.ImageService
+	// statusProvider is used to get pod metadata
+	statusProvider status.PodStatusProvider
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -55,11 +58,13 @@ func newCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	imageService kubecontainer.ImageService,
+	statusProvider status.PodStatusProvider,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
 		cadvisor:         cadvisor,
 		resourceAnalyzer: resourceAnalyzer,
 		imageService:     imageService,
+		statusProvider:   statusProvider,
 	}
 }
 
@@ -114,7 +119,6 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
-			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
 		} else {
 			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
 		}
@@ -139,7 +143,13 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			podStats.CPU = cpu
 			podStats.Memory = memory
 		}
-		result = append(result, *podStats)
+
+		status, found := p.statusProvider.GetPodStatus(podUID)
+		if found && status.StartTime != nil && !status.StartTime.IsZero() {
+			podStats.StartTime = *status.StartTime
+			// only append stats if we were able to get the start time of the pod
+			result = append(result, *podStats)
+		}
 	}
 
 	return result, nil
@@ -306,7 +316,7 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		glog.Warningf(
+		klog.Warningf(
 			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
 			podName, podNamespace)
 	}
@@ -429,7 +439,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			glog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+			klog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}

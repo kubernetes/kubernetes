@@ -63,7 +63,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//api/openapi-spec:all-srcs",
-        "//api/swagger-spec:all-srcs",
         "//build:all-srcs",
         "//cluster:all-srcs",
         "//cmd:all-srcs",

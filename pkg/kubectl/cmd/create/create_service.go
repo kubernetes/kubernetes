@@ -61,6 +61,7 @@ func addPortFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
 }
 
+// ServiceClusterIPOpts holds the options for 'create service clusterip' sub command
 type ServiceClusterIPOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -97,6 +98,7 @@ func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
 	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }
 
+// Complete completes all the required options
 func (o *ServiceClusterIPOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -119,7 +121,7 @@ func (o *ServiceClusterIPOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateServiceClusterIP is the implementation of the create service clusterip command
+// Run calls the CreateSubcommandOptions.Run in ServiceClusterIPOpts instance
 func (o *ServiceClusterIPOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -133,6 +135,7 @@ var (
     kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
+// ServiceNodePortOpts holds the options for 'create service nodeport' sub command
 type ServiceNodePortOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -165,6 +168,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ServiceNodePortOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -188,7 +192,7 @@ func (o *ServiceNodePortOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateServiceNodePort is the implementation of the create service nodeport command
+// Run calls the CreateSubcommandOptions.Run in ServiceNodePortOpts instance
 func (o *ServiceNodePortOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -202,6 +206,7 @@ var (
     kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
 )
 
+// ServiceLoadBalancerOpts holds the options for 'create service loadbalancer' sub command
 type ServiceLoadBalancerOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -233,6 +238,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ServiceLoadBalancerOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -255,7 +261,7 @@ func (o *ServiceLoadBalancerOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateServiceLoadBalancer is the implementation of the create service loadbalancer command
+// Run calls the CreateSubcommandOptions.Run in ServiceLoadBalancerOpts instance
 func (o *ServiceLoadBalancerOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -273,6 +279,7 @@ var (
 	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
+// ServiceExternalNameOpts holds the options for 'create service externalname' sub command
 type ServiceExternalNameOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -306,6 +313,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ServiceExternalNameOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -328,7 +336,7 @@ func (o *ServiceExternalNameOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateExternalNameService is the implementation of the create service externalname command
+// Run calls the CreateSubcommandOptions.Run in ServiceExternalNameOpts instance
 func (o *ServiceExternalNameOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

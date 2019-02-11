@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
@@ -39,11 +40,6 @@ import (
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*csiPlugin, string) {
-	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for CSIBlockVolume: %v", err)
-	}
-
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -108,7 +104,22 @@ func makeTestPV(name string, sizeGig int, driverName, volID string) *api.Persist
 	}
 }
 
+func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
+	highestSupportedVersions, err := highestSupportedVersion(versions)
+	if err != nil {
+		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
+	}
+
+	csiDrivers.Clear()
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersions,
+	})
+}
+
 func TestPluginGetPluginName(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	if plug.GetPluginName() != "kubernetes.io/csi" {
@@ -117,6 +128,8 @@ func TestPluginGetPluginName(t *testing.T) {
 }
 
 func TestPluginGetVolumeName(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
@@ -133,6 +146,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
+		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
 		pv := makeTestPV("test-pv", 10, tc.driverName, tc.volName)
 		spec := volume.NewSpecFromPersistentVolume(pv, false)
 		name, err := plug.GetVolumeName(spec)
@@ -146,9 +160,12 @@ func TestPluginGetVolumeName(t *testing.T) {
 }
 
 func TestPluginCanSupport(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 
@@ -158,6 +175,8 @@ func TestPluginCanSupport(t *testing.T) {
 }
 
 func TestPluginConstructVolumeSpec(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -218,9 +237,12 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 }
 
 func TestPluginNewMounter(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewMounter(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -237,7 +259,7 @@ func TestPluginNewMounter(t *testing.T) {
 	csiMounter := mounter.(*csiMountMgr)
 
 	// validate mounter fields
-	if csiMounter.driverName != testDriver {
+	if string(csiMounter.driverName) != testDriver {
 		t.Error("mounter driver name not set")
 	}
 	if csiMounter.volumeID != testVol {
@@ -266,9 +288,12 @@ func TestPluginNewMounter(t *testing.T) {
 }
 
 func TestPluginNewUnmounter(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -311,6 +336,8 @@ func TestPluginNewUnmounter(t *testing.T) {
 }
 
 func TestPluginNewAttacher(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -329,6 +356,8 @@ func TestPluginNewAttacher(t *testing.T) {
 }
 
 func TestPluginNewDetacher(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -346,10 +375,43 @@ func TestPluginNewDetacher(t *testing.T) {
 	}
 }
 
+func TestPluginCanAttach(t *testing.T) {
+	tests := []struct {
+		name       string
+		driverName string
+		canAttach  bool
+	}{
+		{
+			name:       "attachable",
+			driverName: "attachble-driver",
+			canAttach:  true,
+		},
+	}
+
+	for _, test := range tests {
+		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		t.Run(test.name, func(t *testing.T) {
+			fakeCSIClient := fakecsi.NewSimpleClientset(csiDriver)
+			plug, tmpDir := newTestPlugin(t, nil, fakeCSIClient)
+			defer os.RemoveAll(tmpDir)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driverName, "test-vol"), false)
+
+			pluginCanAttach := plug.CanAttach(spec)
+			if pluginCanAttach != test.canAttach {
+				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
+				return
+			}
+		})
+	}
+}
+
 func TestPluginNewBlockMapper(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewBlockVolumeMapper(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -366,7 +428,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	csiMapper := mounter.(*csiBlockMapper)
 
 	// validate mounter fields
-	if csiMapper.driverName != testDriver {
+	if string(csiMapper.driverName) != testDriver {
 		t.Error("CSI block mapper missing driver name")
 	}
 	if csiMapper.volumeID != testVol {
@@ -392,9 +454,12 @@ func TestPluginNewBlockMapper(t *testing.T) {
 }
 
 func TestPluginNewUnmapper(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -440,7 +505,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 	}
 
 	// test loaded vol data
-	if csiUnmapper.driverName != testDriver {
+	if string(csiUnmapper.driverName) != testDriver {
 		t.Error("unmapper driverName not set")
 	}
 	if csiUnmapper.volumeID != testVol {
@@ -449,6 +514,8 @@ func TestPluginNewUnmapper(t *testing.T) {
 }
 
 func TestPluginConstructBlockVolumeSpec(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -503,6 +570,439 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 
 		if spec.Name() != tc.specVolID {
 			t.Errorf("Unexpected spec name %s", spec.Name())
+		}
+	}
+}
+
+func TestValidatePlugin(t *testing.T) {
+	testCases := []struct {
+		pluginName           string
+		endpoint             string
+		versions             []string
+		foundInDeprecatedDir bool
+		shouldFail           bool
+	}{
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"v1.0.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"0.3.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"0.2.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v1.0.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v0.3.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"0.2.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v0.3.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v0.3.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v1.0.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v1.0.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v1.2.3"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"0.2.0", "v1.2.3"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "v0.3.0"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "v0.3.0"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: false,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
+			foundInDeprecatedDir: true,
+			shouldFail:           false,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"4.9.12", "2.0.1"},
+			foundInDeprecatedDir: false,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"4.9.12", "2.0.1"},
+			foundInDeprecatedDir: true,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{},
+			foundInDeprecatedDir: false,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{},
+			foundInDeprecatedDir: true,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:             []string{"var", "boo", "foo"},
+			foundInDeprecatedDir: false,
+			shouldFail:           true,
+		},
+		{
+			pluginName:           "test.plugin",
+			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions:             []string{"var", "boo", "foo"},
+			foundInDeprecatedDir: true,
+			shouldFail:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions, tc.foundInDeprecatedDir)
+
+		// Assert
+		if tc.shouldFail && err == nil {
+			t.Fatalf("expecting ValidatePlugin to fail, but got nil error for testcase: %#v", tc)
+		}
+		if !tc.shouldFail && err != nil {
+			t.Fatalf("unexpected error during ValidatePlugin for testcase: %#v\r\n err:%v", tc, err)
+		}
+	}
+}
+
+func TestValidatePluginExistingDriver(t *testing.T) {
+	testCases := []struct {
+		pluginName1           string
+		endpoint1             string
+		versions1             []string
+		pluginName2           string
+		endpoint2             string
+		versions2             []string
+		foundInDeprecatedDir2 bool
+		shouldFail            bool
+	}{
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:             []string{"v1.0.0"},
+			pluginName2:           "test.plugin2",
+			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:             []string{"v1.0.0"},
+			foundInDeprecatedDir2: false,
+			shouldFail:            false,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:             []string{"v1.0.0"},
+			pluginName2:           "test.plugin2",
+			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions2:             []string{"v1.0.0"},
+			foundInDeprecatedDir2: true,
+			shouldFail:            true,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions1:             []string{"v1.0.0"},
+			pluginName2:           "test.plugin",
+			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:             []string{"v1.0.0"},
+			foundInDeprecatedDir2: false,
+			shouldFail:            true,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:             []string{"v1.0.0"},
+			pluginName2:           "test.plugin",
+			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:             []string{"v1.0.0"},
+			foundInDeprecatedDir2: false,
+			shouldFail:            true,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:             []string{"v1.0.0"},
+			pluginName2:           "test.plugin",
+			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions2:             []string{"v1.0.0"},
+			foundInDeprecatedDir2: true,
+			shouldFail:            true,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions1:             []string{"v0.3.0", "0.2.0"},
+			pluginName2:           "test.plugin",
+			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:             []string{"1.0.0"},
+			foundInDeprecatedDir2: false,
+			shouldFail:            false,
+		},
+		{
+			pluginName1:           "test.plugin",
+			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions1:             []string{"v0.3.0", "0.2.0"},
+			pluginName2:           "test.plugin",
+			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions2:             []string{"1.0.0"},
+			foundInDeprecatedDir2: true,
+			shouldFail:            true,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		highestSupportedVersions1, err := highestSupportedVersion(tc.versions1)
+		if err != nil {
+			t.Fatalf("unexpected error parsing version for testcase: %#v", tc)
+		}
+
+		csiDrivers.Clear()
+		csiDrivers.Set(tc.pluginName1, Driver{
+			endpoint:                tc.endpoint1,
+			highestSupportedVersion: highestSupportedVersions1,
+		})
+
+		// Arrange & Act
+		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)
+
+		// Assert
+		if tc.shouldFail && err == nil {
+			t.Fatalf("expecting ValidatePlugin to fail, but got nil error for testcase: %#v", tc)
+		}
+		if !tc.shouldFail && err != nil {
+			t.Fatalf("unexpected error during ValidatePlugin for testcase: %#v\r\n err:%v", tc, err)
+		}
+	}
+}
+
+func TestHighestSupportedVersion(t *testing.T) {
+	testCases := []struct {
+		versions                        []string
+		expectedHighestSupportedVersion string
+		shouldFail                      bool
+	}{
+		{
+			versions:                        []string{"v1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.3.0"},
+			expectedHighestSupportedVersion: "0.3.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0"},
+			expectedHighestSupportedVersion: "0.2.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v0.3.0"},
+			expectedHighestSupportedVersion: "0.3.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0"},
+			expectedHighestSupportedVersion: "0.2.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0", "v0.3.0"},
+			expectedHighestSupportedVersion: "0.3.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0", "v1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0", "v1.2.3"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "v0.3.0"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"4.9.12", "2.0.1"},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+		{
+			versions:                        []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+		{
+			versions:                        []string{"var", "boo", "foo"},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		actual, err := highestSupportedVersion(tc.versions)
+
+		// Assert
+		if tc.shouldFail && err == nil {
+			t.Fatalf("expecting highestSupportedVersion to fail, but got nil error for testcase: %#v", tc)
+		}
+		if !tc.shouldFail && err != nil {
+			t.Fatalf("unexpected error during ValidatePlugin for testcase: %#v\r\n err:%v", tc, err)
+		}
+		if tc.expectedHighestSupportedVersion != "" {
+			result, err := actual.Compare(tc.expectedHighestSupportedVersion)
+			if err != nil {
+				t.Fatalf("comparison failed with %v for testcase %#v", err, tc)
+			}
+			if result != 0 {
+				t.Fatalf("expectedHighestSupportedVersion %v, but got %v for tc: %#v", tc.expectedHighestSupportedVersion, actual, tc)
+			}
 		}
 	}
 }

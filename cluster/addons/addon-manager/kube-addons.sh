@@ -44,12 +44,11 @@ KUBECTL_PRUNE_WHITELIST=(
   core/v1/Service
   batch/v1/Job
   batch/v1beta1/CronJob
-  extensions/v1beta1/DaemonSet
-  extensions/v1beta1/Deployment
+  apps/v1/DaemonSet
+  apps/v1/Deployment
+  apps/v1/ReplicaSet
+  apps/v1/StatefulSet
   extensions/v1beta1/Ingress
-  extensions/v1beta1/ReplicaSet
-  apps/v1beta1/StatefulSet
-  apps/v1beta1/Deployment
 )
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}

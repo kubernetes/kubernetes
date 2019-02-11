@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +64,7 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 	if component == constants.Etcd {
 		image = images.GetEtcdImage(d.cfg)
 	} else {
-		image = images.GetKubeControlPlaneImage(component, d.cfg)
+		image = images.GetKubernetesImage(component, d.cfg)
 	}
 	ds := buildPrePullDaemonSet(component, image)
 

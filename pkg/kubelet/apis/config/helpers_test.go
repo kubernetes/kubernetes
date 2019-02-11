@@ -197,6 +197,7 @@ var (
 		"MaxOpenFiles",
 		"MaxPods",
 		"NodeStatusUpdateFrequency.Duration",
+		"NodeStatusReportFrequency.Duration",
 		"NodeLeaseDurationSeconds",
 		"OOMScoreAdj",
 		"PodCIDR",

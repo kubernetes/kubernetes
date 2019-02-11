@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/klog"
 	"strings"
 )
 
@@ -284,9 +284,9 @@ func createPVSpec(name string, readOnly bool, zones []string) *volume.Spec {
 	}
 
 	if zones != nil {
-		zonesLabel := strings.Join(zones, kubeletapis.LabelMultiZoneDelimiter)
+		zonesLabel := strings.Join(zones, volumeutil.LabelMultiZoneDelimiter)
 		spec.PersistentVolume.ObjectMeta.Labels = map[string]string{
-			kubeletapis.LabelZoneFailureDomain: zonesLabel,
+			v1.LabelZoneFailureDomain: zonesLabel,
 		}
 	}
 
@@ -346,7 +346,7 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, r
 		return errors.New("Unexpected AttachDisk call: wrong regional")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.ret)
 
 	return expected.ret
 }
@@ -371,7 +371,7 @@ func (testcase *testcase) DetachDisk(devicePath string, nodeName types.NodeName)
 		return errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", devicePath, nodeName, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", devicePath, nodeName, expected.ret)
 
 	return expected.ret
 }
@@ -396,7 +396,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
+	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
 }

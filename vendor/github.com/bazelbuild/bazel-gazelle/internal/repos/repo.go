@@ -61,10 +61,12 @@ type lockFileFormat int
 const (
 	unknownFormat lockFileFormat = iota
 	depFormat
+	moduleFormat
 )
 
 var lockFileParsers = map[lockFileFormat]func(string) ([]Repo, error){
-	depFormat: importRepoRulesDep,
+	depFormat:    importRepoRulesDep,
+	moduleFormat: importRepoRulesModules,
 }
 
 // ImportRepoRules reads the lock file of a vendoring tool and returns
@@ -94,6 +96,8 @@ func getLockFileFormat(filename string) lockFileFormat {
 	switch filepath.Base(filename) {
 	case "Gopkg.lock":
 		return depFormat
+	case "go.mod":
+		return moduleFormat
 	default:
 		return unknownFormat
 	}
@@ -103,7 +107,12 @@ func getLockFileFormat(filename string) lockFileFormat {
 // be written in a WORKSPACE file.
 func GenerateRule(repo Repo) *rule.Rule {
 	r := rule.NewRule("go_repository", repo.Name)
-	r.SetAttr("commit", repo.Commit)
+	if repo.Commit != "" {
+		r.SetAttr("commit", repo.Commit)
+	}
+	if repo.Tag != "" {
+		r.SetAttr("tag", repo.Tag)
+	}
 	r.SetAttr("importpath", repo.GoPrefix)
 	if repo.Remote != "" {
 		r.SetAttr("remote", repo.Remote)

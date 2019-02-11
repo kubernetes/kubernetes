@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	"time"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,10 +75,15 @@ func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (res
 
 // List takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
 func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *apiextensions.CustomResourceDefinitionList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &apiextensions.CustomResourceDefinitionList{}
 	err = c.client.Get().
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -84,10 +91,15 @@ func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *apiextens
 
 // Watch returns a watch.Interface that watches the requested customResourceDefinitions.
 func (c *customResourceDefinitions) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -141,9 +153,14 @@ func (c *customResourceDefinitions) Delete(name string, options *v1.DeleteOption
 
 // DeleteCollection deletes a collection of objects.
 func (c *customResourceDefinitions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("customresourcedefinitions").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

@@ -20,8 +20,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +74,7 @@ var (
 		kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
 		# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-		kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+		kubectl expose rc streamer --port=4100 --protocol=UDP --name=video-stream
 
 		# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rs nginx --port=80 --target-port=8000
@@ -321,7 +321,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if err := o.Recorder.Record(object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.DryRun {

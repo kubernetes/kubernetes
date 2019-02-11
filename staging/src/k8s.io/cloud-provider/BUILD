@@ -20,7 +20,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -33,6 +33,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/cloud-provider/features:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/node:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/service/helpers:all-srcs",
+    ],
     tags = ["automanaged"],
 )

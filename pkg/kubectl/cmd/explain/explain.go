@@ -55,7 +55,7 @@ type ExplainOptions struct {
 	genericclioptions.IOStreams
 
 	CmdParent  string
-	ApiVersion string
+	APIVersion string
 	Recursive  bool
 
 	Mapper meta.RESTMapper
@@ -77,7 +77,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 		Use:                   "explain RESOURCE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Documentation of resources"),
-		Long:                  explainLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
@@ -86,7 +86,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 		},
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.ApiVersion, "api-version", o.ApiVersion, "Get different explanations for particular API version")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version")
 	return cmd
 }
 
@@ -106,7 +106,7 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *ExplainOptions) Validate(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("You must specify the type of resource to explain. %s\n", cmdutil.SuggestApiResources(o.CmdParent))
+		return fmt.Errorf("You must specify the type of resource to explain. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 	}
 	if len(args) > 1 {
 		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
@@ -118,7 +118,7 @@ func (o *ExplainOptions) Validate(args []string) error {
 // Run executes the appropriate steps to print a model's documentation
 func (o *ExplainOptions) Run(args []string) error {
 	recursive := o.Recursive
-	apiVersionString := o.ApiVersion
+	apiVersionString := o.APIVersion
 
 	// TODO: After we figured out the new syntax to separate group and resource, allow
 	// the users to use it in explain (kubectl explain <group><syntax><resource>).

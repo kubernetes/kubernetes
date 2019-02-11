@@ -65,7 +65,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	if clusterStatus.APIEndpoints == nil {
 		clusterStatus.APIEndpoints = map[string]kubeadmapi.APIEndpoint{}
 	}
-	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.APIEndpoint
+	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
 
 	// Marshal the ClusterStatus back into YAML
 	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)

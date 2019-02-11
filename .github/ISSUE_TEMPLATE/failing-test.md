@@ -1,6 +1,7 @@
 ---
 name: Failing Test
 about: Report test failures in Kubernetes CI jobs
+labels: kind/failing-test
 
 ---
 
@@ -17,6 +18,3 @@ about: Report test failures in Kubernetes CI jobs
 **Reason for failure**:
 
 **Anything else we need to know**:
-
-<!-- DO NOT EDIT BELOW THIS LINE -->
-/kind failing-test

@@ -17,23 +17,26 @@ limitations under the License.
 package gce
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 const (
-	nodesHealthCheckPath   = "/healthz"
-	lbNodesHealthCheckPort = ports.ProxyHealthzPort
+	nodesHealthCheckPath = "/healthz"
+	// NOTE: Please keep the following port in sync with ProxyHealthzPort in pkg/master/ports/ports.go
+	// ports.ProxyHealthzPort was not used here to avoid dependencies to k8s.io/kubernetes in the
+	// GCE cloud provider which is required as part of the out-of-tree cloud provider efforts.
+	// TODO: use a shared constant once ports in pkg/master/ports are in a common external repo.
+	lbNodesHealthCheckPort = 10256
 )
 
 var (
@@ -42,7 +45,7 @@ var (
 
 func init() {
 	if v, err := utilversion.ParseGeneric("1.7.2"); err != nil {
-		glog.Fatalf("Failed to parse version for minNodesHealthCheckVersion: %v", err)
+		klog.Fatalf("Failed to parse version for minNodesHealthCheckVersion: %v", err)
 	} else {
 		minNodesHealthCheckVersion = v
 	}
@@ -274,7 +277,7 @@ func GetNodesHealthCheckPath() string {
 func isAtLeastMinNodesHealthCheckVersion(vstring string) bool {
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return false
 	}
 	return version.AtLeast(minNodesHealthCheckVersion)

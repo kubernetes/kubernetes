@@ -8,10 +8,13 @@ subjects:
     name: csi-attacher
     namespace: default
   - kind: ServiceAccount
-    name: csi-driver-registrar
+    name: csi-node-sa
     namespace: default
   - kind: ServiceAccount
     name: csi-provisioner
+    namespace: default
+  - kind: ServiceAccount
+    name: csi-snapshotter
     namespace: default
 roleRef:
   kind: ClusterRole

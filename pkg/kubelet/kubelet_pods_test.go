@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 
@@ -42,6 +43,7 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -91,9 +93,7 @@ func TestDisabledSubpath(t *testing.T) {
 		},
 	}
 
-	utilfeature.DefaultFeatureGate.Set("VolumeSubpath=false")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeSubpath=true")
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
 	for name, test := range cases {
 		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm, nil)
 		if err != nil && !test.expectError {
@@ -183,9 +183,7 @@ fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -214,12 +212,8 @@ fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}
@@ -300,9 +294,7 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -323,12 +315,8 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}

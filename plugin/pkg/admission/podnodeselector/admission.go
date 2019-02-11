@@ -21,7 +21,7 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 )
 
 // The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
@@ -97,14 +96,6 @@ func readConfig(config io.Reader) *pluginConfig {
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
 func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	if shouldIgnore(a) {
-		return nil
-	}
-	updateInitialized, err := util.IsUpdatingInitializedObject(a)
-	if err != nil {
-		return err
-	}
-	if updateInitialized {
-		// node selector of an initialized pod is immutable
 		return nil
 	}
 	if !p.WaitForReady() {
@@ -190,7 +181,7 @@ func shouldIgnore(a admission.Attributes) bool {
 
 	_, ok := a.GetObject().(*api.Pod)
 	if !ok {
-		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
+		klog.Errorf("expected pod but got %s", a.GetKind().Kind)
 		return true
 	}
 
@@ -199,7 +190,7 @@ func shouldIgnore(a admission.Attributes) bool {
 
 func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector {
 	return &podNodeSelector{
-		Handler:              admission.NewHandler(admission.Create, admission.Update),
+		Handler:              admission.NewHandler(admission.Create),
 		clusterNodeSelectors: clusterNodeSelectors,
 	}
 }

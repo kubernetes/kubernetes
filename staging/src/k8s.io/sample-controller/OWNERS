@@ -1,9 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - sttts
 - munnerz
 reviewers:
 - gregory-m
-- kargakis
 - sttts
 - munnerz
 - nikhita

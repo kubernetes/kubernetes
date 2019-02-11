@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -478,7 +478,7 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
 
 	if err != nil {
-		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
 	}
 	diskUUID = formatVirtualDiskUUID(diskUUID)

@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 )
 
 const (
@@ -85,7 +85,7 @@ func runMigrate() {
 	if opts.name == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			glog.Errorf("Error while getting hostname to supply default --name: %v", err)
+			klog.Errorf("Error while getting hostname to supply default --name: %v", err)
 			os.Exit(1)
 		}
 		opts.name = fmt.Sprintf("etcd-%s", hostname)
@@ -98,29 +98,29 @@ func runMigrate() {
 		opts.initialCluster = fmt.Sprintf("%s=http://localhost:2380", opts.name)
 	}
 	if opts.targetStorage == "" {
-		glog.Errorf("--target-storage is required")
+		klog.Errorf("--target-storage is required")
 		os.Exit(1)
 	}
 	if opts.targetVersion == "" {
-		glog.Errorf("--target-version is required")
+		klog.Errorf("--target-version is required")
 		os.Exit(1)
 	}
 	if opts.dataDir == "" {
-		glog.Errorf("--data-dir is required")
+		klog.Errorf("--data-dir is required")
 		os.Exit(1)
 	}
 	if opts.bundledVersionString == "" {
-		glog.Errorf("--bundled-versions is required")
+		klog.Errorf("--bundled-versions is required")
 		os.Exit(1)
 	}
 
 	bundledVersions, err := ParseSupportedVersions(opts.bundledVersionString)
 	if err != nil {
-		glog.Errorf("Failed to parse --supported-versions: %v", err)
+		klog.Errorf("Failed to parse --supported-versions: %v", err)
 	}
 	err = validateBundledVersions(bundledVersions, opts.binDir)
 	if err != nil {
-		glog.Errorf("Failed to validate that 'etcd-<version>' and 'etcdctl-<version>' binaries exist in --bin-dir '%s' for all --bundled-verions '%s': %v",
+		klog.Errorf("Failed to validate that 'etcd-<version>' and 'etcdctl-<version>' binaries exist in --bin-dir '%s' for all --bundled-verions '%s': %v",
 			opts.binDir, opts.bundledVersionString, err)
 		os.Exit(1)
 	}
@@ -139,7 +139,7 @@ func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls 
 
 	dataDir, err := OpenOrCreateDataDirectory(dataDirPath)
 	if err != nil {
-		glog.Errorf("Error opening or creating data directory %s: %v", dataDirPath, err)
+		klog.Errorf("Error opening or creating data directory %s: %v", dataDirPath, err)
 		os.Exit(1)
 	}
 
@@ -158,7 +158,7 @@ func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls 
 	}
 	client, err := NewEtcdMigrateClient(cfg)
 	if err != nil {
-		glog.Errorf("Migration failed: %v", err)
+		klog.Errorf("Migration failed: %v", err)
 		os.Exit(1)
 	}
 	defer client.Close()
@@ -167,7 +167,7 @@ func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls 
 
 	err = migrator.MigrateIfNeeded(target)
 	if err != nil {
-		glog.Errorf("Migration failed: %v", err)
+		klog.Errorf("Migration failed: %v", err)
 		os.Exit(1)
 	}
 }

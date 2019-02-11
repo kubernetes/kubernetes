@@ -62,6 +62,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MaxPods = 110
 			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
+			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency

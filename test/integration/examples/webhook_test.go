@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestWebhookLoopback(t *testing.T) {
@@ -40,7 +41,7 @@ func TestWebhookLoopback(t *testing.T) {
 
 	called := int32(0)
 
-	client, _ := startTestServer(t, stopCh, TestServerSetup{
+	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *master.Config) {
@@ -108,8 +109,9 @@ func (f auditChecker) LevelAndStages(attrs authorizer.Attributes) (auditinternal
 
 type auditSinkFunc func(events ...*auditinternal.Event)
 
-func (f auditSinkFunc) ProcessEvents(events ...*auditinternal.Event) {
+func (f auditSinkFunc) ProcessEvents(events ...*auditinternal.Event) bool {
 	f(events...)
+	return true
 }
 
 func (auditSinkFunc) Run(stopCh <-chan struct{}) error {

@@ -254,7 +254,7 @@ func TestCNIPlugin(t *testing.T) {
 	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation)
+	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation, nil)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

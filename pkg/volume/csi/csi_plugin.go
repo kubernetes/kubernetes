@@ -21,18 +21,19 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"context"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -61,6 +62,8 @@ const (
 	csiResyncPeriod = time.Minute
 )
 
+var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}
+
 type csiPlugin struct {
 	host              volume.VolumeHost
 	blockEnabled      bool
@@ -80,16 +83,6 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // volume.VolumePlugin methods
 var _ volume.VolumePlugin = &csiPlugin{}
 
-type csiDriver struct {
-	driverName     string
-	driverEndpoint string
-}
-
-type csiDriversStore struct {
-	driversMap map[string]csiDriver
-	sync.RWMutex
-}
-
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
 }
@@ -97,7 +90,7 @@ type RegistrationHandler struct {
 // TODO (verult) consider using a struct instead of global variables
 // csiDrivers map keep track of all registered CSI drivers on the node and their
 // corresponding sockets
-var csiDrivers csiDriversStore
+var csiDrivers = &DriversStore{}
 
 var nim nodeinfomanager.Interface
 
@@ -107,54 +100,108 @@ var PluginHandler = &RegistrationHandler{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	glog.Infof(log("Trying to register a new plugin with name: %s endpoint: %s versions: %s",
-		pluginName, endpoint, strings.Join(versions, ",")))
+func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s, foundInDeprecatedDir: %v",
+		pluginName, endpoint, strings.Join(versions, ","), foundInDeprecatedDir))
 
-	return nil
+	if foundInDeprecatedDir {
+		// CSI 0.x drivers used /var/lib/kubelet/plugins as the socket dir.
+		// This was deprecated as the socket dir for kubelet drivers, in lieu of a dedicated dir /var/lib/kubelet/plugins_registry
+		// The deprecated dir will only be allowed for a whitelisted set of old versions.
+		// CSI 1.x drivers should use the /var/lib/kubelet/plugins_registry
+		if !isDeprecatedSocketDirAllowed(versions) {
+			err := fmt.Errorf("socket for CSI driver %q versions %v was found in a deprecated dir. Drivers implementing CSI 1.x+ must use the new dir", pluginName, versions)
+			klog.Error(err)
+			return err
+		}
+	}
+
+	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
+	return err
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string) error {
-	glog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
-	func() {
-		// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-		// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
+	if err != nil {
+		return err
+	}
 
-		// It's not necessary to lock the entire RegistrationCallback() function because only the CSI
-		// client depends on this driver map, and the CSI client does not depend on node information
-		// updated in the rest of the function.
-		csiDrivers.Lock()
-		defer csiDrivers.Unlock()
-		csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
-	}()
+	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersion,
+	})
 
 	// Get node info from the driver.
-	csi := newCsiDriverClient(pluginName)
-	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
+	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
-		unregisterDriver(pluginName)
-		return fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
+		klog.Error(log("registrationHandler.RegisterPlugin failed at CSI.NodeGetInfo: %v", err))
+		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			return unregErr
+		}
+		return err
 	}
 
-	err = nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		unregisterDriver(pluginName)
-		return fmt.Errorf("error updating CSI node info in the cluster: %v", err)
+		klog.Error(log("registrationHandler.RegisterPlugin failed at AddNodeInfo: %v", err))
+		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			return unregErr
+		}
+		return err
 	}
 
 	return nil
 }
 
-// DeRegisterPlugin is called when a plugin removed it's socket, signaling
+func (h *RegistrationHandler) validateVersions(callerName, pluginName string, endpoint string, versions []string) (*utilversion.Version, error) {
+	if len(versions) == 0 {
+		err := fmt.Errorf("%s for CSI driver %q failed. Plugin returned an empty list for supported versions", callerName, pluginName)
+		klog.Error(err)
+		return nil, err
+	}
+
+	// Validate version
+	newDriverHighestVersion, err := highestSupportedVersion(versions)
+	if err != nil {
+		err := fmt.Errorf("%s for CSI driver %q failed. None of the versions specified %q are supported. err=%v", callerName, pluginName, versions, err)
+		klog.Error(err)
+		return nil, err
+	}
+
+	existingDriver, driverExists := csiDrivers.Get(pluginName)
+	if driverExists {
+		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
+			err := fmt.Errorf("%s for CSI driver %q failed. Another driver with the same name is already registered with a higher supported version: %q", callerName, pluginName, existingDriver.highestSupportedVersion)
+			klog.Error(err)
+			return nil, err
+		}
+	}
+
+	return newDriverHighestVersion, nil
+}
+
+// DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
-// TODO: Handle DeRegistration
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
+	klog.V(4).Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
+	if err := unregisterDriver(pluginName); err != nil {
+		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+	}
 }
 
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
@@ -163,7 +210,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		csiClient := host.GetCSIClient()
 		if csiClient == nil {
-			glog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
+			klog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
 		} else {
 			// Start informer for CSIDrivers.
 			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
@@ -173,9 +220,11 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	// Initializing csiDrivers map and label management channels
-	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
+	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
+
+	// TODO(#70514) Init CSINodeInfo object if the CRD exists and create Driver
+	// objects for migrated drivers.
 
 	return nil
 }
@@ -189,7 +238,7 @@ func (p *csiPlugin) GetPluginName() string {
 func (p *csiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	csi, err := getCSISourceFromSpec(spec)
 	if err != nil {
-		glog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %v", err))
+		klog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %v", err))
 		return "", err
 	}
 
@@ -201,6 +250,10 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	// TODO (vladimirvivien) CanSupport should also take into account
 	// the availability/registration of specified Driver in the volume source
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
+}
+
+func (p *csiPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *csiPlugin) RequiresRemount() bool {
@@ -222,11 +275,14 @@ func (p *csiPlugin) NewMounter(
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
-		glog.Error(log("failed to get a kubernetes client"))
+		klog.Error(log("failed to get a kubernetes client"))
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	csi := newCsiDriverClient(pvSource.Driver)
+	csi, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	mounter := &csiMountMgr{
 		plugin:       p,
@@ -234,7 +290,7 @@ func (p *csiPlugin) NewMounter(
 		spec:         spec,
 		pod:          pod,
 		podUID:       pod.UID,
-		driverName:   pvSource.Driver,
+		driverName:   csiDriverName(pvSource.Driver),
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
 		csiClient:    csi,
@@ -246,10 +302,10 @@ func (p *csiPlugin) NewMounter(
 	dataDir := path.Dir(dir) // dropoff /mount at end
 
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
-		glog.Error(log("failed to create dir %#v:  %v", dataDir, err))
+		klog.Error(log("failed to create dir %#v:  %v", dataDir, err))
 		return nil, err
 	}
-	glog.V(4).Info(log("created path successfully [%s]", dataDir))
+	klog.V(4).Info(log("created path successfully [%s]", dataDir))
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
@@ -263,21 +319,21 @@ func (p *csiPlugin) NewMounter(
 	}
 
 	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
-		glog.Error(log("failed to save volume info data: %v", err))
+		klog.Error(log("failed to save volume info data: %v", err))
 		if err := os.RemoveAll(dataDir); err != nil {
-			glog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
+			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
 			return nil, err
 		}
 		return nil, err
 	}
 
-	glog.V(4).Info(log("mounter created successfully"))
+	klog.V(4).Info(log("mounter created successfully"))
 
 	return mounter, nil
 }
 
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	glog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
+	klog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
 
 	unmounter := &csiMountMgr{
 		plugin:       p,
@@ -290,26 +346,29 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	dataDir := path.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
-		glog.Error(log("unmounter failed to load volume data file [%s]: %v", dir, err))
+		klog.Error(log("unmounter failed to load volume data file [%s]: %v", dir, err))
 		return nil, err
 	}
-	unmounter.driverName = data[volDataKey.driverName]
+	unmounter.driverName = csiDriverName(data[volDataKey.driverName])
 	unmounter.volumeID = data[volDataKey.volHandle]
-	unmounter.csiClient = newCsiDriverClient(unmounter.driverName)
+	unmounter.csiClient, err = newCsiDriverClient(unmounter.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmounter, nil
 }
 
 func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	glog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
+	klog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
 	if err != nil {
-		glog.Error(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
+		klog.Error(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
 		return nil, err
 	}
 
-	glog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
+	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{
@@ -351,7 +410,7 @@ var _ volume.DeviceMountableVolumePlugin = &csiPlugin{}
 func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
-		glog.Error(log("unable to get kubernetes client from host"))
+		klog.Error(log("unable to get kubernetes client from host"))
 		return nil, errors.New("unable to get Kubernetes client")
 	}
 
@@ -369,7 +428,7 @@ func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
-		glog.Error(log("unable to get kubernetes client from host"))
+		klog.Error(log("unable to get kubernetes client from host"))
 		return nil, errors.New("unable to get Kubernetes client")
 	}
 
@@ -378,6 +437,29 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 		k8s:           k8s,
 		waitSleepTime: 1 * time.Second,
 	}, nil
+}
+
+func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
+	if spec.PersistentVolume == nil {
+		klog.Error(log("plugin.CanAttach test failed, spec missing PersistentVolume"))
+		return false
+	}
+
+	var driverName string
+	if spec.PersistentVolume.Spec.CSI != nil {
+		driverName = spec.PersistentVolume.Spec.CSI.Driver
+	} else {
+		klog.Error(log("plugin.CanAttach test failed, spec missing CSIPersistentVolume"))
+		return false
+	}
+
+	skipAttach, err := p.skipAttach(driverName)
+
+	if err != nil {
+		klog.Error(log("plugin.CanAttach error when calling plugin.skipAttach for driver %s: %s", driverName, err))
+	}
+
+	return !skipAttach
 }
 
 func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
@@ -406,12 +488,15 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		return nil, err
 	}
 
-	glog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient(pvSource.Driver)
+	klog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
+	client, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
-		glog.Error(log("failed to get a kubernetes client"))
+		klog.Error(log("failed to get a kubernetes client"))
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
@@ -420,7 +505,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		k8s:        k8s,
 		plugin:     p,
 		volumeID:   pvSource.VolumeHandle,
-		driverName: pvSource.Driver,
+		driverName: csiDriverName(pvSource.Driver),
 		readOnly:   readOnly,
 		spec:       spec,
 		specName:   spec.Name(),
@@ -431,10 +516,10 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	dataDir := getVolumeDeviceDataDir(spec.Name(), p.host)
 
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
-		glog.Error(log("failed to create data dir %s:  %v", dataDir, err))
+		klog.Error(log("failed to create data dir %s:  %v", dataDir, err))
 		return nil, err
 	}
-	glog.V(4).Info(log("created path successfully [%s]", dataDir))
+	klog.V(4).Info(log("created path successfully [%s]", dataDir))
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
@@ -448,9 +533,9 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 
 	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
-		glog.Error(log("failed to save volume info data: %v", err))
+		klog.Error(log("failed to save volume info data: %v", err))
 		if err := os.RemoveAll(dataDir); err != nil {
-			glog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
+			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
 			return nil, err
 		}
 		return nil, err
@@ -464,7 +549,7 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
 
-	glog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
+	klog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
 	unmapper := &csiBlockMapper{
 		plugin:   p,
 		podUID:   podUID,
@@ -475,12 +560,15 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 	dataDir := getVolumeDeviceDataDir(unmapper.specName, p.host)
 	data, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
-		glog.Error(log("unmapper failed to load volume data file [%s]: %v", dataDir, err))
+		klog.Error(log("unmapper failed to load volume data file [%s]: %v", dataDir, err))
 		return nil, err
 	}
-	unmapper.driverName = data[volDataKey.driverName]
+	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
-	unmapper.csiClient = newCsiDriverClient(unmapper.driverName)
+	unmapper.csiClient, err = newCsiDriverClient(unmapper.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmapper, nil
 }
@@ -490,16 +578,16 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
 
-	glog.V(4).Infof("plugin.ConstructBlockVolumeSpec [podUID=%s, specVolName=%s, path=%s]", string(podUID), specVolName, mapPath)
+	klog.V(4).Infof("plugin.ConstructBlockVolumeSpec [podUID=%s, specVolName=%s, path=%s]", string(podUID), specVolName, mapPath)
 
 	dataDir := getVolumeDeviceDataDir(specVolName, p.host)
 	volData, err := loadVolumeData(dataDir, volDataFileName)
 	if err != nil {
-		glog.Error(log("plugin.ConstructBlockVolumeSpec failed loading volume data using [%s]: %v", mapPath, err))
+		klog.Error(log("plugin.ConstructBlockVolumeSpec failed loading volume data using [%s]: %v", mapPath, err))
 		return nil, err
 	}
 
-	glog.V(4).Info(log("plugin.ConstructBlockVolumeSpec extracted [%#v]", volData))
+	klog.V(4).Info(log("plugin.ConstructBlockVolumeSpec extracted [%#v]", volData))
 
 	blockMode := api.PersistentVolumeBlock
 	pv := &api.PersistentVolume{
@@ -541,7 +629,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err
@@ -565,14 +653,79 @@ func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, dri
 	return attachment.Status.AttachmentMetadata, nil
 }
 
-func unregisterDriver(driverName string) {
-	func() {
-		csiDrivers.Lock()
-		defer csiDrivers.Unlock()
-		delete(csiDrivers.driversMap, driverName)
-	}()
+func unregisterDriver(driverName string) error {
+	csiDrivers.Delete(driverName)
 
-	if err := nim.RemoveNodeInfo(driverName); err != nil {
-		glog.Errorf("Error unregistering CSI driver: %v", err)
+	if err := nim.UninstallCSIDriver(driverName); err != nil {
+		klog.Errorf("Error uninstalling CSI driver: %v", err)
+		return err
 	}
+
+	return nil
+}
+
+// Return the highest supported version
+func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("CSI driver reporting empty array for supported versions")
+	}
+
+	// Sort by lowest to highest version
+	sort.Slice(versions, func(i, j int) bool {
+		parsedVersionI, err := utilversion.ParseGeneric(versions[i])
+		if err != nil {
+			// Push bad values to the bottom
+			return true
+		}
+
+		parsedVersionJ, err := utilversion.ParseGeneric(versions[j])
+		if err != nil {
+			// Push bad values to the bottom
+			return false
+		}
+
+		return parsedVersionI.LessThan(parsedVersionJ)
+	})
+
+	for i := len(versions) - 1; i >= 0; i-- {
+		highestSupportedVersion, err := utilversion.ParseGeneric(versions[i])
+		if err != nil {
+			return nil, err
+		}
+
+		if highestSupportedVersion.Major() <= 1 {
+			return highestSupportedVersion, nil
+		}
+	}
+
+	return nil, fmt.Errorf("None of the CSI versions reported by this driver are supported")
+}
+
+// Only drivers that implement CSI 0.x are allowed to use deprecated socket dir.
+func isDeprecatedSocketDirAllowed(versions []string) bool {
+	for _, version := range versions {
+		if isV0Version(version) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isV0Version(version string) bool {
+	parsedVersion, err := utilversion.ParseGeneric(version)
+	if err != nil {
+		return false
+	}
+
+	return parsedVersion.Major() == 0
+}
+
+func isV1Version(version string) bool {
+	parsedVersion, err := utilversion.ParseGeneric(version)
+	if err != nil {
+		return false
+	}
+
+	return parsedVersion.Major() == 1
 }

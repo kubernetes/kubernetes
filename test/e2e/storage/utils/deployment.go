@@ -88,11 +88,15 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			// value.
 			switch container.Name {
 			case o.DriverContainerName:
-				container.Args = append(container.Args, "--drivername="+o.NewDriverName)
+				container.Args = append(container.Args, o.DriverContainerArguments...)
 			case o.ProvisionerContainerName:
 				// Driver name is expected to be the same
 				// as the provisioner here.
 				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
+			case o.SnapshotterContainerName:
+				// Driver name is expected to be the same
+				// as the snapshotter here.
+				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
 			}
 		}
 	}
@@ -135,13 +139,20 @@ type PatchCSIOptions struct {
 	// in existing fields).
 	NewDriverName string
 	// The name of the container which has the CSI driver binary.
-	// If non-empty, --drivername with the new name will be
-	// appended to the argument list.
+	// If non-empty, DriverContainerArguments are added to argument
+	// list in container with that name.
 	DriverContainerName string
+	// List of arguments to add to container with
+	// DriverContainerName.
+	DriverContainerArguments []string
 	// The name of the container which has the provisioner binary.
 	// If non-empty, --provisioner with new name will be appended
 	// to the argument list.
 	ProvisionerContainerName string
+	// The name of the container which has the snapshotter binary.
+	// If non-empty, --snapshotter with new name will be appended
+	// to the argument list.
+	SnapshotterContainerName string
 	// If non-empty, all pods are forced to run on this node.
 	NodeName string
 }

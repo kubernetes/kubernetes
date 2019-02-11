@@ -31,9 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -70,7 +67,6 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Containers:        []v1.Container{container},
 			PriorityClassName: "system-cluster-critical",
 			HostNetwork:       true,
-			DNSPolicy:         v1.DNSClusterFirstWithHostNet,
 			Volumes:           VolumeMapToSlice(volumes),
 		},
 	}
@@ -85,28 +81,11 @@ func ComponentResources(cpu string) v1.ResourceRequirements {
 	}
 }
 
-// ComponentProbe is a helper function building a ready v1.Probe object from some simple parameters
-func ComponentProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, path string, scheme v1.URIScheme) *v1.Probe {
-	return &v1.Probe{
-		Handler: v1.Handler{
-			HTTPGet: &v1.HTTPGetAction{
-				Host:   GetProbeAddress(cfg, componentName),
-				Path:   path,
-				Port:   intstr.FromInt(port),
-				Scheme: scheme,
-			},
-		},
-		InitialDelaySeconds: 15,
-		TimeoutSeconds:      15,
-		FailureThreshold:    8,
-	}
-}
-
 // EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
-func EtcdProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+func EtcdProbe(cfg *kubeadmapi.Etcd, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
 	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
 	// etcd pod is alive if a linearizable get succeeds.
-	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=https://[%s]:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=https://[%s]:%d %s get foo", GetEtcdProbeAddress(cfg), port, tlsFlags)
 
 	return &v1.Probe{
 		Handler: v1.Handler{
@@ -228,73 +207,80 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
-// in static pod manifests.
-func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) string {
-	switch {
-	case componentName == kubeadmconstants.KubeAPIServer:
-		// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
-		// will generate a DaemonSet with a nodeSelector such that all nodes with the label
-		// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
-		// is run only once on an initial host, the API advertise address will be invalid for any
-		// future hosts that do not have the same address. Furthermore, since liveness and readiness
-		// probes do not support the Downward API we cannot dynamically set the advertise address to
-		// the node's IP. The only option then is to use localhost.
-		if features.Enabled(cfg.FeatureGates, features.SelfHosting) {
-			return "127.0.0.1"
-		} else if cfg.APIEndpoint.AdvertiseAddress != "" {
-			return cfg.APIEndpoint.AdvertiseAddress
-		}
-	case componentName == kubeadmconstants.KubeControllerManager:
-		if addr, exists := cfg.ControllerManagerExtraArgs[kubeControllerManagerAddressArg]; exists {
-			return addr
-		}
-	case componentName == kubeadmconstants.KubeScheduler:
-		if addr, exists := cfg.SchedulerExtraArgs[kubeSchedulerAddressArg]; exists {
-			return addr
-		}
-	case componentName == kubeadmconstants.Etcd:
-		if cfg.Etcd.Local != nil && cfg.Etcd.Local.ExtraArgs != nil {
-			if arg, exists := cfg.Etcd.Local.ExtraArgs[etcdListenClientURLsArg]; exists {
-				// Use the first url in the listen-client-urls if multiple url's are specified.
-				if strings.ContainsAny(arg, ",") {
-					arg = strings.Split(arg, ",")[0]
+// GetAPIServerProbeAddress returns the probe address for the API server
+func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
+	// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
+	// will generate a DaemonSet with a nodeSelector such that all nodes with the label
+	// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
+	// is run only once on an initial host, the API advertise address will be invalid for any
+	// future hosts that do not have the same address. Furthermore, since liveness and readiness
+	// probes do not support the Downward API we cannot dynamically set the advertise address to
+	// the node's IP. The only option then is to use localhost.
+	if endpoint != nil && endpoint.AdvertiseAddress != "" {
+		return endpoint.AdvertiseAddress
+	}
+
+	return "127.0.0.1"
+}
+
+// GetControllerManagerProbeAddress returns the kubernetes controller manager probe address
+func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
+	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
+		return addr
+	}
+	return "127.0.0.1"
+}
+
+// GetSchedulerProbeAddress returns the kubernetes scheduler probe address
+func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
+	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
+		return addr
+	}
+	return "127.0.0.1"
+}
+
+// GetEtcdProbeAddress returns the etcd probe address
+func GetEtcdProbeAddress(cfg *kubeadmapi.Etcd) string {
+	if cfg.Local != nil && cfg.Local.ExtraArgs != nil {
+		if arg, exists := cfg.Local.ExtraArgs[etcdListenClientURLsArg]; exists {
+			// Use the first url in the listen-client-urls if multiple url's are specified.
+			if strings.ContainsAny(arg, ",") {
+				arg = strings.Split(arg, ",")[0]
+			}
+			parsedURL, err := url.Parse(arg)
+			if err != nil || parsedURL.Hostname() == "" {
+				return "127.0.0.1"
+			}
+			// Return the IP if the URL contains an address instead of a name.
+			if ip := net.ParseIP(parsedURL.Hostname()); ip != nil {
+				// etcdctl doesn't support auto-converting zero addresses into loopback addresses
+				if ip.Equal(net.IPv4zero) {
+					return "127.0.0.1"
 				}
-				parsedURL, err := url.Parse(arg)
-				if err != nil || parsedURL.Hostname() == "" {
-					break
-				}
-				// Return the IP if the URL contains an address instead of a name.
-				if ip := net.ParseIP(parsedURL.Hostname()); ip != nil {
-					// etcdctl doesn't support auto-converting zero addresses into loopback addresses
-					if ip.Equal(net.IPv4zero) {
-						return "127.0.0.1"
-					}
-					if ip.Equal(net.IPv6zero) {
-						return net.IPv6loopback.String()
-					}
-					return ip.String()
-				}
-				// Use the local resolver to try resolving the name within the URL.
-				// If the name can not be resolved, return an IPv4 loopback address.
-				// Otherwise, select the first valid IPv4 address.
-				// If the name does not resolve to an IPv4 address, select the first valid IPv6 address.
-				addrs, err := net.LookupIP(parsedURL.Hostname())
-				if err != nil {
-					break
-				}
-				var ip net.IP
-				for _, addr := range addrs {
-					if addr.To4() != nil {
-						ip = addr
-						break
-					}
-					if addr.To16() != nil && ip == nil {
-						ip = addr
-					}
+				if ip.Equal(net.IPv6zero) {
+					return net.IPv6loopback.String()
 				}
 				return ip.String()
 			}
+			// Use the local resolver to try resolving the name within the URL.
+			// If the name can not be resolved, return an IPv4 loopback address.
+			// Otherwise, select the first valid IPv4 address.
+			// If the name does not resolve to an IPv4 address, select the first valid IPv6 address.
+			addrs, err := net.LookupIP(parsedURL.Hostname())
+			if err != nil {
+				return "127.0.0.1"
+			}
+			var ip net.IP
+			for _, addr := range addrs {
+				if addr.To4() != nil {
+					ip = addr
+					break
+				}
+				if addr.To16() != nil && ip == nil {
+					ip = addr
+				}
+			}
+			return ip.String()
 		}
 	}
 	return "127.0.0.1"

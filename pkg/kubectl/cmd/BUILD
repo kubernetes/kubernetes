@@ -68,27 +68,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "cmd_printing_test.go",
-        "cmd_test.go",
-    ],
+    srcs = ["cmd_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
         "//pkg/kubectl/cmd/plugin:testdata",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/printers:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

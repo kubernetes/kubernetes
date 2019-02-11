@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"net/http"
 
@@ -36,8 +36,10 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
+	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -73,7 +75,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.
-		glog.Errorf("Failed to start service controller: %v", err)
+		klog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
 	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
@@ -81,8 +83,8 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
-	var clusterCIDR *net.IPNet = nil
-	var serviceCIDR *net.IPNet = nil
+	var clusterCIDR *net.IPNet
+	var serviceCIDR *net.IPNet
 
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		return nil, false, nil
@@ -92,14 +94,14 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
 		_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 		if err != nil {
-			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+			klog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 		}
 	}
 
 	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIPAMController.ServiceCIDR)) != 0 {
 		_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIPAMController.ServiceCIDR)
 		if err != nil {
-			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIPAMController.ServiceCIDR, err)
+			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIPAMController.ServiceCIDR, err)
 		}
 	}
 
@@ -124,8 +126,8 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Coordination().V1beta1().Leases(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
-		ctx.Cloud,
+		ctx.InformerFactory.Apps().V1().DaemonSets(),
+		// node lifecycle controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
@@ -146,23 +148,42 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
+func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
+	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
+		ctx.InformerFactory.Core().V1().Nodes(),
+		// cloud node lifecycle controller uses existing cluster role from node-controller
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		ctx.Cloud,
+		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+	)
+	if err != nil {
+		// the controller manager should continue to run if the "Instances" interface is not
+		// supported, though it's unlikely for a cloud provider to not support it
+		klog.Errorf("failed to start cloud node lifecycle controller: %v", err)
+		return nil, false, nil
+	}
+
+	go cloudNodeLifecycleController.Run(ctx.Stop)
+	return nil, true, nil
+}
+
 func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
-		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
+		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
 	}
 	if ctx.Cloud == nil {
-		glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
+		klog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
 		return nil, false, nil
 	}
 	routes, ok := ctx.Cloud.Routes()
 	if !ok {
-		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
+		klog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return nil, false, nil
 	}
 	_, clusterCIDR, err := net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+		klog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 	}
 	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.ComponentConfig.KubeCloudShared.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
@@ -193,7 +214,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
 	// csiClient works with CRDs that support json only
@@ -311,6 +332,10 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 	nsKubeconfig.QPS *= 20
 	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
+	return startModifiedNamespaceController(ctx, namespaceKubeClient, nsKubeconfig)
+}
+
+func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
 
 	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
 	if err != nil {

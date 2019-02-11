@@ -46,7 +46,7 @@ find_files() {
 IFS=$'\n'
 conflicts=($(find_files | sed 's|/.readonly||' | while read dir; do
     dir=${dir#./}
-    if kube::util::has_changes_against_upstream_branch "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
+    if kube::util::has_changes "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
         echo "${dir}"
     fi
 done))

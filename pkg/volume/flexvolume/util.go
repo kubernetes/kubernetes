@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -49,7 +49,7 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 	}
 	for name, data := range secrets {
 		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString([]byte(data))
-		glog.V(1).Infof("found flex volume secret info: %s", name)
+		klog.V(1).Infof("found flex volume secret info: %s", name)
 	}
 
 	return nil
@@ -141,7 +141,7 @@ func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, err
 func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string, options []string) error {
 	err := mounter.Mount(devicePath, deviceMountPath, fsType, options)
 	if err != nil {
-		glog.Errorf("Failed to mount the volume at %s, device: %s, error: %s", deviceMountPath, devicePath, err.Error())
+		klog.Errorf("Failed to mount the volume at %s, device: %s, error: %s", deviceMountPath, devicePath, err.Error())
 		return err
 	}
 	return nil
@@ -150,7 +150,7 @@ func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string
 func isNotMounted(mounter mount.Interface, deviceMountPath string) (bool, error) {
 	notmnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
-		glog.Errorf("Error checking mount point %s, error: %v", deviceMountPath, err)
+		klog.Errorf("Error checking mount point %s, error: %v", deviceMountPath, err)
 		return false, err
 	}
 	return notmnt, nil

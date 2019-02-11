@@ -14,14 +14,13 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:go_default_library",
     ],
 )

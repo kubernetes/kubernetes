@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -108,7 +108,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 
 	// Ignore if exclusion annotation is present
 	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
-		glog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
+		klog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
 		if podAnnotations[api.PodPresetOptOutAnnotationKey] == "true" {
 			return nil
 		}
@@ -137,14 +137,14 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	err = safeToApplyPodPresetsOnPod(pod, matchingPPs)
 	if err != nil {
 		// conflict, ignore the error, but raise an event
-		glog.Warningf("conflict occurred while applying podpresets: %s on pod: %v err: %v",
+		klog.Warningf("conflict occurred while applying podpresets: %s on pod: %v err: %v",
 			strings.Join(presetNames, ","), pod.GetGenerateName(), err)
 		return nil
 	}
 
 	applyPodPresetsOnPod(pod, matchingPPs)
 
-	glog.Infof("applied podpresets: %s successfully on Pod: %+v ", strings.Join(presetNames, ","), pod.GetGenerateName())
+	klog.Infof("applied podpresets: %s successfully on Pod: %+v ", strings.Join(presetNames, ","), pod.GetGenerateName())
 
 	return nil
 }
@@ -163,7 +163,7 @@ func filterPodPresets(list []*settingsv1alpha1.PodPreset, pod *api.Pod) ([]*sett
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		glog.V(4).Infof("PodPreset %s matches pod %s labels", pp.GetName(), pod.GetName())
+		klog.V(4).Infof("PodPreset %s matches pod %s labels", pp.GetName(), pod.GetName())
 		matchingPPs = append(matchingPPs, pp)
 	}
 	return matchingPPs, nil

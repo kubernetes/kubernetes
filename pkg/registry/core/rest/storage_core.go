@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -254,13 +254,13 @@ type componentStatusStorage struct {
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
 	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
+		"scheduler":          {Addr: "127.0.0.1", Port: ports.InsecureSchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
 		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
-			glog.Errorf("Failed to parse etcd url for validation: %v", err)
+			klog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
 		}
 		var port int
@@ -269,7 +269,7 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 			var portString string
 			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
 			if err != nil {
-				glog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
+				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
 				continue
 			}
 			port, _ = strconv.Atoi(portString)

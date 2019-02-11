@@ -18,40 +18,35 @@ package util
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
-	"syscall"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"reflect"
-
-	"hash/fnv"
-	"math/rand"
-	"strconv"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -78,6 +73,9 @@ const (
 	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
+
+	// LabelMultiZoneDelimiter separates zones for volumes
+	LabelMultiZoneDelimiter = "__"
 )
 
 // VolumeZoneConfig contains config information about zonal volume.
@@ -101,7 +99,7 @@ func IsReady(dir string) bool {
 	}
 
 	if !s.Mode().IsRegular() {
-		glog.Errorf("ready-file is not a file: %s", readyFile)
+		klog.Errorf("ready-file is not a file: %s", readyFile)
 		return false
 	}
 
@@ -113,117 +111,17 @@ func IsReady(dir string) bool {
 // created.
 func SetReady(dir string) {
 	if err := os.MkdirAll(dir, 0750); err != nil && !os.IsExist(err) {
-		glog.Errorf("Can't mkdir %s: %v", dir, err)
+		klog.Errorf("Can't mkdir %s: %v", dir, err)
 		return
 	}
 
 	readyFile := path.Join(dir, readyFileName)
 	file, err := os.Create(readyFile)
 	if err != nil {
-		glog.Errorf("Can't touch %s: %v", readyFile, err)
+		klog.Errorf("Can't touch %s: %v", readyFile, err)
 		return
 	}
 	file.Close()
-}
-
-// UnmountPath is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
-}
-
-// UnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
-		return nil
-	}
-	corruptedMnt := IsCorruptedMnt(pathErr)
-	if pathErr != nil && !corruptedMnt {
-		return fmt.Errorf("Error checking path: %v", pathErr)
-	}
-	return doUnmountMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
-}
-
-// doUnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, Take it as an argument for convenience of testing
-func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
-	if !corruptedMnt {
-		var notMnt bool
-		var err error
-		if extensiveMountPointCheck {
-			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-		} else {
-			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if notMnt {
-			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-			return os.Remove(mountPath)
-		}
-	}
-
-	// Unmount the mount path
-	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
-	if err := mounter.Unmount(mountPath); err != nil {
-		return err
-	}
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
-	if mntErr != nil {
-		return mntErr
-	}
-	if notMnt {
-		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
-		return os.Remove(mountPath)
-	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
-}
-
-// PathExists returns true if the specified path exists.
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if IsCorruptedMnt(err) {
-		return true, err
-	} else {
-		return false, err
-	}
-}
-
-// IsCorruptedMnt return true if err is about corrupted mount point
-func IsCorruptedMnt(err error) bool {
-	if err == nil {
-		return false
-	}
-	var underlyingError error
-	switch pe := err.(type) {
-	case nil:
-		return false
-	case *os.PathError:
-		underlyingError = pe.Err
-	case *os.LinkError:
-		underlyingError = pe.Err
-	case *os.SyscallError:
-		underlyingError = pe.Err
-	}
-
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
@@ -291,7 +189,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
-		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
+		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
 		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
 			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
@@ -353,9 +251,9 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 
 		// pick node's zone for one of the replicas
 		var ok bool
-		zoneFromNode, ok = node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if !ok {
-			return nil, fmt.Errorf("%s Label for node missing", kubeletapis.LabelZoneFailureDomain)
+			return nil, fmt.Errorf("%s Label for node missing", v1.LabelZoneFailureDomain)
 		}
 		// if single replica volume and node with zone found, return immediately
 		if numReplicas == 1 {
@@ -370,7 +268,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	}
 
 	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
-		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", kubeletapis.LabelZoneFailureDomain, kubeletapis.LabelZoneFailureDomain)
+		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomain)
 	}
 
 	if allowedZones.Len() > 0 {
@@ -420,7 +318,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 	zones := make(sets.String)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
-			if exp.Key == kubeletapis.LabelZoneFailureDomain {
+			if exp.Key == v1.LabelZoneFailureDomain {
 				for _, value := range exp.Values {
 					zones.Insert(value)
 				}
@@ -434,7 +332,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 
 // ZonesSetToLabelValue converts zones set to label value
 func ZonesSetToLabelValue(strSet sets.String) string {
-	return strings.Join(strSet.UnsortedList(), kubeletapis.LabelMultiZoneDelimiter)
+	return strings.Join(strSet.UnsortedList(), LabelMultiZoneDelimiter)
 }
 
 // ZonesToSet converts a string containing a comma separated list of zones to set
@@ -448,7 +346,7 @@ func ZonesToSet(zonesString string) (sets.String, error) {
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
 func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
-	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+	return stringToSet(labelZonesValue, LabelMultiZoneDelimiter)
 }
 
 // StringToSet converts a string containing list separated by specified delimiter to a set
@@ -470,7 +368,7 @@ func stringToSet(str, delimiter string) (sets.String, error) {
 
 // LabelZonesToList converts a PV label value from string containing a delimited list of zones to list
 func LabelZonesToList(labelZonesValue string) ([]string, error) {
-	return stringToList(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+	return stringToList(labelZonesValue, LabelMultiZoneDelimiter)
 }
 
 // StringToList converts a string containing list separated by specified delimiter to a list
@@ -607,7 +505,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	zoneSlice := zones.List()
 	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
 
-	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	klog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
 	return zone
 }
 
@@ -666,7 +564,7 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 		replicaZones.Insert(zone)
 	}
 
-	glog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
+	klog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
 		pvcName, replicaZones.UnsortedList(), zoneSlice)
 	return replicaZones
 }
@@ -674,7 +572,7 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
-		glog.Warningf("No name defined during volume create; choosing random zone")
+		klog.Warningf("No name defined during volume create; choosing random zone")
 
 		hash = rand.Uint32()
 	} else {
@@ -710,7 +608,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 					hashString = hashString[lastDash+1:]
 				}
 
-				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
+				klog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
 
@@ -726,7 +624,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volSpec volume.Spec, podUID utypes.UID) error {
-	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
+	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)
@@ -825,9 +723,10 @@ func GetUniqueVolumeName(pluginName, volumeName string) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
 }
 
-// GetUniqueVolumeNameForNonAttachableVolume returns the unique volume name
-// for a non-attachable volume.
-func GetUniqueVolumeNameForNonAttachableVolume(
+// GetUniqueVolumeNameFromSpecWithPod returns a unique volume name with pod
+// name included. This is useful to generate different names for different pods
+// on same volume.
+func GetUniqueVolumeNameFromSpecWithPod(
 	podName types.UniquePodName, volumePlugin volume.VolumePlugin, volumeSpec *volume.Spec) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(
 		fmt.Sprintf("%s/%v-%s", volumePlugin.GetPluginName(), podName, volumeSpec.Name()))

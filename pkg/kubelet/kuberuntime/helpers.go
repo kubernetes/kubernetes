@@ -22,10 +22,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -83,7 +83,7 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_SCTP
 	}
 
-	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return runtimeapi.Protocol_TCP
 }
 

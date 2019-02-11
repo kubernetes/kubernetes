@@ -16,6 +16,7 @@ go_test(
         "//test/e2e/apps:go_default_library",
         "//test/e2e/auth:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
+        "//test/e2e/cloud:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
@@ -32,6 +33,7 @@ go_test(
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
         "//test/e2e/ui:go_default_library",
+        "//test/e2e/windows:go_default_library",
     ],
 )
 
@@ -54,9 +56,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
@@ -68,11 +70,11 @@ go_library(
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/manifest:go_default_library",
         "//test/utils:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -103,6 +105,7 @@ filegroup(
         "//test/e2e/auth:all-srcs",
         "//test/e2e/autoscaling:all-srcs",
         "//test/e2e/chaosmonkey:all-srcs",
+        "//test/e2e/cloud:all-srcs",
         "//test/e2e/common:all-srcs",
         "//test/e2e/framework:all-srcs",
         "//test/e2e/generated:all-srcs",
@@ -120,6 +123,7 @@ filegroup(
         "//test/e2e/testing-manifests:all-srcs",
         "//test/e2e/ui:all-srcs",
         "//test/e2e/upgrades:all-srcs",
+        "//test/e2e/windows:all-srcs",
     ],
     tags = ["automanaged"],
 )

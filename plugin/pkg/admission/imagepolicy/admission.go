@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -110,7 +110,7 @@ func (a *Plugin) filterAnnotations(allAnnotations map[string]string) map[string]
 // Function to call on webhook failure; behavior determined by defaultAllow flag
 func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
 	if err != nil {
-		glog.V(2).Infof("error contacting webhook backend: %s", err)
+		klog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
 			attributes.AddAnnotation(AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix, "true")
 			// TODO(wteiken): Remove the annotation code for the 1.13 release
@@ -121,10 +121,10 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 			annotations[api.ImagePolicyFailedOpenKey] = "true"
 			pod.ObjectMeta.SetAnnotations(annotations)
 
-			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
+			klog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
-		glog.V(2).Infof("resource not allowed due to webhook backend failure ")
+		klog.V(2).Infof("resource not allowed due to webhook backend failure ")
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
@@ -194,7 +194,7 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 
 	for k, v := range review.Status.AuditAnnotations {
 		if err := attributes.AddAnnotation(AuditKeyPrefix+k, v); err != nil {
-			glog.Warningf("failed to set admission audit annotation %s to %s: %v", AuditKeyPrefix+k, v, err)
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", AuditKeyPrefix+k, v, err)
 		}
 	}
 	if !review.Status.Allowed {

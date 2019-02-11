@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -156,7 +156,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		numPhysicalCores += len(socket.Cores)
 		for _, core := range socket.Cores {
 			if coreID, err = getUniqueCoreID(core.Threads); err != nil {
-				glog.Errorf("could not get unique coreID for socket: %d core %d threads: %v",
+				klog.Errorf("could not get unique coreID for socket: %d core %d threads: %v",
 					socket.Id, core.Id, core.Threads)
 				return nil, err
 			}

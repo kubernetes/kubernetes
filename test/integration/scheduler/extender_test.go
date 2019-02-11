@@ -349,7 +349,7 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = "v1"
 
-	context = initTestScheduler(t, context, nil, false, &policy)
+	context = initTestScheduler(t, context, false, &policy)
 	defer cleanupTest(t, context)
 
 	DoTestPodScheduling(context.ns, t, clientSet)

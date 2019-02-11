@@ -17,7 +17,8 @@
  */
 
 // Package metadata define the structure of the metadata supported by gRPC library.
-// Please refer to https://grpc.io/docs/guides/wire.html for more information about custom-metadata.
+// Please refer to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+// for more information about custom-metadata.
 package metadata
 
 import (
@@ -27,7 +28,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-// DecodeKeyValue returns k, v, nil.  It is deprecated and should not be used.
+// DecodeKeyValue returns k, v, nil.
+//
+// Deprecated: use k and v directly instead.
 func DecodeKeyValue(k, v string) (string, string, error) {
 	return k, v, nil
 }
@@ -94,6 +97,30 @@ func (md MD) Copy() MD {
 	return Join(md)
 }
 
+// Get obtains the values for a given key.
+func (md MD) Get(k string) []string {
+	k = strings.ToLower(k)
+	return md[k]
+}
+
+// Set sets the value of a given key with a slice of values.
+func (md MD) Set(k string, vals ...string) {
+	if len(vals) == 0 {
+		return
+	}
+	k = strings.ToLower(k)
+	md[k] = vals
+}
+
+// Append adds the values to key k, not overwriting what was already stored at that key.
+func (md MD) Append(k string, vals ...string) {
+	if len(vals) == 0 {
+		return
+	}
+	k = strings.ToLower(k)
+	md[k] = append(md[k], vals...)
+}
+
 // Join joins any number of mds into a single MD.
 // The order of values for each key is determined by the order in which
 // the mds containing those values are presented to Join.
@@ -115,9 +142,26 @@ func NewIncomingContext(ctx context.Context, md MD) context.Context {
 	return context.WithValue(ctx, mdIncomingKey{}, md)
 }
 
-// NewOutgoingContext creates a new context with outgoing md attached.
+// NewOutgoingContext creates a new context with outgoing md attached. If used
+// in conjunction with AppendToOutgoingContext, NewOutgoingContext will
+// overwrite any previously-appended metadata.
 func NewOutgoingContext(ctx context.Context, md MD) context.Context {
-	return context.WithValue(ctx, mdOutgoingKey{}, md)
+	return context.WithValue(ctx, mdOutgoingKey{}, rawMD{md: md})
+}
+
+// AppendToOutgoingContext returns a new context with the provided kv merged
+// with any existing metadata in the context. Please refer to the
+// documentation of Pairs for a description of kv.
+func AppendToOutgoingContext(ctx context.Context, kv ...string) context.Context {
+	if len(kv)%2 == 1 {
+		panic(fmt.Sprintf("metadata: AppendToOutgoingContext got an odd number of input pairs for metadata: %d", len(kv)))
+	}
+	md, _ := ctx.Value(mdOutgoingKey{}).(rawMD)
+	added := make([][]string, len(md.added)+1)
+	copy(added, md.added)
+	added[len(added)-1] = make([]string, len(kv))
+	copy(added[len(added)-1], kv)
+	return context.WithValue(ctx, mdOutgoingKey{}, rawMD{md: md.md, added: added})
 }
 
 // FromIncomingContext returns the incoming metadata in ctx if it exists.  The
@@ -128,10 +172,39 @@ func FromIncomingContext(ctx context.Context) (md MD, ok bool) {
 	return
 }
 
+// FromOutgoingContextRaw returns the un-merged, intermediary contents
+// of rawMD. Remember to perform strings.ToLower on the keys. The returned
+// MD should not be modified. Writing to it may cause races. Modification
+// should be made to copies of the returned MD.
+//
+// This is intended for gRPC-internal use ONLY.
+func FromOutgoingContextRaw(ctx context.Context) (MD, [][]string, bool) {
+	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
+	if !ok {
+		return nil, nil, false
+	}
+
+	return raw.md, raw.added, true
+}
+
 // FromOutgoingContext returns the outgoing metadata in ctx if it exists.  The
 // returned MD should not be modified. Writing to it may cause races.
-// Modification should be made to the copies of the returned MD.
-func FromOutgoingContext(ctx context.Context) (md MD, ok bool) {
-	md, ok = ctx.Value(mdOutgoingKey{}).(MD)
-	return
+// Modification should be made to copies of the returned MD.
+func FromOutgoingContext(ctx context.Context) (MD, bool) {
+	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
+	if !ok {
+		return nil, false
+	}
+
+	mds := make([]MD, 0, len(raw.added)+1)
+	mds = append(mds, raw.md)
+	for _, vv := range raw.added {
+		mds = append(mds, Pairs(vv...))
+	}
+	return Join(mds...), ok
+}
+
+type rawMD struct {
+	md    MD
+	added [][]string
 }

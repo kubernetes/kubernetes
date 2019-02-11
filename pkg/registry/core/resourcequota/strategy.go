@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	resourcequotautil "k8s.io/kubernetes/pkg/api/resourcequota"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
@@ -46,6 +47,7 @@ func (resourcequotaStrategy) NamespaceScoped() bool {
 func (resourcequotaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	resourcequota := obj.(*api.ResourceQuota)
 	resourcequota.Status = api.ResourceQuotaStatus{}
+	resourcequotautil.DropDisabledFields(&resourcequota.Spec, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -53,6 +55,7 @@ func (resourcequotaStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Status = oldResourcequota.Status
+	resourcequotautil.DropDisabledFields(&newResourcequota.Spec, &oldResourcequota.Spec)
 }
 
 // Validate validates a new resourcequota.

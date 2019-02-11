@@ -38,11 +38,11 @@ import (
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 const (
@@ -56,32 +56,31 @@ kind: InitConfiguration
 nodeRegistration:
   name: foo
   criSocket: ""
-apiEndpoint:
-  advertiseAddress: 1.2.3.4
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
   bindPort: 6443
+bootstrapTokens:
+- token: ce3aa5.5ec8455bb76b379f
+  ttl: 24h
 ---
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
 
-apiServerCertSANs: null
-apiServerExtraArgs: null
+apiServer:
+  certSANs: null
+  extraArgs: null
 certificatesDir: %s
-controllerManagerExtraArgs: null
 etcd:
   local:
     dataDir: %s
     image: ""
-featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-schedulerExtraArgs: null
-token: ce3aa5.5ec8455bb76b379f
-tokenTTL: 24h
-unifiedControlPlaneImage: ""
+useHyperKubeImage: false
 `
 )
 
@@ -131,6 +130,11 @@ func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
 
 // WaitForHealthyKubelet returns a dummy nil just to implement the interface
 func (w *fakeWaiter) WaitForHealthyKubelet(_ time.Duration, _ string) error {
+	return nil
+}
+
+// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
+func (w *fakeWaiter) WaitForKubeletAndFunc(f func() error) error {
 	return nil
 }
 
@@ -224,13 +228,9 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) HasTLS() bool {
-	return c.TLS
-}
-
 func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
-func (c fakeTLSEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
@@ -259,14 +259,9 @@ func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
-func (c fakePodManifestEtcdClient) HasTLS() bool {
-	hasTLS, _ := etcdutil.PodManifestsHaveTLS(c.ManifestDir)
-	return hasTLS
-}
-
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
-func (c fakePodManifestEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
@@ -417,115 +412,117 @@ func TestStaticPodControlPlane(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
-		pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
-		if err != nil {
-			t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
-		}
-		defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
-		constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
-
-		tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
-		if err != nil {
-			t.Fatalf("couldn't create temporary certificates directory: %v", err)
-		}
-		defer os.RemoveAll(tempCertsDir)
-		tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
-		if err != nil {
-			t.Fatalf("couldn't create temporary etcd data directory: %v", err)
-		}
-		defer os.RemoveAll(tmpEtcdDataDir)
-
-		oldcfg, err := getConfig("v1.12.0", tempCertsDir, tmpEtcdDataDir)
-		if err != nil {
-			t.Fatalf("couldn't create config: %v", err)
-		}
-
-		tree, err := certsphase.GetCertsWithoutEtcd().AsMap().CertTree()
-		if err != nil {
-			t.Fatalf("couldn't get cert tree: %v", err)
-		}
-
-		if err := tree.CreateTree(oldcfg); err != nil {
-			t.Fatalf("couldn't get create cert tree: %v", err)
-		}
-
-		t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
-
-		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
-		if err != nil {
-			t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
-		}
-		err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg)
-		if err != nil {
-			t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
-		}
-		// Get a hash of the v1.7 API server manifest to compare later (was the file re-written)
-		oldHash, err := getAPIServerHash(pathMgr.RealManifestDir())
-		if err != nil {
-			t.Fatalf("couldn't read temp file: %v", err)
-		}
-
-		newcfg, err := getConfig("v1.11.0", tempCertsDir, tmpEtcdDataDir)
-		if err != nil {
-			t.Fatalf("couldn't create config: %v", err)
-		}
-
-		// create the kubeadm etcd certs
-		caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
-		if err != nil {
-			t.Fatalf("couldn't create new CA certificate: %v", err)
-		}
-		for _, cert := range []*certsphase.KubeadmCert{
-			&certsphase.KubeadmCertEtcdServer,
-			&certsphase.KubeadmCertEtcdPeer,
-			&certsphase.KubeadmCertEtcdHealthcheck,
-			&certsphase.KubeadmCertEtcdAPIClient,
-		} {
-			if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
-				t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
+		t.Run(rt.description, func(t *testing.T) {
+			waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
+			pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
+			if err != nil {
+				t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
 			}
-		}
+			defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
+			constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
-		actualErr := StaticPodControlPlane(
-			nil,
-			waiter,
-			pathMgr,
-			newcfg,
-			true,
-			fakeTLSEtcdClient{
-				TLS: false,
-			},
-			fakePodManifestEtcdClient{
-				ManifestDir:     pathMgr.RealManifestDir(),
-				CertificatesDir: newcfg.CertificatesDir,
-			},
-		)
-		if (actualErr != nil) != rt.expectedErr {
-			t.Errorf(
-				"failed UpgradeStaticPodControlPlane\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
-				rt.description,
-				rt.expectedErr,
-				(actualErr != nil),
-				actualErr,
+			tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
+			if err != nil {
+				t.Fatalf("couldn't create temporary certificates directory: %v", err)
+			}
+			defer os.RemoveAll(tempCertsDir)
+			tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
+			if err != nil {
+				t.Fatalf("couldn't create temporary etcd data directory: %v", err)
+			}
+			defer os.RemoveAll(tmpEtcdDataDir)
+
+			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			if err != nil {
+				t.Fatalf("couldn't create config: %v", err)
+			}
+
+			tree, err := certsphase.GetCertsWithoutEtcd().AsMap().CertTree()
+			if err != nil {
+				t.Fatalf("couldn't get cert tree: %v", err)
+			}
+
+			if err := tree.CreateTree(oldcfg); err != nil {
+				t.Fatalf("couldn't get create cert tree: %v", err)
+			}
+
+			t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+
+			// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
+			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+			if err != nil {
+				t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
+			}
+			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
+			if err != nil {
+				t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
+			}
+			// Get a hash of the v1.7 API server manifest to compare later (was the file re-written)
+			oldHash, err := getAPIServerHash(pathMgr.RealManifestDir())
+			if err != nil {
+				t.Fatalf("couldn't read temp file: %v", err)
+			}
+
+			newcfg, err := getConfig(constants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			if err != nil {
+				t.Fatalf("couldn't create config: %v", err)
+			}
+
+			// create the kubeadm etcd certs
+			caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
+			if err != nil {
+				t.Fatalf("couldn't create new CA certificate: %v", err)
+			}
+			for _, cert := range []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdServer,
+				&certsphase.KubeadmCertEtcdPeer,
+				&certsphase.KubeadmCertEtcdHealthcheck,
+				&certsphase.KubeadmCertEtcdAPIClient,
+			} {
+				if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
+					t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
+				}
+			}
+
+			actualErr := StaticPodControlPlane(
+				nil,
+				waiter,
+				pathMgr,
+				newcfg,
+				true,
+				fakeTLSEtcdClient{
+					TLS: false,
+				},
+				fakePodManifestEtcdClient{
+					ManifestDir:     pathMgr.RealManifestDir(),
+					CertificatesDir: newcfg.CertificatesDir,
+				},
 			)
-		}
+			if (actualErr != nil) != rt.expectedErr {
+				t.Errorf(
+					"failed UpgradeStaticPodControlPlane\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+					rt.description,
+					rt.expectedErr,
+					(actualErr != nil),
+					actualErr,
+				)
+			}
 
-		newHash, err := getAPIServerHash(pathMgr.RealManifestDir())
-		if err != nil {
-			t.Fatalf("couldn't read temp file: %v", err)
-		}
+			newHash, err := getAPIServerHash(pathMgr.RealManifestDir())
+			if err != nil {
+				t.Fatalf("couldn't read temp file: %v", err)
+			}
 
-		if (oldHash != newHash) != rt.manifestShouldChange {
-			t.Errorf(
-				"failed StaticPodControlPlane\n%s\n\texpected manifest change: %t\n\tgot: %t",
-				rt.description,
-				rt.manifestShouldChange,
-				(oldHash != newHash),
-			)
-		}
-		return
+			if (oldHash != newHash) != rt.manifestShouldChange {
+				t.Errorf(
+					"failed StaticPodControlPlane\n%s\n\texpected manifest change: %t\n\tgot: %t\n\tnewHash: %v",
+					rt.description,
+					rt.manifestShouldChange,
+					(oldHash != newHash),
+					newHash,
+				)
+			}
+		})
 	}
 }
 

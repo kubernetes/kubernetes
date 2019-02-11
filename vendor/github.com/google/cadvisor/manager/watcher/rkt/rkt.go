@@ -23,8 +23,8 @@ import (
 	"github.com/google/cadvisor/manager/watcher"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 type rktContainerWatcher struct {
@@ -53,7 +53,7 @@ func (self *rktContainerWatcher) Stop() error {
 }
 
 func (self *rktContainerWatcher) detectRktContainers(events chan watcher.ContainerEvent) {
-	glog.V(1).Infof("Starting detectRktContainers thread")
+	klog.V(1).Infof("Starting detectRktContainers thread")
 	ticker := time.Tick(10 * time.Second)
 	curpods := make(map[string]*rktapi.Pod)
 
@@ -62,13 +62,13 @@ func (self *rktContainerWatcher) detectRktContainers(events chan watcher.Contain
 		case <-ticker:
 			pods, err := listRunningPods()
 			if err != nil {
-				glog.Errorf("detectRktContainers: listRunningPods failed: %v", err)
+				klog.Errorf("detectRktContainers: listRunningPods failed: %v", err)
 				continue
 			}
 			curpods = self.syncRunningPods(pods, events, curpods)
 
 		case <-self.stopWatcher:
-			glog.Infof("Exiting rktContainer Thread")
+			klog.Infof("Exiting rktContainer Thread")
 			return
 		}
 	}
@@ -92,7 +92,7 @@ func (self *rktContainerWatcher) syncRunningPods(pods []*rktapi.Pod, events chan
 	for id, pod := range curpods {
 		if _, ok := newpods[id]; !ok {
 			for _, cgroup := range podToCgroup(pod) {
-				glog.V(2).Infof("cgroup to delete = %v", cgroup)
+				klog.V(2).Infof("cgroup to delete = %v", cgroup)
 				self.sendDestroyEvent(cgroup, events)
 			}
 		}

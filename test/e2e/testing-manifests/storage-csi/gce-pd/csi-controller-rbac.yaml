@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-controller
+  name: csi-controller-sa
 
 ---
 kind: ClusterRoleBinding
@@ -10,7 +10,7 @@ metadata:
   name: csi-controller-attacher-role
 subjects:
   - kind: ServiceAccount
-    name: csi-controller
+    name: csi-controller-sa
     namespace: default
 roleRef:
   kind: ClusterRole
@@ -25,7 +25,7 @@ metadata:
   namespace: default
 subjects:
   - kind: ServiceAccount
-    name: csi-controller
+    name: csi-controller-sa
     namespace: default
 roleRef:
   kind: Role
@@ -38,7 +38,7 @@ metadata:
   name: csi-controller-provisioner-role
 subjects:
   - kind: ServiceAccount
-    name: csi-controller
+    name: csi-controller-sa
     namespace: default
 roleRef:
   kind: ClusterRole
@@ -53,7 +53,7 @@ metadata:
   namespace: default
 subjects:
   - kind: ServiceAccount
-    name: csi-controller
+    name: csi-controller-sa
     namespace: default
 roleRef:
   kind: Role
@@ -67,10 +67,10 @@ metadata:
   name: psp-csi-controller-driver-registrar-role
 subjects:
   - kind: ServiceAccount
-    name: csi-controller
+    name: csi-controller-sa
     namespace: default
   - kind: ServiceAccount
-    name: csi-driver-registrar
+    name: csi-node-sa
     namespace: default
 roleRef:
   kind: ClusterRole

@@ -6,6 +6,7 @@ go_library(
         "csi_attacher.go",
         "csi_block.go",
         "csi_client.go",
+        "csi_drivers_store.go",
         "csi_mounter.go",
         "csi_plugin.go",
         "csi_util.go",
@@ -14,8 +15,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csi/csiv0:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -23,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -30,9 +32,10 @@ go_library(
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/listers/csi/v1alpha1:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 
@@ -42,6 +45,7 @@ go_test(
         "csi_attacher_test.go",
         "csi_block_test.go",
         "csi_client_test.go",
+        "csi_drivers_store_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
     ],
@@ -69,8 +73,8 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/fake:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -85,6 +89,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/volume/csi/csiv0:all-srcs",
         "//pkg/volume/csi/fake:all-srcs",
         "//pkg/volume/csi/nodeinfomanager:all-srcs",
     ],

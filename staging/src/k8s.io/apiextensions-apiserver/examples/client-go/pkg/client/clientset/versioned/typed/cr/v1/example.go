@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,11 +77,16 @@ func (c *examples) Get(name string, options metav1.GetOptions) (result *v1.Examp
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
 func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.ExampleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -87,11 +94,16 @@ func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err er
 
 // Watch returns a watch.Interface that watches the requested examples.
 func (c *examples) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -133,10 +145,15 @@ func (c *examples) Delete(name string, options *metav1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *examples) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("examples").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

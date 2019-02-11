@@ -24,8 +24,8 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -46,7 +47,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -162,7 +163,7 @@ type RCConfig struct {
 	// If set to false starting RC will print progress, otherwise only errors will be printed.
 	Silent bool
 
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 	// If set those functions will be used to gather data from Nodes - in integration tests where no
 	// kubelets are running those variables should be nil.
@@ -180,7 +181,7 @@ func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
 	if rc.LogFunc != nil {
 		rc.LogFunc(fmt, args...)
 	}
-	glog.Infof(fmt, args...)
+	klog.Infof(fmt, args...)
 }
 
 type DeploymentConfig struct {
@@ -242,6 +243,18 @@ func (p PodDiff) String(ignorePhases sets.String) string {
 	return ret
 }
 
+// DeletedPods returns a slice of pods that were present at the beginning
+// and then disappeared.
+func (p PodDiff) DeletedPods() []string {
+	var deletedPods []string
+	for podName, podInfo := range p {
+		if podInfo.hostname == nonExist {
+			deletedPods = append(deletedPods, podName)
+		}
+	}
+	return deletedPods
+}
+
 // Diff computes a PodDiff given 2 lists of pods.
 func Diff(oldPods []*v1.Pod, curPods []*v1.Pod) PodDiff {
 	podInfoMap := PodDiff{}
@@ -287,11 +300,11 @@ func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
 }
 
 func (config *DeploymentConfig) create() error {
-	deployment := &extensions.Deployment{
+	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -304,6 +317,7 @@ func (config *DeploymentConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -362,11 +376,11 @@ func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
 }
 
 func (config *ReplicaSetConfig) create() error {
-	rs := &extensions.ReplicaSet{
+	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -379,6 +393,7 @@ func (config *ReplicaSetConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -446,6 +461,7 @@ func (config *JobConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -765,9 +781,8 @@ func (config *RCConfig) start() error {
 		pods := ps.List()
 		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
 
-		pods = startupStatus.Created
 		if config.CreatedPods != nil {
-			*config.CreatedPods = pods
+			*config.CreatedPods = startupStatus.Created
 		}
 		if !config.Silent {
 			config.RCConfigLog(startupStatus.String(config.Name))
@@ -787,16 +802,15 @@ func (config *RCConfig) start() error {
 			}
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
-		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
-			// This failure mode includes:
-			// kubelet is dead, so node controller deleted pods and rc creates more
-			//	- diagnose by noting the pod diff below.
-			// pod is unhealthy, so replication controller creates another to take its place
-			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
-			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
-			config.RCConfigLog("%v, pods that changed since the last iteration:", errorStr)
-			config.RCConfigLog(Diff(oldPods, pods).String(sets.NewString()))
-			return fmt.Errorf(errorStr)
+
+		diff := Diff(oldPods, pods)
+		deletedPods := diff.DeletedPods()
+		if len(deletedPods) != 0 {
+			// There are some pods that have disappeared.
+			err := fmt.Errorf("%d pods disappeared for %s: %v", len(deletedPods), config.Name, strings.Join(deletedPods, ", "))
+			config.RCConfigLog(err.Error())
+			config.RCConfigLog(diff.String(sets.NewString()))
+			return err
 		}
 
 		if len(pods) > len(oldPods) || startupStatus.Running > oldRunning {
@@ -1134,7 +1148,7 @@ type SecretConfig struct {
 	Client    clientset.Interface
 	Name      string
 	Namespace string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 }
 
@@ -1192,7 +1206,7 @@ type ConfigMapConfig struct {
 	Client    clientset.Interface
 	Name      string
 	Namespace string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 }
 
@@ -1303,7 +1317,7 @@ type DaemonConfig struct {
 	Name      string
 	Namespace string
 	Image     string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 	// How long we wait for DaemonSet to become running.
 	Timeout time.Duration
@@ -1316,11 +1330,11 @@ func (config *DaemonConfig) Run() error {
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",
 	}
-	daemon := &extensions.DaemonSet{
+	daemon := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: nameLabel,

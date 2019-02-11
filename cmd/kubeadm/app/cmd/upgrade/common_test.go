@@ -25,15 +25,18 @@ import (
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
+		name          string
 		cfg           *kubeadmapi.ClusterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
 		{
+			name:          "config is nil",
 			cfg:           nil,
 			expectedBytes: []byte(""),
 		},
 		{
+			name: "cluster config with local Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Etcd: kubeadmapi.Etcd{
@@ -41,18 +44,21 @@ func TestPrintConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
-	auditPolicy:
-	  logDir: ""
-	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
+	controllerManager: {}
+	dns:
+	  type: CoreDNS
 	etcd:
 	  local:
 	    dataDir: /some/path
-	    image: ""
 	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
@@ -60,10 +66,11 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
-	unifiedControlPlaneImage: ""
+	scheduler: {}
 `),
 		},
 		{
+			name: "cluster config with ServiceSubnet and external Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Networking: kubeadmapi.Networking{
@@ -74,14 +81,18 @@ func TestPrintConfiguration(t *testing.T) {
 						Endpoints: []string{"https://one-etcd-instance:2379"},
 					},
 				},
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
-	auditPolicy:
-	  logDir: ""
-	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
+	controllerManager: {}
+	dns:
+	  type: CoreDNS
 	etcd:
 	  external:
 	    caFile: ""
@@ -96,20 +107,22 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
-	unifiedControlPlaneImage: ""
+	scheduler: {}
 `),
 		},
 	}
 	for _, rt := range tests {
-		rt.buf = bytes.NewBufferString("")
-		printConfiguration(rt.cfg, rt.buf)
-		actualBytes := rt.buf.Bytes()
-		if !bytes.Equal(actualBytes, rt.expectedBytes) {
-			t.Errorf(
-				"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
-				string(rt.expectedBytes),
-				string(actualBytes),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			rt.buf = bytes.NewBufferString("")
+			printConfiguration(rt.cfg, rt.buf)
+			actualBytes := rt.buf.Bytes()
+			if !bytes.Equal(actualBytes, rt.expectedBytes) {
+				t.Errorf(
+					"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
+					string(rt.expectedBytes),
+					string(actualBytes),
+				)
+			}
+		})
 	}
 }

@@ -225,7 +225,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so its ok to run the controller on a single thread
+// It's a slow moving API, so it's ok to run the controller on a single thread
 func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
@@ -285,7 +285,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 }
 
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so its ok to run the controller on a single thread.
+// It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	version := apiregistration.APIServiceNameToGroupVersion(apiServiceName)
 

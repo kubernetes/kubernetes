@@ -25,8 +25,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -146,7 +146,7 @@ func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfi
 	if pluginCfg.Path != "" {
 		content, err := ioutil.ReadFile(pluginCfg.Path)
 		if err != nil {
-			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
+			klog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
 			return nil, err
 		}
 		return bytes.NewBuffer(content), nil

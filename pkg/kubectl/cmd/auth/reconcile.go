@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -59,13 +59,22 @@ var (
 	reconcileLong = templates.LongDesc(`
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects.
 
-		This is preferred to 'apply' for RBAC resources so that proper rule coverage checks are done.`)
+		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
+		
+		Existing roles are updated to include the permissions in the input objects,
+		and remove extra permissions if --remove-extra-permissions is specified.
+
+		Existing bindings are updated to include the subjects in the input objects,
+		and remove extra subjects if --remove-extra-subjects is specified.
+
+		This is preferred to 'apply' for RBAC resources so that semantically-aware merging of rules and subjects is done.`)
 
 	reconcileExample = templates.Examples(`
 		# Reconcile rbac resources from a file
 		kubectl auth reconcile -f my-rbac-rules.yaml`)
 )
 
+// NewReconcileOptions returns a new ReconcileOptions instance
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
@@ -74,6 +83,7 @@ func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOption
 	}
 }
 
+// NewCmdReconcile holds the options for 'auth reconcile' sub command
 func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewReconcileOptions(streams)
 
@@ -101,6 +111,7 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
@@ -149,6 +160,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	return nil
 }
 
+// Validate makes sure provided values for ReconcileOptions are valid
 func (o *ReconcileOptions) Validate() error {
 	if o.Visitor == nil {
 		return errors.New("ReconcileOptions.Visitor must be set")
@@ -171,6 +183,7 @@ func (o *ReconcileOptions) Validate() error {
 	return nil
 }
 
+// RunReconcile performs the execution
 func (o *ReconcileOptions) RunReconcile() error {
 	return o.Visitor.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -251,7 +264,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			return fmt.Errorf("only rbac.authorization.k8s.io/v1 is supported: not %T", t)
 
 		default:
-			glog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
+			klog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
 			// skip ignored resources
 		}
 

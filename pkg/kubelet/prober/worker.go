@@ -20,10 +20,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -160,13 +160,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		glog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
+		klog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		glog.V(3).Infof("Pod %v %v, exiting probe worker",
+		klog.V(3).Infof("Pod %v %v, exiting probe worker",
 			format.Pod(w.pod), status.Phase)
 		return false
 	}
@@ -174,7 +174,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
-		glog.V(3).Infof("Probe target container not found: %v - %v",
+		klog.V(3).Infof("Probe target container not found: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		return true // Wait for more information.
 	}
@@ -195,7 +195,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	if c.State.Running == nil {
-		glog.V(3).Infof("Non-running container probed: %v - %v",
+		klog.V(3).Infof("Non-running container probed: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)

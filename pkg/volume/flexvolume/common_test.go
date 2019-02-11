@@ -76,11 +76,11 @@ func fakeResultOutput(result interface{}) fakeexec.FakeCombinedOutputAction {
 }
 
 func successOutput() fakeexec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil})
+	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil, 0})
 }
 
 func notSupportedOutput() fakeexec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil})
+	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil, 0})
 }
 
 func sameArgs(args, expectedArgs []string) bool {

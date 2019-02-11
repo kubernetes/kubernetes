@@ -23,18 +23,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -49,7 +49,7 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
-type HollowNodeConfig struct {
+type hollowNodeConfig struct {
 	KubeconfigPath       string
 	KubeletPort          int
 	KubeletReadOnlyPort  int
@@ -71,7 +71,7 @@ const (
 // and make the config driven.
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
-func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
+func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
 	fs.IntVar(&c.KubeletPort, "kubelet-port", 10250, "Port on which HollowKubelet should be listening.")
 	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", 10255, "Read-only port on which Kubelet is listening.")
@@ -84,7 +84,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 }
 
-func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
+func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
 	clientConfig, err := clientcmd.LoadFromFile(c.KubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("error while loading kubeconfig from file %v: %v", c.KubeconfigPath, err)
@@ -121,7 +121,7 @@ func main() {
 
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
-	s := &HollowNodeConfig{}
+	s := &hollowNodeConfig{}
 
 	cmd := &cobra.Command{
 		Use:  "kubemark",
@@ -136,20 +136,20 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(config *HollowNodeConfig) {
+func run(config *hollowNodeConfig) {
 	if !knownMorphs.Has(config.Morph) {
-		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
 	clientConfig, err := config.createClientConfigFromFile()
 	if err != nil {
-		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+		klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
 	}
 
 	if config.Morph == "kubelet" {
@@ -181,7 +181,7 @@ func run(config *HollowNodeConfig) {
 	if config.Morph == "proxy" {
 		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
-			glog.Fatalf("Failed to create API Server client: %v", err)
+			klog.Fatalf("Failed to create API Server client: %v", err)
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
@@ -203,7 +203,7 @@ func run(config *HollowNodeConfig) {
 			config.ProxierMinSyncPeriod,
 		)
 		if err != nil {
-			glog.Fatalf("Failed to create hollowProxy instance: %v", err)
+			klog.Fatalf("Failed to create hollowProxy instance: %v", err)
 		}
 		hollowProxy.Run()
 	}

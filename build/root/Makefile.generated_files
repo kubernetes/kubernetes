@@ -296,16 +296,23 @@ $(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter
 
 
 # Conversion generation
+
+# Any package that wants conversion functions generated into it must
+# include one or more comment-tags in its `doc.go` file, of the form:
+#     // +k8s:conversion-gen=<INTERNAL_TYPES_DIR>
 #
-# Any package that wants conversion functions generated must include one or
-# more comment-tags in any .go file, in column 0, of the form:
-#     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
+# The INTERNAL_TYPES_DIR is a project-local path to another directory
+# which should be considered when evaluating peer types for
+# conversions.  An optional additional comment of the form
+#     // +k8s:conversion-gen-external-types=<EXTERNAL_TYPES_DIR>
 #
-# The CONVERSION_TARGET_DIR is a project-local path to another directory which
-# should be considered when evaluating peer types for conversions.  Types which
-# are found in the source package (where conversions are being generated)
-# but do not have a peer in one of the target directories will not have
-# conversions generated.
+# identifies where to find the external types; if there is no such
+# comment then the external types are sought in the package where the
+# `k8s:conversion` tag is found.
+#
+# Conversions, in both directions, are generated for every type name
+# that is defined in both an internal types package and the external
+# types package.
 #
 # TODO: it might be better in the long term to make peer-types explicit in the
 # IDL.
@@ -405,7 +412,15 @@ OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 REPORT_FILENAME := $(OUT_DIR)/violations.report
 KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
-API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to api/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
+# When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
+# updated API violations to the known API violation exceptions list.
+ifeq ($(UPDATE_API_KNOWN_VIOLATIONS),true)
+    REPORT_FILENAME:=$(KNOWN_VIOLATION_FILENAME)
+    # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, touch the exceptions
+    # list so that the OPENAPI_OUTFILE target re-run instead of being cached.
+    $(shell touch $(KNOWN_VIOLATION_FILENAME))
+endif
+API_RULE_CHECK_FAILURE_MESSAGE := "ERROR: \n\t API rule check failed. Reported violations differ from known violations. Please read api/api-rules/README.md to resolve the failure. \n"
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
@@ -452,7 +467,7 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
 	    -r $(REPORT_FILENAME)                                                       \
 	    "$$@";                                                                      \
 	diff $(REPORT_FILENAME) $(KNOWN_VIOLATION_FILENAME) ||                          \
-	(echo $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
+	(echo -e $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
 
 
 # How to build the generator tool.  The deps for this are defined in

@@ -22,10 +22,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -46,14 +46,14 @@ var (
 		what the _desired_ kubelet version is. Give 
 		`)
 
-	upgradeNodeConfigExample = normalizer.Examples(`
+	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm upgrade node config --kubelet-version v1.12.0
+		kubeadm upgrade node config --kubelet-version %s
 
 		# Simulates the downloading of the kubelet configuration from the ConfigMap in the cluster with a specific desired
 		# version. Does not change any state locally on the node.
-		kubeadm upgrade node config --kubelet-version v1.12.0 --dry-run
-		`)
+		kubeadm upgrade node config --kubelet-version %[1]s --dry-run
+		`, constants.CurrentKubernetesVersion))
 )
 
 type nodeUpgradeFlags struct {
@@ -126,7 +126,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if flags.nodeName == "" {
-				glog.V(1).Infoln("[upgrade] found NodeName empty; considered OS hostname as NodeName")
+				klog.V(1).Infoln("[upgrade] found NodeName empty; considered OS hostname as NodeName")
 			}
 			nodeName, err := node.GetHostname(flags.nodeName)
 			if err != nil {

@@ -47,6 +47,9 @@ func NestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{
 	var val interface{} = obj
 
 	for i, field := range fields {
+		if val == nil {
+			return nil, false, nil
+		}
 		if m, ok := val.(map[string]interface{}); ok {
 			val, ok = m[field]
 			if !ok {

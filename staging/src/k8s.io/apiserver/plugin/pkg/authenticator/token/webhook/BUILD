@@ -16,6 +16,8 @@ go_test(
     deps = [
         "//staging/src/k8s.io/api/authentication/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
     ],
@@ -30,13 +32,12 @@ go_library(
         "//staging/src/k8s.io/api/authentication/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

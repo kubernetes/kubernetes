@@ -107,6 +107,16 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 	}
+	if obj.NodeStatusReportFrequency == zeroDuration {
+		// For backward compatibility, NodeStatusReportFrequency's default value is
+		// set to NodeStatusUpdateFrequency if NodeStatusUpdateFrequency is set
+		// explicitly.
+		if obj.NodeStatusUpdateFrequency == zeroDuration {
+			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
+		} else {
+			obj.NodeStatusReportFrequency = obj.NodeStatusUpdateFrequency
+		}
+	}
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
@@ -148,7 +158,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
-	if obj.PodPidsLimit == nil {
+	// default nil or negative value to -1 (implies node allocatable pid limit)
+	if obj.PodPidsLimit == nil || *obj.PodPidsLimit < int64(0) {
 		temp := int64(-1)
 		obj.PodPidsLimit = &temp
 	}

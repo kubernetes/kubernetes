@@ -16,37 +16,68 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
+
+	"github.com/bazelbuild/bazel-gazelle/internal/config"
+	"github.com/bazelbuild/bazel-gazelle/internal/rule"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
-func diffFile(path string, newContents []byte) error {
-	oldContents, err := ioutil.ReadFile(path)
+func diffFile(c *config.Config, f *rule.File) error {
+	rel, err := filepath.Rel(c.RepoRoot, f.Path)
 	if err != nil {
-		oldContents = nil
+		return fmt.Errorf("error getting old path for file %q: %v", f.Path, err)
 	}
-	if bytes.Equal(oldContents, newContents) {
-		return nil
+	rel = filepath.ToSlash(rel)
+
+	date := "1970-01-01 00:00:00.000000000 +0000"
+	diff := difflib.UnifiedDiff{
+		Context:  3,
+		FromDate: date,
+		ToDate:   date,
 	}
-	f, err := ioutil.TempFile("", filepath.Base(path))
-	if err != nil {
-		return err
+
+	if oldContent, err := ioutil.ReadFile(f.Path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error reading original file: %v", err)
+	} else if err != nil {
+		diff.FromFile = "/dev/null"
+	} else if err == nil {
+		diff.A = difflib.SplitLines(string(oldContent))
+		if c.ReadBuildFilesDir == "" {
+			path, err := filepath.Rel(c.RepoRoot, f.Path)
+			if err != nil {
+				return fmt.Errorf("error getting old path for file %q: %v", f.Path, err)
+			}
+			diff.FromFile = filepath.ToSlash(path)
+		} else {
+			diff.FromFile = f.Path
+		}
 	}
-	f.Close()
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), newContents, 0666); err != nil {
-		return err
+
+	newContent := f.Format()
+	diff.B = difflib.SplitLines(string(newContent))
+	outPath := findOutputPath(c, f)
+	if c.WriteBuildFilesDir == "" {
+		path, err := filepath.Rel(c.RepoRoot, f.Path)
+		if err != nil {
+			return fmt.Errorf("error getting new path for file %q: %v", f.Path, err)
+		}
+		diff.ToFile = filepath.ToSlash(path)
+	} else {
+		diff.ToFile = outPath
 	}
-	cmd := exec.Command("diff", "-u", "--new-file", path, f.Name())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		// diff returns non-zero when files are different. This is not an error.
-		return nil
+
+	uc := getUpdateConfig(c)
+	var out io.Writer = os.Stdout
+	if uc.patchPath != "" {
+		out = &uc.patchBuffer
 	}
-	return err
+	if err := difflib.WriteUnifiedDiff(out, diff); err != nil {
+		return fmt.Errorf("error diffing %s: %v", f.Path, err)
+	}
+	return nil
 }

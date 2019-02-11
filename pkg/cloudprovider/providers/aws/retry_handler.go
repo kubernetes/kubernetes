@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -52,7 +52,7 @@ func (c *CrossRequestRetryDelay) BeforeSign(r *request.Request) {
 	now := time.Now()
 	delay := c.backoff.ComputeDelayForRequest(now)
 	if delay > 0 {
-		glog.Warningf("Inserting delay before AWS request (%s) to avoid RequestLimitExceeded: %s",
+		klog.Warningf("Inserting delay before AWS request (%s) to avoid RequestLimitExceeded: %s",
 			describeRequest(r), delay.String())
 
 		if sleepFn := r.Config.SleepDelay; sleepFn != nil {
@@ -96,7 +96,7 @@ func (c *CrossRequestRetryDelay) AfterRetry(r *request.Request) {
 	if awsError.Code() == "RequestLimitExceeded" {
 		c.backoff.ReportError()
 		recordAWSThrottlesMetric(operationName(r))
-		glog.Warningf("Got RequestLimitExceeded error on AWS request (%s)",
+		klog.Warningf("Got RequestLimitExceeded error on AWS request (%s)",
 			describeRequest(r))
 	}
 }

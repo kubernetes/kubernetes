@@ -32,8 +32,8 @@ import (
 	"syscall"
 	"unicode"
 
-	"github.com/golang/glog"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 )
 
 type ProcFS struct{}
@@ -137,7 +137,7 @@ func getPids(re *regexp.Regexp) []int {
 
 			cmdline, err := ioutil.ReadFile(filepath.Join("/proc", entry.Name(), "cmdline"))
 			if err != nil {
-				glog.V(4).Infof("Error reading file %s: %+v", filepath.Join("/proc", entry.Name(), "cmdline"), err)
+				klog.V(4).Infof("Error reading file %s: %+v", filepath.Join("/proc", entry.Name(), "cmdline"), err)
 				continue
 			}
 

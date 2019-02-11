@@ -33,14 +33,14 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
 	defaultStorageAccountType       = compute.StandardLRS
 	defaultAzureDiskKind            = v1.AzureManagedDisk
-	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingNone
+	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingReadOnly
 )
 
 type dataDisk struct {
@@ -66,7 +66,7 @@ var (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(azureDataDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(azureDataDiskPluginName), volName)
 }
 
 // creates a unique path for disks (even if they share the same *.vhd name)

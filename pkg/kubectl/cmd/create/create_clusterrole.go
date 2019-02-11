@@ -58,13 +58,14 @@ var (
 	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
 )
 
+// CreateClusterRoleOptions is returned by NewCmdCreateClusterRole
 type CreateClusterRoleOptions struct {
 	*CreateRoleOptions
 	NonResourceURLs []string
 	AggregationRule map[string]string
 }
 
-// ClusterRole is a command to ease creating ClusterRoles.
+// NewCmdCreateClusterRole initializes and returns new ClusterRoles command
 func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	c := &CreateClusterRoleOptions{
 		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
@@ -97,6 +98,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	return cmd
 }
 
+// Complete completes all the required options
 func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	// Remove duplicate nonResourceURLs
 	nonResourceURLs := []string{}
@@ -110,6 +112,7 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	return c.CreateRoleOptions.Complete(f, cmd, args)
 }
 
+// Validate makes sure there is no discrepency in CreateClusterRoleOptions
 func (c *CreateClusterRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
@@ -170,6 +173,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 
 }
 
+// RunCreateRole creates a new clusterRole
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	clusterRole := &rbacv1.ClusterRole{
 		// this is ok because we know exactly how we want to be serialized

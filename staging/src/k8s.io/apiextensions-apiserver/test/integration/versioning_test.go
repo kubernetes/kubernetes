@@ -24,13 +24,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func TestInternalVersionIsHandlerVersion(t *testing.T) {
@@ -64,7 +63,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 
 	// update validation via update because the cache priming in CreateNewCustomResourceDefinition will fail otherwise
 	t.Logf("Updating CRD to validate apiVersion")
-	noxuDefinition, err = updateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+	noxuDefinition, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
 		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
 			OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
@@ -88,7 +87,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta1.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+			_, err := noxuNamespacedResourceClientV1beta1.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
@@ -111,7 +110,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta2.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+			_, err := noxuNamespacedResourceClientV1beta2.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			assert.NotNil(t, err)
 
 			// work around "grpc: the client connection is closing" error
@@ -127,7 +126,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	}
 }
 
-func TestVersionedNamspacedScopedCRD(t *testing.T) {
+func TestVersionedNamespacedScopedCRD(t *testing.T) {
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)

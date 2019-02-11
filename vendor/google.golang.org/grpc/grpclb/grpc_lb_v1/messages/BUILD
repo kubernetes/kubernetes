@@ -6,7 +6,11 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/grpclb/grpc_lb_v1/messages",
     importpath = "google.golang.org/grpc/grpclb/grpc_lb_v1/messages",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/duration:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
+    ],
 )
 
 filegroup(

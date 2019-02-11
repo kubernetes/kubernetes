@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -191,7 +191,7 @@ func (wc *watchChan) sync() error {
 func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
-			glog.Errorf("failed to sync with latest state: %v", err)
+			klog.Errorf("failed to sync with latest state: %v", err)
 			wc.sendError(err)
 			return
 		}
@@ -205,7 +205,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		if wres.Err() != nil {
 			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			glog.Errorf("watch chan error: %v", err)
+			klog.Errorf("watch chan error: %v", err)
 			wc.sendError(err)
 			return
 		}
@@ -232,7 +232,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				glog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+				klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
 					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
@@ -265,7 +265,7 @@ func (wc *watchChan) acceptAll() bool {
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
-		glog.Errorf("failed to prepare current and previous objects: %v", err)
+		klog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
 		return nil
 	}
@@ -339,7 +339,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		glog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+		klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
 			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
 			incomingBufSize)
 	}

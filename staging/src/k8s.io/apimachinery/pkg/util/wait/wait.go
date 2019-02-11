@@ -88,6 +88,15 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, true, stopCh)
 }
 
+// UntilWithContext loops until context is done, running f every period.
+//
+// UntilWithContext is syntactic sugar on top of JitterUntilWithContext
+// with zero jitter factor and with sliding = true (which means the timer
+// for period starts after the f completes).
+func UntilWithContext(ctx context.Context, f func(context.Context), period time.Duration) {
+	JitterUntilWithContext(ctx, f, period, 0.0, true)
+}
+
 // NonSlidingUntil loops until stop channel is closed, running f every
 // period.
 //
@@ -96,6 +105,16 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // time as the function starts).
 func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, false, stopCh)
+}
+
+// NonSlidingUntilWithContext loops until context is done, running f every
+// period.
+//
+// NonSlidingUntilWithContext is syntactic sugar on top of JitterUntilWithContext
+// with zero jitter factor, with sliding = false (meaning the timer for period
+// starts at the same time as the function starts).
+func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration) {
+	JitterUntilWithContext(ctx, f, period, 0.0, false)
 }
 
 // JitterUntil loops until stop channel is closed, running f every period.
@@ -151,6 +170,19 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 	}
 }
 
+// JitterUntilWithContext loops until context is done, running f every period.
+//
+// If jitterFactor is positive, the period is jittered before every run of f.
+// If jitterFactor is not positive, the period is unchanged and not jittered.
+//
+// If sliding is true, the period is computed after f runs. If it is false then
+// period includes the runtime for f.
+//
+// Cancel context to stop. f may not be invoked if context is already expired.
+func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
+	JitterUntil(func() { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
+}
+
 // Jitter returns a time.Duration between duration and duration + maxFactor *
 // duration.
 //
@@ -173,10 +205,49 @@ type ConditionFunc func() (done bool, err error)
 
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
-	Duration time.Duration // the base duration
-	Factor   float64       // Duration is multiplied by factor each iteration
-	Jitter   float64       // The amount of jitter applied each iteration
-	Steps    int           // Exit with error after this many steps
+	// The initial duration.
+	Duration time.Duration
+	// Duration is multiplied by factor each iteration. Must be greater
+	// than or equal to zero.
+	Factor float64
+	// The amount of jitter applied each iteration. Jitter is applied after
+	// cap.
+	Jitter float64
+	// The number of steps before duration stops changing. If zero, initial
+	// duration is always used. Used for exponential backoff in combination
+	// with Factor.
+	Steps int
+	// The returned duration will never be greater than cap *before* jitter
+	// is applied. The actual maximum cap is `cap * (1.0 + jitter)`.
+	Cap time.Duration
+}
+
+// Step returns the next interval in the exponential backoff. This method
+// will mutate the provided backoff.
+func (b *Backoff) Step() time.Duration {
+	if b.Steps < 1 {
+		if b.Jitter > 0 {
+			return Jitter(b.Duration, b.Jitter)
+		}
+		return b.Duration
+	}
+	b.Steps--
+
+	duration := b.Duration
+
+	// calculate the next step
+	if b.Factor != 0 {
+		b.Duration = time.Duration(float64(b.Duration) * b.Factor)
+		if b.Cap > 0 && b.Duration > b.Cap {
+			b.Duration = b.Cap
+			b.Steps = 0
+		}
+	}
+
+	if b.Jitter > 0 {
+		duration = Jitter(duration, b.Jitter)
+	}
+	return duration
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
@@ -190,19 +261,14 @@ type Backoff struct {
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
-	duration := backoff.Duration
-	for i := 0; i < backoff.Steps; i++ {
-		if i != 0 {
-			adjusted := duration
-			if backoff.Jitter > 0.0 {
-				adjusted = Jitter(duration, backoff.Jitter)
-			}
-			time.Sleep(adjusted)
-			duration = time.Duration(float64(duration) * backoff.Factor)
-		}
+	for backoff.Steps > 0 {
 		if ok, err := condition(); err != nil || ok {
 			return err
 		}
+		if backoff.Steps == 1 {
+			break
+		}
+		time.Sleep(backoff.Step())
 	}
 	return ErrWaitTimeout
 }
@@ -317,29 +383,39 @@ type WaitFunc func(done <-chan struct{}) <-chan struct{}
 // WaitFor continually checks 'fn' as driven by 'wait'.
 //
 // WaitFor gets a channel from 'wait()'', and then invokes 'fn' once for every value
-// placed on the channel and once more when the channel is closed.
+// placed on the channel and once more when the channel is closed. If the channel is closed
+// and 'fn' returns false without error, WaitFor returns ErrWaitTimeout.
 //
-// If 'fn' returns an error the loop ends and that error is returned, and if
+// If 'fn' returns an error the loop ends and that error is returned. If
 // 'fn' returns true the loop ends and nil is returned.
 //
-// ErrWaitTimeout will be returned if the channel is closed without fn ever
+// ErrWaitTimeout will be returned if the 'done' channel is closed without fn ever
 // returning true.
+//
+// When the done channel is closed, because the golang `select` statement is
+// "uniform pseudo-random", the `fn` might still run one or multiple time,
+// though eventually `WaitFor` will return.
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
-	c := wait(done)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	c := wait(stopCh)
 	for {
-		_, open := <-c
-		ok, err := fn()
-		if err != nil {
-			return err
-		}
-		if ok {
-			return nil
-		}
-		if !open {
-			break
+		select {
+		case _, open := <-c:
+			ok, err := fn()
+			if err != nil {
+				return err
+			}
+			if ok {
+				return nil
+			}
+			if !open {
+				return ErrWaitTimeout
+			}
+		case <-done:
+			return ErrWaitTimeout
 		}
 	}
-	return ErrWaitTimeout
 }
 
 // poller returns a WaitFunc that will send to the channel every interval until

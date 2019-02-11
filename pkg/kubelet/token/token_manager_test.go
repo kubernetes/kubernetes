@@ -23,6 +23,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 )
 
@@ -170,6 +171,189 @@ func TestRequiresRefresh(t *testing.T) {
 			rr := mgr.requiresRefresh(tr)
 			if rr != c.expectRefresh {
 				t.Fatalf("unexpected requiresRefresh result, got: %v, want: %v", rr, c.expectRefresh)
+			}
+		})
+	}
+}
+
+func TestDeleteServiceAccountToken(t *testing.T) {
+	type request struct {
+		name, namespace string
+		tr              authenticationv1.TokenRequest
+		shouldFail      bool
+	}
+
+	cases := []struct {
+		name         string
+		requestIndex []int
+		deletePodUID []types.UID
+		expLeftIndex []int
+	}{
+		{
+			name:         "delete none with all success requests",
+			requestIndex: []int{0, 1, 2},
+			expLeftIndex: []int{0, 1, 2},
+		},
+		{
+			name:         "delete one with all success requests",
+			requestIndex: []int{0, 1, 2},
+			deletePodUID: []types.UID{"fake-uid-1"},
+			expLeftIndex: []int{1, 2},
+		},
+		{
+			name:         "delete two with all success requests",
+			requestIndex: []int{0, 1, 2},
+			deletePodUID: []types.UID{"fake-uid-1", "fake-uid-3"},
+			expLeftIndex: []int{1},
+		},
+		{
+			name:         "delete all with all suceess requests",
+			requestIndex: []int{0, 1, 2},
+			deletePodUID: []types.UID{"fake-uid-1", "fake-uid-2", "fake-uid-3"},
+		},
+		{
+			name:         "delete no pod with failed requests",
+			requestIndex: []int{0, 1, 2, 3},
+			deletePodUID: []types.UID{},
+			expLeftIndex: []int{0, 1, 2},
+		},
+		{
+			name:         "delete other pod with failed requests",
+			requestIndex: []int{0, 1, 2, 3},
+			deletePodUID: []types.UID{"fake-uid-2"},
+			expLeftIndex: []int{0, 2},
+		},
+		{
+			name:         "delete no pod with request which success after failure",
+			requestIndex: []int{0, 1, 2, 3, 4},
+			deletePodUID: []types.UID{},
+			expLeftIndex: []int{0, 1, 2, 4},
+		},
+		{
+			name:         "delete the pod which success after failure",
+			requestIndex: []int{0, 1, 2, 3, 4},
+			deletePodUID: []types.UID{"fake-uid-4"},
+			expLeftIndex: []int{0, 1, 2},
+		},
+		{
+			name:         "delete other pod with request which success after failure",
+			requestIndex: []int{0, 1, 2, 3, 4},
+			deletePodUID: []types.UID{"fake-uid-1"},
+			expLeftIndex: []int{1, 2, 4},
+		},
+		{
+			name:         "delete some pod not in the set",
+			requestIndex: []int{0, 1, 2},
+			deletePodUID: []types.UID{"fake-uid-100", "fake-uid-200"},
+			expLeftIndex: []int{0, 1, 2},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requests := []request{
+				{
+					name:      "fake-name-1",
+					namespace: "fake-namespace-1",
+					tr: authenticationv1.TokenRequest{
+						Spec: authenticationv1.TokenRequestSpec{
+							BoundObjectRef: &authenticationv1.BoundObjectReference{
+								UID:  "fake-uid-1",
+								Name: "fake-name-1",
+							},
+						},
+					},
+					shouldFail: false,
+				},
+				{
+					name:      "fake-name-2",
+					namespace: "fake-namespace-2",
+					tr: authenticationv1.TokenRequest{
+						Spec: authenticationv1.TokenRequestSpec{
+							BoundObjectRef: &authenticationv1.BoundObjectReference{
+								UID:  "fake-uid-2",
+								Name: "fake-name-2",
+							},
+						},
+					},
+					shouldFail: false,
+				},
+				{
+					name:      "fake-name-3",
+					namespace: "fake-namespace-3",
+					tr: authenticationv1.TokenRequest{
+						Spec: authenticationv1.TokenRequestSpec{
+							BoundObjectRef: &authenticationv1.BoundObjectReference{
+								UID:  "fake-uid-3",
+								Name: "fake-name-3",
+							},
+						},
+					},
+					shouldFail: false,
+				},
+				{
+					name:      "fake-name-4",
+					namespace: "fake-namespace-4",
+					tr: authenticationv1.TokenRequest{
+						Spec: authenticationv1.TokenRequestSpec{
+							BoundObjectRef: &authenticationv1.BoundObjectReference{
+								UID:  "fake-uid-4",
+								Name: "fake-name-4",
+							},
+						},
+					},
+					shouldFail: true,
+				},
+				{
+					//exactly the same with last one, besides it will success
+					name:      "fake-name-4",
+					namespace: "fake-namespace-4",
+					tr: authenticationv1.TokenRequest{
+						Spec: authenticationv1.TokenRequestSpec{
+							BoundObjectRef: &authenticationv1.BoundObjectReference{
+								UID:  "fake-uid-4",
+								Name: "fake-name-4",
+							},
+						},
+					},
+					shouldFail: false,
+				},
+			}
+			testMgr := NewManager(nil)
+			testMgr.clock = clock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
+
+			successGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+				tr.Status = authenticationv1.TokenRequestStatus{
+					ExpirationTimestamp: metav1.Time{Time: testMgr.clock.Now().Add(10 * time.Hour)},
+				}
+				return tr, nil
+			}
+			failGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+				return nil, fmt.Errorf("fail tr")
+			}
+
+			for _, index := range c.requestIndex {
+				req := requests[index]
+				if req.shouldFail {
+					testMgr.getToken = failGetToken
+				} else {
+					testMgr.getToken = successGetToken
+				}
+				testMgr.GetServiceAccountToken(req.namespace, req.name, &req.tr)
+			}
+
+			for _, uid := range c.deletePodUID {
+				testMgr.DeleteServiceAccountToken(uid)
+			}
+			if len(c.expLeftIndex) != len(testMgr.cache) {
+				t.Errorf("%s got unexpected result: expected left cache size is %d, got %d", c.name, len(c.expLeftIndex), len(testMgr.cache))
+			}
+			for _, leftIndex := range c.expLeftIndex {
+				r := requests[leftIndex]
+				_, ok := testMgr.get(keyFunc(r.name, r.namespace, &r.tr))
+				if !ok {
+					t.Errorf("%s got unexpected result: expected token request %v exist in cache, but not", c.name, r)
+				}
 			}
 		})
 	}

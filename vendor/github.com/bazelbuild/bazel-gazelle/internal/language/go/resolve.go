@@ -91,7 +91,14 @@ func (gl *goLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repos.Rem
 		log.Print(err)
 	}
 	if !deps.IsEmpty() {
-		r.SetAttr("deps", deps)
+		if r.Kind() == "go_proto_library" {
+			// protos may import the same library multiple times by different names,
+			// so we need to de-duplicate them. Protos are not platform-specific,
+			// so it's safe to just flatten them.
+			r.SetAttr("deps", deps.Flat())
+		} else {
+			r.SetAttr("deps", deps)
+		}
 	}
 }
 
@@ -115,6 +122,10 @@ func resolveGo(c *config.Config, ix *resolve.RuleIndex, rc *repos.RemoteCache, r
 		return label.NoLabel, skipImportError
 	}
 
+	if l, ok := resolve.FindRuleWithOverride(c, resolve.ImportSpec{Lang: "go", Imp: imp}, "go"); ok {
+		return l, nil
+	}
+
 	if pc.Mode.ShouldUseKnownImports() {
 		// These are commonly used libraries that depend on Well Known Types.
 		// They depend on the generated versions of these protos to avoid conflicts.
@@ -129,6 +140,8 @@ func resolveGo(c *config.Config, ix *resolve.RuleIndex, rc *repos.RemoteCache, r
 			return label.New("com_github_golang_protobuf", "descriptor", "go_default_library_gen"), nil
 		case "github.com/golang/protobuf/ptypes":
 			return label.New("com_github_golang_protobuf", "ptypes", "go_default_library_gen"), nil
+		case "google.golang.org/grpc":
+			return label.New("org_golang_google_grpc", "", "go_default_library"), nil
 		}
 		if l, ok := knownGoProtoImports[imp]; ok {
 			return l, nil
@@ -234,6 +247,10 @@ func resolveProto(c *config.Config, ix *resolve.RuleIndex, rc *repos.RemoteCache
 
 	if wellKnownProtos[imp] {
 		return label.NoLabel, skipImportError
+	}
+
+	if l, ok := resolve.FindRuleWithOverride(c, resolve.ImportSpec{Lang: "proto", Imp: imp}, "go"); ok {
+		return l, nil
 	}
 
 	if l, ok := knownProtoImports[imp]; ok && pc.Mode.ShouldUseKnownImports() {

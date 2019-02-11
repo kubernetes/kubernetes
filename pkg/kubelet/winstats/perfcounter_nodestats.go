@@ -26,10 +26,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 )
 
 // MemoryStatusEx is the same as Windows structure MEMORYSTATUSEX
@@ -141,19 +141,19 @@ func (p *perfCounterNodeStatsClient) getNodeInfo() nodeInfo {
 func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter *perfCounter) {
 	cpuValue, err := cpuCounter.getData()
 	if err != nil {
-		glog.Errorf("Unable to get cpu perf counter data; err: %v", err)
+		klog.Errorf("Unable to get cpu perf counter data; err: %v", err)
 		return
 	}
 
 	memWorkingSetValue, err := memWorkingSetCounter.getData()
 	if err != nil {
-		glog.Errorf("Unable to get memWorkingSet perf counter data; err: %v", err)
+		klog.Errorf("Unable to get memWorkingSet perf counter data; err: %v", err)
 		return
 	}
 
 	memCommittedBytesValue, err := memCommittedBytesCounter.getData()
 	if err != nil {
-		glog.Errorf("Unable to get memCommittedBytes perf counter data; err: %v", err)
+		klog.Errorf("Unable to get memCommittedBytes perf counter data; err: %v", err)
 		return
 	}
 

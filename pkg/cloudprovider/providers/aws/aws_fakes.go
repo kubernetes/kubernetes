@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // FakeAWSServices is an fake AWS session used for testing
@@ -141,7 +141,7 @@ func (ec2i *FakeEC2Impl) DescribeInstances(request *ec2.DescribeInstancesInput) 
 	for _, instance := range ec2i.aws.instances {
 		if request.InstanceIds != nil {
 			if instance.InstanceId == nil {
-				glog.Warning("Instance with no instance id: ", instance)
+				klog.Warning("Instance with no instance id: ", instance)
 				continue
 			}
 
@@ -354,9 +354,9 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 		}
 
 		return "", nil
-	} else {
-		return "", nil
 	}
+
+	return "", nil
 }
 
 // FakeELB is a fake ELB client used for testing

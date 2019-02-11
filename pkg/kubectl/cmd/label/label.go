@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +72,6 @@ type LabelOptions struct {
 
 	namespace                    string
 	enforceNamespace             bool
-	includeUninitialized         bool
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -192,7 +191,6 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
@@ -224,7 +222,6 @@ func (o *LabelOptions) RunLabel() error {
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(o.includeUninitialized).
 		Flatten()
 
 	if !o.local {
@@ -288,7 +285,7 @@ func (o *LabelOptions) RunLabel() error {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
-				glog.V(4).Infof("error recording current command: %v", err)
+				klog.V(4).Infof("error recording current command: %v", err)
 			}
 			newObj, err := json.Marshal(obj)
 			if err != nil {
@@ -298,7 +295,7 @@ func (o *LabelOptions) RunLabel() error {
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
-				glog.V(2).Infof("couldn't compute patch: %v", err)
+				klog.V(2).Infof("couldn't compute patch: %v", err)
 			}
 
 			mapping := info.ResourceMapping()
@@ -344,8 +341,7 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(info.Object, o.Out)
-		return nil
+		return printer.PrintObj(info.Object, o.Out)
 	})
 }
 

@@ -1,10 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- deads2k
-- liggitt
-- tallclair
-- mikedanese
+- sig-auth-node-isolation-approvers
 reviewers:
-- deads2k
-- liggitt
-- tallclair
-- mikedanese
+- sig-auth-node-isolation-reviewers
+labels:
+- sig/auth
+

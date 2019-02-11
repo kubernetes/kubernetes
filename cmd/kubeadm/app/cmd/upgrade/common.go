@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,6 +57,11 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+	}
+
+	// Check if the cluster is self-hosted
+	if upgrade.IsControlPlaneSelfHosted(client) {
+		return nil, errors.Errorf("cannot upgrade a self-hosted control plane")
 	}
 
 	// Run healthchecks against the cluster

@@ -27,7 +27,6 @@ import (
 
 	"reflect"
 
-	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	csiapi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -75,6 +75,7 @@ func TestMounterGetPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
+		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV(tc.specVolumeName, 10, testDriver, testVol)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
@@ -98,54 +99,53 @@ func TestMounterGetPath(t *testing.T) {
 func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, podInfoEnabled)()
 	tests := []struct {
-		name       string
-		driver     string
-		attributes map[string]string
-
-		expectedAttributes map[string]string
+		name                  string
+		driver                string
+		volumeContext         map[string]string
+		expectedVolumeContext map[string]string
 	}{
 		{
-			name:               "no pod info",
-			driver:             "no-info",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "no pod info",
+			driver:                "no-info",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "no CSIDriver -> no pod info",
-			driver:             "unknown-driver",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "no CSIDriver -> no pod info",
+			driver:                "unknown-driver",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "CSIDriver with PodInfoRequiredOnMount=nil -> no pod info",
-			driver:             "nil",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "CSIDriver with PodInfoRequiredOnMount=nil -> no pod info",
+			driver:                "nil",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "no pod info -> keep existing attributes",
-			driver:             "no-info",
-			attributes:         map[string]string{"foo": "bar"},
-			expectedAttributes: map[string]string{"foo": "bar"},
+			name:                  "no pod info -> keep existing volumeContext",
+			driver:                "no-info",
+			volumeContext:         map[string]string{"foo": "bar"},
+			expectedVolumeContext: map[string]string{"foo": "bar"},
 		},
 		{
-			name:               "add pod info",
-			driver:             "info",
-			attributes:         nil,
-			expectedAttributes: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			name:                  "add pod info",
+			driver:                "info",
+			volumeContext:         nil,
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
 		},
 		{
-			name:               "add pod info -> keep existing attributes",
-			driver:             "info",
-			attributes:         map[string]string{"foo": "bar"},
-			expectedAttributes: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			name:                  "add pod info -> keep existing volumeContext",
+			driver:                "info",
+			volumeContext:         map[string]string{"foo": "bar"},
+			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
 		},
 	}
 
 	emptyPodMountInfoVersion := ""
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			glog.Infof("Starting test %s", test.name)
+			klog.Infof("Starting test %s", test.name)
 			fakeClient := fakeclient.NewSimpleClientset()
 			fakeCSIClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("no-info", &emptyPodMountInfoVersion, nil),
@@ -162,8 +162,9 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				})
 			}
 
+			registerFakePlugin(test.driver, "endpoint", []string{"1.0.0"}, t)
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
-			pv.Spec.CSI.VolumeAttributes = test.attributes
+			pv.Spec.CSI.VolumeAttributes = test.volumeContext
 			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
 			pvName := pv.GetName()
 
@@ -188,7 +189,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
+			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 
 			attachment := &storage.VolumeAttachment{
 				ObjectMeta: meta.ObjectMeta{
@@ -245,13 +246,13 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
 			}
 			if podInfoEnabled {
-				if !reflect.DeepEqual(vol.Attributes, test.expectedAttributes) {
-					t.Errorf("csi server expected attributes %+v, got %+v", test.expectedAttributes, vol.Attributes)
+				if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
+					t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
 				}
 			} else {
-				// CSIPodInfo feature is disabled, we expect no modifications to attributes.
-				if !reflect.DeepEqual(vol.Attributes, test.attributes) {
-					t.Errorf("csi server expected attributes %+v, got %+v", test.attributes, vol.Attributes)
+				// CSIPodInfo feature is disabled, we expect no modifications to volumeContext.
+				if !reflect.DeepEqual(vol.VolumeContext, test.volumeContext) {
+					t.Errorf("csi server expected volumeContext %+v, got %+v", test.volumeContext, vol.VolumeContext)
 				}
 			}
 		})
@@ -332,6 +333,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		t.Logf("Running test %s", tc.name)
 
 		volName := fmt.Sprintf("test-vol-%d", i)
+		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		pv := makeTestPV("test-pv", 10, testDriver, volName)
 		pv.Spec.AccessModes = tc.accessModes
 		pvName := pv.GetName()
@@ -358,7 +360,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		csiMounter := mounter.(*csiMountMgr)
 		csiMounter.csiClient = setupClient(t, true)
 
-		attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
+		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
 
 		_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
@@ -393,6 +395,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount

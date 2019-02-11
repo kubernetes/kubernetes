@@ -19,8 +19,8 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

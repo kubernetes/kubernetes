@@ -29,6 +29,7 @@ func NewXMLElement(name xml.Name) *XMLNode {
 
 // AddChild adds child to the XMLNode.
 func (n *XMLNode) AddChild(child *XMLNode) {
+	child.parent = n
 	if _, ok := n.Children[child.Name.Local]; !ok {
 		n.Children[child.Name.Local] = []*XMLNode{}
 	}

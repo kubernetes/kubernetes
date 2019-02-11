@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -307,7 +307,6 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		// By default we should serve the request from etcd.
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
-	p.IncludeUninitialized = options.IncludeUninitialized
 	p.Limit = options.Limit
 	p.Continue = options.Continue
 	list := e.NewListFunc()
@@ -380,90 +379,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 	}
-	if !options.IncludeUninitialized {
-		return e.WaitForInitialized(ctx, out)
-	}
 	return out, nil
-}
-
-// WaitForInitialized holds until the object is initialized, or returns an error if the default limit expires.
-// This method is exposed publicly for consumers of generic rest tooling.
-func (e *Store) WaitForInitialized(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
-	// return early if we don't have initializers, or if they've completed already
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return obj, nil
-	}
-	initializers := accessor.GetInitializers()
-	if initializers == nil {
-		return obj, nil
-	}
-	if result := initializers.Result; result != nil {
-		return nil, kubeerr.FromObject(result)
-	}
-
-	key, err := e.KeyFunc(ctx, accessor.GetName())
-	if err != nil {
-		return nil, err
-	}
-	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	w, err := e.Storage.Watch(ctx, key, accessor.GetResourceVersion(), storage.SelectionPredicate{
-		Label: labels.Everything(),
-		Field: fields.Everything(),
-
-		IncludeUninitialized: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer w.Stop()
-
-	latest := obj
-	ch := w.ResultChan()
-	for {
-		select {
-		case event, ok := <-ch:
-			if !ok {
-				msg := fmt.Sprintf("server has timed out waiting for the initialization of %s %s",
-					qualifiedResource.String(), accessor.GetName())
-				return nil, kubeerr.NewTimeoutError(msg, 0)
-			}
-			switch event.Type {
-			case watch.Deleted:
-				if latest = event.Object; latest != nil {
-					if accessor, err := meta.Accessor(latest); err == nil {
-						if initializers := accessor.GetInitializers(); initializers != nil && initializers.Result != nil {
-							// initialization failed, but we missed the modification event
-							return nil, kubeerr.FromObject(initializers.Result)
-						}
-					}
-				}
-				return nil, kubeerr.NewInternalError(fmt.Errorf("object deleted while waiting for creation"))
-			case watch.Error:
-				if status, ok := event.Object.(*metav1.Status); ok {
-					return nil, &kubeerr.StatusError{ErrStatus: *status}
-				}
-				return nil, kubeerr.NewInternalError(fmt.Errorf("unexpected object in watch stream, can't complete initialization %T", event.Object))
-			case watch.Modified:
-				latest = event.Object
-				accessor, err = meta.Accessor(latest)
-				if err != nil {
-					return nil, kubeerr.NewInternalError(fmt.Errorf("object no longer has access to metadata %T: %v", latest, err))
-				}
-				initializers := accessor.GetInitializers()
-				if initializers == nil {
-					// completed initialization
-					return latest, nil
-				}
-				if result := initializers.Result; result != nil {
-					// initialization failed
-					return nil, kubeerr.FromObject(result)
-				}
-			}
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
 }
 
 // shouldDeleteDuringUpdate checks if a Update is removing all the object's
@@ -483,25 +399,11 @@ func (e *Store) shouldDeleteDuringUpdate(ctx context.Context, key string, obj, e
 	return len(newMeta.GetFinalizers()) == 0 && oldMeta.GetDeletionGracePeriodSeconds() != nil && *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
-// shouldDeleteForFailedInitialization returns true if the provided object is initializing and has
-// a failure recorded.
-func (e *Store) shouldDeleteForFailedInitialization(ctx context.Context, obj runtime.Object) bool {
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return false
-	}
-	if initializers := m.GetInitializers(); initializers != nil && initializers.Result != nil {
-		return true
-	}
-	return false
-}
-
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
 func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
+	klog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions, dryRun); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
@@ -650,10 +552,6 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			err = storeerr.InterpretUpdateError(err, qualifiedResource, name)
 		}
 		return nil, false, err
-	}
-
-	if e.shouldDeleteForFailedInitialization(ctx, out) {
-		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions, dryrun.IsDryRun(options.DryRun))
 	}
 
 	if creating {
@@ -841,21 +739,25 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
-// DeletionTimestamp to "now". Finalizers are watching for such updates and will
+// DeletionTimestamp to "now" if there is no existing deletionTimestamp or if the existing
+// deletionTimestamp is further in future. Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
-func markAsDeleting(obj runtime.Object) (err error) {
+func markAsDeleting(obj runtime.Object, now time.Time) (err error) {
 	objectMeta, kerr := meta.Accessor(obj)
 	if kerr != nil {
 		return kerr
 	}
-	now := metav1.NewTime(time.Now())
 	// This handles Generation bump for resources that don't support graceful
 	// deletion. For resources that support graceful deletion is handle in
 	// pkg/api/rest/delete.go
 	if objectMeta.GetDeletionTimestamp() == nil && objectMeta.GetGeneration() > 0 {
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
-	objectMeta.SetDeletionTimestamp(&now)
+	existingDeletionTimestamp := objectMeta.GetDeletionTimestamp()
+	if existingDeletionTimestamp == nil || existingDeletionTimestamp.After(now) {
+		metaNow := metav1.NewTime(now)
+		objectMeta.SetDeletionTimestamp(&metaNow)
+	}
 	var zero int64 = 0
 	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
@@ -909,8 +811,8 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
-					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
-					err = markAsDeleting(existing)
+					klog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
+					err = markAsDeleting(existing, time.Now())
 					if err != nil {
 						return nil, err
 					}
@@ -1017,7 +919,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	}
 
 	// delete immediately, or no graceful deletion supported
-	glog.V(6).Infof("going to delete %s from registry: ", name)
+	klog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions, dryrun.IsDryRun(options.DryRun)); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
@@ -1050,11 +952,6 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 	} else {
 		listOptions = listOptions.DeepCopy()
 	}
-
-	// DeleteCollection must remain backwards compatible with old clients that expect it to
-	// remove all resources, initialized or not, within the type. It is also consistent with
-	// Delete which does not require IncludeUninitialized
-	listOptions.IncludeUninitialized = true
 
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
@@ -1103,7 +1000,7 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 					return
 				}
 				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
-					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
 				}
@@ -1170,7 +1067,6 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	resourceVersion := ""
 	if options != nil {
 		resourceVersion = options.ResourceVersion
-		predicate.IncludeUninitialized = options.IncludeUninitialized
 	}
 	return e.WatchPredicate(ctx, predicate, resourceVersion)
 }
@@ -1246,7 +1142,7 @@ func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptio
 	if accessor, err := meta.Accessor(obj); err == nil {
 		exportObjectMeta(accessor, opts.Exact)
 	} else {
-		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
+		klog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}
 
 	if e.ExportStrategy != nil {
@@ -1411,12 +1307,12 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 func (e *Store) startObservingCount(period time.Duration) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
-	glog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
+	klog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
 	stopCh := make(chan struct{})
 	go wait.JitterUntil(func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
-			glog.V(5).Infof("Failed to update storage count metric: %v", err)
+			klog.V(5).Infof("Failed to update storage count metric: %v", err)
 			metrics.UpdateObjectCount(resourceName, -1)
 		} else {
 			metrics.UpdateObjectCount(resourceName, count)

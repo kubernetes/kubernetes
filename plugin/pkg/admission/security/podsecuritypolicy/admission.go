@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -132,20 +132,20 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	if allowedPod != nil {
 		*pod = *allowedPod
 		// annotate and accept the pod
-		glog.V(4).Infof("pod %s (generate: %s) in namespace %s validated against provider %s", pod.Name, pod.GenerateName, a.GetNamespace(), pspName)
+		klog.V(4).Infof("pod %s (generate: %s) in namespace %s validated against provider %s", pod.Name, pod.GenerateName, a.GetNamespace(), pspName)
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
 		key := auditKeyPrefix + "/" + "admit-policy"
 		if err := a.AddAnnotation(key, pspName); err != nil {
-			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
 		}
 		return nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
-	glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
+	klog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
@@ -166,13 +166,13 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 	if apiequality.Semantic.DeepEqual(pod, allowedPod) {
 		key := auditKeyPrefix + "/" + "validate-policy"
 		if err := a.AddAnnotation(key, pspName); err != nil {
-			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
 		}
 		return nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
-	glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
+	klog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
@@ -207,7 +207,7 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 // saved in kubernetes.io/psp annotation. This psp is usually the one we are looking for.
 func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, specMutationAllowed bool, validatedPSPHint string) (*api.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
-	glog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
+	klog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info
 	if len(pod.Spec.ServiceAccountName) > 0 {
 		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
@@ -241,7 +241,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 
 	providers, errs := c.createProvidersFromPolicies(policies, pod.Namespace)
 	for _, err := range errs {
-		glog.V(4).Infof("provider creation error: %v", err)
+		klog.V(4).Infof("provider creation error: %v", err)
 	}
 
 	if len(providers) == 0 {
@@ -379,7 +379,7 @@ func authorizedForPolicyInAPIGroup(info user.Info, namespace, policyName, apiGro
 	attr := buildAttributes(info, namespace, policyName, apiGroupName)
 	decision, reason, err := authz.Authorize(attr)
 	if err != nil {
-		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
+		klog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}
 	return (decision == authorizer.DecisionAllow)
 }

@@ -25,12 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 )
 
-// HorizontalPodAutoscalerV1Generator supports stable generation of a horizontal pod autoscaler.
+// HorizontalPodAutoscalerGeneratorV1 supports stable generation of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerGeneratorV1 struct {
 	Name               string
 	ScaleRefKind       string
 	ScaleRefName       string
-	ScaleRefApiVersion string
+	ScaleRefAPIVersion string
 	MinReplicas        int32
 	MaxReplicas        int32
 	CPUPercent         int32
@@ -53,7 +53,7 @@ func (s *HorizontalPodAutoscalerGeneratorV1) StructuredGenerate() (runtime.Objec
 			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
 				Kind:       s.ScaleRefKind,
 				Name:       s.ScaleRefName,
-				APIVersion: s.ScaleRefApiVersion,
+				APIVersion: s.ScaleRefAPIVersion,
 			},
 			MaxReplicas: s.MaxReplicas,
 		},

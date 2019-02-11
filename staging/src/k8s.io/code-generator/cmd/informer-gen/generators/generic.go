@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	codegennamer "k8s.io/code-generator/pkg/namer"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -56,6 +57,7 @@ func (g *genericGenerator) Namers(c *generator.Context) namer.NameSystems {
 		"raw":                namer.NewRawNamer(g.outputPackage, g.imports),
 		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
 		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
+		"resource":           codegennamer.NewTagOverrideNamer("resourceName", namer.NewAllLowercasePluralNamer(pluralExceptions)),
 	}
 }
 
@@ -168,7 +170,7 @@ func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResour
 			{{range $version := .Versions -}}
 	// Group={{$group.Name}}, Version={{.Name}}
 				{{range .Resources -}}
-	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|allLowercasePlural}}"):
+	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|resource}}"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$GroupGoName}}().{{$version.GoName}}().{{.|publicPlural}}().Informer()}, nil
 				{{end}}
 			{{end}}

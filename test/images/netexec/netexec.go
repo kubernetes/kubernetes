@@ -80,7 +80,7 @@ func main() {
 
 func startHTTPServer(httpPort int) {
 	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/clientip", clientIpHandler)
+	http.HandleFunc("/clientip", clientIPHandler)
 	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/exit", exitHandler)
 	http.HandleFunc("/hostname", hostnameHandler)
@@ -104,7 +104,7 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%s", r.FormValue("msg"))
 }
 
-func clientIpHandler(w http.ResponseWriter, r *http.Request) {
+func clientIPHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /clientip")
 	fmt.Fprintf(w, r.RemoteAddr)
 }

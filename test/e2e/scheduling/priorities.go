@@ -30,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -256,66 +254,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
-	It("Pod should be preferably scheduled to nodes which satisfy its limits", func() {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-			framework.Skipf("ResourceLimits Priority function is not enabled, so skipping this test")
-		}
-		var podwithLargeRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100Mi"),
-				v1.ResourceCPU:    resource.MustParse("100m"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("3000Mi"),
-				v1.ResourceCPU:    resource.MustParse("5000m"),
-			},
-		}
-		// Update one node to have large allocatable.
-		lastNode := nodeList.Items[len(nodeList.Items)-1]
-		nodeName := lastNode.Name
-		nodeOriginalMemory, found := lastNode.Status.Allocatable[v1.ResourceMemory]
-		nodeOriginalCPU, found := lastNode.Status.Allocatable[v1.ResourceCPU]
-		nodeOriginalCPUCapacity, found := lastNode.Status.Capacity[v1.ResourceCPU]
-		nodeOriginalMemoryCapacity, found := lastNode.Status.Capacity[v1.ResourceMemory]
-		Expect(found).To(Equal(true))
-		nodeOriginalMemoryVal := nodeOriginalMemory.Value()
-		nodeOriginalCPUVal := nodeOriginalCPU.MilliValue()
-		nodeOriginalMemoryCapacityVal := nodeOriginalMemoryCapacity.Value()
-		nodeOriginalCPUCapacityVal := nodeOriginalCPUCapacity.MilliValue()
-		err := updateNodeResources(cs, nodeName, int64(10737418240), int64(12000), int64(10737418240), int64(12000))
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			// Resize the node back to its original allocatable values.
-			if err := updateNodeResources(cs, nodeName, nodeOriginalMemoryVal, nodeOriginalCPUVal, nodeOriginalMemoryCapacityVal, nodeOriginalCPUCapacityVal); err != nil {
-				framework.Logf("Failed to revert node resources with %v", err)
-			}
-			// Reset the node list with its old entry.
-			nodeList.Items[len(nodeList.Items)-1] = lastNode
-		}()
-		// update nodeList with newNode.
-		newNode, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("Failed to get node", err)
-		}
-		nodeList.Items[len(nodeList.Items)-1] = *newNode
-		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
-		framework.ExpectNoError(err)
-		// After the above we should see 50% of node to be available which is 5000MiB memory, 6000m cpu for large node.
-		By("Create a pod with unusual large limits")
-		podWithLargeLimits := "with-large-limits"
-
-		pod := createPausePod(f, pausePodConfig{
-			Name:      podWithLargeLimits,
-			Resources: podwithLargeRequestedResource,
-		})
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-
-		By("Pod should preferably scheduled to nodes which satisfy its limits")
-		// The pod should land onto large node(which has 5000MiB free) which satisfies the pod limits which is 3000MiB.
-		podHighLimits, err := cs.CoreV1().Pods(ns).Get(podWithLargeLimits, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(podHighLimits.Spec.NodeName).To(Equal(nodeName))
-	})
 })
 
 // createBalancedPodForNodes creates a pod per node that asks for enough resources to make all nodes have the same mem/cpu usage ratio.
@@ -460,19 +398,4 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
-}
-
-// updateNodeResources updates the resource of given node with the given values.
-func updateNodeResources(c clientset.Interface, nodeName string, memoryAllocatable, cpuAllocatable, memoryCapacity, cpuCapacity int64) error {
-	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	if err != nil {
-		return err
-	}
-	node.Status.Capacity[v1.ResourceMemory] = *resource.NewQuantity(memoryCapacity, resource.BinarySI)
-	node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuCapacity, resource.DecimalSI)
-	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memoryAllocatable, resource.BinarySI)
-	node.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuAllocatable, resource.DecimalSI)
-	_, err = c.CoreV1().Nodes().UpdateStatus(node)
-	return err
 }

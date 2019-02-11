@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.2.24}
+ETCD_VERSION=${ETCD_VERSION:-3.3.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
@@ -47,12 +47,12 @@ kube::etcd::validate() {
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
-   export PATH=$KUBE_ROOT/third_party/etcd:$PATH
+  if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+   export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
-   echo $PATH
+   echo "${PATH}"
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
+   if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
@@ -70,8 +70,8 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
-  if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
-    ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
+  if [[ -d "${ARTIFACTS:-}" ]]; then
+    ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
@@ -108,6 +108,8 @@ kube::etcd::install() {
     cd "${KUBE_ROOT}/third_party"
     os=$(uname | tr "[:upper:]" "[:lower:]")
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
+      kube::log::info "etcd v${ETCD_VERSION} already installed at path:"
+      kube::log::info "$(pwd)/$(readlink etcd)"
       return  # already installed
     fi
     if [[ ${os} == "darwin" ]]; then

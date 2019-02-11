@@ -24,7 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -121,7 +121,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 	info, err := disk.describeVolume()
 
 	if err != nil {
-		glog.Warningf("Error describing volume %s with %v", diskName, err)
+		klog.Warningf("Error describing volume %s with %v", diskName, err)
 		awsDiskInfo.volumeState = "unknown"
 		return awsDiskInfo, false, err
 	}
@@ -138,7 +138,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		// has been deleted
 		if err != nil {
 			fetchErr := fmt.Errorf("Error fetching instance %s for volume %s", instanceID, diskName)
-			glog.Warning(fetchErr)
+			klog.Warning(fetchErr)
 			return awsDiskInfo, false, fetchErr
 		}
 

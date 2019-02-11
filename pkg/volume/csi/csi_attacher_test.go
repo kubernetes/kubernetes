@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +38,7 @@ import (
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -85,11 +85,11 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 			t.Error(err)
 		}
 		if attach != nil {
-			glog.Infof("stopping wait")
+			klog.Infof("stopping wait")
 			break
 		}
 	}
-	glog.Infof("stopped wait")
+	klog.Infof("stopped wait")
 
 	if attach == nil {
 		t.Logf("attachment not found for id:%v", attachID)
@@ -251,6 +251,16 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
+			pluginCanAttach := plug.CanAttach(spec)
+			if pluginCanAttach != test.expectVolumeAttachment {
+				t.Errorf("attacher.CanAttach does not match expected attachment status %t", test.expectVolumeAttachment)
+			}
+
+			if !pluginCanAttach {
+				t.Log("plugin is not attachable")
+				return
+			}
+
 			expectedAttachID := getAttachmentName("test-vol", test.driver, "node")
 			status := storage.VolumeAttachmentStatus{
 				Attached: true,
@@ -258,6 +268,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			if test.expectVolumeAttachment {
 				go markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, expectedAttachID, status)
 			}
+
 			attachID, err := csiAttacher.Attach(spec, types.NodeName("node"))
 			if err != nil {
 				t.Errorf("Attach() failed: %s", err)
@@ -321,12 +332,86 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			}
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
+
+			pluginCanAttach := plug.CanAttach(spec)
+			if !pluginCanAttach {
+				t.Log("plugin is not attachable")
+				return
+			}
+
 			_, err = csiAttacher.WaitForAttach(spec, "", nil, time.Second)
 			if err != nil && !test.expectError {
 				t.Errorf("Unexpected error: %s", err)
 			}
 			if err == nil && test.expectError {
 				t.Errorf("Expected error, got none")
+			}
+		})
+	}
+}
+
+func TestAttacherWaitForAttach(t *testing.T) {
+	tests := []struct {
+		name             string
+		driver           string
+		makeAttachment   func() *storage.VolumeAttachment
+		expectedAttachID string
+		expectError      bool
+	}{
+		{
+			name:   "successful attach",
+			driver: "attachable",
+			makeAttachment: func() *storage.VolumeAttachment {
+
+				testAttachID := getAttachmentName("test-vol", "attachable", "node")
+				successfulAttachment := makeTestAttachment(testAttachID, "node", "test-pv")
+				successfulAttachment.Status.Attached = true
+				return successfulAttachment
+			},
+			expectedAttachID: getAttachmentName("test-vol", "attachable", "node"),
+			expectError:      false,
+		},
+		{
+			name:        "failed attach",
+			driver:      "attachable",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plug, _, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
+			}
+			csiAttacher := attacher.(*csiAttacher)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
+
+			if test.makeAttachment != nil {
+				attachment := test.makeAttachment()
+				_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+				if err != nil {
+					t.Fatalf("failed to create VolumeAttachment: %v", err)
+				}
+				gotAttachment, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Get(attachment.Name, meta.GetOptions{})
+				if err != nil {
+					t.Fatalf("failed to get created VolumeAttachment: %v", err)
+				}
+				t.Logf("created test VolumeAttachment %+v", gotAttachment)
+			}
+
+			attachID, err := csiAttacher.WaitForAttach(spec, "", nil, time.Second)
+			if err != nil && !test.expectError {
+				t.Errorf("Unexpected error: %s", err)
+			}
+			if err == nil && test.expectError {
+				t.Errorf("Expected error, got none")
+			}
+			if attachID != test.expectedAttachID {
+				t.Errorf("Expected attachID %q, got %q", test.expectedAttachID, attachID)
 			}
 		})
 	}

@@ -45,12 +45,11 @@ func InstrumentRoundTripperInFlight(gauge prometheus.Gauge, next http.RoundTripp
 
 // InstrumentRoundTripperCounter is a middleware that wraps the provided
 // http.RoundTripper to observe the request result with the provided CounterVec.
-// The CounterVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. Partitioning of the CounterVec happens by HTTP status
-// code and/or HTTP method if the respective instance label names are present
-// in the CounterVec. For unpartitioned counting, use a CounterVec with
-// zero labels.
+// The CounterVec must have zero, one, or two non-const non-curried labels. For
+// those, the only allowed label names are "code" and "method". The function
+// panics otherwise. Partitioning of the CounterVec happens by HTTP status code
+// and/or HTTP method if the respective instance label names are present in the
+// CounterVec. For unpartitioned counting, use a CounterVec with zero labels.
 //
 // If the wrapped RoundTripper panics or returns a non-nil error, the Counter
 // is not incremented.
@@ -69,18 +68,21 @@ func InstrumentRoundTripperCounter(counter *prometheus.CounterVec, next http.Rou
 }
 
 // InstrumentRoundTripperDuration is a middleware that wraps the provided
-// http.RoundTripper to observe the request duration with the provided ObserverVec.
-// The ObserverVec must have zero, one, or two labels. The only allowed label
-// names are "code" and "method". The function panics if any other instance
-// labels are provided. The Observe method of the Observer in the ObserverVec
-// is called with the request duration in seconds. Partitioning happens by HTTP
-// status code and/or HTTP method if the respective instance label names are
-// present in the ObserverVec. For unpartitioned observations, use an
-// ObserverVec with zero labels. Note that partitioning of Histograms is
-// expensive and should be used judiciously.
+// http.RoundTripper to observe the request duration with the provided
+// ObserverVec.  The ObserverVec must have zero, one, or two non-const
+// non-curried labels. For those, the only allowed label names are "code" and
+// "method". The function panics otherwise. The Observe method of the Observer
+// in the ObserverVec is called with the request duration in
+// seconds. Partitioning happens by HTTP status code and/or HTTP method if the
+// respective instance label names are present in the ObserverVec. For
+// unpartitioned observations, use an ObserverVec with zero labels. Note that
+// partitioning of Histograms is expensive and should be used judiciously.
 //
 // If the wrapped RoundTripper panics or returns a non-nil error, no values are
 // reported.
+//
+// Note that this method is only guaranteed to never observe negative durations
+// if used with Go1.9+.
 func InstrumentRoundTripperDuration(obs prometheus.ObserverVec, next http.RoundTripper) RoundTripperFunc {
 	code, method := checkLabels(obs)
 

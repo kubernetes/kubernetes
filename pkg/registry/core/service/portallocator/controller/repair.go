@@ -21,16 +21,17 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -38,7 +39,7 @@ import (
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
 	interval      time.Duration
-	serviceClient coreclient.ServicesGetter
+	serviceClient corev1client.ServicesGetter
 	portRange     net.PortRange
 	alloc         rangeallocation.RangeRegistry
 	leaks         map[int]int // counter per leaked port
@@ -51,9 +52,9 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient coreclient.ServicesGetter, eventClient coreclient.EventsGetter, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient corev1client.EventsGetter, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&coreclient.EventSinkImpl{Interface: eventClient.Events("")})
+	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: eventClient.Events("")})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "portallocator-repair-controller"})
 
 	return &Repair{
@@ -196,7 +197,7 @@ func (c *Repair) runOnce() error {
 	return nil
 }
 
-func collectServiceNodePorts(service *api.Service) []int {
+func collectServiceNodePorts(service *corev1.Service) []int {
 	servicePorts := []int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]

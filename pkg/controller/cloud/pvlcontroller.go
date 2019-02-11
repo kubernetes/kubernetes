@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,22 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
 	cloudprovider "k8s.io/cloud-provider"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
-
-const initializerName = "pvlabel.kubernetes.io"
 
 // PersistentVolumeLabelController handles adding labels to persistent volumes when they are created
 type PersistentVolumeLabelController struct {
@@ -79,11 +71,9 @@ func NewPersistentVolumeLabelController(
 	pvlc.pvlIndexer, pvlc.pvlController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.IncludeUninitialized = true
 				return kubeClient.CoreV1().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.IncludeUninitialized = true
 				return kubeClient.CoreV1().PersistentVolumes().Watch(options)
 			},
 		},
@@ -109,8 +99,8 @@ func (pvlc *PersistentVolumeLabelController) Run(threadiness int, stopCh <-chan 
 	defer utilruntime.HandleCrash()
 	defer pvlc.queue.ShutDown()
 
-	glog.Infof("Starting PersistentVolumeLabelController")
-	defer glog.Infof("Shutting down PersistentVolumeLabelController")
+	klog.Infof("Starting PersistentVolumeLabelController")
+	defer klog.Infof("Shutting down PersistentVolumeLabelController")
 
 	go pvlc.pvlController.Run(stopCh)
 
@@ -189,7 +179,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinity(key string) er
 func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
 	// Only add labels if the next pending initializer.
-	if needsInitialization(vol.Initializers, initializerName) {
+	if needsInitialization(vol) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
 			labels, err := labeler.GetLabelsForVolume(context.TODO(), vol)
 			if err != nil {
@@ -197,7 +187,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v
 			}
 			volumeLabels = labels
 		} else {
-			glog.V(4).Info("cloud provider does not support PVLabeler")
+			klog.V(4).Info("cloud provider does not support PVLabeler")
 		}
 		return pvlc.updateVolume(vol, volumeLabels)
 	}
@@ -207,7 +197,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v
 func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolume, volLabels map[string]string) ([]byte, error) {
 	volName := vol.Name
 	newVolume := vol.DeepCopyObject().(*v1.PersistentVolume)
-	populateAffinity := utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && len(volLabels) != 0
+	populateAffinity := len(volLabels) != 0
 
 	if newVolume.Labels == nil {
 		newVolume.Labels = make(map[string]string)
@@ -219,7 +209,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		// Set NodeSelectorRequirements based on the labels
 		if populateAffinity {
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				zones, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v)
@@ -244,7 +234,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		}
 		// Populate NodeAffinity with requirements if there are no conflicting keys found
 		if v1helper.NodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-			glog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+			klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
 				requirements, newVolume.Spec.NodeAffinity)
 		} else {
 			for _, req := range requirements {
@@ -254,8 +244,8 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 			}
 		}
 	}
-	newVolume.Initializers = removeInitializer(newVolume.Initializers, initializerName)
-	glog.V(4).Infof("removed initializer on PersistentVolume %s", newVolume.Name)
+	markInitialized(newVolume)
+	klog.V(4).Infof("marked PersistentVolume %s initialized", newVolume.Name)
 
 	oldData, err := json.Marshal(vol)
 	if err != nil {
@@ -276,7 +266,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 
 func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolume, volLabels map[string]string) error {
 	volName := vol.Name
-	glog.V(4).Infof("updating PersistentVolume %s", volName)
+	klog.V(4).Infof("updating PersistentVolume %s", volName)
 	patchBytes, err := pvlc.createPatch(vol, volLabels)
 	if err != nil {
 		return err
@@ -286,43 +276,18 @@ func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolu
 	if err != nil {
 		return fmt.Errorf("failed to update PersistentVolume %s: %v", volName, err)
 	}
-	glog.V(4).Infof("updated PersistentVolume %s", volName)
+	klog.V(4).Infof("updated PersistentVolume %s", volName)
 
 	return nil
 }
 
-func removeInitializer(initializers *metav1.Initializers, name string) *metav1.Initializers {
-	if initializers == nil {
-		return nil
-	}
-
-	var updated []metav1.Initializer
-	for _, pending := range initializers.Pending {
-		if pending.Name != name {
-			updated = append(updated, pending)
-		}
-	}
-	if len(updated) == len(initializers.Pending) {
-		return initializers
-	}
-	if len(updated) == 0 {
-		return nil
-	}
-
-	return &metav1.Initializers{Pending: updated}
+func markInitialized(vol *v1.PersistentVolume) {
+	// TODO: mark initialized using a different field, since initializers are not being promoted past alpha, or convert to an admission plugin
 }
 
 // needsInitialization checks whether or not the PVL is the next pending initializer.
-func needsInitialization(initializers *metav1.Initializers, name string) bool {
-	if initializers == nil {
-		return false
-	}
-
-	if len(initializers.Pending) == 0 {
-		return false
-	}
-
-	// There is at least one initializer still pending so check to
-	// see if the PVL is the next in line.
-	return initializers.Pending[0].Name == name
+func needsInitialization(vol *v1.PersistentVolume) bool {
+	// TODO: determine whether initialization is required based on a different attribute,
+	// since initializers are not being promoted past alpha, or convert to an admission plugin
+	return false
 }

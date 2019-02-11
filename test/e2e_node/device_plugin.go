@@ -53,14 +53,19 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
-	testDevicePlugin(f, true, "/var/lib/kubelet/plugins/")
+	testDevicePlugin(f, true, "/var/lib/kubelet/plugins_registry")
 })
 
 func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSockDir string) {
+	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	Context("DevicePlugin", func() {
 		By("Enabling support for Kubelet Plugins Watcher")
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
 			initialConfig.FeatureGates[string(features.KubeletPluginsWatcher)] = enablePluginWatcher
+			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
 		})
 		It("Verifies the Kubelet device plugin functionality.", func() {
 			By("Start stub device plugin")
@@ -97,6 +102,17 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devId1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devId1).To(Not(Equal("")))
+
+			podResources, err := getNodeDevices()
+			Expect(err).To(BeNil())
+			Expect(len(podResources.PodResources)).To(Equal(1))
+			Expect(podResources.PodResources[0].Name).To(Equal(pod1.Name))
+			Expect(podResources.PodResources[0].Namespace).To(Equal(pod1.Namespace))
+			Expect(len(podResources.PodResources[0].Containers)).To(Equal(1))
+			Expect(podResources.PodResources[0].Containers[0].Name).To(Equal(pod1.Spec.Containers[0].Name))
+			Expect(len(podResources.PodResources[0].Containers[0].Devices)).To(Equal(1))
+			Expect(podResources.PodResources[0].Containers[0].Devices[0].ResourceName).To(Equal(resourceName))
+			Expect(len(podResources.PodResources[0].Containers[0].Devices[0].DeviceIds)).To(Equal(1))
 
 			pod1, err = f.PodClient().Get(pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

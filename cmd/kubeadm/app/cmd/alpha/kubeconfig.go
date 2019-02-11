@@ -96,8 +96,8 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
 	// Add flags to the command
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored")
-	cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on")
-	cmd.Flags().Int32Var(&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort, "The port the API server is accessible on")
+	cmd.Flags().StringVar(&cfg.LocalAPIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.LocalAPIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on")
+	cmd.Flags().Int32Var(&cfg.LocalAPIEndpoint.BindPort, "apiserver-bind-port", cfg.LocalAPIEndpoint.BindPort, "The port the API server is accessible on")
 	cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 	cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The orgnizations of the client certificate. It will be used as the O if client certificates are created")

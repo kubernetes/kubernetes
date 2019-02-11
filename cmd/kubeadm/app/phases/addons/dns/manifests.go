@@ -22,7 +22,7 @@ const (
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kube-dns
+  name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -50,7 +50,7 @@ spec:
           optional: true
       containers:
       - name: kubedns
-        image: {{ .ImageRepository }}/k8s-dns-kube-dns:{{ .Version }}
+        image: {{ .KubeDNSImage }}
         imagePullPolicy: IfNotPresent
         resources:
           # TODO: Set memory limits when we've profiled the container for large
@@ -102,7 +102,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: {{ .ImageRepository }}/k8s-dns-dnsmasq-nanny:{{ .Version }}
+        image: {{ .DNSMasqImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -143,7 +143,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: {{ .ImageRepository }}/k8s-dns-sidecar:{{ .Version }}
+        image: {{ .SidecarImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -204,6 +204,10 @@ spec:
     port: 53
     protocol: TCP
     targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
   selector:
     k8s-app: kube-dns
 `
@@ -213,7 +217,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: coredns
+  name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -237,9 +241,11 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: {{ .ImageRepository }}/coredns:{{ .Version }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -307,7 +313,7 @@ data:
            fallthrough in-addr.arpa ip6.arpa
         }{{ .Federation }}
         prometheus :9153
-        proxy . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }}
         cache 30
         loop
         reload

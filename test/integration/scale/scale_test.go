@@ -25,7 +25,7 @@ import (
 	_ "github.com/coreos/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
 
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,7 +52,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestScaleSubresources(t *testing.T) {
-	clientSet, tearDown := setup(t)
+	clientSet, tearDown := setupWithOptions(t, nil, []string{
+		"--runtime-config",
+		// TODO(liggitt): remove these once apps/v1beta1, apps/v1beta2, and extensions/v1beta1 can no longer be served
+		"api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicationcontrollers=true,extensions/v1beta1/replicasets=true",
+	})
 	defer tearDown()
 
 	resourceLists, err := clientSet.Discovery().ServerResources()
@@ -63,6 +67,7 @@ func TestScaleSubresources(t *testing.T) {
 	expectedScaleSubresources := map[schema.GroupVersionResource]schema.GroupVersionKind{
 		makeGVR("", "v1", "replicationcontrollers/scale"): makeGVK("autoscaling", "v1", "Scale"),
 
+		// TODO(liggitt): remove these once apps/v1beta1, apps/v1beta2, and extensions/v1beta1 can no longer be served
 		makeGVR("extensions", "v1beta1", "deployments/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
 		makeGVR("extensions", "v1beta1", "replicationcontrollers/scale"): makeGVK("extensions", "v1beta1", "Scale"),
 		makeGVR("extensions", "v1beta1", "replicasets/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
@@ -136,13 +141,13 @@ func TestScaleSubresources(t *testing.T) {
 	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(rcStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().ReplicaSets("default").Create(rsStub); err != nil {
+	if _, err := clientSet.AppsV1().ReplicaSets("default").Create(rsStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().Deployments("default").Create(deploymentStub); err != nil {
+	if _, err := clientSet.AppsV1().Deployments("default").Create(deploymentStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(ssStub); err != nil {
+	if _, err := clientSet.AppsV1().StatefulSets("default").Create(ssStub); err != nil {
 		t.Fatal(err)
 	}
 
@@ -198,24 +203,28 @@ var (
 		Spec:       corev1.ReplicationControllerSpec{Selector: podStub.Labels, Replicas: &replicas, Template: &podStub},
 	}
 
-	rsStub = &appsv1beta2.ReplicaSet{
+	rsStub = &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	deploymentStub = &appsv1beta2.Deployment{
+	deploymentStub = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	ssStub = &appsv1beta2.StatefulSet{
+	ssStub = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 )
 
 func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	result := apitesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	return setupWithOptions(t, nil, nil)
+}
+
+func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstanceOptions, flags []string) (client kubernetes.Interface, tearDown func()) {
+	result := apitesting.StartTestServerOrDie(t, instanceOptions, flags, framework.SharedEtcd())
 
 	// TODO: Disable logging here until we resolve teardown issues which result in
 	// massive log spam. Another path forward would be to refactor

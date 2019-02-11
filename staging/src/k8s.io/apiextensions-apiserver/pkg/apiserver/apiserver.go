@@ -21,6 +21,18 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/status"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,20 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
-	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
-	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
-	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
-	"k8s.io/apiextensions-apiserver/pkg/controller/status"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
-
-	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 var (
@@ -78,6 +77,11 @@ type ExtraConfig struct {
 	// MasterCount is used to detect whether cluster is HA, and if it is
 	// the CRD Establishing will be hold by 5 seconds.
 	MasterCount int
+
+	// ServiceResolver is used in CR webhook converters to resolve webhook's service names
+	ServiceResolver webhook.ServiceResolver
+	// AuthResolverWrapper is used in CR webhook converters
+	AuthResolverWrapper webhook.AuthenticationInfoResolverWrapper
 }
 
 type Config struct {
@@ -167,7 +171,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		delegate:  delegateHandler,
 	}
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
-	crdHandler := NewCustomResourceDefinitionHandler(
+	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
@@ -175,8 +179,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 		establishingController,
+		c.ExtraConfig.ServiceResolver,
+		c.ExtraConfig.AuthResolverWrapper,
 		c.ExtraConfig.MasterCount,
+		s.GenericAPIServer.Authorizer,
 	)
+	if err != nil {
+		return nil, err
+	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 

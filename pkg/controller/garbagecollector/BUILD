@@ -22,8 +22,6 @@ go_library(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
-        "//pkg/util/reflector/prometheus:go_default_library",
-        "//pkg/util/workqueue/prometheus:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -43,12 +41,12 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/encoding:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/encoding/dot:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

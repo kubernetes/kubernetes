@@ -31,6 +31,7 @@ import (
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
+	"k8s.io/apiserver/pkg/authentication/token/cache"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	"k8s.io/client-go/util/cert"
@@ -49,6 +50,8 @@ type DelegatingAuthenticatorConfig struct {
 
 	// ClientCAFile is the CA bundle file used to authenticate client certificates
 	ClientCAFile string
+
+	APIAudiences authenticator.Audiences
 
 	RequestHeaderConfig *RequestHeaderConfig
 }
@@ -85,11 +88,12 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	if c.TokenAccessReviewClient != nil {
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.CacheTTL)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences)
 		if err != nil {
 			return nil, nil, err
 		}
-		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
+		cachingTokenAuth := cache.New(tokenAuth, false, c.CacheTTL, c.CacheTTL)
+		authenticators = append(authenticators, bearertoken.New(cachingTokenAuth), websocket.NewProtocolAuthenticator(cachingTokenAuth))
 
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
 			SecuritySchemeProps: spec.SecuritySchemeProps{

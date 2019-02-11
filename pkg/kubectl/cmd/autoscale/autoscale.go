@@ -19,8 +19,8 @@ package autoscale
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,7 +42,7 @@ var (
 	autoscaleLong = templates.LongDesc(i18n.T(`
 		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
-		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		Looks up a Deployment, ReplicaSet, StatefulSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`))
 
 	autoscaleExample = templates.Examples(i18n.T(`
@@ -66,7 +66,7 @@ type AutoscaleOptions struct {
 	Generator  string
 	Min        int32
 	Max        int32
-	CpuPercent int32
+	CPUPercent int32
 
 	createAnnotation bool
 	args             []string
@@ -120,7 +120,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int32Var(&o.CpuPercent, "cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
+	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
 	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
@@ -156,10 +156,10 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 				Name:               name,
 				MinReplicas:        o.Min,
 				MaxReplicas:        o.Max,
-				CPUPercent:         o.CpuPercent,
+				CPUPercent:         o.CPUPercent,
 				ScaleRefName:       name,
 				ScaleRefKind:       mapping.GroupVersionKind.Kind,
-				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
+				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}, nil
 		default:
 			return nil, cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", o.Generator)
@@ -234,7 +234,7 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		if err := o.Recorder.Record(hpa); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.dryRun {

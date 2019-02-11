@@ -16,15 +16,17 @@
 
 REGISTRY?="staging-k8s.gcr.io"
 IMAGE=$(REGISTRY)/debian-iptables
-TAG?=v11.0
+TAG?=v11.0.1
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 TEMP_DIR:=$(shell mktemp -d)
 
-BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.4.0
+BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.4.1
 
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 build:
 	cp ./* $(TEMP_DIR)
@@ -32,7 +34,7 @@ build:
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 
 	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)

@@ -16,7 +16,7 @@
  *
  */
 
-//go:generate protoc --go_out=plugins=grpc:. grpc_health_v1/health.proto
+//go:generate ./regenerate.sh
 
 // Package health provides some utility functions to health-check a server. The implementation
 // is based on protobuf. Users need to write their own implementations if other IDLs are used.
@@ -26,9 +26,9 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 )
 
 // Server implements `service Health`.
@@ -60,7 +60,7 @@ func (s *Server) Check(ctx context.Context, in *healthpb.HealthCheckRequest) (*h
 			Status: status,
 		}, nil
 	}
-	return nil, grpc.Errorf(codes.NotFound, "unknown service")
+	return nil, status.Error(codes.NotFound, "unknown service")
 }
 
 // SetServingStatus is called when need to reset the serving status of a service

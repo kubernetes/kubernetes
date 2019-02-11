@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -240,7 +240,7 @@ func (o *ScaleOptions) RunScale() error {
 
 		// if the recorder makes a change, compute and create another patch
 		if mergePatch, err := o.Recorder.MakeRecordMergePatch(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		} else if len(mergePatch) > 0 {
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
@@ -248,7 +248,7 @@ func (o *ScaleOptions) RunScale() error {
 			}
 			helper := resource.NewHelper(client, mapping)
 			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
-				glog.V(4).Infof("error recording reason: %v", err)
+				klog.V(4).Infof("error recording reason: %v", err)
 			}
 		}
 

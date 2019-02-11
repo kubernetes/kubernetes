@@ -92,7 +92,7 @@ func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterf
 	return f.Delegate.ToDiscoveryClient()
 }
 
-// RESTMapper returns a mapper.
+// ToRESTMapper returns a mapper.
 func (f *MatchVersionFlags) ToRESTMapper() (meta.RESTMapper, error) {
 	if err := f.checkMatchingServerVersion(); err != nil {
 		return nil, err

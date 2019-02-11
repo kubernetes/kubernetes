@@ -110,7 +110,7 @@ func TestMatchImageTagOrSHA(t *testing.T) {
 			Output: true,
 		},
 		{
-			// RepoDigest match is is required
+			// RepoDigest match is required
 			Inspected: dockertypes.ImageInspect{
 				ID:          "",
 				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:000084acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},

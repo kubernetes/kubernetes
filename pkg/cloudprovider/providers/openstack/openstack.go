@@ -41,13 +41,13 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/gcfg.v1"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	"k8s.io/klog"
 )
 
 const (
@@ -125,6 +125,9 @@ type MetadataOpts struct {
 	SearchOrder    string     `gcfg:"search-order"`
 	RequestTimeout MyDuration `gcfg:"request-timeout"`
 }
+
+var _ cloudprovider.Interface = (*OpenStack)(nil)
+var _ cloudprovider.Zones = (*OpenStack)(nil)
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
@@ -277,7 +280,7 @@ func readInstanceID(searchOrder string) (string, error) {
 	if err == nil {
 		instanceID := string(idBytes)
 		instanceID = strings.TrimSpace(instanceID)
-		glog.V(3).Infof("Got instance id from %s: %s", instanceIDFile, instanceID)
+		klog.V(3).Infof("Got instance id from %s: %s", instanceIDFile, instanceID)
 		if instanceID != "" {
 			return instanceID, nil
 		}
@@ -473,7 +476,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 				addressType = v1.NodeInternalIP
 			}
 
-			v1helper.AddToNodeAddresses(&addrs,
+			nodehelpers.AddToNodeAddresses(&addrs,
 				v1.NodeAddress{
 					Type:    addressType,
 					Address: props.Addr,
@@ -484,7 +487,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 
 	// AccessIPs are usually duplicates of "public" addresses.
 	if srv.AccessIPv4 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv4,
@@ -493,7 +496,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.AccessIPv6 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv6,
@@ -502,7 +505,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.Metadata[TypeHostName] != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeHostName,
 				Address: srv.Metadata[TypeHostName],
@@ -584,10 +587,10 @@ func (os *OpenStack) HasClusterID() bool {
 
 // LoadBalancer initializes a LbaasV2 object
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	glog.V(4).Info("openstack.LoadBalancer() called")
+	klog.V(4).Info("openstack.LoadBalancer() called")
 
 	if reflect.DeepEqual(os.lbOpts, LoadBalancerOpts{}) {
-		glog.V(4).Info("LoadBalancer section is empty/not defined in cloud-config")
+		klog.V(4).Info("LoadBalancer section is empty/not defined in cloud-config")
 		return nil, false
 	}
 
@@ -610,11 +613,11 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	// Currently kubernetes OpenStack cloud provider just support LBaaS v2.
 	lbVersion := os.lbOpts.LBVersion
 	if lbVersion != "" && lbVersion != "v2" {
-		glog.Warningf("Config error: currently only support LBaaS v2, unrecognised lb-version \"%v\"", lbVersion)
+		klog.Warningf("Config error: currently only support LBaaS v2, unrecognised lb-version \"%v\"", lbVersion)
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support LoadBalancer")
+	klog.V(1).Info("Claiming to support LoadBalancer")
 
 	return &LbaasV2{LoadBalancer{network, compute, lb, os.lbOpts}}, true
 }
@@ -635,7 +638,7 @@ func isNotFound(err error) bool {
 
 // Zones indicates that we support zones
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("Claiming to support Zones")
+	klog.V(1).Info("Claiming to support Zones")
 	return os, true
 }
 
@@ -650,7 +653,7 @@ func (os *OpenStack) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		FailureDomain: md.AvailabilityZone,
 		Region:        os.region,
 	}
-	glog.V(4).Infof("Current zone is %v", zone)
+	klog.V(4).Infof("Current zone is %v", zone)
 	return zone, nil
 }
 
@@ -677,7 +680,7 @@ func (os *OpenStack) GetZoneByProviderID(ctx context.Context, providerID string)
 		FailureDomain: srv.Metadata[availabilityZone],
 		Region:        os.region,
 	}
-	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+	klog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
 	return zone, nil
 }
 
@@ -702,13 +705,13 @@ func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 		FailureDomain: srv.Metadata[availabilityZone],
 		Region:        os.region,
 	}
-	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+	klog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
 	return zone, nil
 }
 
 // Routes initializes routes support
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
-	glog.V(4).Info("openstack.Routes() called")
+	klog.V(4).Info("openstack.Routes() called")
 
 	network, err := os.NewNetworkV2()
 	if err != nil {
@@ -717,12 +720,12 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 
 	netExts, err := networkExtensions(network)
 	if err != nil {
-		glog.Warningf("Failed to list neutron extensions: %v", err)
+		klog.Warningf("Failed to list neutron extensions: %v", err)
 		return nil, false
 	}
 
 	if !netExts["extraroute"] {
-		glog.V(3).Info("Neutron extraroute extension not found, required for Routes support")
+		klog.V(3).Info("Neutron extraroute extension not found, required for Routes support")
 		return nil, false
 	}
 
@@ -733,11 +736,11 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 
 	r, err := NewRoutes(compute, network, os.routeOpts)
 	if err != nil {
-		glog.Warningf("Error initialising Routes support: %v", err)
+		klog.Warningf("Error initialising Routes support: %v", err)
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support Routes")
+	klog.V(1).Info("Claiming to support Routes")
 	return r, true
 }
 
@@ -755,21 +758,21 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Info("Using Blockstorage API V1")
+		klog.V(3).Info("Using Blockstorage API V1")
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
 		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Info("Using Blockstorage API V2")
+		klog.V(3).Info("Using Blockstorage API V2")
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "v3":
 		sClient, err := os.NewBlockStorageV3()
 		if err != nil {
 			return nil, err
 		}
-		glog.V(3).Info("Using Blockstorage API V3")
+		klog.V(3).Info("Using Blockstorage API V3")
 		return &VolumesV3{sClient, os.bsOpts}, nil
 	case "auto":
 		// Currently kubernetes support Cinder v1 / Cinder v2 / Cinder v3.
@@ -777,17 +780,17 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		// If kubernetes can't initialize cinder v2 client, try to initialize cinder v1 client.
 		// Return appropriate message when kubernetes can't initialize them.
 		if sClient, err := os.NewBlockStorageV3(); err == nil {
-			glog.V(3).Info("Using Blockstorage API V3")
+			klog.V(3).Info("Using Blockstorage API V3")
 			return &VolumesV3{sClient, os.bsOpts}, nil
 		}
 
 		if sClient, err := os.NewBlockStorageV2(); err == nil {
-			glog.V(3).Info("Using Blockstorage API V2")
+			klog.V(3).Info("Using Blockstorage API V2")
 			return &VolumesV2{sClient, os.bsOpts}, nil
 		}
 
 		if sClient, err := os.NewBlockStorageV1(); err == nil {
-			glog.V(3).Info("Using Blockstorage API V1")
+			klog.V(3).Info("Using Blockstorage API V1")
 			return &VolumesV1{sClient, os.bsOpts}, nil
 		}
 

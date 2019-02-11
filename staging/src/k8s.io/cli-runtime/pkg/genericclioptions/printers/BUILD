@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "discard.go",
+        "doc.go",
         "interface.go",
         "json.go",
         "jsonpath.go",
@@ -20,8 +21,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

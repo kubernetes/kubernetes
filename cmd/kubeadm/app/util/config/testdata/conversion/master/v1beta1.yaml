@@ -1,6 +1,3 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
-  bindPort: 6443
 apiVersion: kubeadm.k8s.io/v1beta1
 bootstrapTokens:
 - groups:
@@ -11,6 +8,9 @@ bootstrapTokens:
   - signing
   - authentication
 kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
+  bindPort: 6443
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: master-1
@@ -18,28 +18,37 @@ nodeRegistration:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
-apiServerExtraArgs:
-  authorization-mode: Node,RBAC,Webhook
+apiServer:
+  extraArgs:
+    authorization-mode: Node,RBAC,Webhook
+  extraVolumes:
+  - hostPath: /host/read-only
+    mountPath: /mount/read-only
+    name: ReadOnlyVolume
+    readOnly: true
+  - hostPath: /host/writable
+    mountPath: /mount/writable
+    name: WritableVolume
+  timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
+controllerManager: {}
+dns:
+  type: CoreDNS
 etcd:
   local:
     dataDir: /var/lib/etcd
-    image: ""
 imageRepository: k8s.gcr.io
 kind: ClusterConfiguration
-kubernetesVersion: v1.11.2
+kubernetesVersion: v1.12.2
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-unifiedControlPlaneImage: ""
+scheduler: {}
+useHyperKubeImage: true
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
@@ -140,6 +149,7 @@ makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
 nodeLeaseDurationSeconds: 40
+nodeStatusReportFrequency: 1m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1

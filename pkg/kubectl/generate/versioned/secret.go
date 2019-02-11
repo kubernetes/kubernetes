@@ -205,7 +205,7 @@ func handleFromFileSources(secret *v1.Secret, fileSources []string) error {
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
-				return fmt.Errorf("cannot give a key name for a directory path.")
+				return fmt.Errorf("cannot give a key name for a directory path")
 			}
 			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {
@@ -265,7 +265,7 @@ func addKeyFromLiteralToSecret(secret *v1.Secret, keyName string, data []byte) e
 	}
 
 	if _, entryExists := secret.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, secret.Data)
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v", keyName, secret.Data)
 	}
 	secret.Data[keyName] = data
 	return nil

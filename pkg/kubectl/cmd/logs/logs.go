@@ -181,7 +181,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 		logOptions.SinceSeconds = &sec
 	}
 
-	if len(o.Selector) > 0 && o.Tail != -1 {
+	if len(o.Selector) > 0 && o.Tail == -1 {
 		logOptions.TailLines = &selectorTail
 	} else if o.Tail != -1 {
 		logOptions.TailLines = &o.Tail

@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 // IdentityClient is a CSI identity client used for testing
@@ -57,9 +57,9 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 }
 
 type CSIVolume struct {
-	Attributes map[string]string
-	Path       string
-	MountFlags []string
+	VolumeContext map[string]string
+	Path          string
+	MountFlags    []string
 }
 
 // NodeClient returns CSI node client
@@ -99,10 +99,10 @@ func (f *NodeClient) GetNodeStagedVolumes() map[string]CSIVolume {
 	return f.nodeStagedVolumes
 }
 
-func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, attributes map[string]string) {
+func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
 	f.nodeStagedVolumes[volID] = CSIVolume{
-		Path:       deviceMountPath,
-		Attributes: attributes,
+		Path:          deviceMountPath,
+		VolumeContext: volumeContext,
 	}
 }
 
@@ -125,9 +125,9 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 		return nil, errors.New("invalid fstype")
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
-		Path:       req.GetTargetPath(),
-		Attributes: req.GetVolumeAttributes(),
-		MountFlags: req.GetVolumeCapability().GetMount().MountFlags,
+		Path:          req.GetTargetPath(),
+		VolumeContext: req.GetVolumeContext(),
+		MountFlags:    req.GetVolumeCapability().GetMount().MountFlags,
 	}
 	return &csipb.NodePublishVolumeResponse{}, nil
 }
@@ -172,8 +172,8 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 	}
 
 	f.nodeStagedVolumes[req.GetVolumeId()] = CSIVolume{
-		Path:       req.GetStagingTargetPath(),
-		Attributes: req.GetVolumeAttributes(),
+		Path:          req.GetStagingTargetPath(),
+		VolumeContext: req.GetVolumeContext(),
 	}
 	return &csipb.NodeStageVolumeResponse{}, nil
 }
@@ -193,11 +193,6 @@ func (f *NodeClient) NodeUnstageVolume(ctx context.Context, req *csipb.NodeUnsta
 
 	delete(f.nodeStagedVolumes, req.GetVolumeId())
 	return &csipb.NodeUnstageVolumeResponse{}, nil
-}
-
-// NodeGetId implements method
-func (f *NodeClient) NodeGetId(ctx context.Context, in *csipb.NodeGetIdRequest, opts ...grpc.CallOption) (*csipb.NodeGetIdResponse, error) {
-	return nil, nil
 }
 
 // NodeGetId implements csi method
@@ -224,6 +219,11 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 	if f.stageUnstageSet {
 		return resp, nil
 	}
+	return nil, nil
+}
+
+// NodeGetVolumeStats implements csi method
+func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, in *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {
 	return nil, nil
 }
 

@@ -15,7 +15,6 @@ go_library(
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/ipset:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

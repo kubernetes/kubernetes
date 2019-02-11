@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "crdfinder.go",
         "factory.go",
         "factory_client_access.go",
@@ -14,7 +13,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
@@ -41,9 +39,9 @@ go_library(
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

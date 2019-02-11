@@ -95,13 +95,15 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: KubeDNSDeployment,
-			data: struct{ ImageRepository, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
-				ImageRepository: "foo",
-				Version:         "foo",
-				DNSBindAddr:     "foo",
-				DNSProbeAddr:    "foo",
-				DNSDomain:       "foo",
-				MasterTaintKey:  "foo",
+			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
+				DeploymentName: "foo",
+				KubeDNSImage:   "foo",
+				DNSMasqImage:   "foo",
+				SidecarImage:   "foo",
+				DNSBindAddr:    "foo",
+				DNSProbeAddr:   "foo",
+				DNSDomain:      "foo",
+				MasterTaintKey: "foo",
 			},
 			expected: true,
 		},
@@ -114,10 +116,10 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSDeployment,
-			data: struct{ ImageRepository, MasterTaintKey, Version string }{
-				ImageRepository: "foo",
-				MasterTaintKey:  "foo",
-				Version:         "foo",
+			data: struct{ DeploymentName, Image, MasterTaintKey string }{
+				DeploymentName: "foo",
+				Image:          "foo",
+				MasterTaintKey: "foo",
 			},
 			expected: true,
 		},
@@ -204,28 +206,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }`,
 		},
 		{
@@ -255,28 +257,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }`,
 		},
 		{
@@ -294,7 +296,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		out, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, testCase.configMap)
+		out, err := translateStubDomainOfKubeDNSToForwardCoreDNS(kubeDNSStubDomain, testCase.configMap)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
