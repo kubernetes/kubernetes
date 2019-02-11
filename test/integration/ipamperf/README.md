@@ -51,9 +51,9 @@ is one of
 - CloudAllocator
 - IPAMFromCloud
 
-and X represents the QPS configured for the kubernetes API client, and Y is the number of nodes to create.
+and ```X``` represents the QPS configured for the kubernetes API client, and ```Y``` is the number of nodes to create.
 
-The -d flags set the -v level for glog to 6, enabling nearly all of the debug logs in the code.
+The ```-d``` flags set the ```-v``` level for glog to 6, enabling nearly all of the debug logs in the code.
 
 So to run the test for CloudAllocator with 10 nodes, one can run
 
@@ -61,20 +61,20 @@ So to run the test for CloudAllocator with 10 nodes, one can run
 ./test-performance.sh -r /CloudAllocator.*Nodes10$
 ```
 
-At the end of the test, a JSON format of the results for all the tests run is printed. Passing the -o option 
+At the end of the test, a JSON format of the results for all the tests run is printed. Passing the ```-o``` option 
 allows for also saving this JSON to a named file.
 
 ### Profiling the code
 It's possible to get the CPU and memory profiles of code during test execution by using the ```-p``` option.
 The CPU and memory profiles are generated in the same directory with the file names set to ```cpu-<id>.out```
-and ```cpu-<id>.out```, where ```<id>``` is the argument value. Typicall pattern is to put in the number
+and ```cpu-<id>.out```, where ```<id>``` is the argument value. Typical pattern is to put in the number
 of nodes being simulated as the id, or 'all' in case running the full suite.
 
 ### Custom Test Configuration
-It's also possible to run a custom test configuration by passing the -c option. With this option, it then
-possible to specify the number of nodes to simulate and the API server qps values for creation, 
+It's also possible to run a custom test configuration by passing the ```-c``` option. With this option, it then
+possible to specify the number of nodes to simulate and the API server QPS values for creation, 
 IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the 
-qps parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
+QPS parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
 default allocator is the RangeAllocator.
 
 Code Organization
