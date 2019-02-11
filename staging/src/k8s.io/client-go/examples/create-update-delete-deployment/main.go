@@ -60,7 +60,7 @@ func main() {
 		panic(err)
 	}
 
-	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+	deploymentsClient := clientset.AppsV1().Deployments(metav1.NamespaceDefault)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -142,7 +142,7 @@ func main() {
 
 	// List Deployments
 	prompt()
-	fmt.Printf("Listing deployments in namespace %q:\n", apiv1.NamespaceDefault)
+	fmt.Printf("Listing deployments in namespace %q:\n", metav1.NamespaceDefault)
 	list, err := deploymentsClient.List(metav1.ListOptions{})
 	if err != nil {
 		panic(err)

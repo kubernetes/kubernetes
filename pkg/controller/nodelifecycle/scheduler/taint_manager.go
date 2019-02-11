@@ -127,12 +127,12 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 
 func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
 	selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-	pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: selector.String(),
 		LabelSelector: labels.Everything().String(),
 	})
 	for i := 0; i < retries && err != nil; i++ {
-		pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+		pods, err = c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})

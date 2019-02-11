@@ -54,7 +54,7 @@ func buildPodsByCreationTime() PodsByCreationTime {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo1",
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				CreationTimestamp: metav1.Time{
 					Time: time.Now(),
 				},
@@ -63,7 +63,7 @@ func buildPodsByCreationTime() PodsByCreationTime {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo2",
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				CreationTimestamp: metav1.Time{
 					Time: time.Now().Add(time.Hour * 1),
 				},
@@ -72,7 +72,7 @@ func buildPodsByCreationTime() PodsByCreationTime {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo3",
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				CreationTimestamp: metav1.Time{
 					Time: time.Now().Add(time.Hour * 2),
 				},

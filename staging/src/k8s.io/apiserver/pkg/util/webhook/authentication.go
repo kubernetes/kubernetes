@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -47,7 +47,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				return delegate.ClientConfigFor(server)
 			},
 			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
-				if serviceName == "kubernetes" && serviceNamespace == corev1.NamespaceDefault {
+				if serviceName == "kubernetes" && serviceNamespace == metav1.NamespaceDefault {
 					return kubeapiserverClientConfig, nil
 				}
 				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)

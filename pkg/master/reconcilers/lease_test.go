@@ -76,7 +76,7 @@ func (f *fakeLeases) GetUpdatedKeys() []string {
 }
 
 func TestLeaseEndpointReconciler(t *testing.T) {
-	ns := corev1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
@@ -431,7 +431,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
-		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+		actualEndpoints, err := clientset.CoreV1().Endpoints(metav1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -531,7 +531,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(metav1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -548,7 +548,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 }
 
 func TestLeaseStopReconciling(t *testing.T) {
-	ns := corev1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
@@ -631,7 +631,7 @@ func TestLeaseStopReconciling(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(metav1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -51,7 +52,7 @@ func TestOpenPodHostports(t *testing.T) {
 		{
 			&PodPortMapping{
 				Name:        "test-pod",
-				Namespace:   v1.NamespaceDefault,
+				Namespace:   metav1.NamespaceDefault,
 				IP:          net.ParseIP("10.1.1.2"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
@@ -104,7 +105,7 @@ func TestOpenPodHostports(t *testing.T) {
 		{
 			&PodPortMapping{
 				Name:        "another-test-pod",
-				Namespace:   v1.NamespaceDefault,
+				Namespace:   metav1.NamespaceDefault,
 				IP:          net.ParseIP("10.1.1.5"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{

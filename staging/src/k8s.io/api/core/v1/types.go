@@ -24,10 +24,6 @@ import (
 )
 
 const (
-	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
-	NamespaceDefault string = "default"
-	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
-	NamespaceAll string = ""
 	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
 	NamespaceNodeLease string = "kube-node-lease"
 )

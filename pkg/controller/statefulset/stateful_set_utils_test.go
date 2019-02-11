@@ -344,7 +344,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
 		Spec: apps.StatefulSetSpec{

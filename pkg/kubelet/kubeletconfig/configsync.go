@@ -198,7 +198,7 @@ func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, sourc
 	// because the event recorder won't flush its queue before we exit (we'd lose the event)
 	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
 	klog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(event); err != nil {
+	if _, err := eventClient.Events(metav1.NamespaceDefault).Create(event); err != nil {
 		utillog.Errorf("failed to send event, error: %v", err)
 	}
 	utillog.Infof(message)

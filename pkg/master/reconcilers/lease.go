@@ -160,7 +160,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 }
 
 func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	e, err := r.endpointClient.Endpoints(corev1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -171,7 +171,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: corev1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 		}
 	}
@@ -221,11 +221,11 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
 	if shouldCreate {
-		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
+		if _, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
 			err = nil
 		}
 	} else {
-		_, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Update(e)
+		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 	}
 	return err
 }

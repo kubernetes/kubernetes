@@ -611,7 +611,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				sleepTime := maxTolerationTime + 20*time.Second
 				By(fmt.Sprintf("Sleeping for %v and checking if all Pods were evicted", sleepTime))
 				time.Sleep(sleepTime)
-				pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(podOpts)
+				pods, err = c.CoreV1().Pods(metav1.NamespaceAll).List(podOpts)
 				framework.ExpectNoError(err)
 				seenRunning := []string{}
 				for _, pod := range pods.Items {

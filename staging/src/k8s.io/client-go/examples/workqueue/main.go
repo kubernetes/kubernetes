@@ -162,7 +162,7 @@ func main() {
 	}
 
 	// create the pod watcher
-	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
+	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", meta_v1.NamespaceDefault, fields.Everything())
 
 	// create the workqueue
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
@@ -203,7 +203,7 @@ func main() {
 	indexer.Add(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      "mypod",
-			Namespace: v1.NamespaceDefault,
+			Namespace: meta_v1.NamespaceDefault,
 		},
 	})
 

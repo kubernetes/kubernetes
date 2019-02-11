@@ -1639,7 +1639,7 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       uid,
 		},
 		Spec: apps.StatefulSetSpec{
