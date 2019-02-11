@@ -317,7 +317,7 @@ func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, 
 	return result, &ErrGroupDiscoveryFailed{Groups: failedGroups}
 }
 
-// fetchServerResourcesForGroupVersions uses the discovery client to fetch the resources for the specified groups in parallel
+// fetchServerResourcesForGroupVersions uses the discovery client to fetch the resources for the specified groups in parallel.
 func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroupList) (map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error) {
 	groupVersionResources := make(map[schema.GroupVersion]*metav1.APIResourceList)
 	failedGroups := make(map[schema.GroupVersion]error)
@@ -341,7 +341,9 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 				if err != nil {
 					// TODO: maybe restrict this to NotFound errors
 					failedGroups[groupVersion] = err
-				} else {
+				}
+				if apiResourceList != nil {
+					// even in case of error, some fallback might have been returned
 					groupVersionResources[groupVersion] = apiResourceList
 				}
 			}()
