@@ -2135,8 +2135,8 @@ function create-network() {
 
   # Open up TCP 3389 to allow RDP connections.
   if [[ ${NUM_WINDOWS_NODES} -gt 0 ]]; then
-    if ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NETWORK}-default-rdp" &>/dev/null; then
-      gcloud compute firewall-rules create "${NETWORK}-default-rdp" \
+    if ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NETWORK}-allow-rdp" &>/dev/null; then
+      gcloud compute firewall-rules create "${NETWORK}-allow-rdp" \
         --project "${NETWORK_PROJECT}" \
         --network "${NETWORK}" \
         --source-ranges "0.0.0.0/0" \
