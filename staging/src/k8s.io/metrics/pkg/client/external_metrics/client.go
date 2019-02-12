@@ -45,7 +45,7 @@ func NewForConfig(c *rest.Config) (ExternalMetricsClient, error) {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &v1beta1.SchemeGroupVersion
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.Direct()
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {

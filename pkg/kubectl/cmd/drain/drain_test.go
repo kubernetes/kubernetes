@@ -166,7 +166,7 @@ func TestCordon(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.Direct()
 
 			newNode := &corev1.Node{}
 			updated := false
@@ -731,7 +731,7 @@ func TestDrain(t *testing.T) {
 				defer tf.Cleanup()
 
 				codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-				ns := scheme.Codecs
+				ns := scheme.Codecs.Direct()
 
 				tf.Client = &fake.RESTClient{
 					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},

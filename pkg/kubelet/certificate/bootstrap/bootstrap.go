@@ -276,7 +276,7 @@ func verifyKeyData(data []byte) bool {
 }
 
 func waitForServer(cfg restclient.Config, deadline time.Duration) error {
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	cfg.NegotiatedSerializer = scheme.Codecs.Direct()
 	cfg.Timeout = 1 * time.Second
 	cli, err := restclient.UnversionedRESTClientFor(&cfg)
 	if err != nil {

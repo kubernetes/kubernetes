@@ -304,7 +304,7 @@ func TestHelperGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.Direct(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -385,7 +385,7 @@ func TestHelperList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.Direct(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -596,7 +596,7 @@ func TestHelperReplace(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.Direct(),
 				Client:               tt.HTTPClient,
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,

@@ -83,7 +83,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) FakeC
 	return func(version schema.GroupVersion) (RESTClient, error) {
 		return &fake.RESTClient{
 			GroupVersion:         corev1GV,
-			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+			NegotiatedSerializer: scheme.Codecs.Direct(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				p := req.URL.Path
 				q := req.URL.RawQuery

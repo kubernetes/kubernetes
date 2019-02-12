@@ -76,7 +76,7 @@ func TestForbidden(t *testing.T) {
 	for _, test := range cases {
 		observer := httptest.NewRecorder()
 		scheme := runtime.NewScheme()
-		negotiatedSerializer := serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
+		negotiatedSerializer := serializer.NewCodecFactory(scheme).Direct()
 		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{}, test.reason, negotiatedSerializer)
 		result := string(observer.Body.Bytes())
 		if result != test.expected {

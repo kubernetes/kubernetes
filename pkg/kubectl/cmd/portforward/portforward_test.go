@@ -77,7 +77,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.Direct()
 
 			tf.Client = &fake.RESTClient{
 				VersionedAPIPath:     "/api/v1",

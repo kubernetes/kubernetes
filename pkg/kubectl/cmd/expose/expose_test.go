@@ -602,7 +602,7 @@ func TestRunExposeService(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.Direct()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
