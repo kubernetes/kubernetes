@@ -43,7 +43,7 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 	if wsstream.IsWebSocketRequest(req) {
 		err = handleWebSocketStreams(req, w, portForwarder, podName, uid, portForwardOptions, supportedProtocols, idleTimeout, streamCreationTimeout)
 	} else {
-		err = handleHttpStreams(req, w, portForwarder, podName, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
+		err = handleHTTPStreams(req, w, portForwarder, podName, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
 	}
 
 	if err != nil {
