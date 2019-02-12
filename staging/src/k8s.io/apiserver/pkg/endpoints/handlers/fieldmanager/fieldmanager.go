@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -178,7 +177,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
-			return nil, errors.NewApplyConflict(conflicts)
+			return nil, internal.NewConflictError(conflicts)
 		}
 		return nil, err
 	}
