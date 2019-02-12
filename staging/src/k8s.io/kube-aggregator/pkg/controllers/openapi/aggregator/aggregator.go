@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package aggregator
 
 import (
 	"fmt"
@@ -34,6 +34,15 @@ import (
 	"k8s.io/kube-openapi/pkg/handler"
 )
 
+// SpecAggregator calls out to http handlers of APIServices and merges specs. It keeps state of the last
+// known specs including the http etag.
+type SpecAggregator interface {
+	AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error
+	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
+	RemoveAPIServiceSpec(apiServiceName string) error
+	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
+}
+
 const (
 	aggregatorUser                = "system:aggregator"
 	specDownloadTimeout           = 60 * time.Second
@@ -43,42 +52,16 @@ const (
 	locallyGeneratedEtagPrefix = "\"6E8F849B434D4B98A569B9D7718876E9-"
 )
 
-type specAggregator struct {
-	// mutex protects all members of this struct.
-	rwMutex sync.RWMutex
-
-	// Map of API Services' OpenAPI specs by their name
-	openAPISpecs map[string]*openAPISpecInfo
-
-	// provided for dynamic OpenAPI spec
-	openAPIVersionedService *handler.OpenAPIService
-}
-
-var _ AggregationManager = &specAggregator{}
-
-// This function is not thread safe as it only being called on startup.
-func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Handler, name, etag string) {
-	localAPIService := apiregistration.APIService{}
-	localAPIService.Name = name
-	s.openAPISpecs[name] = &openAPISpecInfo{
-		etag:       etag,
-		apiService: localAPIService,
-		handler:    localHandler,
-		spec:       spec,
-	}
-}
-
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
 func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
-	config *common.Config, pathHandler common.PathHandler) (AggregationManager, error) {
+	config *common.Config, pathHandler common.PathHandler) (SpecAggregator, error) {
 	s := &specAggregator{
 		openAPISpecs: map[string]*openAPISpecInfo{},
 	}
 
 	i := 0
 	// Build Aggregator's spec
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(
-		webServices, config)
+	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(webServices, config)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +99,31 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	return s, nil
+}
+
+type specAggregator struct {
+	// mutex protects all members of this struct.
+	rwMutex sync.RWMutex
+
+	// Map of API Services' OpenAPI specs by their name
+	openAPISpecs map[string]*openAPISpecInfo
+
+	// provided for dynamic OpenAPI spec
+	openAPIVersionedService *handler.OpenAPIService
+}
+
+var _ SpecAggregator = &specAggregator{}
+
+// This function is not thread safe as it only being called on startup.
+func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Handler, name, etag string) {
+	localAPIService := apiregistration.APIService{}
+	localAPIService.Name = name
+	s.openAPISpecs[name] = &openAPISpecInfo{
+		etag:       etag,
+		apiService: localAPIService,
+		handler:    localHandler,
+		spec:       spec,
+	}
 }
 
 // openAPISpecInfo is used to store OpenAPI spec with its priority.
