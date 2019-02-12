@@ -24,7 +24,6 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/generated/openapi:go_default_library",
