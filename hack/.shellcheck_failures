@@ -125,7 +125,6 @@
 ./hack/verify-description.sh
 ./hack/verify-generated-device-plugin.sh
 ./hack/verify-generated-docs.sh
-./hack/verify-generated-files-remake.sh
 ./hack/verify-generated-files.sh
 ./hack/verify-generated-kms.sh
 ./hack/verify-generated-kubelet-plugin-registration.sh
