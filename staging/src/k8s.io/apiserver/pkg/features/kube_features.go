@@ -55,6 +55,7 @@ const (
 
 	// owner: @pbarker
 	// alpha: v1.13
+	// beta: v1.14
 	//
 	// DynamicAuditing enables configuration of audit policy and webhook backends through an
 	// AuditSink API object.

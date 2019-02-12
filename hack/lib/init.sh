@@ -62,6 +62,7 @@ apps/v1 \
 apps/v1beta1 \
 apps/v1beta2 \
 auditregistration.k8s.io/v1alpha1 \
+auditregistration.k8s.io/v1beta1 \
 authentication.k8s.io/v1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1 \
