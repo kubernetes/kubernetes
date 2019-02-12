@@ -57,7 +57,10 @@ pkg_tar(
         ":package_src": "//",
         "//conditions:default": ".",
     }),
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
 )
 
 # Included in node and server tarballs.
@@ -75,7 +78,10 @@ pkg_tar(
     srcs = ["//build:client-targets"],
     mode = "0755",
     package_dir = "client/bin",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -83,7 +89,10 @@ pkg_tar(
     name = "kubernetes-client-%s-%s" % (os, arch),
     extension = "tar.gz",
     package_dir = "kubernetes",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     deps = select({go_platform_constraint(os, arch): [":_client-bin"]}),
 ) for arch in archs] for os, archs in CLIENT_PLATFORMS.items()]
 
@@ -95,7 +104,10 @@ pkg_tar(
     ],
     mode = "0755",
     package_dir = "node/bin",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -105,7 +117,10 @@ pkg_tar(
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     deps = select({go_platform_constraint(os, arch): [":_node-bin"]}),
 ) for arch in archs] for os, archs in NODE_PLATFORMS.items()]
 
@@ -119,7 +134,10 @@ pkg_tar(
     ],
     mode = "0755",
     package_dir = "server/bin",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -137,7 +155,10 @@ pkg_tar(
         ":.dummy",
     ],
     package_dir = "addons",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -147,7 +168,10 @@ pkg_tar(
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     deps = select({
         go_platform_constraint(os, arch): [
             ":_server-addons",
@@ -164,7 +188,10 @@ pkg_tar(
     package_dir = select(for_platforms(
         for_test = "platforms/{OS}/{ARCH}",
     )),
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -201,7 +228,10 @@ pkg_tar(
         "build/release-tars/DEPRECATION_NOTICE": "DEPRECATION_NOTICE",
     },
     strip_prefix = "//",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     deps = select(for_platforms(
         for_test = [":_test-mondo-bin"],
     )),
@@ -221,7 +251,10 @@ pkg_tar(
     srcs = ["//build:test-targets"],
     mode = "0755",
     package_dir = "test/bin",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -230,6 +263,10 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     tags = ["no-cache"],
     deps = select({go_platform_constraint(os, arch): [":_test-bin"]}),
 ) for arch in archs] for os, archs in TEST_PLATFORMS.items()]
@@ -240,7 +277,10 @@ pkg_tar(
         ":kubernetes-manifests.tar.gz",
     ],
     package_dir = "server",
-    tags = ["no-cache"],
+    tags = [
+        "manual",
+        "no-cache",
+    ],
     visibility = ["//visibility:private"],
 )
 

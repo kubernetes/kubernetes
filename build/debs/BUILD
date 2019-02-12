@@ -64,6 +64,7 @@ alias(
         },
     ],
     goarch = arch,
+    tags = ["manual"],
 ) for arch in CLIENT_PLATFORMS["linux"]]
 
 [[deb_data(
@@ -76,6 +77,7 @@ alias(
         },
     ],
     goarch = arch,
+    tags = ["manual"],
 ) for binary in [
     "cloud-controller-manager",
     "kube-apiserver",
@@ -99,6 +101,7 @@ alias(
         },
     ],
     goarch = arch,
+    tags = ["manual"],
 ) for arch in NODE_PLATFORMS["linux"]]
 
 [deb_data(
@@ -126,17 +129,20 @@ alias(
         },
     ],
     goarch = arch,
+    tags = ["manual"],
 ) for arch in NODE_PLATFORMS["linux"]]
 
 [pkg_tar(
     name = "kubernetes-cni-data-%s" % goarch,
     package_dir = "/opt/cni/bin",
+    tags = ["manual"],
     deps = ["@kubernetes_cni_%s//file" % goarch],
 ) for goarch in NODE_PLATFORMS["linux"]]
 
 [pkg_tar(
     name = "cri-tools-data-%s" % goarch,
     package_dir = "/usr/bin",
+    tags = ["manual"],
     deps = ["@cri_tools_%s//file" % goarch],
 ) for goarch in NODE_PLATFORMS["linux"]]
 
@@ -144,6 +150,7 @@ alias(
     name = "cloud-controller-manager",
     description = "Kubernetes Cloud Controller Manager",
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in SERVER_PLATFORMS["linux"]]
 
@@ -153,6 +160,7 @@ alias(
 The Kubernetes command line tool for interacting with the Kubernetes API.
 """,
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in CLIENT_PLATFORMS["linux"]]
 
@@ -160,6 +168,7 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
     name = "kube-apiserver",
     description = "Kubernetes API Server",
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in SERVER_PLATFORMS["linux"]]
 
@@ -167,6 +176,7 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
     name = "kube-controller-manager",
     description = "Kubernetes Controller Manager",
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in SERVER_PLATFORMS["linux"]]
 
@@ -174,6 +184,7 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
     name = "kube-scheduler",
     description = "Kubernetes Scheduler",
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in SERVER_PLATFORMS["linux"]]
 
@@ -185,6 +196,7 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
     ],
     description = "Kubernetes Service Proxy",
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in NODE_PLATFORMS["linux"]]
 
@@ -205,6 +217,7 @@ The Kubernetes command line tool for interacting with the Kubernetes API.
 The node agent of Kubernetes, the container cluster manager
 """,
     goarch = arch,
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in NODE_PLATFORMS["linux"]]
 
@@ -221,6 +234,7 @@ The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
     goarch = arch,
     postinst = "postinst",
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 ) for arch in NODE_PLATFORMS["linux"]]
 
@@ -230,6 +244,7 @@ The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 The Container Networking Interface tools for provisioning container networks.
 """,
     goarch = arch,
+    tags = ["manual"],
     version = CNI_VERSION,
 ) for arch in NODE_PLATFORMS["linux"]]
 
@@ -237,6 +252,7 @@ The Container Networking Interface tools for provisioning container networks.
     name = "cri-tools",
     description = """Container Runtime Interface tools (crictl)""",
     goarch = arch,
+    tags = ["manual"],
     version = CRI_TOOLS_VERSION,
 ) for arch in NODE_PLATFORMS["linux"]]
 
