@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"

@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -125,20 +125,9 @@ type RoleBindingRESTClient struct {
 }
 
 func (c *RoleBindingRESTClient) Post() *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &groupVersion,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+	config := restclient.ClientContentConfig{
+		ContentType: runtime.ContentTypeJSON,
+		Negotiator:  runtime.NewClientNegotiator(c.NegotiatedSerializer, groupVersion),
 	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, groupVersion),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, groupVersion),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return restclient.NewRequestWithClient(&url.URL{Host: "localhost"}, c.VersionedAPIPath, config, c.Client).Verb("POST")
 }

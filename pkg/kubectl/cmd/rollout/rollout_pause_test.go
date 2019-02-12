@@ -34,16 +34,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
-var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
+var rolloutPauseGroupVersion = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
 
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"
-	ns := scheme.Codecs
+	ns := scheme.Codecs.Direct()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersion)
 	tf.Client = &RolloutPauseRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -77,39 +76,19 @@ type RolloutPauseRESTClient struct {
 }
 
 func (c *RolloutPauseRESTClient) Get() *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &rolloutPauseGroupVersionEncoder,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+	config := restclient.ClientContentConfig{
+		ContentType:  runtime.ContentTypeJSON,
+		GroupVersion: rolloutPauseGroupVersion,
+		Negotiator:   runtime.NewClientNegotiator(c.NegotiatedSerializer, rolloutPauseGroupVersion),
 	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, rolloutPauseGroupVersionDecoder),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return restclient.NewRequestWithClient(&url.URL{Host: "localhost"}, c.VersionedAPIPath, config, c.Client).Verb("GET")
 }
 
 func (c *RolloutPauseRESTClient) Patch(pt types.PatchType) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &rolloutPauseGroupVersionEncoder,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+	config := restclient.ClientContentConfig{
+		ContentType:  runtime.ContentTypeJSON,
+		GroupVersion: rolloutPauseGroupVersion,
+		Negotiator:   runtime.NewClientNegotiator(c.NegotiatedSerializer, rolloutPauseGroupVersion),
 	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, rolloutPauseGroupVersionDecoder),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return restclient.NewRequestWithClient(&url.URL{Host: "localhost"}, c.VersionedAPIPath, config, c.Client).Verb("PATCH")
 }

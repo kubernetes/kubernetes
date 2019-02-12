@@ -48,7 +48,7 @@ import (
 
 var (
 	// longThrottleLatency defines threshold for logging requests. All requests being
-	// throttle for more than longThrottleLatency will be logged.
+	// rateLimiter for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
 )
 
@@ -74,19 +74,20 @@ func (r *RequestConstructionError) Error() string {
 	return fmt.Sprintf("request construction error: '%v'", r.Err)
 }
 
+var noBackoff = &NoBackoff{}
+
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
 type Request struct {
-	// required
-	client HTTPClient
-	verb   string
+	c *RESTClient
 
-	baseURL     *url.URL
-	content     ContentConfig
-	serializers Serializers
+	rateLimiter flowcontrol.RateLimiter
+	backoff     BackoffManager
+	timeout     time.Duration
 
 	// generic components accessible via method setters
+	verb       string
 	pathPrefix string
 	subpath    string
 	params     url.Values
@@ -98,7 +99,6 @@ type Request struct {
 	resource     string
 	resourceName string
 	subresource  string
-	timeout      time.Duration
 
 	// output
 	err  error
@@ -106,39 +106,69 @@ type Request struct {
 
 	// This is only used for per-request timeouts, deadlines, and cancellations.
 	ctx context.Context
-
-	backoffMgr BackoffManager
-	throttle   flowcontrol.RateLimiter
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter, timeout time.Duration) *Request {
+func NewRequest(c *RESTClient) *Request {
+	var backoff BackoffManager
+	if c.createBackoffMgr != nil {
+		backoff = c.createBackoffMgr()
+	}
 	if backoff == nil {
-		klog.V(2).Infof("Not implementing request backoff strategy.")
-		backoff = &NoBackoff{}
+		backoff = noBackoff
 	}
 
-	pathPrefix := "/"
-	if baseURL != nil {
-		pathPrefix = path.Join(pathPrefix, baseURL.Path)
+	var pathPrefix string
+	if c.base != nil {
+		pathPrefix = path.Join("/", c.base.Path, c.versionedAPIPath)
+	} else {
+		pathPrefix = path.Join("/", c.versionedAPIPath)
 	}
+
+	var timeout time.Duration
+	if c.Client != nil {
+		timeout = c.Client.Timeout
+	}
+
 	r := &Request{
-		client:      client,
-		verb:        verb,
-		baseURL:     baseURL,
-		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
-		content:     content,
-		serializers: serializers,
-		backoffMgr:  backoff,
-		throttle:    throttle,
+		c:           c,
+		rateLimiter: c.rateLimiter,
+		backoff:     backoff,
 		timeout:     timeout,
+		pathPrefix:  pathPrefix,
 	}
+
 	switch {
-	case len(content.AcceptContentTypes) > 0:
-		r.SetHeader("Accept", content.AcceptContentTypes)
-	case len(content.ContentType) > 0:
-		r.SetHeader("Accept", content.ContentType+", */*")
+	case len(c.content.AcceptContentTypes) > 0:
+		r.SetHeader("Accept", c.content.AcceptContentTypes)
+	case len(c.content.ContentType) > 0:
+		r.SetHeader("Accept", c.content.ContentType+", */*")
 	}
+	return r
+}
+
+// NewRequestWithoutClient is exposed to allow test interfaces to create a request with a different RESTClient.
+func NewRequestWithoutClient(base *url.URL, versionedAPIPath string, content ClientContentConfig) *Request {
+	return NewRequest(&RESTClient{
+		base:             base,
+		versionedAPIPath: versionedAPIPath,
+		content:          content,
+	})
+}
+
+// NewRequestWithClient is exposed to allow test interfaces to create a request with a different RESTClient.
+func NewRequestWithClient(base *url.URL, versionedAPIPath string, content ClientContentConfig, client *http.Client) *Request {
+	return NewRequest(&RESTClient{
+		base:             base,
+		versionedAPIPath: versionedAPIPath,
+		content:          content,
+		Client:           client,
+	})
+}
+
+// Verb sets the verb this request will use.
+func (r *Request) Verb(verb string) *Request {
+	r.verb = verb
 	return r
 }
 
@@ -184,17 +214,17 @@ func (r *Request) Resource(resource string) *Request {
 // or defaults to the stub implementation if nil is provided
 func (r *Request) BackOff(manager BackoffManager) *Request {
 	if manager == nil {
-		r.backoffMgr = &NoBackoff{}
+		r.backoff = &NoBackoff{}
 		return r
 	}
 
-	r.backoffMgr = manager
+	r.backoff = manager
 	return r
 }
 
 // Throttle receives a rate-limiter and sets or replaces an existing request limiter
 func (r *Request) Throttle(limiter flowcontrol.RateLimiter) *Request {
-	r.throttle = limiter
+	r.rateLimiter = limiter
 	return r
 }
 
@@ -272,8 +302,8 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.pathPrefix = path.Join(r.baseURL.Path, path.Join(segments...))
-	if len(segments) == 1 && (len(r.baseURL.Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
+	r.pathPrefix = path.Join(r.c.base.Path, path.Join(segments...))
+	if len(segments) == 1 && (len(r.c.base.Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
 		// preserve any trailing slashes for legacy behavior
 		r.pathPrefix += "/"
 	}
@@ -317,7 +347,7 @@ func (r *Request) Param(paramName, s string) *Request {
 // VersionedParams will not write query parameters that have omitempty set and are empty. If a
 // parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
-	return r.SpecificallyVersionedParams(obj, codec, *r.content.GroupVersion)
+	return r.SpecificallyVersionedParams(obj, codec, r.c.content.GroupVersion)
 }
 
 func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.ParameterCodec, version schema.GroupVersion) *Request {
@@ -397,14 +427,19 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		data, err := runtime.Encode(r.serializers.Encoder, t)
+		encoder, err := r.c.content.Negotiator.Encoder(r.c.content.ContentType, nil)
+		if err != nil {
+			r.err = err
+			return r
+		}
+		data, err := runtime.Encode(encoder, t)
 		if err != nil {
 			r.err = err
 			return r
 		}
 		glogBody("Request Body", data)
 		r.body = bytes.NewReader(data)
-		r.SetHeader("Content-Type", r.content.ContentType)
+		r.SetHeader("Content-Type", r.c.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
@@ -433,8 +468,8 @@ func (r *Request) URL() *url.URL {
 	}
 
 	finalURL := &url.URL{}
-	if r.baseURL != nil {
-		*finalURL = *r.baseURL
+	if r.c.base != nil {
+		*finalURL = *r.c.base
 	}
 	finalURL.Path = p
 
@@ -468,8 +503,8 @@ func (r Request) finalURLTemplate() url.URL {
 	segments := strings.Split(r.URL().Path, "/")
 	groupIndex := 0
 	index := 0
-	if r.URL() != nil && r.baseURL != nil && strings.Contains(r.URL().Path, r.baseURL.Path) {
-		groupIndex += len(strings.Split(r.baseURL.Path, "/"))
+	if r.URL() != nil && r.c.base != nil && strings.Contains(r.URL().Path, r.c.base.Path) {
+		groupIndex += len(strings.Split(r.c.base.Path, "/"))
 	}
 	if groupIndex >= len(segments) {
 		return *url
@@ -523,8 +558,8 @@ func (r Request) finalURLTemplate() url.URL {
 
 func (r *Request) tryThrottle() {
 	now := time.Now()
-	if r.throttle != nil {
-		r.throttle.Accept()
+	if r.rateLimiter != nil {
+		r.rateLimiter.Accept()
 	}
 	if latency := time.Since(now); latency > longThrottleLatency {
 		klog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
@@ -534,26 +569,10 @@ func (r *Request) tryThrottle() {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
-	return r.WatchWithSpecificDecoders(
-		func(body io.ReadCloser) streaming.Decoder {
-			framer := r.serializers.Framer.NewFrameReader(body)
-			return streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
-		},
-		r.serializers.Decoder,
-	)
-}
-
-// WatchWithSpecificDecoders attempts to begin watching the requested location with a *different* decoder.
-// Turns out that you want one "standard" decoder for the watch event and one "personal" decoder for the content
-// Returns a watch.Interface, or an error.
-func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser) streaming.Decoder, embeddedDecoder runtime.Decoder) (watch.Interface, error) {
 	// We specifically don't want to rate limit watches, so we
-	// don't use r.throttle here.
+	// don't use r.rateLimiter here.
 	if r.err != nil {
 		return nil, r.err
-	}
-	if r.serializers.Framer == nil {
-		return nil, fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType)
 	}
 
 	url := r.URL().String()
@@ -565,18 +584,18 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		req = req.WithContext(r.ctx)
 	}
 	req.Header = r.headers
-	client := r.client
+	client := r.c.Client
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.baseURL != nil {
+	if r.c.base != nil {
 		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
+			r.backoff.UpdateBackoff(r.c.base, err, 0)
 		} else {
-			r.backoffMgr.UpdateBackoff(r.baseURL, err, resp.StatusCode)
+			r.backoff.UpdateBackoff(r.c.base, err, resp.StatusCode)
 		}
 	}
 	if err != nil {
@@ -585,6 +604,7 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		if net.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
+		fmt.Printf("DEBUG: %T %#v\n", err, err)
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -594,9 +614,22 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		}
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
-	wrapperDecoder := wrapperDecoderFn(resp.Body)
+
+	contentType := resp.Header.Get("Content-Type")
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		klog.V(4).Infof("Unexpected content type from the server: %q: %v", contentType, err)
+	}
+	decoder, streamingSerializer, framer, err := r.c.content.Negotiator.StreamDecoder(mediaType, params)
+	if err != nil {
+		return nil, err
+	}
+
+	frameReader := framer.NewFrameReader(resp.Body)
+	streamingDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
+
 	return watch.NewStreamWatcher(
-		restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder),
+		restclientwatch.NewDecoder(streamingDecoder, decoder),
 		errors.NewClientErrorReporter(http.StatusUnsupportedMediaType, r.verb),
 	), nil
 }
@@ -605,8 +638,8 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 // It also handles corner cases for incomplete/invalid request data.
 func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	url := "none"
-	if req.baseURL != nil {
-		url = req.baseURL.Host
+	if req.c.base != nil {
+		url = req.c.base.Host
 	}
 
 	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
@@ -639,18 +672,18 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		req = req.WithContext(r.ctx)
 	}
 	req.Header = r.headers
-	client := r.client
+	client := r.c.Client
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.baseURL != nil {
+	if r.c.base != nil {
 		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+			r.backoff.UpdateBackoff(r.URL(), err, 0)
 		} else {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+			r.backoff.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 	}
 	if err != nil {
@@ -698,7 +731,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		return fmt.Errorf("an empty namespace may not be set during creation")
 	}
 
-	client := r.client
+	client := r.c.Client
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -725,7 +758,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
-		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 		if retries > 0 {
 			// We are retrying the request that we already send to apiserver
 			// at least once before.
@@ -735,9 +768,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+			r.backoff.UpdateBackoff(r.URL(), err, 0)
 		} else {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+			r.backoff.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 		if err != nil {
 			// "Connection reset by peer" is usually a transient error.
@@ -780,7 +813,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 				}
 
 				klog.V(4).Infof("Got a Retry-After %ds response for attempt %d to %v", seconds, retries, url)
-				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
+				r.backoff.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}
 			fn(req, resp)
@@ -864,14 +897,18 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	glogBody("Response Body", body)
 
 	// verify the content type is accurate
+	var decoder runtime.Decoder
 	contentType := resp.Header.Get("Content-Type")
-	decoder := r.serializers.Decoder
-	if len(contentType) > 0 && (decoder == nil || (len(r.content.ContentType) > 0 && contentType != r.content.ContentType)) {
+	if len(contentType) == 0 {
+		contentType = r.c.content.ContentType
+	}
+	if len(contentType) > 0 {
+		var err error
 		mediaType, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
 			return Result{err: errors.NewInternalError(err)}
 		}
-		decoder, err = r.serializers.RenegotiatedDecoder(mediaType, params)
+		decoder, err = r.c.content.Negotiator.Decoder(mediaType, params)
 		if err != nil {
 			// if we fail to negotiate a decoder, treat this as an unstructured error
 			switch {
@@ -991,7 +1028,7 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	}
 	var groupResource schema.GroupResource
 	if len(r.resource) > 0 {
-		groupResource.Group = r.content.GroupVersion.Group
+		groupResource.Group = r.c.content.GroupVersion.Group
 		groupResource.Resource = r.resource
 	}
 	return errors.NewGenericServerResponse(

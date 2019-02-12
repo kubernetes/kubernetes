@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -735,6 +735,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 		{
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
+				t.Logf("%s %s", req.Method, req.URL.Path)
 				switch req.URL.Path {
 				case "/api/v1":
 					list = &stable

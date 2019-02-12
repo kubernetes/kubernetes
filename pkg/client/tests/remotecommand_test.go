@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -232,11 +233,11 @@ func TestStream(t *testing.T) {
 			server := httptest.NewServer(fakeServer(t, requestReceived, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
 
 			url, _ := url.ParseRequestURI(server.URL)
-			config := restclient.ContentConfig{
-				GroupVersion:         &schema.GroupVersion{Group: "x"},
-				NegotiatedSerializer: legacyscheme.Codecs,
+			config := restclient.ClientContentConfig{
+				GroupVersion: schema.GroupVersion{Group: "x"},
+				Negotiator:   runtime.NewClientNegotiator(legacyscheme.Codecs, schema.GroupVersion{Group: "x"}),
 			}
-			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
+			c, err := restclient.NewRESTClient(url, "", config, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}

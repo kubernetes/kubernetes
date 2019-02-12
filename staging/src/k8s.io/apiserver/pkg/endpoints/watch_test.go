@@ -34,7 +34,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -626,7 +625,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 	}
 }
 
-func TestWatchHTTPDynamicClientErrors(t *testing.T) {
+func TestWatchHTTPWithWrongMimeTypeFails(t *testing.T) {
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
@@ -654,6 +653,48 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		watchServer.ServeHTTP(w, req)
 	}))
 	defer s.Close()
+	defer s.CloseClientConnections()
+
+	client := dynamic.NewForConfigOrDie(&restclient.Config{
+		Host:    s.URL,
+		APIPath: "/" + prefix,
+	}).Resource(newGroupVersion.WithResource("simple"))
+
+	_, err := client.Watch(metav1.ListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "no stream serializers registered for testcase/json") {
+		t.Fatal(err)
+	}
+}
+
+func TestWatchHTTPDynamicClientErrors(t *testing.T) {
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	done := make(chan struct{})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
+	}
+	serializer := info.StreamSerializer
+
+	// Setup a new watchserver
+	watchServer := &handlers.WatchServer{
+		Watching: watcher,
+
+		MediaType:       "application/json",
+		Framer:          serializer.Framer,
+		Encoder:         newCodec,
+		EmbeddedEncoder: newCodec,
+
+		Fixup:          func(obj runtime.Object) {},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watchServer.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+	defer s.CloseClientConnections()
 
 	client := dynamic.NewForConfigOrDie(&restclient.Config{
 		Host:    s.URL,
@@ -673,15 +714,11 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	if got.Type != watch.Error {
 		t.Fatalf("unexpected watch type: %#v", got)
 	}
-	obj, ok := got.Object.(*unstructured.Unstructured)
+	status, ok := got.Object.(*metav1.Status)
 	if !ok {
-		t.Fatalf("not the correct object type: %#v", got)
+		t.Fatalf("not the correct object type: %T %#v", got.Object, got.Object)
 	}
 
-	status := &metav1.Status{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), status); err != nil {
-		t.Fatal(err)
-	}
 	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
 		t.Fatalf("error: %#v", status)
 	}

@@ -19,6 +19,7 @@ go_library(
         "garbage_collector.go",
         "generated_clientset.go",
         "namespace.go",
+        "protocol.go",
         "resource_quota.go",
         "table_conversion.go",
         "watch.go",

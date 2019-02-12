@@ -48,6 +48,7 @@ go_library(
         "generated.pb.go",
         "helper.go",
         "interfaces.go",
+        "negotiate.go",
         "register.go",
         "scheme.go",
         "scheme_builder.go",

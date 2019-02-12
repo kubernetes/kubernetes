@@ -86,24 +86,12 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &c.GroupVersion,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+	config := restclient.ClientContentConfig{
+		ContentType:  runtime.ContentTypeJSON,
+		GroupVersion: c.GroupVersion,
+		Negotiator:   runtime.NewClientNegotiator(c.NegotiatedSerializer, c.GroupVersion),
 	}
-
-	ns := c.NegotiatedSerializer
-	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		// TODO this was hardcoded before, but it doesn't look right
-		Encoder: ns.EncoderForVersion(info.Serializer, c.GroupVersion),
-		Decoder: ns.DecoderToVersion(info.Serializer, c.GroupVersion),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return restclient.NewRequestWithClient(&url.URL{Scheme: "https", Host: "localhost"}, c.VersionedAPIPath, config, CreateHTTPClient(c.Do)).Verb(verb)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
