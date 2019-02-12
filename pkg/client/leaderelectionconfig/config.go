@@ -17,16 +17,8 @@ limitations under the License.
 package leaderelectionconfig
 
 import (
-	"time"
-
 	"github.com/spf13/pflag"
 	componentbaseconfig "k8s.io/component-base/config"
-)
-
-const (
-	// DefaultLeaseDuration defines a default duration of lease.
-	// TODO: This constant should move to the k8s.io/component-base/config package
-	DefaultLeaseDuration = 15 * time.Second
 )
 
 // BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
