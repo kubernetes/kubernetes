@@ -511,6 +511,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
+
+		MaxRequestBodyBytes: a.group.MaxRequestBodyBytes,
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
