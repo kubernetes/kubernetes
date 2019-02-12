@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -1510,5 +1511,57 @@ func TestHighestSupportedVersion(t *testing.T) {
 				t.Fatalf("expectedHighestSupportedVersion %v, but got %v for tc: %#v", tc.expectedHighestSupportedVersion, actual, tc)
 			}
 		}
+	}
+}
+
+func TestToPluginHandler(t *testing.T) {
+	testCases := map[string]struct {
+		genericPlugin  volume.VolumePlugin
+		expectedErrMsg string
+	}{
+		"nil cannot be type-casted to csiPlugin": {
+			genericPlugin:  nil,
+			expectedErrMsg: "is not a CSI volume plugin",
+		},
+		"a generic plugin cannot be type-casted to csiPlugin": {
+			genericPlugin:  &volumetest.FakeVolumePlugin{},
+			expectedErrMsg: "is not a CSI volume plugin",
+		},
+		"a CSI plugin can be used as a PluginHandler": {
+			genericPlugin:  &csiPlugin{},
+			expectedErrMsg: "",
+		},
+	}
+
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			plug, err := ToPluginHandler(tc.genericPlugin)
+
+			checkErrMsg(t, err, tc.expectedErrMsg)
+
+			if err == nil && plug == nil {
+				t.Error("Expected plugin not to be nil")
+			}
+		})
+	}
+}
+
+func checkErrMsg(t *testing.T, actualErr error, expectedErrMsg string) {
+	t.Helper()
+
+	if actualErr == nil {
+		if expectedErrMsg != "" {
+			t.Errorf("Expected error to contain '%s', but got no error", expectedErrMsg)
+		}
+		return
+	}
+
+	if expectedErrMsg == "" {
+		t.Errorf("Expected no error, but got: %v", actualErr)
+		return
+	}
+
+	if !strings.Contains(actualErr.Error(), expectedErrMsg) {
+		t.Errorf("Expected error to contain '%s', but got: %v", expectedErrMsg, actualErr)
 	}
 }

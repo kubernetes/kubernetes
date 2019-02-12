@@ -996,3 +996,15 @@ func isV1Version(version string) bool {
 
 	return parsedVersion.Major() == 1
 }
+
+// ToPluginHandler converts the generic volume plugin to a specific csiPlugin and
+// returns that as a PluginHandler. In case the generic plugin is not a CSI
+// plugin and thus not a PluginHandler, an error is returned.
+func ToPluginHandler(genericPlugin volume.VolumePlugin) (pluginwatcher.PluginHandler, error) {
+	csiPlugin, ok := genericPlugin.(*csiPlugin)
+	if !ok {
+		return nil, errors.New("volume plugin is not a CSI volume plugin")
+	}
+
+	return pluginwatcher.PluginHandler(csiPlugin), nil
+}
