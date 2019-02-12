@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
@@ -33,12 +34,16 @@ import (
 )
 
 const (
-	master_v1alpha3YAML   = "testdata/conversion/master/v1alpha3.yaml"
-	master_v1beta1YAML    = "testdata/conversion/master/v1beta1.yaml"
-	master_internalYAML   = "testdata/conversion/master/internal.yaml"
-	master_incompleteYAML = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML  = "testdata/defaulting/master/defaulted.yaml"
-	master_invalidYAML    = "testdata/validation/invalid_mastercfg.yaml"
+	master_v1alpha3YAML          = "testdata/conversion/master/v1alpha3.yaml"
+	master_v1alpha3YAMLNonLinux  = "testdata/conversion/master/v1alpha3_non_linux.yaml"
+	master_v1beta1YAML           = "testdata/conversion/master/v1beta1.yaml"
+	master_v1beta1YAMLNonLinux   = "testdata/conversion/master/v1beta1_non_linux.yaml"
+	master_internalYAML          = "testdata/conversion/master/internal.yaml"
+	master_internalYAMLNonLinux  = "testdata/conversion/master/internal_non_linux.yaml"
+	master_incompleteYAML        = "testdata/defaulting/master/incomplete.yaml"
+	master_defaultedYAML         = "testdata/defaulting/master/defaulted.yaml"
+	master_defaultedYAMLNonLinux = "testdata/defaulting/master/defaulted_non_linux.yaml"
+	master_invalidYAML           = "testdata/validation/invalid_mastercfg.yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -126,6 +131,17 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 }
 
 func TestInitConfigurationMarshallingFromFile(t *testing.T) {
+	master_v1alpha3YAMLAbstracted := master_v1alpha3YAML
+	master_v1beta1YAMLAbstracted := master_v1beta1YAML
+	master_internalYAMLAbstracted := master_internalYAML
+	master_defaultedYAMLAbstracted := master_defaultedYAML
+	if runtime.GOOS != "linux" {
+		master_v1alpha3YAMLAbstracted = master_v1alpha3YAMLNonLinux
+		master_v1beta1YAMLAbstracted = master_v1beta1YAMLNonLinux
+		master_internalYAMLAbstracted = master_internalYAMLNonLinux
+		master_defaultedYAMLAbstracted = master_defaultedYAMLNonLinux
+	}
+
 	var tests = []struct {
 		name, in, out string
 		groupVersion  schema.GroupVersion
@@ -135,26 +151,26 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
 			name:         "v1alpha3ToInternal",
-			in:           master_v1alpha3YAML,
-			out:          master_internalYAML,
+			in:           master_v1alpha3YAMLAbstracted,
+			out:          master_internalYAMLAbstracted,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
-			in:           master_v1beta1YAML,
-			out:          master_internalYAML,
+			in:           master_v1beta1YAMLAbstracted,
+			out:          master_internalYAMLAbstracted,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
 		{ // v1alpha3 -> internal -> v1beta1
 			name:         "v1alpha3Tov1beta1",
-			in:           master_v1alpha3YAML,
-			out:          master_v1beta1YAML,
+			in:           master_v1alpha3YAMLAbstracted,
+			out:          master_v1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
-			in:           master_v1beta1YAML,
-			out:          master_v1beta1YAML,
+			in:           master_v1beta1YAMLAbstracted,
+			out:          master_v1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadInitConfigurationFromFile,
@@ -162,7 +178,7 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 		{ // v1beta1 -> default -> validate -> internal -> v1beta1
 			name:         "incompleteYAMLToDefaultedv1beta1",
 			in:           master_incompleteYAML,
-			out:          master_defaultedYAML,
+			out:          master_defaultedYAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1alpha3 -> validation should fail
