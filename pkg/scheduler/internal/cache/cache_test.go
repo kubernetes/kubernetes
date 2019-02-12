@@ -1132,7 +1132,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		cachedNodes := map[string]*schedulernodeinfo.NodeInfo{}
-		cache.UpdateNodeNameToInfoMap(cachedNodes)
+		cache.SnapshotNodeInfo(cachedNodes)
 	}
 }
 
