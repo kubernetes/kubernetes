@@ -136,6 +136,9 @@ var (
 	VolumeISCSIServer   = Config{e2eRegistry, "volume/iscsi", "1.0"}
 	VolumeGlusterServer = Config{e2eRegistry, "volume/gluster", "1.0"}
 	VolumeRBDServer     = Config{e2eRegistry, "volume/rbd", "1.0.1"}
+
+	// Use a newer version of the metadata concealment check on 1.14+ servers. See http://issue.k8s.io/71094
+	CheckMetadataConcealment1_2 = Config{e2eRegistry, "metadata-concealment", "1.2"}
 )
 
 // GetE2EImage returns the fully qualified URI to an image (including version)
