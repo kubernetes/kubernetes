@@ -254,10 +254,9 @@ func TestComponentPod(t *testing.T) {
 					Kind:       "Pod",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "foo",
-					Namespace:   "kube-system",
-					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/critical-pod": ""},
-					Labels:      map[string]string{"component": "foo", "tier": "control-plane"},
+					Name:      "foo",
+					Namespace: "kube-system",
+					Labels:    map[string]string{"component": "foo", "tier": "control-plane"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
