@@ -51,7 +51,7 @@ import (
 
 var (
 	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-		Your Kubernetes master has initialized successfully!
+		Your Kubernetes control-plane has initialized successfully!
 
 		To start using your cluster, you need to run the following as a regular user:
 

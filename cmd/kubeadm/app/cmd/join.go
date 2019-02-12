@@ -55,7 +55,7 @@ var (
 		* Certificate signing request was sent to apiserver and a response was received.
 		* The Kubelet was informed of the new secure connection details.
 
-		Run 'kubectl get nodes' on the master to see this node join the cluster.
+		Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
 
 		`)
 
@@ -81,8 +81,8 @@ var (
 	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
-		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
-		Master trust the Node).
+		trust the Kubernetes Control Plane) and TLS bootstrap (having the 
+		Kubernetes Control Plane trust the Node).
 
 		There are 2 main schemes for discovery. The first is to use a shared
 		token along with the IP address of the API server. The second is to
@@ -97,8 +97,8 @@ var (
 
 		If you use a shared token for discovery, you should also pass the
 		--discovery-token-ca-cert-hash flag to validate the public key of the
-		root certificate authority (CA) presented by the Kubernetes Master. The
-		value of this flag is specified as "<hash-type>:<hex-encoded-value>",
+		root certificate authority (CA) presented by the Kubernetes Control Plane. 
+		The value of this flag is specified as "<hash-type>:<hex-encoded-value>",
 		where the supported hash type is "sha256". The hash is calculated over
 		the bytes of the Subject Public Key Info (SPKI) object (as in RFC7469).
 		This value is available in the output of "kubeadm init" or can be
@@ -108,12 +108,12 @@ var (
 		If you cannot know the CA public key hash ahead of time, you can pass
 		the --discovery-token-unsafe-skip-ca-verification flag to disable this
 		verification. This weakens the kubeadm security model since other nodes
-		can potentially impersonate the Kubernetes Master.
+		can potentially impersonate the Kubernetes Control Plane.
 
 		The TLS bootstrap mechanism is also driven via a shared token. This is
-		used to temporarily authenticate with the Kubernetes Master to submit a
+		used to temporarily authenticate with the Kubernetes Control Plane to submit a
 		certificate signing request (CSR) for a locally created key pair. By
-		default, kubeadm will set up the Kubernetes Master to automatically
+		default, kubeadm will set up the Kubernetes Control Plane to automatically
 		approve these signing requests. This token is passed in with the
 		--tls-bootstrap-token abcdef.1234567890abcdef flag.
 
@@ -231,7 +231,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 	)
 	flagSet.StringVar(
 		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
-		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
+		`Specify the token used to temporarily authenticate with the Kubernetes Control Plane while joining the node.`,
 	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
