@@ -345,31 +345,6 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetNetNS")
-
-	for _, fp := range f.AllPodList {
-		for _, c := range fp.Pod.Containers {
-			if c.ID == containerID {
-				return fp.NetnsPath, nil
-			}
-		}
-	}
-
-	return "", f.Err
-}
-
-func (f *FakeRuntime) GetPodContainerID(pod *Pod) (ContainerID, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetPodContainerID")
-	return ContainerID{}, f.Err
-}
-
 func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
