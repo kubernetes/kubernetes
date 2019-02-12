@@ -26,6 +26,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1alpha1 "k8s.io/api/auditregistration/v1alpha1"
+	auditregistrationv1beta1 "k8s.io/api/auditregistration/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -120,6 +121,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=auditregistration.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("auditsinks"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().V1alpha1().AuditSinks().Informer()}, nil
+
+		// Group=auditregistration.k8s.io, Version=v1beta1
+	case auditregistrationv1beta1.SchemeGroupVersion.WithResource("auditsinks"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().V1beta1().AuditSinks().Informer()}, nil
 
 		// Group=autoscaling, Version=v1
 	case autoscalingv1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):

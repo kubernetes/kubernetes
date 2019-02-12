@@ -62,6 +62,7 @@ filegroup(
         "//staging/src/k8s.io/api/apps/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/apps/v1beta2:all-srcs",
         "//staging/src/k8s.io/api/auditregistration/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/api/auditregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/authentication/v1:all-srcs",
         "//staging/src/k8s.io/api/authentication/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/authorization/v1:all-srcs",

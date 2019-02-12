@@ -25,6 +25,7 @@ import (
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	auditregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1"
+	auditregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1beta1"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -67,8 +68,9 @@ type Interface interface {
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AuditregistrationV1alpha1() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface
+	AuditregistrationV1beta1() auditregistrationv1beta1.AuditregistrationV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface
+	Auditregistration() auditregistrationv1beta1.AuditregistrationV1beta1Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Authentication() authenticationv1.AuthenticationV1Interface
@@ -137,6 +139,7 @@ type Clientset struct {
 	appsV1beta1                  *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                  *appsv1beta2.AppsV1beta2Client
 	auditregistrationV1alpha1    *auditregistrationv1alpha1.AuditregistrationV1alpha1Client
+	auditregistrationV1beta1     *auditregistrationv1beta1.AuditregistrationV1beta1Client
 	authenticationV1             *authenticationv1.AuthenticationV1Client
 	authenticationV1beta1        *authenticationv1beta1.AuthenticationV1beta1Client
 	authorizationV1              *authorizationv1.AuthorizationV1Client
@@ -203,10 +206,15 @@ func (c *Clientset) AuditregistrationV1alpha1() auditregistrationv1alpha1.Auditr
 	return c.auditregistrationV1alpha1
 }
 
+// AuditregistrationV1beta1 retrieves the AuditregistrationV1beta1Client
+func (c *Clientset) AuditregistrationV1beta1() auditregistrationv1beta1.AuditregistrationV1beta1Interface {
+	return c.auditregistrationV1beta1
+}
+
 // Deprecated: Auditregistration retrieves the default version of AuditregistrationClient.
 // Please explicitly pick a version.
-func (c *Clientset) Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface {
-	return c.auditregistrationV1alpha1
+func (c *Clientset) Auditregistration() auditregistrationv1beta1.AuditregistrationV1beta1Interface {
+	return c.auditregistrationV1beta1
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
@@ -470,6 +478,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.auditregistrationV1beta1, err = auditregistrationv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.authenticationV1, err = authenticationv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -595,6 +607,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
 	cs.auditregistrationV1alpha1 = auditregistrationv1alpha1.NewForConfigOrDie(c)
+	cs.auditregistrationV1beta1 = auditregistrationv1beta1.NewForConfigOrDie(c)
 	cs.authenticationV1 = authenticationv1.NewForConfigOrDie(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.NewForConfigOrDie(c)
 	cs.authorizationV1 = authorizationv1.NewForConfigOrDie(c)
@@ -635,6 +648,7 @@ func New(c rest.Interface) *Clientset {
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
 	cs.auditregistrationV1alpha1 = auditregistrationv1alpha1.New(c)
+	cs.auditregistrationV1beta1 = auditregistrationv1beta1.New(c)
 	cs.authenticationV1 = authenticationv1.New(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.New(c)
 	cs.authorizationV1 = authorizationv1.New(c)

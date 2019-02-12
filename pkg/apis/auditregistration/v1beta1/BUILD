@@ -9,11 +9,11 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1",
+    importpath = "k8s.io/kubernetes/pkg/apis/auditregistration/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/auditregistration:go_default_library",
-        "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/auditregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -28,7 +28,7 @@ go_test(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/auditregistration/install:go_default_library",
-        "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/auditregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

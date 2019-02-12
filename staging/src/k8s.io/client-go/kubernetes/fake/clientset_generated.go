@@ -34,6 +34,8 @@ import (
 	fakeappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2/fake"
 	auditregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1"
 	fakeauditregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1/fake"
+	auditregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1beta1"
+	fakeauditregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1beta1/fake"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	fakeauthenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1/fake"
 	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
@@ -168,9 +170,14 @@ func (c *Clientset) AuditregistrationV1alpha1() auditregistrationv1alpha1.Auditr
 	return &fakeauditregistrationv1alpha1.FakeAuditregistrationV1alpha1{Fake: &c.Fake}
 }
 
-// Auditregistration retrieves the AuditregistrationV1alpha1Client
-func (c *Clientset) Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface {
-	return &fakeauditregistrationv1alpha1.FakeAuditregistrationV1alpha1{Fake: &c.Fake}
+// AuditregistrationV1beta1 retrieves the AuditregistrationV1beta1Client
+func (c *Clientset) AuditregistrationV1beta1() auditregistrationv1beta1.AuditregistrationV1beta1Interface {
+	return &fakeauditregistrationv1beta1.FakeAuditregistrationV1beta1{Fake: &c.Fake}
+}
+
+// Auditregistration retrieves the AuditregistrationV1beta1Client
+func (c *Clientset) Auditregistration() auditregistrationv1beta1.AuditregistrationV1beta1Interface {
+	return &fakeauditregistrationv1beta1.FakeAuditregistrationV1beta1{Fake: &c.Fake}
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client

@@ -31,6 +31,7 @@ filegroup(
         "//pkg/apis/auditregistration/fuzzer:all-srcs",
         "//pkg/apis/auditregistration/install:all-srcs",
         "//pkg/apis/auditregistration/v1alpha1:all-srcs",
+        "//pkg/apis/auditregistration/v1beta1:all-srcs",
         "//pkg/apis/auditregistration/validation:all-srcs",
     ],
     tags = ["automanaged"],

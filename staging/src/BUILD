@@ -126,6 +126,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/apps/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/apps/v1beta2:all-srcs",
         "//staging/src/k8s.io/client-go/listers/auditregistration/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/auditregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/authentication/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/authentication/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/authorization/v1:all-srcs",
