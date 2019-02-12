@@ -215,6 +215,11 @@ func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.Grou
 	return f.CodecForVersions(encoder, nil, gv, nil)
 }
 
+// Direct returns a NegotiatedSerializer that performs no conversion.
+func (f CodecFactory) Direct() runtime.NegotiatedSerializer {
+	return DirectCodecFactory{f}
+}
+
 // DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion.
 type DirectCodecFactory struct {
 	CodecFactory
@@ -222,7 +227,7 @@ type DirectCodecFactory struct {
 
 // EncoderForVersion returns an encoder that does not do conversion.
 func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
-	return versioning.DirectEncoder{
+	return runtime.DirectEncoder{
 		Version:     version,
 		Encoder:     serializer,
 		ObjectTyper: f.CodecFactory.scheme,
@@ -231,7 +236,7 @@ func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, versio
 
 // DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
 func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
-	return versioning.DirectDecoder{
+	return runtime.DirectDecoder{
 		Decoder: serializer,
 	}
 }

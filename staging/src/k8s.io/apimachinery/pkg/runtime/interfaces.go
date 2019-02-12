@@ -128,6 +128,15 @@ type NegotiatedSerializer interface {
 	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
 }
 
+// ClientNegotiator handles turning an HTTP content type into the appropriate encoder.
+// Use NewClientNegotiator or NewVersionedClientNegotiator to create this interface from
+// a NegiotatedSerializer.
+type ClientNegotiator interface {
+	Encoder(contentType string, params map[string]string) (Encoder, error)
+	Decoder(contentType string, params map[string]string) (Decoder, error)
+	StreamDecoder(contentType string, params map[string]string) (Decoder, Serializer, Framer, error)
+}
+
 // StorageSerializer is an interface used for obtaining encoders, decoders, and serializers
 // that can read and write data at rest. This would commonly be used by client tools that must
 // read files, or server side storage interfaces that persist restful objects.
