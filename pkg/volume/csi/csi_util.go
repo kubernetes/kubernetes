@@ -142,16 +142,17 @@ func hasReadWriteOnce(modes []api.PersistentVolumeAccessMode) bool {
 }
 
 // supportsVolumeOwnership encapsulates the logic for wether a volume ownership mode is set.
-func supportsVolumeOwnership(readOnly bool, volSpec *volume.Spec) bool {
-	if volSpec.PersistentVolume.Spec.AccessModes == nil {
+func supportsVolumeOwnership(volSpec *volume.Spec) bool {
+	accessModes := volSpec.PersistentVolume.Spec.AccessModes
+	if accessModes == nil {
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
 		return false
 	}
-	if !hasReadWriteOnce(volSpec.PersistentVolume.Spec.AccessModes) {
+	if !hasReadWriteOnce(accessModes) {
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
 		return false
 	}
-	if readOnly {
+	if volSpec.ReadOnly {
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
 		return false
 	}

@@ -320,7 +320,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
 			return nil
 		}
-		if supportsVolumeOwnership(c.readOnly, c.spec) {
+		if supportsVolumeOwnership(c.spec) {
 			klog.Infof("Setting ownership for %v (driver = %v)", c.volumeID, c.driverName)
 			err := volume.SetVolumeOwnership(c, fsGroup)
 			if err != nil {

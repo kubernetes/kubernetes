@@ -51,15 +51,14 @@ func calculateMask(mounter Mounter, mode os.FileMode, dir bool) os.FileMode {
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
-	path := mounter.GetPath()
-	klog.Infof("Setting volume ownership for %v to %v", path, fsGroup)
+	klog.Infof("Setting volume ownership for %v to %v", mounter.GetPath(), fsGroup)
 
 	if fsGroup == nil {
 		klog.Infof("No fsGroup specified! No permissions fixing will occur.")
 		return nil
 	}
 
-	klog.Infof("Fixing all permissions under %v file chmod/chown for group %v.", path, fsGroup)
+	klog.Infof("Fixing all permissions under %v file chmod/chown for group %v.", mounter.GetPath(), fsGroup)
 	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
