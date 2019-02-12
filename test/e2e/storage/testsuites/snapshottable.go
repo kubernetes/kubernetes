@@ -80,6 +80,10 @@ func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (s *snapshottableTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapDataSource] {
+		framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+	}
 }
 
 func createSnapshottableTestInput(driver TestDriver, pattern testpatterns.TestPattern) (snapshottableTestResource, snapshottableTestInput) {
@@ -87,18 +91,17 @@ func createSnapshottableTestInput(driver TestDriver, pattern testpatterns.TestPa
 	resource := snapshottableTestResource{}
 	resource.setupResource(driver, pattern)
 
+	dInfo := driver.GetDriverInfo()
 	input := snapshottableTestInput{
-		testCase: SnapshotClassTest{},
-		cs:       driver.GetDriverInfo().Config.Framework.ClientSet,
-		dc:       driver.GetDriverInfo().Config.Framework.DynamicClient,
-		pvc:      resource.pvc,
-		sc:       resource.sc,
-		vsc:      resource.vsc,
-		dInfo:    driver.GetDriverInfo(),
-	}
-
-	if driver.GetDriverInfo().Config.ClientNodeName != "" {
-		input.testCase.NodeName = driver.GetDriverInfo().Config.ClientNodeName
+		testCase: SnapshotClassTest{
+			NodeName: dInfo.Config.ClientNodeName,
+		},
+		cs:    dInfo.Config.Framework.ClientSet,
+		dc:    dInfo.Config.Framework.DynamicClient,
+		pvc:   resource.pvc,
+		sc:    resource.sc,
+		vsc:   resource.vsc,
+		dInfo: dInfo,
 	}
 
 	return resource, input
@@ -187,10 +190,7 @@ type snapshottableTestInput struct {
 }
 
 func testSnapshot(input *snapshottableTestInput) {
-	It("should create snapshot with defaults", func() {
-		if input.dInfo.Name == "csi-hostpath-v0" {
-			framework.Skipf("skip test when using driver csi-hostpath-v0 - skipping")
-		}
+	It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
 		TestCreateSnapshot(input.testCase, input.cs, input.dc, input.pvc, input.sc, input.vsc)
 	})
 }

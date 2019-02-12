@@ -84,7 +84,7 @@ var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath", config,
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapDataSource: true},
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapDataSource: true, testsuites.CapMultiPODs: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -259,7 +259,7 @@ func (m *mockCSIDriver) CleanupDriver() {
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0", config,
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true},
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -297,6 +297,7 @@ func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
@@ -409,6 +410,7 @@ func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDri
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
