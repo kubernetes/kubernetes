@@ -168,7 +168,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 
 	klog.V(1).Info("[reset] removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
-		klog.Errorf("[reset] failed to remove containers: %+v", err)
+		klog.Errorf("[reset] failed to remove containers: %v", err)
 	}
 
 	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
