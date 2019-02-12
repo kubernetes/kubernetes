@@ -56,6 +56,7 @@ fi
 # won't pick them up.
 REQUIRED_BINS=(
   "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/bazelbuild/buildtools/buildozer"
   "github.com/cespare/prettybench"
   "github.com/client9/misspell/cmd/misspell"
   "github.com/cloudflare/cfssl/cmd/cfssl"
