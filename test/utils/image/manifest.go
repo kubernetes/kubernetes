@@ -90,6 +90,9 @@ var (
 	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume/iscsi", "1.0"}
 	VolumeGlusterServer = ImageConfig{e2eRegistry, "volume/gluster", "1.0"}
 	VolumeRBDServer     = ImageConfig{e2eRegistry, "volume/rbd", "1.0.1"}
+
+	// Use a newer version of the metadata concealment check on 1.14+ servers. See http://issue.k8s.io/71094
+	CheckMetadataConcealment1_2 = ImageConfig{e2eRegistry, "metadata-concealment", "1.2"}
 )
 
 func GetE2EImage(image ImageConfig) string {
