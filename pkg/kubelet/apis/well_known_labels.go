@@ -24,6 +24,12 @@ import (
 )
 
 const (
+	// The OS/Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta OS/Arch labels in Kubernetes 1.18.
+	LabelOS   = "beta.kubernetes.io/os"
+	LabelArch = "beta.kubernetes.io/arch"
+
 	// GA versions of the legacy beta labels.
 	// TODO: update kubelet and controllers to set both beta and GA labels, then export these constants
 	labelZoneFailureDomainGA = "failure-domain.kubernetes.io/zone"
@@ -39,8 +45,8 @@ var kubeletLabels = sets.NewString(
 	v1.LabelOSStable,
 	v1.LabelArchStable,
 
-	v1.LabelOS,
-	v1.LabelArch,
+	LabelOS,
+	LabelArch,
 
 	labelZoneFailureDomainGA,
 	labelZoneRegionGA,
