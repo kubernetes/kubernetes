@@ -21,6 +21,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// StringInSlice traversal and determine return bool
 func StringInSlice(s string, list []string) bool {
 	for _, v := range list {
 		if v == s {

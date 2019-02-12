@@ -41,6 +41,7 @@ type basicWorkQueue struct {
 
 var _ WorkQueue = &basicWorkQueue{}
 
+// NewBasicWorkQueue instantiate the queue and return WorkQueue
 func NewBasicWorkQueue(clock clock.Clock) WorkQueue {
 	queue := make(map[types.UID]time.Time)
 	return &basicWorkQueue{queue: queue, clock: clock}
