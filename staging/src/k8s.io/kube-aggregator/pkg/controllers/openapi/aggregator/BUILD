@@ -26,7 +26,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["aggregator_test.go"],
+    srcs = [
+        "downloader_test.go",
+        "priority_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",

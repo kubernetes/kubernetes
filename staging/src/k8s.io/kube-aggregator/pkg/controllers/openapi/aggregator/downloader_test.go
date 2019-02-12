@@ -19,57 +19,11 @@ package aggregator
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
-
-func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {
-	r := apiregistration.APIService{}
-	r.Spec.Group = group
-	r.Spec.GroupPriorityMinimum = minGroupPriority
-	r.Spec.VersionPriority = versionPriority
-	r.Spec.Service = &apiregistration.ServiceReference{}
-	r.Name = name
-	return r
-}
-
-func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames []string) {
-	actualNames := []string{}
-	for _, a := range actual {
-		actualNames = append(actualNames, a.apiService.Name)
-	}
-	if !reflect.DeepEqual(actualNames, expectedNames) {
-		t.Errorf("Expected %s got %s.", expectedNames, actualNames)
-	}
-}
-
-func TestAPIServiceSort(t *testing.T) {
-	list := []openAPISpecInfo{
-		{
-			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3),
-			spec:       &spec.Swagger{},
-		},
-	}
-	sortByPriority(list)
-	assertSortedServices(t, list, []string{"FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
-}
 
 type handlerTest struct {
 	etag string
@@ -136,7 +90,6 @@ func assertDownloadedSpec(actualSpec *spec.Swagger, actualEtag string, err error
 }
 
 func TestDownloadOpenAPISpec(t *testing.T) {
-
 	s := Downloader{}
 
 	// Test with no eTag
