@@ -19,7 +19,6 @@ package aggregator
 import (
 	"fmt"
 	"net/http"
-	"sort"
 	"sync"
 	"time"
 
@@ -135,59 +134,6 @@ type openAPISpecInfo struct {
 	spec    *spec.Swagger
 	handler http.Handler
 	etag    string
-}
-
-// byPriority can be used in sort.Sort to sort specs with their priorities.
-type byPriority struct {
-	specs           []openAPISpecInfo
-	groupPriorities map[string]int32
-}
-
-func (a byPriority) Len() int      { return len(a.specs) }
-func (a byPriority) Swap(i, j int) { a.specs[i], a.specs[j] = a.specs[j], a.specs[i] }
-func (a byPriority) Less(i, j int) bool {
-	// All local specs will come first
-	if a.specs[i].apiService.Spec.Service == nil && a.specs[j].apiService.Spec.Service != nil {
-		return true
-	}
-	if a.specs[i].apiService.Spec.Service != nil && a.specs[j].apiService.Spec.Service == nil {
-		return false
-	}
-	// WARNING: This will result in not following priorities for local APIServices.
-	if a.specs[i].apiService.Spec.Service == nil {
-		// Sort local specs with their name. This is the order in the delegation chain (aggregator first).
-		return a.specs[i].apiService.Name < a.specs[j].apiService.Name
-	}
-	var iPriority, jPriority int32
-	if a.specs[i].apiService.Spec.Group == a.specs[j].apiService.Spec.Group {
-		iPriority = a.specs[i].apiService.Spec.VersionPriority
-		jPriority = a.specs[i].apiService.Spec.VersionPriority
-	} else {
-		iPriority = a.groupPriorities[a.specs[i].apiService.Spec.Group]
-		jPriority = a.groupPriorities[a.specs[j].apiService.Spec.Group]
-	}
-	if iPriority != jPriority {
-		// Sort by priority, higher first
-		return iPriority > jPriority
-	}
-	// Sort by service name.
-	return a.specs[i].apiService.Name < a.specs[j].apiService.Name
-}
-
-func sortByPriority(specs []openAPISpecInfo) {
-	b := byPriority{
-		specs:           specs,
-		groupPriorities: map[string]int32{},
-	}
-	for _, spec := range specs {
-		if spec.apiService.Spec.Service == nil {
-			continue
-		}
-		if pr, found := b.groupPriorities[spec.apiService.Spec.Group]; !found || spec.apiService.Spec.GroupPriorityMinimum > pr {
-			b.groupPriorities[spec.apiService.Spec.Group] = spec.apiService.Spec.GroupPriorityMinimum
-		}
-	}
-	sort.Sort(b)
 }
 
 // buildOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.

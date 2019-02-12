@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "aggregator.go",
         "downloader.go",
+        "priority.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator",
