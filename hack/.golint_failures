@@ -577,7 +577,6 @@ staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource
-staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
