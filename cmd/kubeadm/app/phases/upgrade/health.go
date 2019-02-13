@@ -109,16 +109,16 @@ func masterNodesReady(client clientset.Interface) error {
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "couldn't list masters in cluster")
+		return errors.Wrap(err, "couldn't list control-planes in cluster")
 	}
 
 	if len(masters.Items) == 0 {
-		return errors.New("failed to find any nodes with master role")
+		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
 	notReadyMasters := getNotReadyNodes(masters.Items)
 	if len(notReadyMasters) != 0 {
-		return errors.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
+		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyMasters)
 	}
 	return nil
 }
