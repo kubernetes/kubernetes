@@ -1063,7 +1063,11 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *s
 	if t.DelayBinding {
 		bindingMode = storage.VolumeBindingWaitForFirstConsumer
 	}
-	return getStorageClass(pluginName, t.Parameters, &bindingMode, ns, suffix)
+	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, ns, suffix)
+	if t.AllowVolumeExpansion {
+		sc.AllowVolumeExpansion = &t.AllowVolumeExpansion
+	}
+	return sc
 }
 
 func getStorageClass(
