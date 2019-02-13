@@ -239,6 +239,14 @@ func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32
 		}
 		exponent = exponent - 2
 	}
+	for {
+		if exponent <= -12 {
+			amount, _, _ = divideByScaleInt64(amount, 3)
+			exponent = exponent + 3
+		} else {
+			break
+		}
+	}
 	return strconv.AppendInt(out, amount, 10), exponent
 }
 
