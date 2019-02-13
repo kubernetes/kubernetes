@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -275,6 +277,78 @@ func TestEvents(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
+	}
+}
+
+// verifyWatchCacheEvents verifies the type, resource version, and key of the specified events
+func verifyWatchCacheEvents(t *testing.T, events []*watchCacheEvent, expectedEvents []watchCacheEvent) {
+	t.Helper()
+	if len(events) != len(expectedEvents) {
+		t.Errorf("expected %d items, got %d:\n%v", len(expectedEvents), len(events), events)
+	}
+
+	truncatedEvents := []watchCacheEvent{}
+	for i := range events {
+		truncatedEvents = append(truncatedEvents, watchCacheEvent{
+			Type:            events[i].Type,
+			Key:             events[i].Key,
+			ResourceVersion: events[i].ResourceVersion,
+		})
+	}
+
+	if !reflect.DeepEqual(truncatedEvents, expectedEvents) {
+		t.Errorf("unexpected diff:\n%s", diff.ObjectReflectDiff(expectedEvents, truncatedEvents))
+	}
+}
+
+func TestRV0Events(t *testing.T) {
+	store := newTestWatchCache(2)
+
+	store.Add(makeTestPod("pod", 3))
+	store.Add(makeTestPod("pod2", 4))
+	store.Add(makeTestPod("pod3", 5))
+
+	// Test for Added event.
+	{
+		items, err := store.GetAllEventsSince(0)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		verifyWatchCacheEvents(t, items, []watchCacheEvent{
+			{Type: "ADDED", ResourceVersion: 3, Key: "prefix/ns/pod"},
+			{Type: "ADDED", ResourceVersion: 4, Key: "prefix/ns/pod2"},
+			{Type: "ADDED", ResourceVersion: 5, Key: "prefix/ns/pod3"},
+		})
+	}
+
+	store.Update(makeTestPod("pod", 6))
+
+	// Test for Added event reflecting new update in correct order.
+	{
+		items, err := store.GetAllEventsSince(0)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		verifyWatchCacheEvents(t, items, []watchCacheEvent{
+			{Type: "ADDED", ResourceVersion: 4, Key: "prefix/ns/pod2"},
+			{Type: "ADDED", ResourceVersion: 5, Key: "prefix/ns/pod3"},
+			{Type: "ADDED", ResourceVersion: 6, Key: "prefix/ns/pod"},
+		})
+	}
+
+	// Test for delete event.
+	store.Delete(makeTestPod("pod2", 7))
+
+	// Test for Added event reflecting delete in correct order.
+	{
+		items, err := store.GetAllEventsSince(0)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		verifyWatchCacheEvents(t, items, []watchCacheEvent{
+			{Type: "ADDED", ResourceVersion: 5, Key: "prefix/ns/pod3"},
+			{Type: "ADDED", ResourceVersion: 6, Key: "prefix/ns/pod"},
+		})
 	}
 }
 

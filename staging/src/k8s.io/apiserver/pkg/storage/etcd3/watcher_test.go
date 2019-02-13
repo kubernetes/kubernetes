@@ -147,18 +147,40 @@ func TestDeleteTriggerWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
-	w, err := store.Watch(ctx, key, "0", storage.Everything)
+	watchKey := "/pod"
+
+	key1 := "/pod/1"
+	storedObj := &example.Pod{}
+	if err := store.Create(ctx, key1, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, storedObj, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	key2 := "/pod/2"
+	storedObj2 := &example.Pod{}
+	if err := store.Create(ctx, key2, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"}}, storedObj2, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	key3 := "/pod/3"
+	storedObj3 := &example.Pod{}
+	if err := store.Create(ctx, key3, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "ns"}}, storedObj3, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	w, err := store.WatchList(ctx, watchKey, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
+	// ADDED events, in updated order
 	testCheckResult(t, 0, watch.Added, w, storedObj)
+	testCheckResult(t, 0, watch.Added, w, storedObj2)
+	testCheckResult(t, 0, watch.Added, w, storedObj3)
 	w.Stop()
 
 	// Update
 	out := &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+	err = store.GuaranteedUpdate(ctx, key1, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
 		}))
@@ -167,16 +189,19 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Make sure when we watch from 0 we receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.WatchList(ctx, watchKey, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
+	// ADDED events, in updated order
+	testCheckResult(t, 0, watch.Added, w, storedObj2)
+	testCheckResult(t, 0, watch.Added, w, storedObj3)
 	testCheckResult(t, 1, watch.Added, w, out)
 	w.Stop()
 
 	// Update again
 	out = &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+	err = store.GuaranteedUpdate(ctx, key1, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
 		}))
@@ -195,10 +220,13 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.WatchList(ctx, watchKey, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
+	// ADDED events, in updated order
+	testCheckResult(t, 0, watch.Added, w, storedObj2)
+	testCheckResult(t, 0, watch.Added, w, storedObj3)
 	testCheckResult(t, 2, watch.Added, w, out)
 }
 
@@ -340,6 +368,7 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 }
 
 func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+	t.Helper()
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
