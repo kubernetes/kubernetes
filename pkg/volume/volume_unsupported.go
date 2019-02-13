@@ -18,6 +18,11 @@ limitations under the License.
 
 package volume
 
+import "k8s.io/klog"
+
+// SetVolumeOwnership for unsupported volumes does nothing.  For convention, if an in-tree
+// volume isnt actually setting ownership, it should call this function at the end of its "SetUpAt" implementation.
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
+	klog.Infof("Warning: Skipped setting fsGroup (%v) volume at path %v.", fsGroup, mounter.GetPath())
 	return nil
 }
