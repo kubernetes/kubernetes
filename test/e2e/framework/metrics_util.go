@@ -92,24 +92,45 @@ func (m *MetricsForE2E) filterMetrics() {
 	(*m).KubeletMetrics = interestingKubeletMetrics
 }
 
+func printSample(sample *model.Sample) string {
+	buf := make([]string, 0)
+	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
+	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
+	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
+	// but it works...
+	_, normalContainer := sample.Metric["kubernetes_container_name"]
+	for k, v := range sample.Metric {
+		if strings.HasPrefix(string(k), "__") {
+			continue
+		}
+
+		if string(k) == "id" && normalContainer {
+			continue
+		}
+		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
+	}
+	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
+}
+
+
 func (m *MetricsForE2E) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	for _, interestingMetric := range InterestingApiServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for _, interestingMetric := range InterestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for _, interestingMetric := range InterestingClusterAutoscalerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for kubelet, grabbed := range (*m).KubeletMetrics {
@@ -117,7 +138,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 		for _, interestingMetric := range InterestingKubeletMetrics {
 			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
 			for _, sample := range grabbed[interestingMetric] {
-				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", printSample(sample)))
 			}
 		}
 	}
