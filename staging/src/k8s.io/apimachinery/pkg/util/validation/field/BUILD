@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "errors_test.go",
-        "path_test.go",
-    ],
+    srcs = ["errors_test.go"],
     embed = [":go_default_library"],
 )
 
@@ -26,6 +23,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/utils/field:go_default_library",
     ],
 )
 
