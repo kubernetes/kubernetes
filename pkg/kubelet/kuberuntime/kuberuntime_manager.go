@@ -26,7 +26,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -544,16 +544,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			continue
 		}
 		// The container is running, but kill the container if any of the following condition is met.
-		reason := ""
+		var message string
 		restart := shouldRestartOnFailure(pod)
-		if expectedHash, actualHash, changed := containerChanged(&container, containerStatus); changed {
-			reason = fmt.Sprintf("Container spec hash changed (%d vs %d).", actualHash, expectedHash)
+		if _, _, changed := containerChanged(&container, containerStatus); changed {
+			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
 			// spec changed.
 			restart = true
 		} else if liveness, found := m.livenessManager.Get(containerStatus.ID); found && liveness == proberesults.Failure {
 			// If the container failed the liveness probe, we should kill it.
-			reason = "Container failed liveness probe."
+			message = fmt.Sprintf("Container %s failed liveness probe", container.Name)
 		} else {
 			// Keep the container.
 			keepCount++
@@ -563,9 +563,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// We need to kill the container, but if we also want to restart the
 		// container afterwards, make the intent clear in the message. Also do
 		// not kill the entire pod since we expect container to be running eventually.
-		message := reason
 		if restart {
-			message = fmt.Sprintf("%s. Container will be killed and recreated.", message)
+			message = fmt.Sprintf("%s, will be restarted", message)
 			changes.ContainersToStart = append(changes.ContainersToStart, idx)
 		}
 
@@ -610,10 +609,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 	// Step 2: Kill the pod if the sandbox has changed.
 	if podContainerChanges.KillPod {
-		if !podContainerChanges.CreateSandbox {
-			klog.V(4).Infof("Stopping PodSandbox for %q because all other containers are dead.", format.Pod(pod))
-		} else {
+		if podContainerChanges.CreateSandbox {
 			klog.V(4).Infof("Stopping PodSandbox for %q, will start new one", format.Pod(pod))
+		} else {
+			klog.V(4).Infof("Stopping PodSandbox for %q because all other containers are dead.", format.Pod(pod))
 		}
 
 		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
