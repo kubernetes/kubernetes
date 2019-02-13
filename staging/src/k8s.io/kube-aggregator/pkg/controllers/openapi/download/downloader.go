@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package download
 
 import (
 	"crypto/sha512"
@@ -22,11 +22,20 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-openapi/spec"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+)
+
+const (
+	aggregatorUser      = "system:aggregator"
+	specDownloadTimeout = 60 * time.Second
+
+	// A randomly generated UUID to differentiate local and remote eTags.
+	locallyGeneratedEtagPrefix = "\"6E8F849B434D4B98A569B9D7718876E9-"
 )
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.

@@ -23,18 +23,26 @@ import (
 	"sync"
 	"time"
 
+	restful "github.com/emicklei/go-restful"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
+	"k8s.io/kube-aggregator/pkg/controllers/openapi/download"
+	"k8s.io/kube-openapi/pkg/builder"
+	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/handler"
 )
 
 const (
 	successfulUpdateDelay   = time.Minute
 	failedUpdateMaxExpDelay = time.Hour
+
+	localDelegateChainNamePattern = "k8s_internal_local_delegation_chain_%010d"
 )
 
 type syncAction int
@@ -45,12 +53,58 @@ const (
 	syncNothing
 )
 
+// BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
+func BuildAndRegisterAggregator(downloader *download.Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
+	config *common.Config, pathHandler common.PathHandler) (aggregator.SpecAggregator, error) {
+	s := aggregator.NewSpecAggregator()
+
+	i := 0
+	// Build Aggregator's spec
+	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(webServices, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reserving non-name spec for aggregator's Spec.
+	s.addLocalSpec(aggregatorOpenAPISpec, nil, fmt.Sprintf(localDelegateChainNamePattern, i), "")
+	i++
+	for delegate := delegationTarget; delegate != nil; delegate = delegate.NextDelegate() {
+		handler := delegate.UnprotectedHandler()
+		if handler == nil {
+			continue
+		}
+		delegateSpec, etag, _, err := downloader.Download(handler, "")
+		if err != nil {
+			return nil, err
+		}
+		if delegateSpec == nil {
+			continue
+		}
+		s.addLocalSpec(delegateSpec, handler, fmt.Sprintf(localDelegateChainNamePattern, i), etag)
+		i++
+	}
+
+	// Build initial spec to serve.
+	specToServe, err := s.buildOpenAPISpec()
+	if err != nil {
+		return nil, err
+	}
+
+	// Install handler
+	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(nil, "/openapi/v2", pathHandler)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
 // AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove
 // them if necessary.
 type AggregationController struct {
 	openAPIAggregationManager aggregator.SpecAggregator
 	queue                     workqueue.RateLimitingInterface
-	downloader                *aggregator.Downloader
+	downloader                *download.Downloader
 
 	lock     sync.Mutex
 	handlers map[string]http.Handler

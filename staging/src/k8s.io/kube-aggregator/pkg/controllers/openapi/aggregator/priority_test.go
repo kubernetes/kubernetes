@@ -35,7 +35,7 @@ func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority 
 	return r
 }
 
-func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames []string) {
+func assertSortedServices(t *testing.T, actual []specInfo, expectedNames []string) {
 	actualNames := []string{}
 	for _, a := range actual {
 		actualNames = append(actualNames, a.apiService.Name)
@@ -46,7 +46,7 @@ func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames 
 }
 
 func TestAPIServiceSort(t *testing.T) {
-	list := []openAPISpecInfo{
+	list := []specInfo{
 		{
 			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5),
 			spec:       &spec.Swagger{},

@@ -7,11 +7,16 @@ go_library(
     importpath = "k8s.io/kube-aggregator/pkg/controllers/openapi",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/download:go_default_library",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -28,6 +33,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/download:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
