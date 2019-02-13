@@ -448,6 +448,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	storagePreconditions := &storage.Preconditions{}
 	if preconditions := objInfo.Preconditions(); preconditions != nil {
 		storagePreconditions.UID = preconditions.UID
+		storagePreconditions.ResourceVersion = preconditions.ResourceVersion
 	}
 
 	out := e.NewFunc()
@@ -879,6 +880,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	var preconditions storage.Preconditions
 	if options.Preconditions != nil {
 		preconditions.UID = options.Preconditions.UID
+		preconditions.ResourceVersion = options.Preconditions.ResourceVersion
 	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {

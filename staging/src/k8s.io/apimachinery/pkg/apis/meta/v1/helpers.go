@@ -228,6 +228,12 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
+// NewPreconditionDeleteOptionsWithResourceVersion returns a DeleteOptions with a UID precondition set.
+func NewPreconditionDeleteOptionsWithResourceVersion(rv string) *DeleteOptions {
+	p := Preconditions{ResourceVersion: &rv}
+	return &DeleteOptions{Preconditions: &p}
+}
+
 // HasObjectMetaSystemFieldValues returns true if fields that are managed by the system on ObjectMeta have values.
 func HasObjectMetaSystemFieldValues(meta Object) bool {
 	return !meta.GetCreationTimestamp().Time.IsZero() ||

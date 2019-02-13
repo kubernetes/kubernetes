@@ -98,6 +98,9 @@ type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
 	UID *types.UID `json:"uid,omitempty"`
+	// Specifies the target ResourceVersion
+	// +optional
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
 }
 
 // NewUIDPreconditions returns a Preconditions with UID set.

@@ -84,11 +84,19 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 	}
 	if options.Preconditions.UID == nil {
 		options.Preconditions.UID = &crd.UID
+		options.Preconditions.ResourceVersion = &crd.ResourceVersion
 	} else if *options.Preconditions.UID != crd.UID {
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
 			name,
 			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, crd.UID),
+		)
+		return nil, false, err
+	} else if *options.Preconditions.ResourceVersion != crd.ResourceVersion {
+		err = apierrors.NewConflict(
+			apiextensions.Resource("customresourcedefinitions"),
+			name,
+			fmt.Errorf("Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, crd.ResourceVersion),
 		)
 		return nil, false, err
 	}
@@ -100,7 +108,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 			return nil, false, err
 		}
 
-		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID, ResourceVersion: options.Preconditions.ResourceVersion}
 
 		out := r.Store.NewFunc()
 		err = r.Store.Storage.GuaranteedUpdate(
