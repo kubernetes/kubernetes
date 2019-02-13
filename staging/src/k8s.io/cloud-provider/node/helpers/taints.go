@@ -30,16 +30,17 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
+	utiltaints "k8s.io/cloud-provider/util/taints"
 )
 
-var updateTaintBackoff = wait.Backoff{
+// UpdateTaintBackoff is the back-off time to update taint.
+var UpdateTaintBackoff = wait.Backoff{
 	Steps:    5,
 	Duration: 100 * time.Millisecond,
 	Jitter:   1.0,
@@ -52,7 +53,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		return nil
 	}
 	firstTry := true
-	return clientretry.RetryOnConflict(updateTaintBackoff, func() error {
+	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
 		var err error
 		var oldNode *v1.Node
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
@@ -71,9 +72,66 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := addOrUpdateTaint(oldNodeCopy, taint)
+			curNewNode, ok, err := utiltaints.AddOrUpdateTaint(oldNodeCopy, taint)
 			if err != nil {
 				return fmt.Errorf("failed to update taint of node")
+			}
+			updated = updated || ok
+			newNode = curNewNode
+			oldNodeCopy = curNewNode
+		}
+		if !updated {
+			return nil
+		}
+		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	if len(taints) == 0 {
+		return nil
+	}
+	// Short circuit for limiting amount of API calls.
+	if node != nil {
+		match := false
+		for _, taint := range taints {
+			if utiltaints.TaintExists(node.Spec.Taints, taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
+
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		var newNode *v1.Node
+		oldNodeCopy := oldNode
+		updated := false
+		for _, taint := range taints {
+			curNewNode, ok, err := utiltaints.RemoveTaint(oldNodeCopy, taint)
+			if err != nil {
+				return fmt.Errorf("failed to remove taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -108,33 +166,4 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 
 	_, err = c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, patchBytes)
 	return err
-}
-
-// addOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
-// false otherwise.
-func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	newNode := node.DeepCopy()
-	nodeTaints := newNode.Spec.Taints
-
-	var newTaints []v1.Taint
-	updated := false
-	for i := range nodeTaints {
-		if taint.MatchTaint(&nodeTaints[i]) {
-			if equality.Semantic.DeepEqual(*taint, nodeTaints[i]) {
-				return newNode, false, nil
-			}
-			newTaints = append(newTaints, *taint)
-			updated = true
-			continue
-		}
-
-		newTaints = append(newTaints, nodeTaints[i])
-	}
-
-	if !updated {
-		newTaints = append(newTaints, *taint)
-	}
-
-	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
 }

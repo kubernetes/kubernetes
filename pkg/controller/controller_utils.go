@@ -18,7 +18,6 @@ package controller
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"sync"
@@ -37,17 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	clientretry "k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/integer"
 
 	"k8s.io/klog"
@@ -81,12 +76,6 @@ const (
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
 )
-
-var UpdateTaintBackoff = wait.Backoff{
-	Steps:    5,
-	Duration: 100 * time.Millisecond,
-	Jitter:   1.0,
-}
 
 var (
 	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
@@ -890,128 +879,6 @@ func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
 		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
 	}
 	return *(o[i].Spec.Replicas) > *(o[j].Spec.Replicas)
-}
-
-// AddOrUpdateTaintOnNode add taints to the node. If taint was added into node, it'll issue API calls
-// to update nodes; otherwise, no API calls. Return error if any.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
-	if len(taints) == 0 {
-		return nil
-	}
-	firstTry := true
-	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
-		var err error
-		var oldNode *v1.Node
-		// First we try getting node from the API server cache, as it's cheaper. If it fails
-		// we get it from etcd to be sure to have fresh data.
-		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
-			firstTry = false
-		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		}
-		if err != nil {
-			return err
-		}
-
-		var newNode *v1.Node
-		oldNodeCopy := oldNode
-		updated := false
-		for _, taint := range taints {
-			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("Failed to update taint of node!")
-			}
-			updated = updated || ok
-			newNode = curNewNode
-			oldNodeCopy = curNewNode
-		}
-		if !updated {
-			return nil
-		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
-	})
-}
-
-// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
-// won't fail if target taint doesn't exist or has been removed.
-// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
-// any API calls.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
-	if len(taints) == 0 {
-		return nil
-	}
-	// Short circuit for limiting amount of API calls.
-	if node != nil {
-		match := false
-		for _, taint := range taints {
-			if taintutils.TaintExists(node.Spec.Taints, taint) {
-				match = true
-				break
-			}
-		}
-		if !match {
-			return nil
-		}
-	}
-
-	firstTry := true
-	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
-		var err error
-		var oldNode *v1.Node
-		// First we try getting node from the API server cache, as it's cheaper. If it fails
-		// we get it from etcd to be sure to have fresh data.
-		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
-			firstTry = false
-		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		}
-		if err != nil {
-			return err
-		}
-
-		var newNode *v1.Node
-		oldNodeCopy := oldNode
-		updated := false
-		for _, taint := range taints {
-			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("Failed to remove taint of node!")
-			}
-			updated = updated || ok
-			newNode = curNewNode
-			oldNodeCopy = curNewNode
-		}
-		if !updated {
-			return nil
-		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
-	})
-}
-
-// PatchNodeTaints patches node's taints.
-func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
-	oldData, err := json.Marshal(oldNode)
-	if err != nil {
-		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
-	}
-
-	newTaints := newNode.Spec.Taints
-	newNodeClone := oldNode.DeepCopy()
-	newNodeClone.Spec.Taints = newTaints
-	newData, err := json.Marshal(newNodeClone)
-	if err != nil {
-		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
-	}
-
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-	if err != nil {
-		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
-	}
-
-	_, err = c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, patchBytes)
-	return err
 }
 
 // WaitForCacheSync is a wrapper around cache.WaitForCacheSync that generates log messages
