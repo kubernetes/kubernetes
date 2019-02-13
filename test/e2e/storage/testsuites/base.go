@@ -67,12 +67,10 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 }
 
 // DefineTestSuite defines tests for all testpatterns and all testSuites for a driver
-func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
+func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
-		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
-
-		for _, pattern := range patterns {
+		for _, pattern := range suite.getTestSuiteInfo().testPatterns {
 			p := pattern
 			Context(getTestNameStr(suite, p), func() {
 				BeforeEach(func() {

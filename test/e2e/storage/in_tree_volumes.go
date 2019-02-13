@@ -19,7 +19,6 @@ package storage
 import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -58,17 +57,13 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 }
 
-func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	return patterns
-}
-
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, testSuites, intreeTunePattern)
+			testsuites.DefineTestSuite(curDriver, testSuites)
 		})
 	}
 })

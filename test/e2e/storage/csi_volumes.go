@@ -31,7 +31,6 @@ import (
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -62,27 +61,13 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitSnapshottableTestSuite,
 }
 
-func csiTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	tunedPatterns := []testpatterns.TestPattern{}
-
-	for _, pattern := range patterns {
-		// Skip inline volume and pre-provsioned PV tests for csi drivers
-		if pattern.VolType == testpatterns.InlineVolume || pattern.VolType == testpatterns.PreprovisionedPV {
-			continue
-		}
-		tunedPatterns = append(tunedPatterns, pattern)
-	}
-
-	return tunedPatterns
-}
-
 // This executes testSuites for csi volumes.
 var _ = utils.SIGDescribe("CSI Volumes", func() {
 	for _, initDriver := range csiTestDrivers {
 		curDriver := initDriver()
 
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, csiTestSuites, csiTunePattern)
+			testsuites.DefineTestSuite(curDriver, csiTestSuites)
 		})
 	}
 
