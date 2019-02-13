@@ -155,11 +155,6 @@
 ./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
-./staging/src/k8s.io/kube-aggregator/hack/build-image.sh
-./staging/src/k8s.io/kube-aggregator/hack/local-up-kube-aggregator.sh
-./staging/src/k8s.io/kube-aggregator/hack/register-all-apis-from.sh
-./staging/src/k8s.io/kube-aggregator/hack/update-codegen.sh
-./staging/src/k8s.io/kube-aggregator/hack/verify-codegen.sh
 ./staging/src/k8s.io/metrics/hack/update-codegen.sh
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
 ./test/cmd/apply.sh
