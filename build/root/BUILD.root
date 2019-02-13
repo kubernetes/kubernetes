@@ -18,13 +18,17 @@ load("//build:platforms.bzl", "for_platforms")
 
 filegroup(
     name = "_binary-artifacts-and-hashes",
-    srcs = [
-        "//build:client-targets-and-hashes",
-        "//build:docker-artifacts-and-hashes",
-        "//build:node-targets-and-hashes",
-        "//build:server-targets-and-hashes",
-        "//build/debs:debs-and-hashes",
-    ],
+    srcs = select(for_platforms(
+        for_client = ["//build:client-targets-and-hashes"],
+        for_node = [
+            "//build:node-targets-and-hashes",
+            "//build/debs:debs-and-hashes",
+        ],
+        for_server = [
+            "//build:docker-artifacts-and-hashes",
+            "//build:server-targets-and-hashes",
+        ],
+    )),
     visibility = ["//visibility:private"],
 )
 
