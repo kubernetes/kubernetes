@@ -19,6 +19,8 @@ reviewers:
 - enj
 - hzxuzhonghu
 - CaoShuFeng
+- jennybuckley
+- apelisse
 labels:
 - sig/api-machinery
 - area/apiserver
