@@ -21,8 +21,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
     deps = [
         "//pkg/util/mount:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -33,6 +31,9 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/node/helpers:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions:go_default_library",

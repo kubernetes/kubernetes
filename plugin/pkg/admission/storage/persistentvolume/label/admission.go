@@ -27,12 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	vol "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -153,7 +153,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 			// Set NodeSelectorRequirements based on the labels
 			var values []string
 			if k == v1.LabelZoneFailureDomain {
-				zones, err := volumeutil.LabelZonesToSet(v)
+				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
 				}
@@ -192,7 +192,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.AWSElasticBlockStore.VolumeID == vol.ProvisionedVolumeName {
+	if volume.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 	pvlabler, err := l.getAWSPVLabeler()
@@ -240,7 +240,7 @@ func (l *persistentVolumeLabel) getAWSPVLabeler() (cloudprovider.PVLabeler, erro
 
 func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.GCEPersistentDisk.PDName == vol.ProvisionedVolumeName {
+	if volume.Spec.GCEPersistentDisk.PDName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -315,7 +315,7 @@ func (l *persistentVolumeLabel) getAzurePVLabeler() (cloudprovider.PVLabeler, er
 
 func (l *persistentVolumeLabel) findAzureDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.AzureDisk.DiskName == vol.ProvisionedVolumeName {
+	if volume.Spec.AzureDisk.DiskName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -364,7 +364,7 @@ func (l *persistentVolumeLabel) getOpenStackPVLabeler() (cloudprovider.PVLabeler
 
 func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.Cinder.VolumeID == vol.ProvisionedVolumeName {
+	if volume.Spec.Cinder.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 

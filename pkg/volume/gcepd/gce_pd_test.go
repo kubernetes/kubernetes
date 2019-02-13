@@ -29,11 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -190,7 +189,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*util.GIB {
+	if size != 100*volumehelpers.GiB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 
@@ -216,7 +215,7 @@ func TestPlugin(t *testing.T) {
 	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
-	zones, _ := volumeutil.ZonesToSet("zone1,zone2")
+	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
 	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
