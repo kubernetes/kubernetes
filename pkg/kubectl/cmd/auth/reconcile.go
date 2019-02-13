@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -205,7 +206,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.Role.GetObject(), o.Out)
+			o.printResults(result.Role.GetObject(), nil, nil, result.MissingRules, result.ExtraRules, result.Operation, result.Protected)
 
 		case *rbacv1.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
@@ -220,7 +221,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.Role.GetObject(), o.Out)
+			o.printResults(result.Role.GetObject(), nil, nil, result.MissingRules, result.ExtraRules, result.Operation, result.Protected)
 
 		case *rbacv1.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -236,7 +237,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
+			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -251,7 +252,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
+			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1beta1.Role,
 			*rbacv1beta1.RoleBinding,
@@ -270,4 +271,57 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		return nil
 	})
+}
+
+func (o *ReconcileOptions) printResults(object runtime.Object,
+	missingSubjects, extraSubjects []rbacv1.Subject,
+	missingRules, extraRules []rbacv1.PolicyRule,
+	operation reconciliation.ReconcileOperation,
+	protected bool) {
+
+	o.PrintObject(object, o.Out)
+
+	caveat := ""
+	if protected {
+		caveat = ", but object opted out (rbac.authorization.kubernetes.io/autoupdate: false)"
+	}
+	switch operation {
+	case reconciliation.ReconcileNone:
+		return
+	case reconciliation.ReconcileCreate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required create%s\n", caveat)
+	case reconciliation.ReconcileUpdate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required update%s\n", caveat)
+	case reconciliation.ReconcileRecreate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required recreate%s\n", caveat)
+	}
+
+	if len(missingSubjects) > 0 {
+		fmt.Fprintf(o.ErrOut, "\tmissing subjects added:\n")
+		for _, s := range missingSubjects {
+			fmt.Fprintf(o.ErrOut, "\t\t%+v\n", s)
+		}
+	}
+	if o.RemoveExtraSubjects {
+		if len(extraSubjects) > 0 {
+			fmt.Fprintf(o.ErrOut, "\textra subjects removed:\n")
+			for _, s := range extraSubjects {
+				fmt.Fprintf(o.ErrOut, "\t\t%+v\n", s)
+			}
+		}
+	}
+	if len(missingRules) > 0 {
+		fmt.Fprintf(o.ErrOut, "\tmissing rules added:\n")
+		for _, r := range missingRules {
+			fmt.Fprintf(o.ErrOut, "\t\t%+v\n", r)
+		}
+	}
+	if o.RemoveExtraPermissions {
+		if len(extraRules) > 0 {
+			fmt.Fprintf(o.ErrOut, "\textra rules removed:\n")
+			for _, r := range extraRules {
+				fmt.Fprintf(o.ErrOut, "\t\t%+v\n", r)
+			}
+		}
+	}
 }
