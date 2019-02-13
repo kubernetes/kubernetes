@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -27,8 +26,10 @@ import (
 	"k8s.io/klog"
 )
 
+// Metrics is generic metrics for other specific metrics
 type Metrics map[string]model.Samples
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *Metrics) Equal(o Metrics) bool {
 	leftKeySet := []string{}
 	rightKeySet := []string{}
@@ -49,6 +50,7 @@ func (m *Metrics) Equal(o Metrics) bool {
 	return true
 }
 
+// NewMetrics returns new metrics which are initialized.
 func NewMetrics() Metrics {
 	result := make(Metrics)
 	return result

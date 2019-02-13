@@ -119,7 +119,7 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest metrics.MetricsCollection
+	clusterAutoscalerMetricsBeforeTest metrics.Collection
 }
 
 type TestDataSummary interface {
