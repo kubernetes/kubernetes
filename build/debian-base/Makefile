@@ -18,7 +18,7 @@ REGISTRY ?= staging-k8s.gcr.io
 IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.4.1
+TAG ?= 0.4.2
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
@@ -26,6 +26,9 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
+
+# include ceph-release for ceph-common to include more recent version
+CEPHRELEASE=luminous
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
@@ -74,6 +77,7 @@ build: clean
 	cat Dockerfile.build \
 		| sed "s|BASEIMAGE|$(BASEIMAGE)|g" \
 		| sed "s|ARCH|$(QEMUARCH)|g" \
+		| sed "s|CEPHRELEASE|$(CEPHRELEASE)|g" \
 		> $(TEMP_DIR)/Dockerfile.build
 
 ifeq ($(ARCH),amd64)
