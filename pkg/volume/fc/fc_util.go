@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -131,20 +132,47 @@ func scsiHostRescan(io ioHandler) {
 	}
 }
 
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/target-lun-0
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/target1-target2-lun-0
 func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
-		return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+		w := strings.Join(wwns, "-")
+		return path.Join(host.GetPluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetPluginDir(fcPluginName), wwids[0])
+	return path.Join(host.GetPluginDir(fcPluginName), strings.Join(wwids, "-"))
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/target-lun-0
 func makeVDPDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
-		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+		w := strings.Join(wwns, "-")
+		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwids[0])
+	return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), strings.Join(wwids, "-"))
+}
+
+func parsePDName(path string) (wwns []string, lun int32, wwids []string, err error) {
+	// parse directory name created by makePDNameInternal or makeVDPDNameInternal
+	dirname := filepath.Base(path)
+	components := strings.Split(dirname, "-")
+	l := len(components)
+	if l == 1 {
+		// No '-', it must be single WWID
+		return nil, 0, components, nil
+	}
+	if components[l-2] == "lun" {
+		// it has -lun-, it's list of WWNs + lun number as the last component
+		if l == 2 {
+			return nil, 0, nil, fmt.Errorf("no wwn in: %s", dirname)
+		}
+		lun, err := strconv.Atoi(components[l-1])
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
+		return components[:l-2], int32(lun), nil, nil
+	}
+	// no -lun-, it's just list of WWIDs
+	return nil, 0, components, nil
 }
 
 type fcUtil struct{}
