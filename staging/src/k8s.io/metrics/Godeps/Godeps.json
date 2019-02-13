@@ -88,7 +88,7 @@
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
-			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
+			"Rev": "5d4384ee4fb2527b0a1256a821ebfc92f91efefc"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
