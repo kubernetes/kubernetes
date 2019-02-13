@@ -537,6 +537,8 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 
 	defer func() {
 		podClient.Delete(podName, nil)
+		err := waitForPodNotFoundInNamespace(client, podName, injectPod.Namespace, PodDeleteTimeout)
+		Expect(err).NotTo(HaveOccurred())
 	}()
 
 	injectPod, err := podClient.Create(injectPod)
