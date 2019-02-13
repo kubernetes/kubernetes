@@ -76,7 +76,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/klog"
@@ -598,7 +598,7 @@ func (s *ProxyServer) Run() error {
 		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		mux.Handle("/metrics", prometheus.Handler())
+		mux.Handle("/metrics", promhttp.Handler())
 		if s.EnableProfiling {
 			routes.Profiling{}.Install(mux)
 		}
