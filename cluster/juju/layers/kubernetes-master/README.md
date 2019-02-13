@@ -42,7 +42,7 @@ operator.
 
 #### Snap Refresh
 
-The kubernetes resources used by this charm are snap packages. When not
+The Kubernetes resources used by this charm are snap packages. When not
 specified during deployment, these resources come from the public store. By
 default, the `snapd` daemon will refresh all snaps installed from the store
 four (4) times per day. A charm configuration option is provided for operators
@@ -92,8 +92,8 @@ Enable RBAC and Node authorisation.
 
 # DNS for the cluster
 
-The DNS add-on allows the pods to have a DNS names in addition to IP addresses.
-The Kubernetes cluster DNS server (based off the SkyDNS library) supports
+The DNS add-on allows the pods to have DNS names in addition to IP addresses.
+The Kubernetes cluster DNS server (based of the SkyDNS library) supports
 forward lookups (A records), service lookups (SRV records) and reverse IP
 address lookups (PTR records). More information about the DNS can be obtained
 from the [Kubernetes DNS admin guide](http://kubernetes.io/docs/admin/dns/).
