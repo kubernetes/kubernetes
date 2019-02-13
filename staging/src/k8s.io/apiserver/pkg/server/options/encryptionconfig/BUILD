@@ -31,10 +31,10 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
+        "//vendor/k8s.io/utils/diff:go_default_library",
     ],
 )
 

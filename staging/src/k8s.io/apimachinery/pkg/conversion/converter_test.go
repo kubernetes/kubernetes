@@ -26,7 +26,7 @@ import (
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")

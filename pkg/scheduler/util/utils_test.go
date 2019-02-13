@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/utils/diff"
 )
 
 // TestGetPodPriority tests GetPodPriority function.

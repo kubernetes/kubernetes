@@ -27,7 +27,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 var mutationDetectionEnabled = false

@@ -22,7 +22,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 func TestPreferredVersionsAllGroups(t *testing.T) {

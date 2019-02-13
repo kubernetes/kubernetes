@@ -25,11 +25,11 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	"k8s.io/utils/diff"
 )
 
 const (

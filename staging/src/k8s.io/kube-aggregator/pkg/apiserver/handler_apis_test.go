@@ -26,8 +26,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/diff"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"

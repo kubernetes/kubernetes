@@ -31,7 +31,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/utils/diff:go_default_library",
     ],
 )
 

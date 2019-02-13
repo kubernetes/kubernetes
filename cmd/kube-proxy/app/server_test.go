@@ -30,11 +30,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/utils/diff"
 	utilpointer "k8s.io/utils/pointer"
 )
 

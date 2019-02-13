@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 func TestBootstrapCRDs(t *testing.T) {

@@ -102,7 +102,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/protobuf:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
@@ -110,5 +109,6 @@ go_test(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/k8s.io/utils/diff:go_default_library",
     ],
 )

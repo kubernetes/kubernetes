@@ -69,11 +69,11 @@ go_test(
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//vendor/k8s.io/utils/diff:go_default_library",
     ],
 )
 

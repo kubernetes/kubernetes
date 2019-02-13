@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/utils/diff"
 )
 
 func createNodeInternalIPAddress(address string) []v1.NodeAddress {

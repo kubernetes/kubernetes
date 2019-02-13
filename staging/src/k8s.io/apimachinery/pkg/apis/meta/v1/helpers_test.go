@@ -25,7 +25,7 @@ import (
 	"github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {

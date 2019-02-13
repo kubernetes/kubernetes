@@ -167,9 +167,9 @@ go_test(
         "//pkg/proxy/apis/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/utils/diff:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [

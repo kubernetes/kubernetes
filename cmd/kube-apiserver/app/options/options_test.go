@@ -24,7 +24,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
@@ -36,6 +35,7 @@ import (
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/utils/diff"
 )
 
 func TestAddFlags(t *testing.T) {

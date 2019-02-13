@@ -23,8 +23,8 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/utils/diff"
 )
 
 func newKubeletServerOrDie() *KubeletServer {

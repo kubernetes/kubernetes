@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/diff"
 )
 
 func TestPodSecurityContextAccessor(t *testing.T) {

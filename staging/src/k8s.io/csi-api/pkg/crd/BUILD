@@ -16,7 +16,7 @@ go_test(
         "//cluster/addons:addon-srcs",
     ],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library"],
+    deps = ["//vendor/k8s.io/utils/diff:go_default_library"],
 )
 
 filegroup(

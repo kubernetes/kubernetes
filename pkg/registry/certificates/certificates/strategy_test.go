@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/utils/diff"
 )
 
 func TestStrategyCreate(t *testing.T) {

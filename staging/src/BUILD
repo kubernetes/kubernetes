@@ -37,7 +37,6 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/types:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/cache:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:all-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/duration:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/framer:all-srcs",

@@ -29,8 +29,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/utils/diff"
 )
 
 func TestDialURL(t *testing.T) {

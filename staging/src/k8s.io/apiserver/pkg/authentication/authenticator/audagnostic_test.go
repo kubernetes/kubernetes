@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/utils/diff"
 )
 
 func TestAuthenticate(t *testing.T) {

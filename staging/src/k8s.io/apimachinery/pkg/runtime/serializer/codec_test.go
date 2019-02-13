@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"

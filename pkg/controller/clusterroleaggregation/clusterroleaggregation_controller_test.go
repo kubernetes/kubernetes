@@ -23,12 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/diff"
 )
 
 func TestSyncClusterRole(t *testing.T) {

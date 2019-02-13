@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/utils/diff"
 	// import to call webhook's init() function to register audit.Policy to schema
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 

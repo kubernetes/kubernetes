@@ -23,7 +23,7 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/diff"
 )
 
 func TestOpenAPIRoundtrip(t *testing.T) {
