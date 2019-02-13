@@ -47,6 +47,11 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
+const (
+	// maximum number of operations a single json patch may contain.
+	maxJSONPatchOperations = 10000
+)
+
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -284,9 +289,18 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(p.patchJS)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewBadRequest(err.Error())
 		}
-		return patchObj.Apply(versionedJS)
+		if len(patchObj) > maxJSONPatchOperations {
+			return nil, errors.NewRequestEntityTooLargeError(
+				fmt.Sprintf("The allowed maximum operations in a JSON patch is %d, got %d",
+					maxJSONPatchOperations, len(patchObj)))
+		}
+		patchedJS, err := patchObj.Apply(versionedJS)
+		if err != nil {
+			return nil, errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
+		}
+		return patchedJS, nil
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(versionedJS, p.patchJS)
 	default:
