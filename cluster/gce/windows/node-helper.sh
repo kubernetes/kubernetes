@@ -24,10 +24,10 @@ function get-windows-node-instance-metadata-from-file {
   # To get startup script output run "gcloud compute instances
   # get-serial-port-output <instance>" from the location where you're running
   # kube-up.
-  metadata+="windows-startup-script-ps1=${KUBE_ROOT}/cluster/gce/${WINDOWS_NODE_OS_DISTRIBUTION}/configure.ps1,"
-  metadata+="common-psm1=${KUBE_ROOT}/cluster/gce/${WINDOWS_NODE_OS_DISTRIBUTION}/common.psm1,"
-  metadata+="k8s-node-setup-psm1=${KUBE_ROOT}/cluster/gce/${WINDOWS_NODE_OS_DISTRIBUTION}/k8s-node-setup.psm1,"
-  metadata+="user-profile-psm1=${KUBE_ROOT}/cluster/gce/${WINDOWS_NODE_OS_DISTRIBUTION}/user-profile.psm1,"
+  metadata+="windows-startup-script-ps1=${KUBE_ROOT}/cluster/gce/windows/configure.ps1,"
+  metadata+="common-psm1=${KUBE_ROOT}/cluster/gce/windows/common.psm1,"
+  metadata+="k8s-node-setup-psm1=${KUBE_ROOT}/cluster/gce/windows/k8s-node-setup.psm1,"
+  metadata+="user-profile-psm1=${KUBE_ROOT}/cluster/gce/windows/user-profile.psm1,"
   metadata+="${NODE_EXTRA_METADATA}"
   echo "${metadata}"
 }
