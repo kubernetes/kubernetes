@@ -20,6 +20,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -32,6 +33,13 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 
 	It("should run a check-metadata-concealment job to completion", func() {
 		framework.SkipUnlessProviderIs("gce")
+
+		concealmentTestImage := imageutil.CheckMetadataConcealment
+		if gte, _ := framework.ServerVersionGTE(utilversion.MustParseSemantic("v1.14.0-alpha.0"), f.ClientSet.Discovery()); gte {
+			framework.Logf("using metadata concealment image 1.2 for 1.14+ server")
+			concealmentTestImage = imageutil.CheckMetadataConcealment1_2
+		}
+
 		By("Creating a job")
 		job := &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -46,7 +54,7 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 						Containers: []v1.Container{
 							{
 								Name:  "check-metadata-concealment",
-								Image: imageutil.GetE2EImage(imageutil.CheckMetadataConcealment),
+								Image: imageutil.GetE2EImage(concealmentTestImage),
 							},
 						},
 						RestartPolicy: v1.RestartPolicyOnFailure,

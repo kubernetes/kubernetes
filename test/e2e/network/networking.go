@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -59,6 +60,13 @@ var _ = SIGDescribe("Networking", func() {
 
 	// First test because it has no dependencies on variables created later on.
 	It("should provide unchanging, static URL paths for kubernetes api services", func() {
+
+		openapiPath := "/swaggerapi"
+		if gte, _ := framework.ServerVersionGTE(utilversion.MustParseSemantic("v1.14.0-alpha.0"), f.ClientSet.Discovery()); gte {
+			framework.Logf("using newer openapi path for 1.14+ server")
+			openapiPath = "/openapi/v2"
+		}
+
 		tests := []struct {
 			path string
 		}{
@@ -66,7 +74,7 @@ var _ = SIGDescribe("Networking", func() {
 			{path: "/api"},
 			{path: "/apis"},
 			{path: "/metrics"},
-			{path: "/swaggerapi"},
+			{path: openapiPath},
 			{path: "/version"},
 			// TODO: test proxy links here
 		}
