@@ -10,6 +10,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/cloud-provider/node/helpers:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/node/testutil:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

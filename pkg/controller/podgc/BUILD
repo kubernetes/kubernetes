@@ -36,7 +36,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller:go_default_library",
-        "//pkg/controller/testutil:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -45,6 +44,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/testutil:go_default_library",
     ],
 )
 

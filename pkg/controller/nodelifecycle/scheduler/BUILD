@@ -46,6 +46,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/testutil:go_default_library",
     ],
 )
 

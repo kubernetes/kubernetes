@@ -14,11 +14,11 @@ go_test(
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
-        "//pkg/controller/testutil:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/testutil:go_default_library",
     ],
 )
 
