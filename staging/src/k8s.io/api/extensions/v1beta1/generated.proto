@@ -30,6 +30,12 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// AllowedCSIDriver represents a single CSI Driver that is allowed to be used.
+message AllowedCSIDriver {
+  // Name of the CSI driver
+  optional string name = 1;
+}
+
 // AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
 // Deprecated: use AllowedFlexVolume from policy API Group instead.
 message AllowedFlexVolume {
@@ -863,6 +869,11 @@ message PodSecurityPolicySpec {
   // is allowed in the "volumes" field.
   // +optional
   repeated AllowedFlexVolume allowedFlexVolumes = 18;
+
+  // AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked
+  // to verify which CSI driver is allowed to run in the cluster.
+  // +optional
+  repeated AllowedCSIDriver allowedCSIDrivers = 23;
 
   // allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered

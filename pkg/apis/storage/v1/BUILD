@@ -18,6 +18,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/storage/v1",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

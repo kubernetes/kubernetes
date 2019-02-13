@@ -29,6 +29,15 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// InlineVolumeSource represents the source location of a in-line volume in a pod.
+message InlineVolumeSource {
+  // VolumeSource is copied from the pod. It ensures that attacher has enough
+  // information to detach a volume when the pod is deleted before detaching.
+  // Only CSIVolumeSource can be set.
+  // Required.
+  optional k8s.io.api.core.v1.VolumeSource volumeSource = 1;
+}
+
 // StorageClass describes the parameters for a class of storage for
 // which PersistentVolumes can be dynamically provisioned.
 //
@@ -128,6 +137,10 @@ message VolumeAttachmentSource {
   // Name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
+
+  // Represents the source location of a in-line volume in a pod.
+  // +optional
+  optional InlineVolumeSource inlineVolumeSource = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
