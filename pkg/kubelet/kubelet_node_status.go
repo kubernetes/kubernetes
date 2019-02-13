@@ -426,6 +426,23 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	now := kl.clock.Now()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) && now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+			// We must mark the volumes as ReportedInUse in volume manager's dsw even
+			// if no changes were made to the node status (no volumes were added or removed
+			// from the VolumesInUse list).
+			//
+			// The reason is that on a kubelet restart, the volume manager's dsw is
+			// repopulated and the volume ReportedInUse is initialized to false, while the
+			// VolumesInUse list from the Node object still contains the state from the
+			// previous kubelet instantiation.
+			//
+			// Once the volumes are added to the dsw, the ReportedInUse field needs to be
+			// synced from the VolumesInUse list in the Node.Status.
+			//
+			// The MarkVolumesAsReportedInUse() call cannot be performed in dsw directly
+			// because it does not have access to the Node object.
+			// This also cannot be populated on node status manager init because the volume
+			// may not have been added to dsw at that time.
+			kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 			return nil
 		}
 	}
