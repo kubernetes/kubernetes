@@ -449,13 +449,17 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 			if err != nil {
 				return nil, err
 			}
+			resourceVersion, err := w.versioner.ObjectResourceVersion(elem.Object)
+			if err != nil {
+				return nil, err
+			}
 			result[i] = &watchCacheEvent{
 				Type:            watch.Added,
 				Object:          elem.Object,
 				ObjLabels:       objLabels,
 				ObjFields:       objFields,
 				Key:             elem.Key,
-				ResourceVersion: w.resourceVersion,
+				ResourceVersion: resourceVersion,
 			}
 		}
 		return result, nil
