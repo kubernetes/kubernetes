@@ -641,11 +641,11 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 		nopreserve  bool
 	}{
 		"copy to pod no preserve user and permissions": {
-			expectedCmd: []string{"tar", "--no-same-permissions", "--no-same-owner", "-xf", "-", "-C", "."},
+			expectedCmd: []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-", "-C", "."},
 			nopreserve:  true,
 		},
 		"copy to pod preserve user and permissions": {
-			expectedCmd: []string{"tar", "-xf", "-", "-C", "."},
+			expectedCmd: []string{"tar", "-xmf", "-", "-C", "."},
 			nopreserve:  false,
 		},
 	}
