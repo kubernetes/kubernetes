@@ -2,7 +2,6 @@ cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
-cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/util/config
