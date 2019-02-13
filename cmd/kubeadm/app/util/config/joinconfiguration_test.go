@@ -46,22 +46,15 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 		// These tests are reading one file, loading it using LoadJoinConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
-			name:         "v1alpha3ToInternal",
-			in:           nodeV1alpha3YAML,
-			out:          nodeInternalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
+			name:        "v1alpha3IsDeprecated",
+			in:          nodeV1alpha3YAML,
+			expectedErr: true,
 		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
 			in:           nodeV1beta1YAML,
 			out:          nodeInternalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1alpha3 -> internal -> v1beta1
-			name:         "v1alpha3Tov1beta1",
-			in:           nodeV1alpha3YAML,
-			out:          nodeV1beta1YAML,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
@@ -77,7 +70,7 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			out:          nodeDefaultedYAML,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		{ // v1alpha3 -> validation should fail
+		{ // v1beta1 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          nodeInvalidYAML,
 			expectedErr: true,

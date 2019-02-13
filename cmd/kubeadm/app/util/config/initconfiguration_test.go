@@ -71,6 +71,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 	var tests = []struct {
 		name         string
 		fileContents []byte
+		expectErr    bool
 	}{
 		{
 			name:         "v1beta1.partial1",
@@ -92,10 +93,12 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 		{
 			name:         "v1alpha3.partial1",
 			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
+			expectErr:    true,
 		},
 		{
 			name:         "v1alpha3.partial2",
 			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
+			expectErr:    true,
 		},
 		{
 			name: "v1alpha3.full",
@@ -105,6 +108,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 				cfgFiles["Kube-proxy_componentconfig"],
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),
+			expectErr: true,
 		},
 	}
 
@@ -118,13 +122,19 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 			}
 
 			obj, err := LoadInitConfigurationFromFile(cfgPath)
-			if err != nil {
-				t.Errorf("Error reading file: %v", err)
-				return
-			}
+			if rt.expectErr {
+				if err == nil {
+					t.Error("Unexpected success")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Error reading file: %v", err)
+					return
+				}
 
-			if obj == nil {
-				t.Errorf("Unexpected nil return value")
+				if obj == nil {
+					t.Errorf("Unexpected nil return value")
+				}
 			}
 		})
 	}
@@ -150,22 +160,15 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
-			name:         "v1alpha3ToInternal",
-			in:           masterV1alpha3YAMLAbstracted,
-			out:          masterInternalYAMLAbstracted,
-			groupVersion: kubeadm.SchemeGroupVersion,
+			name:        "v1alpha3IsDeprecated",
+			in:          masterV1alpha3YAMLAbstracted,
+			expectedErr: true,
 		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
 			in:           masterV1beta1YAMLAbstracted,
 			out:          masterInternalYAMLAbstracted,
 			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1alpha3 -> internal -> v1beta1
-			name:         "v1alpha3Tov1beta1",
-			in:           masterV1alpha3YAMLAbstracted,
-			out:          masterV1beta1YAMLAbstracted,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
@@ -181,7 +184,7 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 			out:          masterDefaultedYAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		{ // v1alpha3 -> validation should fail
+		{ // v1beta1 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          masterInvalidYAML,
 			expectedErr: true,
