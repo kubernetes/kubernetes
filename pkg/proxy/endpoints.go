@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
@@ -127,6 +128,7 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 	if endpoints == nil {
 		return false
 	}
+	metrics.EndpointChangesTotal.Inc()
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 
 	ect.lock.Lock()
@@ -154,6 +156,8 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		// should be exported.
 		delete(ect.lastChangeTriggerTimes, namespacedName)
 	}
+
+	metrics.EndpointChangesPending.Set(float64(len(ect.items)))
 	return len(ect.items) > 0
 }
 
@@ -295,6 +299,7 @@ func (endpointsMap EndpointsMap) apply(changes *EndpointChangeTracker, staleEndp
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
 	}
 	changes.items = make(map[types.NamespacedName]*endpointsChange)
+	metrics.EndpointChangesPending.Set(0)
 	for _, lastChangeTriggerTime := range changes.lastChangeTriggerTimes {
 		*lastChangeTriggerTimes = append(*lastChangeTriggerTimes, lastChangeTriggerTime...)
 	}
