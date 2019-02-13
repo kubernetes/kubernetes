@@ -783,7 +783,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return nil
 			}, framework.StatefulPodTimeout, 2*time.Second).Should(BeNil())
 		})
-		/* Comment it for now until scale sub-resource is finalized in ref:pull/53679 for scale-sub resource specific comment.
+
 		It("should have a working scale subresource", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
@@ -795,10 +795,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = sst.WaitForStatus(ss)
 
 			By("getting scale subresource")
-			scale := framework.NewStatefulSetScale(ss)
-			scaleResult := &appsv1beta2.Scale{}
-
-			err = c.AppsV1().RESTClient().Get().AbsPath("/apis/apps/v1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			scale, err := c.AppsV1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -806,9 +803,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Expect(scale.Status.Replicas).To(Equal(int32(1)))
 
 			By("updating a scale subresource")
-			scale.ResourceVersion = "" //unconditionally update to 2 replicas
 			scale.Spec.Replicas = 2
-			err = c.AppsV1().RESTClient().Put().AbsPath("/apis/apps/v1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(ssName, scale)
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
@@ -821,7 +817,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			Expect(*(ss.Spec.Replicas)).To(Equal(int32(2)))
 		})
-		*/
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
