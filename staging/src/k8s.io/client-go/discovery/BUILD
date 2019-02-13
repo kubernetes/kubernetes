@@ -42,8 +42,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/discovery/cached/disk:all-srcs",
-        "//staging/src/k8s.io/client-go/discovery/cached/memory:all-srcs",
+        "//staging/src/k8s.io/client-go/discovery/cached:all-srcs",
         "//staging/src/k8s.io/client-go/discovery/fake:all-srcs",
     ],
     tags = ["automanaged"],
