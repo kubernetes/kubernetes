@@ -26,6 +26,8 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/kube-openapi/pkg/builder"
+	"k8s.io/kube-openapi/pkg/handler"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -36,6 +38,7 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
+	"k8s.io/kube-aggregator/pkg/controllers/openapi/download"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
@@ -116,7 +119,7 @@ type APIAggregator struct {
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
 
-	openAPIAggregationController *openapicontroller.AggregationController
+	openAPIAggregationController *openapicontroller.AggregationControllerWithLocalHandlers
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -207,17 +210,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	})
 
 	if openAPIConfig != nil {
-		specDownloader := openapiaggregator.NewDownloader()
-		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
-			&specDownloader,
-			delegationTarget,
-			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
-			openAPIConfig,
-			s.GenericAPIServer.Handler.NonGoRestfulMux)
+		aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(), openAPIConfig)
 		if err != nil {
 			return nil, err
 		}
-		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+		openAPIVersionedService, err := handler.RegisterOpenAPIVersionedService(aggregatorOpenAPISpec, "/openapi/v2", s.GenericAPIServer.Handler.NonGoRestfulMux)
+		if err != nil {
+			return nil, err
+		}
+		openAPIAggregator := openapiaggregator.NewSpecAggregator(openAPIVersionedService)
+		specDownloader := download.NewDownloader()
+		s.openAPIAggregationController = openapicontroller.NewAggregationControllerWithLocalHandlers(&specDownloader, openAPIAggregator, aggregatorOpenAPISpec, delegationTarget)
 
 		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)

@@ -23,7 +23,9 @@ import (
 	"sync"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/go-openapi/spec"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,16 +35,15 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/download"
-	"k8s.io/kube-openapi/pkg/builder"
-	"k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/handler"
 )
 
 const (
-	successfulUpdateDelay   = time.Minute
-	failedUpdateMaxExpDelay = time.Hour
+	successfulUpdateDelay          = time.Minute
+	successfulLocalSpecUpdateDelay = time.Second
+	failedUpdateMaxExpDelay        = time.Hour
 
-	localDelegateChainNamePattern = "k8s_internal_local_delegation_chain_%010d"
+	localDelegateChainNamePrefix  = "k8s_internal_local_delegation_chain_"
+	localDelegateChainNamePattern = localDelegateChainNamePrefix + "%010d.%s"
 )
 
 type syncAction int
@@ -53,58 +54,11 @@ const (
 	syncNothing
 )
 
-// BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
-func BuildAndRegisterAggregator(downloader *download.Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
-	config *common.Config, pathHandler common.PathHandler) (aggregator.SpecAggregator, error) {
-	s := aggregator.NewSpecAggregator()
-
-	i := 0
-	// Build Aggregator's spec
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(webServices, config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Reserving non-name spec for aggregator's Spec.
-	s.addLocalSpec(aggregatorOpenAPISpec, nil, fmt.Sprintf(localDelegateChainNamePattern, i), "")
-	i++
-	for delegate := delegationTarget; delegate != nil; delegate = delegate.NextDelegate() {
-		handler := delegate.UnprotectedHandler()
-		if handler == nil {
-			continue
-		}
-		delegateSpec, etag, _, err := downloader.Download(handler, "")
-		if err != nil {
-			return nil, err
-		}
-		if delegateSpec == nil {
-			continue
-		}
-		s.addLocalSpec(delegateSpec, handler, fmt.Sprintf(localDelegateChainNamePattern, i), etag)
-		i++
-	}
-
-	// Build initial spec to serve.
-	specToServe, err := s.buildOpenAPISpec()
-	if err != nil {
-		return nil, err
-	}
-
-	// Install handler
-	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(nil, "/openapi/v2", pathHandler)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-// AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove
-// them if necessary.
+// AggregationController reacts on changes of APIServices, downloads OpenAPI specs via handlers and merges them.
 type AggregationController struct {
-	openAPIAggregationManager aggregator.SpecAggregator
-	queue                     workqueue.RateLimitingInterface
-	downloader                *download.Downloader
+	aggregator aggregator.SpecAggregator
+	queue      workqueue.RateLimitingInterface
+	downloader *download.Downloader
 
 	lock     sync.Mutex
 	handlers map[string]http.Handler
@@ -113,10 +67,79 @@ type AggregationController struct {
 	syncHandler func(key string) (syncAction, error)
 }
 
+// NewAggregationControllerWithLocalHandlers creates a new OpenAPI aggregation controller with local delegate fake
+// handlers in addition which retrieve local OpenAPI specs via the delegate chain. The delegates do not map 1:1 to
+// APIServices and we don't even know which local APIService belong to which delegate.
+// TODO: add knowledge about which APIService belong to which delegate, and then use the normal APIService update logic
+func NewAggregationControllerWithLocalHandlers(downloader *download.Downloader, a aggregator.SpecAggregator, aggregatorSpec *spec.Swagger, delegationTarget server.DelegationTarget) *AggregationControllerWithLocalHandlers {
+	// register aggregator spec
+	i := 0
+	name, service := localFakeService(i)
+	utilruntime.Must(a.AddUpdateService(name, service))
+	utilruntime.Must(a.UpdateSpec(name, aggregatorSpec, ""))
+	i++
+
+	c := &AggregationControllerWithLocalHandlers{
+		AggregationController: NewAggregationController(downloader, a),
+		delegationTarget:      delegationTarget,
+	}
+
+	// register all other specs and handlers
+	for delegate := delegationTarget; delegate != nil; delegate = delegate.NextDelegate() {
+		handler := delegate.UnprotectedHandler()
+		if handler == nil {
+			continue
+		}
+		name, service := localFakeService(i)
+		a.AddUpdateService(name, service)
+		c.AggregationController.handlers[name] = handler
+		// the spec update will come through periodic queuing through the Run method
+
+		i++
+	}
+
+	return c
+}
+
+// AggregationControllerWithLocalHandlers is ann OpenAPI aggregation controller which updates local specs from
+// the delegate chain once a second.
+type AggregationControllerWithLocalHandlers struct {
+	*AggregationController
+
+	delegationTarget server.DelegationTarget
+}
+
+// localFakeServiceName return a name to be used for the i'th local delegate handler.
+func localFakeServiceName(i int) string {
+	return fmt.Sprintf(localDelegateChainNamePattern, i, "v1")
+}
+
+// localFakeService creates a fake APIService to be used for the i'th local delegate handler.
+// TODO: add knowledge about which APIService belongs to which delegate and register each delegate's with the correct APIServices
+func localFakeService(i int) (string, *apiregistration.APIService) {
+	name := localFakeServiceName(i)
+	return name, &apiregistration.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       apiregistration.APIServiceSpec{Group: name, Version: "v1"},
+	}
+}
+
+func (c *AggregationControllerWithLocalHandlers) Run(stopCh <-chan struct{}) {
+	// queue local specs once
+	i := 1 // skip aggregator
+	for delegate := c.delegationTarget; delegate != nil; delegate = delegate.NextDelegate() {
+		name, _ := localFakeService(i)
+		c.queue.AddAfter(name, time.Second)
+		i++
+	}
+
+	c.Run(stopCh)
+}
+
 // NewAggregationController creates new OpenAPI aggregation controller.
-func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregationManager aggregator.SpecAggregator) *AggregationController {
+func NewAggregationController(downloader *download.Downloader, openAPIAggregationManager aggregator.SpecAggregator) *AggregationController {
 	c := &AggregationController{
-		openAPIAggregationManager: openAPIAggregationManager,
+		aggregator: openAPIAggregationManager,
 		queue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay), "APIServiceOpenAPIAggregationControllerQueue1"),
 		downloader: downloader,
@@ -165,8 +188,14 @@ func (c *AggregationController) processNextWorkItem() bool {
 
 	switch action {
 	case syncRequeue:
-		klog.Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
-		c.queue.AddAfter(key, successfulUpdateDelay)
+		if strings.HasPrefix(key.(string), localDelegateChainNamePrefix) {
+			// local specs are checked much more often.
+			klog.V(6).Infof("OpenAPI AggregationController: action for local item %s: Requeue in %s.", key, successfulLocalSpecUpdateDelay)
+			c.queue.AddAfter(key, successfulLocalSpecUpdateDelay)
+		} else {
+			klog.Infof("OpenAPI AggregationController: action for remote item %s: Requeue in %s.", key, successfulUpdateDelay)
+			c.queue.AddAfter(key, successfulUpdateDelay)
+		}
 	case syncRequeueRateLimited:
 		klog.Infof("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
 		c.queue.AddRateLimited(key)
@@ -178,7 +207,7 @@ func (c *AggregationController) processNextWorkItem() bool {
 }
 
 func (c *AggregationController) sync(key string) (syncAction, error) {
-	oldSpec, etag, exists := c.openAPIAggregationManager.Spec(key)
+	_, etag, exists := c.aggregator.Spec(key)
 	if !exists {
 		return syncNothing, nil
 	}
@@ -198,7 +227,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 	case httpStatus == http.StatusNotFound || returnSpec == nil:
 		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exist")
 	case httpStatus == http.StatusOK:
-		if err := c.openAPIAggregationManager.UpdateSpec(key, returnSpec, newEtag); err != nil {
+		if err := c.aggregator.UpdateSpec(key, returnSpec, newEtag); err != nil {
 			return syncRequeueRateLimited, err
 		}
 	}
@@ -208,6 +237,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
 func (c *AggregationController) AddAPIService(handler http.Handler, apiService *apiregistration.APIService) {
 	if apiService.Spec.Service == nil {
+		// ignore local services
 		return
 	}
 
@@ -216,7 +246,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 
 	// TODO: combine APIServices from the same aggregated apiserver by choosing the same key
 	key := apiService.Name
-	if err := c.openAPIAggregationManager.AddUpdateService(key, nil, apiService); err != nil {
+	if err := c.aggregator.AddUpdateService(key, apiService); err != nil {
 		utilruntime.HandleError(fmt.Errorf("adding %q to AggregationController failed with: %v", apiService.Name, err))
 	}
 	c.handlers[key] = handler
@@ -227,6 +257,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 // UpdateAPIService updates API Service's info and handler.
 func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) {
 	if apiService.Spec.Service == nil {
+		// ignore local services
 		return
 	}
 
@@ -235,7 +266,7 @@ func (c *AggregationController) UpdateAPIService(handler http.Handler, apiServic
 
 	// TODO: combine APIServices from the same aggregated apiserver by choosing the same name
 	key := apiService.Name
-	if err := c.openAPIAggregationManager.AddUpdateSpec(key, apiService); err != nil {
+	if err := c.aggregator.AddUpdateService(key, apiService); err != nil {
 		utilruntime.HandleError(fmt.Errorf("updating %q to AggregationController failed with: %v", apiService.Name, err))
 	}
 	c.handlers[key] = handler
@@ -259,8 +290,8 @@ func (c *AggregationController) RemoveAPIService(apiServiceName string) {
 	ns := strings.SplitN(apiServiceName, ".", 2)
 	version, group := ns[0], ns[1]
 
-	key = apiServiceName
-	if err := c.openAPIAggregationManager.RemoveService(key, schema.GroupVersion{group, version}); err != nil {
+	key := apiServiceName
+	if err := c.aggregator.RemoveService(key, schema.GroupVersion{group, version}); err != nil {
 		utilruntime.HandleError(fmt.Errorf("removing %q from AggregationController failed with: %v", apiServiceName, err))
 	}
 	delete(c.handlers, apiServiceName)

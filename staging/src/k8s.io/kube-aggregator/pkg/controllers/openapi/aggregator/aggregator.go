@@ -18,6 +18,7 @@ package aggregator
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/go-openapi/spec"
@@ -31,7 +32,7 @@ import (
 // SpecAggregator calls out to http handlers of APIServices and merges specs. It keeps state of the last
 // known specs including the http etag.
 type SpecAggregator interface {
-	// AddUpdateService adds the services (if they have set a service name) to the given spec name.
+	// AddUpdateService adds the services to the given spec name.
 	// If the name is not registered, create a new nil spec under that name with the given services.
 	AddUpdateService(name string, services ...*apiregistration.APIService) error
 	// RemoveService removes the services with the given GroupVersions (they 1:1 relate) from the
@@ -67,23 +68,11 @@ type specInfo struct {
 	etag string
 }
 
-// This function is not thread safe as it only being called on startup.
-/*
-func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Handler, name, etag string) {
-	localAPIService := apiregistration.APIService{}
-	localAPIService.Name = name
-	s.specs[name] = &specInfo{
-		etag:       etag,
-		apiService: localAPIService,
-		handler:    localHandler,
-		spec:       spec,
-	}
-}
-*/
-
-func NewSpecAggregator() SpecAggregator {
+// NewSpecAggregator creates a new spec aggregator.
+func NewSpecAggregator(openAPIVersionedService *handler.OpenAPIService) SpecAggregator {
 	return &specAggregator{
-		specs: map[string]*specInfo{},
+		specs:                   map[string]*specInfo{},
+		openAPIVersionedService: openAPIVersionedService,
 	}
 }
 
@@ -160,25 +149,23 @@ func (s *specAggregator) AddUpdateService(name string, services ...*apiregistrat
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
 
-	// get active services
-	gvs := make([]schema.GroupVersion, 0, len(services))
-	activeServices := make([]*apiregistration.APIService, 0, len(services))
-	for _, s := range services {
-		if s.Spec.Service != nil {
-			activeServices = append(activeServices, s)
-			gvs = append(gvs, schema.GroupVersion{s.Spec.Group, s.Spec.Version})
-		}
-	}
-
 	// exit early
-	if len(activeServices) == 0 {
+	if len(services) == 0 {
 		return nil
 	}
 
+	gvs := make([]schema.GroupVersion, 0, len(services))
+	for _, s := range services {
+		gvs = append(gvs, schema.GroupVersion{s.Spec.Group, s.Spec.Version})
+	}
+
 	// remove services from other specs
+	anyChange := false
 	newSpecInfos := deepCopySpecs(s.specs)
 	for n, si := range newSpecInfos {
-		si.apiServices, _ = filterOutServices(si.apiServices, gvs...)
+		var changed bool
+		si.apiServices, changed = filterOutServices(si.apiServices, gvs...)
+		anyChange = anyChange || changed
 		if n != name && len(si.apiServices) == 0 {
 			delete(newSpecInfos, n)
 		}
@@ -187,8 +174,15 @@ func (s *specAggregator) AddUpdateService(name string, services ...*apiregistrat
 	// add services to new name
 	if _, found := newSpecInfos[name]; !found {
 		newSpecInfos[name] = &specInfo{}
+		anyChange = true
 	}
-	newSpecInfos[name].apiServices = append(newSpecInfos[name].apiServices, activeServices...)
+	newSpecInfos[name].apiServices = append(newSpecInfos[name].apiServices, services...)
+
+	// anything changed? This way we can also add nil specs without anything happening
+	anyChange = anyChange || !deepEqualServices(s.specs[name].apiServices, newSpecInfos[name].apiServices)
+	if !anyChange {
+		return nil
+	}
 
 	return s.tryMergeSpecs(newSpecInfos)
 }
@@ -258,4 +252,16 @@ func deepCopySpecs(specs map[string]*specInfo) map[string]*specInfo {
 	}
 
 	return clone
+}
+
+func deepEqualServices(a, b []*apiregistration.APIService) bool {
+	as := map[string]*apiregistration.APIService{}
+	bs := map[string]*apiregistration.APIService{}
+	for _, x := range a {
+		as[x.Name] = x
+	}
+	for _, x := range b {
+		as[x.Name] = x
+	}
+	return reflect.DeepEqual(as, bs)
 }
