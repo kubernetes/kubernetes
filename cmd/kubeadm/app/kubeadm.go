@@ -21,6 +21,8 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
+
+	// ensure libs have a chance to globally register their flags
 	_ "k8s.io/klog"
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"
