@@ -462,6 +462,8 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 				ResourceVersion: resourceVersion,
 			}
 		}
+		// Sort by ResourceVersion so we send synthetic ADDED events in order of last update
+		sort.Slice(result, func(i, j int) bool { return result[i].ResourceVersion < result[j].ResourceVersion })
 		return result, nil
 	}
 	if resourceVersion < oldest-1 {

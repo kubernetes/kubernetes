@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -178,6 +179,10 @@ func (wc *watchChan) sync() error {
 	if err != nil {
 		return err
 	}
+
+	// Sort by modRevision so we send synthetic ADDED events in order of last update
+	sort.Slice(getResp.Kvs, func(i, j int) bool { return getResp.Kvs[i].ModRevision < getResp.Kvs[j].ModRevision })
+
 	wc.initialRev = getResp.Header.Revision
 	for _, kv := range getResp.Kvs {
 		wc.sendEvent(parseKV(kv))
