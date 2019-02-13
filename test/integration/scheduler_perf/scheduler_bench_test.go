@@ -24,7 +24,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -98,7 +97,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	)
 	// The test strategy creates pods with affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(apis.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -119,10 +118,10 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
-	testBasePod := makeBasePodWithNodeAffinity(apis.LabelZoneFailureDomain, []string{"zone1", "zone2"})
+	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
 	// The test strategy creates pods with node-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(apis.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -148,7 +147,7 @@ func makeBasePodWithPodAntiAffinity(podLabels, affinityLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityLabels,
 					},
-					TopologyKey: apis.LabelHostname,
+					TopologyKey: v1.LabelHostname,
 				},
 			},
 		},
@@ -173,7 +172,7 @@ func makeBasePodWithPodAffinity(podLabels, affinityZoneLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityZoneLabels,
 					},
-					TopologyKey: apis.LabelZoneFailureDomain,
+					TopologyKey: v1.LabelZoneFailureDomain,
 				},
 			},
 		},

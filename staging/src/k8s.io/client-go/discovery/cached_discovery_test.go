@@ -112,6 +112,10 @@ func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
 
 func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	c.groupCalls = c.groupCalls + 1
+	return c.serverGroups()
+}
+
+func (c *fakeDiscoveryClient) serverGroups() (*metav1.APIGroupList, error) {
 	return &metav1.APIGroupList{
 		Groups: []metav1.APIGroup{
 			{
@@ -140,12 +144,26 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
+	_, rs, err := c.ServerGroupsAndResources()
+	return rs, err
+}
+
+func (c *fakeDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	if c.serverResourcesHandler != nil {
-		return c.serverResourcesHandler()
+
+	gs, _ := c.serverGroups()
+	resultGroups := []*metav1.APIGroup{}
+	for i := range gs.Groups {
+		resultGroups = append(resultGroups, &gs.Groups[i])
 	}
-	return []*metav1.APIResourceList{}, nil
+
+	if c.serverResourcesHandler != nil {
+		rs, err := c.serverResourcesHandler()
+		return resultGroups, rs, err
+	}
+	return resultGroups, []*metav1.APIResourceList{}, nil
 }
 
 func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {

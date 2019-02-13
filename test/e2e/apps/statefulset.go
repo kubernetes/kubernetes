@@ -275,7 +275,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
 		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
-			By("Creating a new StaefulSet")
+			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
@@ -475,7 +475,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			}
 			Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revison %s on update completion",
+				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 					ss.Namespace,
 					ss.Name,
 					ss.Status.CurrentRevision,
@@ -789,7 +789,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -798,7 +798,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			scale := framework.NewStatefulSetScale(ss)
 			scaleResult := &appsv1beta2.Scale{}
 
-			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			err = c.AppsV1().RESTClient().Get().AbsPath("/apis/apps/v1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -808,14 +808,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("updating a scale subresource")
 			scale.ResourceVersion = "" //unconditionally update to 2 replicas
 			scale.Spec.Replicas = 2
-			err = c.AppsV1beta2().RESTClient().Put().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			err = c.AppsV1().RESTClient().Put().AbsPath("/apis/apps/v1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
 			Expect(scaleResult.Spec.Replicas).To(Equal(int32(2)))
 
 			By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = c.AppsV1beta1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			ss, err = c.AppsV1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}

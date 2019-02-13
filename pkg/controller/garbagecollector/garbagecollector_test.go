@@ -948,8 +948,13 @@ func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string
 	return nil, nil
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return nil, nil, nil
 }
 
 func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {

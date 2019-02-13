@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-var podSpec string = `
+var podSpec = `
 {
     "metadata": {
         "creationTimestamp": null,

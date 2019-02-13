@@ -37,10 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/apis"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -110,12 +108,14 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    "1.5Gi",
 			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
+				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 		{
@@ -128,16 +128,16 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    "1.5Gi",
 			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
 				zones, err := framework.GetClusterZones(c)
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "GetClusterZones")
+				err = verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 	}
@@ -205,10 +205,10 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	nodeName := pod.Spec.NodeName
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
-	podZone := node.Labels[apis.LabelZoneFailureDomain]
+	podZone := node.Labels[v1.LabelZoneFailureDomain]
 
 	By("tainting nodes in the zone the pod is scheduled in")
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{apis.LabelZoneFailureDomain: podZone}))
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelZoneFailureDomain: podZone}))
 	nodesInZone, err := c.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
 	Expect(err).ToNot(HaveOccurred())
 	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
@@ -237,7 +237,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		if err != nil {
 			return false, nil
 		}
-		newPodZone := node.Labels[apis.LabelZoneFailureDomain]
+		newPodZone := node.Labels[v1.LabelZoneFailureDomain]
 		return newPodZone == otherZone, nil
 	})
 	Expect(err).NotTo(HaveOccurred(), "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
@@ -319,13 +319,13 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
-	zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+		framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 	}
 	for _, pv := range pvs {
 		checkZoneFromLabelAndAffinity(pv, zone, false)
@@ -376,13 +376,13 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
-	nodeZone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+	nodeZone, ok := node.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+		framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 	}
 	zoneFound := false
 	for _, zone := range topoZones {
@@ -423,7 +423,7 @@ func addAllowedTopologiesToStorageClass(c clientset.Interface, sc *storage.Stora
 	term := v1.TopologySelectorTerm{
 		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 			{
-				Key:    kubeletapis.LabelZoneFailureDomain,
+				Key:    v1.LabelZoneFailureDomain,
 				Values: zones,
 			},
 		},
@@ -585,7 +585,7 @@ func waitForStatefulSetReplicasNotReady(statefulSetName, ns string, c clientset.
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
 func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {
-	pvZones, err := util.LabelZonesToSet(volume.Labels[apis.LabelZoneFailureDomain])
+	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelZoneFailureDomain])
 	if err != nil {
 		return err
 	}

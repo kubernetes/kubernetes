@@ -45,15 +45,34 @@ var (
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
+
+	// NetworkProgrammingLatency is defined as the time it took to program the network - from the time
+	// the service or pod has changed to the time the change was propagated and the proper kube-proxy
+	// rules were synced. Exported for each endpoints object that were part of the rules sync.
+	// See https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
+	// Note that the metrics is partially based on the time exported by the endpoints controller on
+	// the master machine. The measurement may be inaccurate if there is a clock drift between the
+	// node and master machine.
+	NetworkProgrammingLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Subsystem: kubeProxySubsystem,
+			Name:      "network_programming_latency_seconds",
+			Help:      "In Cluster Network Programming Latency in seconds",
+			// TODO(mm4tt): Reevaluate buckets before 1.14 release.
+			// The last bucket will be [0.001s*2^20 ~= 17min, +inf)
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 20),
+		},
+	)
 )
 
 var registerMetricsOnce sync.Once
 
-// RegisterMetrics registers sync proxy rules latency metrics
+// RegisterMetrics registers kube-proxy metrics.
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
 		prometheus.MustRegister(DeprecatedSyncProxyRulesLatency)
+		prometheus.MustRegister(NetworkProgrammingLatency)
 	})
 }
 

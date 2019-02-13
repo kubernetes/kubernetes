@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -65,16 +66,18 @@ type ApplyOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	Selector       string
-	DryRun         bool
-	ServerDryRun   bool
-	Prune          bool
-	PruneResources []pruneResource
-	cmdBaseName    string
-	All            bool
-	Overwrite      bool
-	OpenAPIPatch   bool
-	PruneWhitelist []string
+	ServerSideApply bool
+	ForceConflicts  bool
+	Selector        string
+	DryRun          bool
+	ServerDryRun    bool
+	Prune           bool
+	PruneResources  []pruneResource
+	cmdBaseName     string
+	All             bool
+	Overwrite       bool
+	OpenAPIPatch    bool
+	PruneWhitelist  []string
 
 	Validator       validation.Schema
 	Builder         *resource.Builder
@@ -178,6 +181,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
+	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -188,7 +192,17 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 }
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
+
+	if o.DryRun && o.ServerSideApply {
+		return fmt.Errorf("--dry-run doesn't work with --server-side")
+	}
 
 	if o.DryRun && o.ServerDryRun {
 		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
@@ -293,6 +307,16 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
+func isIncompatibleServerError(err error) bool {
+	// 415: Unsupported media type means we're talking to a server which doesn't
+	// support server-side apply.
+	if _, ok := err.(*errors.StatusError); !ok {
+		// Non-StatusError means the error isn't because the server is incompatible.
+		return false
+	}
+	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
+}
+
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
@@ -354,6 +378,50 @@ func (o *ApplyOptions) Run() error {
 
 		if err := o.Recorder.Record(info.Object); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		if o.ServerSideApply {
+			// Send the full object to be applied on the server side.
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+			if err != nil {
+				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
+			}
+			options := metav1.PatchOptions{
+				Force: &o.ForceConflicts,
+			}
+			if o.ServerDryRun {
+				options.DryRun = []string{metav1.DryRunAll}
+			}
+			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+				&options,
+			)
+			if err == nil {
+				info.Refresh(obj, true)
+				metadata, err := meta.Accessor(info.Object)
+				if err != nil {
+					return err
+				}
+				visitedUids.Insert(string(metadata.GetUID()))
+				count++
+				if len(output) > 0 && !shortOutput {
+					objs = append(objs, info.Object)
+					return nil
+				}
+				printer, err := o.ToPrinter("serverside-applied")
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(info.Object, o.Out)
+			} else if !isIncompatibleServerError(err) {
+				return err
+			}
+			// If we're talking to a server which does not implement server-side apply,
+			// continue with the client side apply after this block.
+			klog.Warningf("serverside-apply incompatible server: %v", err)
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -840,7 +908,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	options := metav1.UpdateOptions{}
+	options := metav1.PatchOptions{}
 	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}

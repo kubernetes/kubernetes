@@ -108,9 +108,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		}
 
 		// for each enumerated huge page size, the qos tiers are unbounded
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-			m.setHugePagesUnbounded(containerConfig)
-		}
+		m.setHugePagesUnbounded(containerConfig)
 
 		// check if it exists
 		if !cm.Exists(containerName) {
@@ -290,10 +288,8 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	}
 
 	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-		if err := m.setHugePagesConfig(qosConfigs); err != nil {
-			return err
-		}
+	if err := m.setHugePagesConfig(qosConfigs); err != nil {
+		return err
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {

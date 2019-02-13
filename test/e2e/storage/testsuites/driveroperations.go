@@ -21,6 +21,7 @@ import (
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -93,6 +94,30 @@ func GetStorageClass(
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
 	}
+}
+
+// GetSnapshotClass constructs a new SnapshotClass instance
+// with a unique name that is based on namespace + suffix.
+func GetSnapshotClass(
+	snapshotter string,
+	parameters map[string]string,
+	ns string,
+	suffix string,
+) *unstructured.Unstructured {
+	snapshotClass := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotClass",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				// Name must be unique, so let's base it on namespace name
+				"name": ns + "-" + suffix,
+			},
+			"snapshotter": snapshotter,
+			"parameters":  parameters,
+		},
+	}
+
+	return snapshotClass
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests

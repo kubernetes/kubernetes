@@ -21,14 +21,39 @@ import (
 	"strings"
 )
 
-// ToCanonicalName converts Golang package/type name into canonical OpenAPI name.
-// Examples:
+// [DEPRECATED] ToCanonicalName converts Golang package/type canonical name into REST friendly OpenAPI name.
+// This method is deprecated because it has a misleading name. Please use ToRESTFriendlyName
+// instead
+//
+// NOTE: actually the "canonical name" in this method should be named "REST friendly OpenAPI name",
+// which is different from "canonical name" defined in GetCanonicalTypeName. The "canonical name" defined
+// in GetCanonicalTypeName means Go type names with full package path.
+//
+// Examples of REST friendly OpenAPI name:
 //	Input:  k8s.io/api/core/v1.Pod
 //	Output: io.k8s.api.core.v1.Pod
 //
 //	Input:  k8s.io/api/core/v1
 //	Output: io.k8s.api.core.v1
+//
+//	Input:  csi.storage.k8s.io/v1alpha1.CSINodeInfo
+//	Output: io.k8s.storage.csi.v1alpha1.CSINodeInfo
 func ToCanonicalName(name string) string {
+	return ToRESTFriendlyName(name)
+}
+
+// ToRESTFriendlyName converts Golang package/type canonical name into REST friendly OpenAPI name.
+//
+// Examples of REST friendly OpenAPI name:
+//	Input:  k8s.io/api/core/v1.Pod
+//	Output: io.k8s.api.core.v1.Pod
+//
+//	Input:  k8s.io/api/core/v1
+//	Output: io.k8s.api.core.v1
+//
+//	Input:  csi.storage.k8s.io/v1alpha1.CSINodeInfo
+//	Output: io.k8s.storage.csi.v1alpha1.CSINodeInfo
+func ToRESTFriendlyName(name string) string {
 	nameParts := strings.Split(name, "/")
 	// Reverse first part. e.g., io.k8s... instead of k8s.io...
 	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
@@ -41,9 +66,30 @@ func ToCanonicalName(name string) string {
 	return strings.Join(nameParts, ".")
 }
 
+// OpenAPICanonicalTypeNamer is an interface for models without Go type to seed model name.
+//
+// OpenAPI canonical names are Go type names with full package path, for uniquely indentifying
+// a model / Go type. If a Go type is vendored from another package, only the path after "/vendor/"
+// should be used. For custom resource definition (CRD), the canonical name is expected to be
+//     group/version.kind
+//
+// Examples of canonical name:
+//     Go type: k8s.io/kubernetes/pkg/apis/core.Pod
+//     CRD:     csi.storage.k8s.io/v1alpha1.CSINodeInfo
+//
+// Example for vendored Go type:
+//     Original full path:  k8s.io/kubernetes/vendor/k8s.io/api/core/v1.Pod
+//     Canonical name:      k8s.io/api/core/v1.Pod
+type OpenAPICanonicalTypeNamer interface {
+	OpenAPICanonicalTypeName() string
+}
+
 // GetCanonicalTypeName will find the canonical type name of a sample object, removing
 // the "vendor" part of the path
 func GetCanonicalTypeName(model interface{}) string {
+	if namer, ok := model.(OpenAPICanonicalTypeNamer); ok {
+		return namer.OpenAPICanonicalTypeName()
+	}
 	t := reflect.TypeOf(model)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()

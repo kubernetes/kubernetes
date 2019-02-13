@@ -273,6 +273,12 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
 			}
 		},
+		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			if j.Fields != nil && len(j.Fields.Map) == 0 {
+				j.Fields = nil
+			}
+		},
 	}
 }
 

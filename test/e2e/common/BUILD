@@ -49,7 +49,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",

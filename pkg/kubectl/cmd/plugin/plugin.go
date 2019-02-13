@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -48,6 +49,8 @@ var (
 		- anywhere on the user's PATH
 		- begin with "kubectl-"
 `)
+
+	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
 
 func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -100,11 +103,7 @@ func (o *PluginListOptions) Complete(cmd *cobra.Command) error {
 		seenPlugins: make(map[string]string, 0),
 	}
 
-	path := "PATH"
-	if runtime.GOOS == "windows" {
-		path = "path"
-	}
-	o.PluginPaths = filepath.SplitList(os.Getenv(path))
+	o.PluginPaths = filepath.SplitList(os.Getenv("PATH"))
 	return nil
 }
 
@@ -117,6 +116,11 @@ func (o *PluginListOptions) Run() error {
 	for _, dir := range uniquePathsList(o.PluginPaths) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
+			if _, ok := err.(*os.PathError); ok && strings.Contains(err.Error(), "no such file") {
+				klog.V(3).Infof("unable to find directory %q in your PATH. Skipping...", dir)
+				continue
+			}
+
 			pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to read directory %q in your PATH: %v", dir, err))
 			continue
 		}
@@ -125,12 +129,12 @@ func (o *PluginListOptions) Run() error {
 			if f.IsDir() {
 				continue
 			}
-			if !strings.HasPrefix(f.Name(), "kubectl-") {
+			if !hasValidPrefix(f.Name(), ValidPluginFilenamePrefixes) {
 				continue
 			}
 
 			if isFirstFile {
-				fmt.Fprintf(o.ErrOut, "The following kubectl-compatible plugins are available:\n\n")
+				fmt.Fprintf(o.ErrOut, "The following compatible plugins are available:\n\n")
 				pluginsFound = true
 				isFirstFile = false
 			}
@@ -230,7 +234,10 @@ func isExecutable(fullPath string) (bool, error) {
 	}
 
 	if runtime.GOOS == "windows" {
-		if strings.HasSuffix(info.Name(), ".exe") {
+		fileExt := strings.ToLower(filepath.Ext(fullPath))
+
+		switch fileExt {
+		case ".bat", ".cmd", ".com", ".exe", ".ps1":
 			return true, nil
 		}
 		return false, nil
@@ -256,4 +263,14 @@ func uniquePathsList(paths []string) []string {
 		newPaths = append(newPaths, p)
 	}
 	return newPaths
+}
+
+func hasValidPrefix(filepath string, validPrefixes []string) bool {
+	for _, prefix := range validPrefixes {
+		if !strings.HasPrefix(filepath, prefix+"-") {
+			continue
+		}
+		return true
+	}
+	return false
 }

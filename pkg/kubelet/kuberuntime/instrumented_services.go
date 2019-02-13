@@ -178,10 +178,15 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 
 func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
-	defer recordOperation(operation, time.Now())
+	startTime := time.Now()
+	defer recordOperation(operation, startTime)
+	defer metrics.RunPodSandboxLatencies.WithLabelValues(runtimeHandler).Observe(metrics.SinceInMicroseconds(startTime))
 
 	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)
+	if err != nil {
+		metrics.RunPodSandboxErrors.WithLabelValues(runtimeHandler).Inc()
+	}
 	return out, err
 }
 

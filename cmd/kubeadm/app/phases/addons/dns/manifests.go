@@ -43,6 +43,7 @@ spec:
       labels:
         k8s-app: kube-dns
     spec:
+      priorityClassName: system-cluster-critical
       volumes:
       - name: kube-dns-config
         configMap:
@@ -235,6 +236,7 @@ spec:
       labels:
         k8s-app: kube-dns
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       tolerations:
       - key: CriticalAddonsOnly
@@ -313,7 +315,7 @@ data:
            fallthrough in-addr.arpa ip6.arpa
         }{{ .Federation }}
         prometheus :9153
-        proxy . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }}
         cache 30
         loop
         reload

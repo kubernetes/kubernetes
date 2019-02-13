@@ -28,11 +28,8 @@ import (
 	"strings"
 	"testing"
 
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -49,6 +46,8 @@ type componentTester interface {
 type kubeControllerManagerTester struct{}
 
 func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+	// avoid starting any controller loops, we're just testing serving
+	customFlags = append([]string{"--controllers="}, customFlags...)
 	gotResult, err := kubectrlmgrtesting.StartTestServer(t, customFlags)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -96,7 +95,7 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	tokenFile.WriteString(fmt.Sprintf(`
-%s,controller-manager,controller-manager,""
+%s,system:kube-controller-manager,system:kube-controller-manager,""
 `, token))
 	tokenFile.Close()
 
@@ -106,44 +105,6 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 		"--authorization-mode", "RBAC",
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
-
-	// allow controller-manager to do SubjectAccessReview
-	client, err := kubernetes.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("unexpected error creating client config: %v", err)
-	}
-	_, err = client.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "controller-manager:system:auth-delegator"},
-		Subjects: []rbacv1.Subject{{
-			Kind: "User",
-			Name: "controller-manager",
-		}},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "system:auth-delegator",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to create system:auth-delegator rbac cluster role binding: %v", err)
-	}
-
-	// allow controller-manager to read kube-system/extension-apiserver-authentication
-	_, err = client.RbacV1().RoleBindings("kube-system").Create(&rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "controller-manager:extension-apiserver-authentication-reader"},
-		Subjects: []rbacv1.Subject{{
-			Kind: "User",
-			Name: "controller-manager",
-		}},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     "extension-apiserver-authentication-reader",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to create controller-manager:extension-apiserver-authentication-reader rbac role binding: %v", err)
-	}
 
 	// create kubeconfig for the apiserver
 	apiserverConfig, err := ioutil.TempFile("", "kubeconfig")

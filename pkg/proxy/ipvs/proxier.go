@@ -44,9 +44,9 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -373,7 +373,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDR(clusterCIDR) != isIPv6 {
+	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != isIPv6 {
 		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
 	}
 
@@ -1199,6 +1199,11 @@ func (proxier *Proxier) syncProxyRules() {
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
+	}
+	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
+		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+		metrics.NetworkProgrammingLatency.Observe(latency)
+		klog.V(4).Infof("Network programming took %f seconds", latency)
 	}
 
 	// Close old local ports and save new ones.

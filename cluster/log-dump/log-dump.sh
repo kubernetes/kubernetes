@@ -51,6 +51,7 @@ readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
@@ -164,6 +165,10 @@ function save-logs() {
         for svc in "${services[@]}"; do
             log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
+
+        if [[ "$dump_systemd_journal" == "true" ]]; then
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise" > "${dir}/systemd.log" || true
+        fi
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
@@ -344,6 +349,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"

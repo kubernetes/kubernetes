@@ -463,10 +463,8 @@ func TestSharedCertificateExists(t *testing.T) {
 			os.MkdirAll(tmpdir+"/etcd", os.ModePerm)
 			defer os.RemoveAll(tmpdir)
 
-			cfg := &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					CertificatesDir: tmpdir,
-				},
+			cfg := &kubeadmapi.ClusterConfiguration{
+				CertificatesDir: tmpdir,
 			}
 
 			// created expected keys
@@ -554,7 +552,7 @@ func TestUsingExternalCA(t *testing.T) {
 			}
 		}
 
-		if val, _ := UsingExternalCA(cfg); val != test.expected {
+		if val, _ := UsingExternalCA(&cfg.ClusterConfiguration); val != test.expected {
 			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
 		}
 	}

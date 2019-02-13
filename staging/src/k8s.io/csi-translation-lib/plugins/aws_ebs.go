@@ -40,6 +40,11 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 	return &awsElasticBlockStoreCSITranslator{}
 }
 
+// TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with AWSElasticBlockStore set from in-tree
 // and converts the AWSElasticBlockStore source to a CSIPersistentVolumeSource
 func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {

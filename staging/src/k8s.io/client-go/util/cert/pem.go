@@ -26,50 +26,18 @@ import (
 )
 
 const (
+
 	// ECPrivateKeyBlockType is a possible value for pem.Block.Type.
 	ECPrivateKeyBlockType = "EC PRIVATE KEY"
 	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
 	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
-	// PrivateKeyBlockType is a possible value for pem.Block.Type.
-	PrivateKeyBlockType = "PRIVATE KEY"
-	// PublicKeyBlockType is a possible value for pem.Block.Type.
-	PublicKeyBlockType = "PUBLIC KEY"
-	// CertificateBlockType is a possible value for pem.Block.Type.
-	CertificateBlockType = "CERTIFICATE"
 	// CertificateRequestBlockType is a possible value for pem.Block.Type.
 	CertificateRequestBlockType = "CERTIFICATE REQUEST"
+	// CertificateBlockType is a possible value for pem.Block.Type.
+	CertificateBlockType = "CERTIFICATE"
+	// PrivateKeyBlockType is a possible value for pem.Block.Type.
+	PrivateKeyBlockType = "PRIVATE KEY"
 )
-
-// EncodePublicKeyPEM returns PEM-encoded public data
-func EncodePublicKeyPEM(key *rsa.PublicKey) ([]byte, error) {
-	der, err := x509.MarshalPKIXPublicKey(key)
-	if err != nil {
-		return []byte{}, err
-	}
-	block := pem.Block{
-		Type:  PublicKeyBlockType,
-		Bytes: der,
-	}
-	return pem.EncodeToMemory(&block), nil
-}
-
-// EncodePrivateKeyPEM returns PEM-encoded private key data
-func EncodePrivateKeyPEM(key *rsa.PrivateKey) []byte {
-	block := pem.Block{
-		Type:  RSAPrivateKeyBlockType,
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	}
-	return pem.EncodeToMemory(&block)
-}
-
-// EncodeCertPEM returns PEM-endcoded certificate data
-func EncodeCertPEM(cert *x509.Certificate) []byte {
-	block := pem.Block{
-		Type:  CertificateBlockType,
-		Bytes: cert.Raw,
-	}
-	return pem.EncodeToMemory(&block)
-}
 
 // ParsePrivateKeyPEM returns a private key parsed from a PEM block in the supplied data.
 // Recognizes PEM blocks for "EC PRIVATE KEY", "RSA PRIVATE KEY", or "PRIVATE KEY"
@@ -145,6 +113,15 @@ func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
 		return nil, fmt.Errorf("data does not contain any valid RSA or ECDSA public keys")
 	}
 	return keys, nil
+}
+
+// EncodePrivateKeyPEM returns PEM-encoded private key data
+func EncodePrivateKeyPEM(key *rsa.PrivateKey) []byte {
+	block := pem.Block{
+		Type:  RSAPrivateKeyBlockType,
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}
+	return pem.EncodeToMemory(&block)
 }
 
 // ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array

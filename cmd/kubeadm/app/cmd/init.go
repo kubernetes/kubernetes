@@ -36,7 +36,7 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -51,7 +51,7 @@ import (
 
 var (
 	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-		Your Kubernetes master has initialized successfully!
+		Your Kubernetes control-plane has initialized successfully!
 
 		To start using your cluster, you need to run the following as a regular user:
 
@@ -136,18 +136,19 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes control plane.",
 		Run: func(cmd *cobra.Command, args []string) {
-			c, err := initRunner.InitData()
+			c, err := initRunner.InitData(args)
 			kubeadmutil.CheckErr(err)
 
-			data := c.(initData)
+			data := c.(*initData)
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
-			err = initRunner.Run()
+			err = initRunner.Run(args)
 			kubeadmutil.CheckErr(err)
 
-			err = showJoinCommand(&data, out)
+			err = showJoinCommand(data, out)
 			kubeadmutil.CheckErr(err)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	// adds flags to the init command
@@ -167,7 +168,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	})
 
 	// initialize the workflow runner with the list of phases
-	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
+	initRunner.AppendPhase(phases.NewPreflightPhase())
 	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
@@ -181,8 +182,8 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
-	initRunner.SetDataInitializer(func(cmd *cobra.Command) (workflow.RunData, error) {
-		return newInitData(cmd, initOptions, out)
+	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		return newInitData(cmd, args, initOptions, out)
 	})
 
 	// binds the Runner to kubeadm init command by altering
@@ -237,10 +238,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
 func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
-	flagSet.StringVar(
-		cfgPath, options.CfgPath, *cfgPath,
-		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
-	)
+	options.AddConfigFlag(flagSet, cfgPath)
 	flagSet.StringSliceVar(
 		ignorePreflightErrors, options.IgnorePreflightErrors, *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
@@ -278,7 +276,7 @@ func newInitOptions() *initOptions {
 // newInitData returns a new initData struct to be used for the execution of the kubeadm init workflow.
 // This func takes care of validating initOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow
-func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initData, error) {
+func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io.Writer) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmscheme.Scheme.Default(options.externalcfg)
 
@@ -286,27 +284,27 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	// validated values to the public kubeadm config API when applicable
 	var err error
 	if options.externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
 	if err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	if err = options.bto.ApplyTo(options.externalcfg); err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
+	cfg, err := configutil.LoadOrDefaultInitConfiguration(options.cfgPath, options.externalcfg)
 	if err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	// override node name and CRI socket from the command line options
@@ -318,33 +316,33 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	}
 
 	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-		return initData{}, err
+		return nil, err
 	}
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
-		return initData{}, err
+		return nil, err
 	}
 
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
 		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
-			return initData{}, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
 	// Checks if an external CA is provided by the user.
-	externalCA, _ := certsphase.UsingExternalCA(cfg)
+	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
 	if externalCA {
 		kubeconfigDir := kubeadmconstants.KubernetesDir
 		if options.dryRun {
 			kubeconfigDir = dryRunDir
 		}
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
-			return initData{}, err
+			return nil, err
 		}
 	}
 
-	return initData{
+	return &initData{
 		cfg:                   cfg,
 		certificatesDir:       cfg.CertificatesDir,
 		skipTokenPrint:        options.skipTokenPrint,
@@ -359,27 +357,27 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 }
 
 // Cfg returns initConfiguration.
-func (d initData) Cfg() *kubeadmapi.InitConfiguration {
+func (d *initData) Cfg() *kubeadmapi.InitConfiguration {
 	return d.cfg
 }
 
 // DryRun returns the DryRun flag.
-func (d initData) DryRun() bool {
+func (d *initData) DryRun() bool {
 	return d.dryRun
 }
 
 // SkipTokenPrint returns the SkipTokenPrint flag.
-func (d initData) SkipTokenPrint() bool {
+func (d *initData) SkipTokenPrint() bool {
 	return d.skipTokenPrint
 }
 
 // IgnorePreflightErrors returns the IgnorePreflightErrors flag.
-func (d initData) IgnorePreflightErrors() sets.String {
+func (d *initData) IgnorePreflightErrors() sets.String {
 	return d.ignorePreflightErrors
 }
 
 // CertificateWriteDir returns the path to the certificate folder or the temporary folder path in case of DryRun.
-func (d initData) CertificateWriteDir() string {
+func (d *initData) CertificateWriteDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
@@ -387,12 +385,12 @@ func (d initData) CertificateWriteDir() string {
 }
 
 // CertificateDir returns the CertificateDir as originally specified by the user.
-func (d initData) CertificateDir() string {
+func (d *initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
 // KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
-func (d initData) KubeConfigDir() string {
+func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
@@ -400,7 +398,7 @@ func (d initData) KubeConfigDir() string {
 }
 
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
-func (d initData) KubeConfigPath() string {
+func (d *initData) KubeConfigPath() string {
 	if d.dryRun {
 		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmconstants.AdminKubeConfigFileName)
 	}
@@ -408,7 +406,7 @@ func (d initData) KubeConfigPath() string {
 }
 
 // ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
-func (d initData) ManifestDir() string {
+func (d *initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
@@ -416,7 +414,7 @@ func (d initData) ManifestDir() string {
 }
 
 // KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
-func (d initData) KubeletDir() string {
+func (d *initData) KubeletDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
@@ -424,19 +422,19 @@ func (d initData) KubeletDir() string {
 }
 
 // ExternalCA returns true if an external CA is provided by the user.
-func (d initData) ExternalCA() bool {
+func (d *initData) ExternalCA() bool {
 	return d.externalCA
 }
 
 // OutputWriter returns the io.Writer used to write output to by this command.
-func (d initData) OutputWriter() io.Writer {
+func (d *initData) OutputWriter() io.Writer {
 	return d.outputWriter
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
-func (d initData) Client() (clientset.Interface, error) {
+func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
 		if d.dryRun {
 			// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
@@ -455,7 +453,7 @@ func (d initData) Client() (clientset.Interface, error) {
 }
 
 // Tokens returns an array of token strings.
-func (d initData) Tokens() []string {
+func (d *initData) Tokens() []string {
 	tokens := []string{}
 	for _, bt := range d.cfg.BootstrapTokens {
 		tokens = append(tokens, bt.Token.String())

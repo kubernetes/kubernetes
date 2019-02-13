@@ -27,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ],

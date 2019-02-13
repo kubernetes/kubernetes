@@ -20,12 +20,10 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/cache"
+	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
+	nodeapiinformer "k8s.io/node-api/pkg/client/informers/externalversions"
+	nodev1alpha1 "k8s.io/node-api/pkg/client/listers/node/v1alpha1"
 )
 
 var (
@@ -38,33 +36,36 @@ var (
 
 // Manager caches RuntimeClass API objects, and provides accessors to the Kubelet.
 type Manager struct {
-	informer cache.SharedInformer
+	informerFactory nodeapiinformer.SharedInformerFactory
+	lister          nodev1alpha1.RuntimeClassLister
 }
 
 // NewManager returns a new RuntimeClass Manager. Run must be called before the manager can be used.
-func NewManager(client dynamic.Interface) *Manager {
-	rc := client.Resource(runtimeClassGVR)
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return rc.List(options)
-		},
-		WatchFunc: rc.Watch,
-	}
-	informer := cache.NewSharedInformer(lw, &unstructured.Unstructured{}, 0)
+func NewManager(client nodeapiclient.Interface) *Manager {
+	const resyncPeriod = 0
+	factory := nodeapiinformer.NewSharedInformerFactory(client, resyncPeriod)
+	lister := factory.Node().V1alpha1().RuntimeClasses().Lister()
 
 	return &Manager{
-		informer: informer,
+		informerFactory: factory,
+		lister:          lister,
 	}
 }
 
-// Run starts syncing the RuntimeClass cache with the apiserver.
-func (m *Manager) Run(stopCh <-chan struct{}) {
-	m.informer.Run(stopCh)
+// Start starts syncing the RuntimeClass cache with the apiserver.
+func (m *Manager) Start(stopCh <-chan struct{}) {
+	m.informerFactory.Start(stopCh)
+}
+
+// WaitForCacheSync exposes the WaitForCacheSync method on the informer factory for testing
+// purposes.
+func (m *Manager) WaitForCacheSync(stopCh <-chan struct{}) {
+	m.informerFactory.WaitForCacheSync(stopCh)
 }
 
 // LookupRuntimeHandler returns the RuntimeHandler string associated with the given RuntimeClass
 // name (or the default of "" for nil). If the RuntimeClass is not found, it returns an
-// apierrors.NotFound error.
+// errors.NotFound error.
 func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error) {
 	if runtimeClassName == nil || *runtimeClassName == "" {
 		// The default RuntimeClass always resolves to the empty runtime handler.
@@ -72,26 +73,18 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 	}
 
 	name := *runtimeClassName
-	item, exists, err := m.informer.GetStore().GetByKey(name)
+
+	rc, err := m.lister.Get(name)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", err
+		}
 		return "", fmt.Errorf("Failed to lookup RuntimeClass %s: %v", name, err)
 	}
-	if !exists {
-		return "", errors.NewNotFound(schema.GroupResource{
-			Group:    runtimeClassGVR.Group,
-			Resource: runtimeClassGVR.Resource,
-		}, name)
-	}
 
-	rc, ok := item.(*unstructured.Unstructured)
-	if !ok {
-		return "", fmt.Errorf("unexpected RuntimeClass type %T", item)
+	handler := rc.Spec.RuntimeHandler
+	if handler == nil {
+		return "", nil
 	}
-
-	handler, _, err := unstructured.NestedString(rc.Object, "spec", "runtimeHandler")
-	if err != nil {
-		return "", fmt.Errorf("Invalid RuntimeClass object: %v", err)
-	}
-
-	return handler, nil
+	return *handler, nil
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -96,7 +97,9 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // Validate validates a new StatefulSet.
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
-	return validation.ValidateStatefulSet(statefulSet)
+	allErrs := validation.ValidateStatefulSet(statefulSet)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&statefulSet.Spec.Template, nil, field.NewPath("spec.template"))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -110,8 +113,11 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
-	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
+	newStatefulSet := obj.(*apps.StatefulSet)
+	oldStatefulSet := old.(*apps.StatefulSet)
+	validationErrorList := validation.ValidateStatefulSet(newStatefulSet)
+	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
+	updateErrorList = append(updateErrorList, corevalidation.ValidateConditionalPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template, field.NewPath("spec.template"))...)
 	return append(validationErrorList, updateErrorList...)
 }
 

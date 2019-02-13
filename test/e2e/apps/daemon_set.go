@@ -719,7 +719,7 @@ func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]st
 	listHistoryFn := func() (bool, error) {
 		selector := labels.Set(label).AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+		historyList, err := c.AppsV1().ControllerRevisions(ns).List(options)
 		if err != nil {
 			return false, err
 		}

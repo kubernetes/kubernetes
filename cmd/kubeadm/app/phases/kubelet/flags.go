@@ -46,29 +46,29 @@ type kubeletFlagsOpts struct {
 
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.InitConfiguration, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
 	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
 	}
 
 	flagOpts := kubeletFlagsOpts{
-		nodeRegOpts:              &cfg.NodeRegistration,
+		nodeRegOpts:              nodeReg,
 		featureGates:             cfg.FeatureGates,
-		pauseImage:               images.GetPauseImage(&cfg.ClusterConfiguration),
+		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:                   utilsexec.New(),
 		pidOfFunc:                procfs.PidOf,
 		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
-	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, cfg.NodeRegistration.KubeletExtraArgs)
+	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
 	envFileContent := fmt.Sprintf("%s=%s\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMap takes a InitConfiguration object and builds based on that a string-string map with flags
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
 // that should be given to the local kubelet daemon.
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}

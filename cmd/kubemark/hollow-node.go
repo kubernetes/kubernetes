@@ -49,7 +49,7 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
-type HollowNodeConfig struct {
+type hollowNodeConfig struct {
 	KubeconfigPath       string
 	KubeletPort          int
 	KubeletReadOnlyPort  int
@@ -71,7 +71,7 @@ const (
 // and make the config driven.
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
-func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
+func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
 	fs.IntVar(&c.KubeletPort, "kubelet-port", 10250, "Port on which HollowKubelet should be listening.")
 	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", 10255, "Read-only port on which Kubelet is listening.")
@@ -84,7 +84,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 }
 
-func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
+func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
 	clientConfig, err := clientcmd.LoadFromFile(c.KubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("error while loading kubeconfig from file %v: %v", c.KubeconfigPath, err)
@@ -121,7 +121,7 @@ func main() {
 
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
-	s := &HollowNodeConfig{}
+	s := &hollowNodeConfig{}
 
 	cmd := &cobra.Command{
 		Use:  "kubemark",
@@ -136,7 +136,7 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(config *HollowNodeConfig) {
+func run(config *hollowNodeConfig) {
 	if !knownMorphs.Has(config.Morph) {
 		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}

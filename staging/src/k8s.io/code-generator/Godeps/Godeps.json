@@ -112,11 +112,47 @@
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/ast/astutil",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/gcexportdata",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/cgo",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/gcimporter",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/packagesdriver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/packages",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/imports",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/fastwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/gopathwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/module",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/semver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",

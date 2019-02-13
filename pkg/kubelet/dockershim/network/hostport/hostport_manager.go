@@ -31,8 +31,8 @@ import (
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 // HostPortManager is an interface for adding and removing hostport for a given pod sandbox.

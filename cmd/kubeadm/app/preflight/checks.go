@@ -226,6 +226,14 @@ func (IsPrivilegedUserCheck) Name() string {
 	return "IsPrivilegedUser"
 }
 
+// IsDockerSystemdCheck verifies if Docker is setup to use systemd as the cgroup driver.
+type IsDockerSystemdCheck struct{}
+
+// Name returns name for IsDockerSystemdCheck
+func (IsDockerSystemdCheck) Name() string {
+	return "IsDockerSystemdCheck"
+}
+
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
 	Path  string
@@ -973,11 +981,11 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 }
 
 // RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
-func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
 	// Check ipvs required kernel module if we use ipvs kube-proxy mode
-	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks,
 			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)
@@ -998,6 +1006,10 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		if containerRuntime.IsDocker() {
 			isDocker = true
 			checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+			// Linux only
+			// TODO: support other CRIs for this check eventually
+			// https://github.com/kubernetes/kubeadm/issues/874
+			checks = append(checks, IsDockerSystemdCheck{})
 		}
 	}
 

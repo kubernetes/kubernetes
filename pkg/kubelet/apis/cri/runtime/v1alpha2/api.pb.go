@@ -736,7 +736,8 @@ type PodSandboxConfig struct {
 	// operation. The runtime may also use this information to improve UX, such
 	// as by constructing a readable name.
 	Metadata *PodSandboxMetadata `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	// Hostname of the sandbox.
+	// Hostname of the sandbox. Hostname could only be empty when the pod
+	// network namespace is NODE.
 	Hostname string `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
 	// Path to the directory on the host in which container log files are
 	// stored.
@@ -3550,7 +3551,7 @@ type ContainerStats struct {
 	Cpu *CpuUsage `protobuf:"bytes,2,opt,name=cpu" json:"cpu,omitempty"`
 	// Memory usage gathered from the container.
 	Memory *MemoryUsage `protobuf:"bytes,3,opt,name=memory" json:"memory,omitempty"`
-	// Usage of the writeable layer.
+	// Usage of the writable layer.
 	WritableLayer *FilesystemUsage `protobuf:"bytes,4,opt,name=writable_layer,json=writableLayer" json:"writable_layer,omitempty"`
 }
 

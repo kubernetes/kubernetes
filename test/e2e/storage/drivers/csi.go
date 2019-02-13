@@ -41,6 +41,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -60,7 +61,7 @@ type hostpathCSIDriver struct {
 	manifests  []string
 }
 
-func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests ...string) testsuites.TestDriver {
+func initHostPathCSIDriver(name string, config testsuites.TestConfig, capabilities map[testsuites.Capability]bool, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        name,
@@ -69,11 +70,8 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: true,
-			},
-
-			Config: config,
+			Capabilities: capabilities,
+			Config:       config,
 		},
 		manifests: manifests,
 	}
@@ -81,15 +79,19 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 
 var _ testsuites.TestDriver = &hostpathCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
+var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath", config,
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapDataSource: true, testsuites.CapMultiPODs: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
@@ -109,6 +111,15 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (h *hostpathCSIDriver) GetSnapshotClass() *unstructured.Unstructured {
+	snapshotter := testsuites.GetUniqueDriverName(h)
+	parameters := map[string]string{}
+	ns := h.driverInfo.Config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-vsc", snapshotter)
+
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
 func (h *hostpathCSIDriver) GetClaimSize() string {
@@ -133,6 +144,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 		DriverContainerName:      "hostpath",
 		DriverContainerArguments: []string{"--drivername=csi-hostpath-" + f.UniqueName},
 		ProvisionerContainerName: "csi-provisioner",
+		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 nodeName,
 	}
 	cleanup, err := h.driverInfo.Config.Framework.CreateFromManifests(func(item interface{}) error {
@@ -247,6 +259,7 @@ func (m *mockCSIDriver) CleanupDriver() {
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0", config,
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -284,6 +297,7 @@ func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
@@ -304,6 +318,9 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 		// tests to fail.
 		framework.SkipIfMultizone(f.ClientSet)
 	}
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -312,6 +329,9 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["csi.storage.k8s.io/fstype"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
@@ -390,6 +410,7 @@ func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDri
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
@@ -404,6 +425,9 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 }
 
 func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -412,6 +436,9 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["csi.storage.k8s.io/fstype"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }

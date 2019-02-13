@@ -399,7 +399,7 @@ type RESTStorageProvider interface {
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
-	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
+	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
@@ -422,13 +422,11 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
 	}
 
-	for i := range apiGroupsInfo {
-		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
-			klog.Fatalf("Error in registering group versions: %v", err)
-		}
+	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+		klog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
 

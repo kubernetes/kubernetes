@@ -32,7 +32,6 @@ import (
 	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -129,6 +128,8 @@ func TestAddFlags(t *testing.T) {
 			MaxMutatingRequestsInFlight: 200,
 			RequestTimeout:              time.Duration(2) * time.Minute,
 			MinRequestTimeout:           1800,
+			JSONPatchMaxCopyBytes:       int64(100 * 1024 * 1024),
+			MaxRequestBodyBytes:         int64(100 * 1024 * 1024),
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -286,10 +287,6 @@ func TestAddFlags(t *testing.T) {
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
 			CloudProvider:   "azure",
-		},
-		StorageSerialization: &kubeoptions.StorageSerializationOptions{
-			StorageVersions:        kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
-			DefaultStorageVersions: kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
 			RuntimeConfig: utilflag.ConfigurationMap{},

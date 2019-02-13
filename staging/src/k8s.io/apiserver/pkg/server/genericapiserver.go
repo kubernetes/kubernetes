@@ -156,6 +156,10 @@ type GenericAPIServer struct {
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+
+	// The limit on the request body size that would be accepted and decoded in a write request.
+	// 0 means no limit.
+	maxRequestBodyBytes int64
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -324,11 +328,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
-func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
-	openAPIGroupModels, err := s.getOpenAPIModelsForGroup(apiPrefix, apiGroupInfo)
-	if err != nil {
-		return fmt.Errorf("unable to get openapi models for group %v: %v", apiPrefix, err)
-	}
+func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels openapiproto.Models) error {
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
 			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
@@ -339,7 +339,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
-		apiGroupVersion.OpenAPIModels = openAPIGroupModels
+		apiGroupVersion.OpenAPIModels = openAPIModels
+		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
@@ -353,7 +354,13 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	if !s.legacyAPIGroupPrefixes.Has(apiPrefix) {
 		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.List())
 	}
-	if err := s.installAPIResources(apiPrefix, apiGroupInfo); err != nil {
+
+	openAPIModels, err := s.getOpenAPIModels(apiPrefix, apiGroupInfo)
+	if err != nil {
+		return fmt.Errorf("unable to get openapi models: %v", err)
+	}
+
+	if err := s.installAPIResources(apiPrefix, apiGroupInfo, openAPIModels); err != nil {
 		return err
 	}
 
@@ -364,49 +371,62 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	return nil
 }
 
+// Exposes given api groups in the API.
+func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) error {
+	for _, apiGroupInfo := range apiGroupInfos {
+		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
+		// Catching these here places the error  much closer to its origin
+		if len(apiGroupInfo.PrioritizedVersions[0].Group) == 0 {
+			return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
+		}
+		if len(apiGroupInfo.PrioritizedVersions[0].Version) == 0 {
+			return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
+		}
+	}
+
+	openAPIModels, err := s.getOpenAPIModels(APIGroupPrefix, apiGroupInfos...)
+	if err != nil {
+		return fmt.Errorf("unable to get openapi models: %v", err)
+	}
+
+	for _, apiGroupInfo := range apiGroupInfos {
+		if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo, openAPIModels); err != nil {
+			return fmt.Errorf("unable to install api resources: %v", err)
+		}
+
+		// setup discovery
+		// Install the version handler.
+		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
+		apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
+		for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
+			// Check the config to make sure that we elide versions that don't have any resources
+			if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+				continue
+			}
+			apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
+				GroupVersion: groupVersion.String(),
+				Version:      groupVersion.Version,
+			})
+		}
+		preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
+			GroupVersion: apiGroupInfo.PrioritizedVersions[0].String(),
+			Version:      apiGroupInfo.PrioritizedVersions[0].Version,
+		}
+		apiGroup := metav1.APIGroup{
+			Name:             apiGroupInfo.PrioritizedVersions[0].Group,
+			Versions:         apiVersionsForDiscovery,
+			PreferredVersion: preferredVersionForDiscovery,
+		}
+
+		s.DiscoveryGroupManager.AddGroup(apiGroup)
+		s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
+	}
+	return nil
+}
+
 // Exposes the given api group in the API.
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
-	// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
-	// Catching these here places the error  much closer to its origin
-	if len(apiGroupInfo.PrioritizedVersions[0].Group) == 0 {
-		return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
-	}
-	if len(apiGroupInfo.PrioritizedVersions[0].Version) == 0 {
-		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
-	}
-
-	if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo); err != nil {
-		return err
-	}
-
-	// setup discovery
-	// Install the version handler.
-	// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
-	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
-	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
-		// Check the config to make sure that we elide versions that don't have any resources
-		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
-			continue
-		}
-		apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
-			GroupVersion: groupVersion.String(),
-			Version:      groupVersion.Version,
-		})
-	}
-	preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
-		GroupVersion: apiGroupInfo.PrioritizedVersions[0].String(),
-		Version:      apiGroupInfo.PrioritizedVersions[0].Version,
-	}
-	apiGroup := metav1.APIGroup{
-		Name:             apiGroupInfo.PrioritizedVersions[0].Group,
-		Versions:         apiVersionsForDiscovery,
-		PreferredVersion: preferredVersionForDiscovery,
-	}
-
-	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
-
-	return nil
+	return s.InstallAPIGroups(apiGroupInfo)
 }
 
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
@@ -455,12 +475,31 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 	}
 }
 
-// getOpenAPIModelsForGroup is a private method for getting the OpenAPI Schemas for each  api group
-func (s *GenericAPIServer) getOpenAPIModelsForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) (openapiproto.Models, error) {
+// getOpenAPIModels is a private method for getting the OpenAPI models
+func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (openapiproto.Models, error) {
 	if s.openAPIConfig == nil {
 		return nil, nil
 	}
 	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
+	resourceNames := make([]string, 0)
+	for _, apiGroupInfo := range apiGroupInfos {
+		groupResources, err := getResourceNamesForGroup(apiPrefix, apiGroupInfo, pathsToIgnore)
+		if err != nil {
+			return nil, err
+		}
+		resourceNames = append(resourceNames, groupResources...)
+	}
+
+	// Build the openapi definitions for those resources and convert it to proto models
+	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
+	if err != nil {
+		return nil, err
+	}
+	return utilopenapi.ToProtoModels(openAPISpec)
+}
+
+// getResourceNamesForGroup is a private method for getting the canonical names for each resource to build in an api group
+func getResourceNamesForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo, pathsToIgnore openapiutil.Trie) ([]string, error) {
 	// Get the canonical names of every resource we need to build in this api group
 	resourceNames := make([]string, 0)
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
@@ -481,10 +520,5 @@ func (s *GenericAPIServer) getOpenAPIModelsForGroup(apiPrefix string, apiGroupIn
 		}
 	}
 
-	// Build the openapi definitions for those resources and convert it to proto models
-	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
-	if err != nil {
-		return nil, err
-	}
-	return utilopenapi.ToProtoModels(openAPISpec)
+	return resourceNames, nil
 }

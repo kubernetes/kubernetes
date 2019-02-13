@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -285,5 +286,9 @@ func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName ty
 }
 
 func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName))
+	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
+}
+
+func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }

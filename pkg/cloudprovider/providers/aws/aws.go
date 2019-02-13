@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -42,7 +43,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
-	gcfg "gopkg.in/gcfg.v1"
+	"gopkg.in/gcfg.v1"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -54,14 +55,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/controller"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volerr "k8s.io/cloud-provider/volume/errors"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 )
 
 // NLBHealthCheckRuleDescription is the comment used on a security group rule to
@@ -505,7 +506,7 @@ type Cloud struct {
 
 	instanceCache instanceCache
 
-	clientBuilder    controller.ControllerClientBuilder
+	clientBuilder    cloudprovider.ControllerClientBuilder
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -571,6 +572,91 @@ type CloudConfig struct {
 		//issue body.
 		DisableStrictZoneCheck bool
 	}
+	// [ServiceOverride "1"]
+	//  Service = s3
+	//  Region = region1
+	//  URL = https://s3.foo.bar
+	//  SigningRegion = signing_region
+	//  SigningMethod = signing_method
+	//
+	//  [ServiceOverride "2"]
+	//     Service = ec2
+	//     Region = region2
+	//     URL = https://ec2.foo.bar
+	//     SigningRegion = signing_region
+	//     SigningMethod = signing_method
+	ServiceOverride map[string]*struct {
+		Service       string
+		Region        string
+		URL           string
+		SigningRegion string
+		SigningMethod string
+		SigningName   string
+	}
+}
+
+func (cfg *CloudConfig) validateOverrides() error {
+	if len(cfg.ServiceOverride) == 0 {
+		return nil
+	}
+	set := make(map[string]bool)
+	for onum, ovrd := range cfg.ServiceOverride {
+		// Note: gcfg does not space trim, so we have to when comparing to empty string ""
+		name := strings.TrimSpace(ovrd.Service)
+		if name == "" {
+			return fmt.Errorf("service name is missing [Service is \"\"] in override %s", onum)
+		}
+		// insure the map service name is space trimmed
+		ovrd.Service = name
+
+		region := strings.TrimSpace(ovrd.Region)
+		if region == "" {
+			return fmt.Errorf("service region is missing [Region is \"\"] in override %s", onum)
+		}
+		// insure the map region is space trimmed
+		ovrd.Region = region
+
+		url := strings.TrimSpace(ovrd.URL)
+		if url == "" {
+			return fmt.Errorf("url is missing [URL is \"\"] in override %s", onum)
+		}
+		signingRegion := strings.TrimSpace(ovrd.SigningRegion)
+		if signingRegion == "" {
+			return fmt.Errorf("signingRegion is missing [SigningRegion is \"\"] in override %s", onum)
+		}
+		signature := name + "_" + region
+		if set[signature] {
+			return fmt.Errorf("duplicate entry found for service override [%s] (%s in %s)", onum, name, region)
+		}
+		set[signature] = true
+	}
+	return nil
+}
+
+func (cfg *CloudConfig) getResolver() endpoints.ResolverFunc {
+	defaultResolver := endpoints.DefaultResolver()
+	defaultResolverFn := func(service, region string,
+		optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
+	if len(cfg.ServiceOverride) == 0 {
+		return defaultResolverFn
+	}
+
+	return func(service, region string,
+		optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		for _, override := range cfg.ServiceOverride {
+			if override.Service == service && override.Region == region {
+				return endpoints.ResolvedEndpoint{
+					URL:           override.URL,
+					SigningRegion: override.SigningRegion,
+					SigningMethod: override.SigningMethod,
+					SigningName:   override.SigningName,
+				}, nil
+			}
+		}
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
 }
 
 // awsSdkEC2 is an implementation of the EC2 interface, backed by aws-sdk-go
@@ -578,16 +664,23 @@ type awsSdkEC2 struct {
 	ec2 *ec2.EC2
 }
 
+// Interface to make the CloudConfig immutable for awsSDKProvider
+type awsCloudConfigProvider interface {
+	getResolver() endpoints.ResolverFunc
+}
+
 type awsSDKProvider struct {
 	creds *credentials.Credentials
+	cfg   awsCloudConfigProvider
 
 	mutex          sync.Mutex
 	regionDelayers map[string]*CrossRequestRetryDelay
 }
 
-func newAWSSDKProvider(creds *credentials.Credentials) *awsSDKProvider {
+func newAWSSDKProvider(creds *credentials.Credentials, cfg *CloudConfig) *awsSDKProvider {
 	return &awsSDKProvider{
 		creds:          creds,
+		cfg:            cfg,
 		regionDelayers: make(map[string]*CrossRequestRetryDelay),
 	}
 }
@@ -657,7 +750,8 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -678,7 +772,8 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -695,7 +790,8 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -713,7 +809,8 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -727,7 +824,9 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	sess, err := session.NewSession(&aws.Config{})
+	sess, err := session.NewSession(&aws.Config{
+		EndpointResolver: p.cfg.getResolver(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -741,7 +840,8 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(p.cfg.getResolver())
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -966,6 +1066,10 @@ func init() {
 			return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
 		}
 
+		if err = cfg.validateOverrides(); err != nil {
+			return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
+		}
+
 		sess, err := session.NewSession(&aws.Config{})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
@@ -991,7 +1095,7 @@ func init() {
 				&credentials.SharedCredentialsProvider{},
 			})
 
-		aws := newAWSSDKProvider(creds)
+		aws := newAWSSDKProvider(creds, cfg)
 		return newAWSCloud(*cfg, aws)
 	})
 }
@@ -1834,7 +1938,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 		Value:  "true",
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	err := controller.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
+	err := nodehelpers.AddOrUpdateTaintOnNode(c.kubeClient, string(nodeName), taint)
 	if err != nil {
 		klog.Errorf("Error applying taint to node %s with error %v", nodeName, err)
 		return
@@ -1932,7 +2036,7 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 		}
 		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "VolumeInUse" {
-				return false, volume.NewDeletedVolumeInUseError(err.Error())
+				return false, volerr.NewDeletedVolumeInUseError(err.Error())
 			}
 		}
 		return false, fmt.Errorf("error deleting EBS volume %q: %q", d.awsID, err)
@@ -2321,7 +2425,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 			devicePath := aws.StringValue(attachment.Device)
 			nodeName := mapInstanceToNodeName(attachedInstance)
 
-			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			danglingErr := volerr.NewDanglingError(attachErr, nodeName, devicePath)
 			return false, danglingErr
 		}
 
@@ -2340,7 +2444,7 @@ func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
+	if pv.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -2369,12 +2473,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
-	labels[kubeletapis.LabelZoneFailureDomain] = az
+	labels[v1.LabelZoneFailureDomain] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[kubeletapis.LabelZoneRegion] = region
+	labels[v1.LabelZoneRegion] = region
 
 	return labels, nil
 }
@@ -2500,7 +2604,7 @@ func (c *Cloud) ResizeDisk(
 		return oldSize, descErr
 	}
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpToGiB(newSize)
+	requestGiB := volumehelpers.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return
@@ -3330,7 +3434,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return nil, err
 	}
 
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -3346,7 +3450,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	if isNLB(annotations) {
 
-		if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 			for i := range v2Mappings {
 				v2Mappings[i].HealthCheckPort = int64(healthCheckNodePort)
 				v2Mappings[i].HealthCheckPath = path
@@ -3604,7 +3708,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
@@ -3621,8 +3725,15 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			tcpHealthCheckPort = int32(*listener.InstancePort)
 			break
 		}
+		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var hcProtocol string
+		if annotationProtocol == "https" || annotationProtocol == "ssl" {
+			hcProtocol = "SSL"
+		} else {
+			hcProtocol = "TCP"
+		}
 		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "", annotations)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}

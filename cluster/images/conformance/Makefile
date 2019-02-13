@@ -25,7 +25,7 @@ KUBECTL_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/kubec
 E2E_TEST_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/e2e.test
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.0
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
 all: build

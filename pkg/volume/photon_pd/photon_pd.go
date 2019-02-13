@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -281,7 +281,7 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
@@ -290,7 +290,7 @@ func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
 
 func (ppd *photonPersistentDisk) GetPath() string {
 	name := photonPersistentDiskPluginName
-	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedNameForDisk(name), ppd.volName)
+	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedName(name), ppd.volName)
 }
 
 // TODO: supporting more access mode for PhotonController persistent disk

@@ -55,15 +55,17 @@ fi
 # Some things we want in godeps aren't code dependencies, so ./...
 # won't pick them up.
 REQUIRED_BINS=(
-  "github.com/onsi/ginkgo/ginkgo"
-  "github.com/jteeuwen/go-bindata/go-bindata"
+  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/cespare/prettybench"
   "github.com/client9/misspell/cmd/misspell"
   "github.com/cloudflare/cfssl/cmd/cfssl"
   "github.com/cloudflare/cfssl/cmd/cfssljson"
-  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/jstemmer/go-junit-report"
+  "github.com/jteeuwen/go-bindata/go-bindata"
+  "github.com/onsi/ginkgo/ginkgo"
+  "golang.org/x/lint/golint"
   "k8s.io/kube-openapi/cmd/openapi-gen"
   "k8s.io/repo-infra/kazel"
-  "golang.org/x/lint/golint"
   "./..."
 )
 
@@ -99,6 +101,8 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - dep-approvers
 __EOF__

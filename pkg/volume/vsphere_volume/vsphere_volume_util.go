@@ -25,9 +25,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -73,7 +75,7 @@ type VolumeSpec struct {
 }
 
 func verifyDevicePath(path string) (string, error) {
-	if pathExists, err := volumeutil.PathExists(path); err != nil {
+	if pathExists, err := mount.PathExists(path); err != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil
@@ -91,9 +93,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 	}
 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// vSphere works with kilobytes, convert to KiB with rounding up
-	volSizeKiB, err := volumeutil.RoundUpSizeInt(volSizeBytes, 1024)
+	volSizeKiB, err := volumehelpers.RoundUpToKiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}

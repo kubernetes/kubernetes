@@ -178,7 +178,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 			continue
 		}
 		// Clean up
-		err := dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Delete(history.Name, nil)
+		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(history.Name, nil)
 		if err != nil {
 			return err
 		}
@@ -234,7 +234,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 			}
 		}
 		// Remove duplicates
-		err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Delete(cur.Name, nil)
+		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(cur.Name, nil)
 		if err != nil {
 			return nil, err
 		}
