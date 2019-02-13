@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Create a ceph-release keyring file with apt-key
+# This requires gnupg and curl but we do not want to install it in the result base container
+# Using a build container to create keyring file
+FROM BASEIMAGE as keybuilder
+CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+     apt-get install -y curl gnupg && \
+     curl -s https://download.ceph.com/keys/release.asc | apt-key --keyring /etc/apt/trusted.gpg.d/ceph-release.gpg add -
+
 FROM BASEIMAGE
 
 # If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so
@@ -26,6 +36,12 @@ COPY excludes /etc/dpkg/dpkg.cfg.d/excludes
 
 # Convenience script for building on this base image.
 COPY clean-install /usr/local/bin/clean-install
+
+# Add download.ceph.com repo and gpg key for ceph-common packages.
+# See http://docs.ceph.com/docs/master/install/get-packages/ for detailed information about ceph repositories
+COPY --from=keybuilder /etc/apt/trusted.gpg.d/ceph-release.gpg /etc/apt/trusted.gpg.d/ceph-release.gpg
+RUN echo "deb http://download.ceph.com/debian-CEPHRELEASE/ $( echo 'BASEIMAGE' | cut -d ':' -f 2 ) main" \
+    > /etc/apt/sources.list.d/ceph-CEPHRELEASE.list
 
 # Update system packages.
 RUN apt-get update \
