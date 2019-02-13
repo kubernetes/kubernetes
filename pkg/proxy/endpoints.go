@@ -161,6 +161,11 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // annotation stored in the given endpoints object or the "zero" time if the annotation wasn't set
 // or was set incorrectly.
 func getLastChangeTriggerTime(endpoints *v1.Endpoints) time.Time {
+	if _, ok := endpoints.Annotations[v1.EndpointsLastChangeTriggerTime]; !ok {
+		// It's possible that the Endpoints object won't have the EndpointsLastChangeTriggerTime
+		// annotation set. In that case return the 'zero value', which is ignored in the upstream code.
+		return time.Time{}
+	}
 	val, err := time.Parse(time.RFC3339Nano, endpoints.Annotations[v1.EndpointsLastChangeTriggerTime])
 	if err != nil {
 		klog.Warningf("Error while parsing EndpointsLastChangeTriggerTimeAnnotation: '%s'. Error is %v",
