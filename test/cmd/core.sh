@@ -487,6 +487,7 @@ run_pod_tests() {
       rm "${ERROR_FILE}"
       sleep $((2**count))
     else
+      rm "${ERROR_FILE}"
       kube::test::get_object_assert pods "{{range.items}}{{$IMAGE_FIELD}}:{{end}}" 'nginx:'
       break
     fi

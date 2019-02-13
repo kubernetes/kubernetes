@@ -497,7 +497,7 @@ runTests() {
   ######################
   # Delete             #
   ######################
-  if kube::test::if_supports_resource "${configmaps}" ; then
+  if kube::test::if_supports_resource "${CONFIGMAPS}" ; then
     record_command run_kubectl_delete_allnamespaces_tests
   fi
 
