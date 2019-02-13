@@ -402,8 +402,8 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" || f.Name == "rootfs" || f.Name == "print-join-command" || f.Name == "node-name" || f.Name == "cri-socket" {
-			// "--skip-*" flags or other whitelisted flags can be set with --config
+		if isAllowedFlag(f.Name) {
+			// "--skip-*" flags or other allowed flags can be set with --config
 			return
 		}
 		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
@@ -413,6 +413,26 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
+}
+
+func isAllowedFlag(flagName string) bool {
+	isAllowed := false
+	switch flagName {
+	case kubeadmcmdoptions.CfgPath,
+		kubeadmcmdoptions.IgnorePreflightErrors,
+		kubeadmcmdoptions.DryRun,
+		kubeadmcmdoptions.KubeconfigPath,
+		kubeadmcmdoptions.NodeName,
+		kubeadmcmdoptions.NodeCRISocket,
+		kubeadmcmdoptions.KubeconfigDir,
+		"print-join-command", "rootfs", "v":
+		isAllowed = true
+	default:
+		if strings.HasPrefix(flagName, "skip-") {
+			isAllowed = true
+		}
+	}
+	return isAllowed
 }
 
 // ValidateFeatureGates validates provided feature gates
