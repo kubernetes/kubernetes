@@ -814,7 +814,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		It("should create and delete persistent volumes [fast]", func() {
 			By("creating a Gluster DP server Pod")
 			pod := startGlusterDpServerPod(c, ns)
-			serverUrl := "https://" + pod.Status.PodIP + ":8081"
+			serverUrl := "http://" + pod.Status.PodIP + ":8081"
 			By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
 				Name:         "Gluster Dynamic provisioner test",
