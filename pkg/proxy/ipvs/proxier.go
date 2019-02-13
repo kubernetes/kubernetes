@@ -1499,6 +1499,12 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
+				}
+			}
 		}
 	}
 }
