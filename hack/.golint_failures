@@ -687,7 +687,6 @@ test/e2e/framework/providers/aws
 test/e2e/framework/providers/azure
 test/e2e/framework/providers/gce
 test/e2e/framework/providers/kubemark
-test/e2e/framework/timer
 test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
