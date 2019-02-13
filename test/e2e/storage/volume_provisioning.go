@@ -828,6 +828,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim object with a suffix for gluster dynamic provisioner")
 			claim := newClaim(test, ns, suffix)
+			claim.Spec.StorageClassName = &class.Name
 
 			testsuites.TestDynamicProvisioning(test, c, claim, class)
 		})

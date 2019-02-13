@@ -297,6 +297,7 @@ func testProvisioning(input *provisioningTestInput) {
 func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) *v1.PersistentVolume {
 	var err error
 	if class != nil {
+		Expect(*claim.Spec.StorageClassName).To(Equal(class.Name))
 		By("creating a StorageClass " + class.Name)
 		_, err = client.StorageV1().StorageClasses().Create(class)
 		// The "should provision storage with snapshot data source" test already has created the class.
