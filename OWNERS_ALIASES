@@ -288,9 +288,12 @@ aliases:
     - jsafrane
     - jbeda
   dep-approvers:
+    - apelisse
+    - BenTheElder
     - cblecker
     - thockin
     - sttts
+    - soltysh
   feature-approvers:
     - AdoHe           # CLI
     - bgrant0607      # Architecture
