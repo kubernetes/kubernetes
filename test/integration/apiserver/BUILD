@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "apiserver_test.go",
         "main_test.go",
+        "max_json_patch_operations_test.go",
         "max_request_body_bytes_test.go",
         "patch_test.go",
         "print_test.go",
