@@ -35,3 +35,7 @@ spec:
   - Ingress
   - Egress
 ```
+
+### Negative caching
+
+The `denial` cache TTL has been reduced to the minimum of 5 seconds [here](https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml#L37). In the unlikely event that this impacts performance, setting this TTL to a higher value make help alleviate issues, but be aware that operations that rely on DNS polling for orchestration may fail (for example operators with StatefulSets).
