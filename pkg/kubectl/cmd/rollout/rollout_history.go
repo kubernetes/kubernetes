@@ -33,7 +33,7 @@ import (
 
 var (
 	historyLong = templates.LongDesc(`
-		View previous rollout revisions and configurations.`)
+		View previous rollout revisions and configurations.` + rolloutValidResources)
 
 	historyExample = templates.Examples(`
 		# View the rollout history of a deployment

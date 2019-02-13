@@ -51,7 +51,7 @@ type UndoOptions struct {
 
 var (
 	undoLong = templates.LongDesc(`
-		Rollback to a previous rollout.`)
+		Rollback to a previous rollout.` + rolloutValidResources)
 
 	undoExample = templates.Examples(`
 		# Rollback to the previous deployment

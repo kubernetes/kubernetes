@@ -44,6 +44,13 @@ var (
 		   * daemonsets
 		   * statefulsets
 		`)
+
+	// Currently, `pause` and `resume` are only supported for deployments.
+	pauseResumeValidResources = dedent.Dedent(`
+		Valid resource types include:
+
+		   * deployments
+		`)
 )
 
 // NewCmdRollout returns a Command instance for 'rollout' sub command

@@ -56,7 +56,7 @@ var (
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
-		Currently only deployments support being paused.`)
+		Currently only deployments support being paused.` + pauseResumeValidResources)
 
 	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
