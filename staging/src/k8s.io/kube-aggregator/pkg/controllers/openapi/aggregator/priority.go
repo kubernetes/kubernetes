@@ -63,7 +63,10 @@ func sortByPriority(specs []openAPISpecInfo) {
 		groupPriorities: map[string]int32{},
 	}
 	for _, spec := range specs {
-		if spec.apiService.Spec.Service == nil {
+		// TODO: split spec and merge in the right order
+		// Note: using [0] here is not worse than before when we were merging n-times, but overriding old definitions
+		//       which did not belong to the APIService at hand (specs can be for more than one APIService!)
+		if spec.apiService[0].Spec.Service == nil {
 			continue
 		}
 		if pr, found := b.groupPriorities[spec.apiService.Spec.Group]; !found || spec.apiService.Spec.GroupPriorityMinimum > pr {

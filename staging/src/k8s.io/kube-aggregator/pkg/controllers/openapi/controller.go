@@ -19,8 +19,11 @@ package openapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
@@ -49,6 +52,9 @@ type AggregationController struct {
 	queue                     workqueue.RateLimitingInterface
 	downloader                *aggregator.Downloader
 
+	lock     sync.Mutex
+	handlers map[string]http.Handler
+
 	// To allow injection for testing.
 	syncHandler func(key string) (syncAction, error)
 }
@@ -60,6 +66,7 @@ func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregat
 		queue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay), "APIServiceOpenAPIAggregationControllerQueue1"),
 		downloader: downloader,
+		handlers:   map[string]http.Handler{},
 	}
 
 	c.syncHandler = c.sync
@@ -117,10 +124,18 @@ func (c *AggregationController) processNextWorkItem() bool {
 }
 
 func (c *AggregationController) sync(key string) (syncAction, error) {
-	handler, etag, exists := c.openAPIAggregationManager.GetAPIServiceInfo(key)
-	if !exists || handler == nil {
+	oldSpec, etag, exists := c.openAPIAggregationManager.Spec(key)
+	if !exists {
 		return syncNothing, nil
 	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	handler := c.handlers[key]
+	if handler == nil {
+		return syncNothing, nil
+	}
+
 	returnSpec, newEtag, httpStatus, err := c.downloader.Download(handler, etag)
 	switch {
 	case err != nil:
@@ -129,7 +144,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 	case httpStatus == http.StatusNotFound || returnSpec == nil:
 		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exist")
 	case httpStatus == http.StatusOK:
-		if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(key, returnSpec, newEtag); err != nil {
+		if err := c.openAPIAggregationManager.UpdateSpec(key, returnSpec, newEtag); err != nil {
 			return syncRequeueRateLimited, err
 		}
 	}
@@ -141,9 +156,17 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 	if apiService.Spec.Service == nil {
 		return
 	}
-	if err := c.openAPIAggregationManager.AddUpdateAPIService(handler, apiService); err != nil {
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// TODO: combine APIServices from the same aggregated apiserver by choosing the same key
+	key := apiService.Name
+	if err := c.openAPIAggregationManager.AddUpdateService(key, nil, apiService); err != nil {
 		utilruntime.HandleError(fmt.Errorf("adding %q to AggregationController failed with: %v", apiService.Name, err))
 	}
+	c.handlers[key] = handler
+
 	c.queue.AddAfter(apiService.Name, time.Second)
 }
 
@@ -152,10 +175,17 @@ func (c *AggregationController) UpdateAPIService(handler http.Handler, apiServic
 	if apiService.Spec.Service == nil {
 		return
 	}
-	if err := c.openAPIAggregationManager.AddUpdateAPIService(handler, apiService); err != nil {
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// TODO: combine APIServices from the same aggregated apiserver by choosing the same name
+	key := apiService.Name
+	if err := c.openAPIAggregationManager.AddUpdateSpec(key, apiService); err != nil {
 		utilruntime.HandleError(fmt.Errorf("updating %q to AggregationController failed with: %v", apiService.Name, err))
 	}
-	key := apiService.Name
+	c.handlers[key] = handler
+
 	if c.queue.NumRequeues(key) > 0 {
 		// The item has failed before. Remove it from failure queue and
 		// update it in a second
@@ -168,9 +198,19 @@ func (c *AggregationController) UpdateAPIService(handler http.Handler, apiServic
 
 // RemoveAPIService removes API Service from OpenAPI Aggregation Controller.
 func (c *AggregationController) RemoveAPIService(apiServiceName string) {
-	if err := c.openAPIAggregationManager.RemoveAPIServiceSpec(apiServiceName); err != nil {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// split APIService name which always has the version.group pattern
+	ns := strings.SplitN(apiServiceName, ".", 2)
+	version, group := ns[0], ns[1]
+
+	key = apiServiceName
+	if err := c.openAPIAggregationManager.RemoveService(key, schema.GroupVersion{group, version}); err != nil {
 		utilruntime.HandleError(fmt.Errorf("removing %q from AggregationController failed with: %v", apiServiceName, err))
 	}
+	delete(c.handlers, apiServiceName)
+
 	// This will only remove it if it was failing before. If it was successful, processNextWorkItem will figure it out
 	// and will not add it again to the queue.
 	c.queue.Forget(apiServiceName)
