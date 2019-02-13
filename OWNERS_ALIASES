@@ -102,7 +102,7 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - hongchaodeng    
+    - hongchaodeng
     - jianhuiz
     - liggitt
     - mbohlool
@@ -292,7 +292,6 @@ aliases:
     - thockin
     - sttts
   feature-approvers:
-    - AdoHe           # CLI
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
     - bsalamat        # Scheduling
@@ -323,6 +322,7 @@ aliases:
     - quinton-hoole   # Multicluster
     - roberthbailey   # Cluster Lifecycle
     - saad-ali        # Storage
+    - seans3          # CLI
     - soltysh         # CLI
     - tallclair       # Auth
     - thockin         # Network
