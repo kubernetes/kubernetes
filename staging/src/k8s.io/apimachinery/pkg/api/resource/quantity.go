@@ -132,7 +132,7 @@ func MustParse(str string) Quantity {
 const (
 	// splitREString is used to separate a number from its suffix; as such,
 	// this is overly permissive, but that's OK-- it will be checked later.
-	splitREString = "^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$"
+	splitREString = "^([+-]?[0-9.]+)([eEinumkKMGTpP]*[-+]?[0-9]*)$"
 )
 
 var (
@@ -230,7 +230,7 @@ Num:
 			suffix = str[suffixStart:end]
 			return
 		}
-		if !strings.ContainsAny(str[i:i+1], "eEinumkKMGTP") {
+		if !strings.ContainsAny(str[i:i+1], "eEinumkKMGTpP") {
 			pos = i
 			break
 		}
@@ -302,7 +302,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		// if we have a denominator, shift the entire value to the left by the number of places in the
 		// denominator
 		scale -= int32(len(denom))
-		if scale >= int32(Nano) {
+		if scale >= int32(Pico) {
 			shifted := num + denom
 
 			var value int64
@@ -356,7 +356,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		amount.Round(amount, Pico.infScale(), inf.RoundUp)
 	}
 
 	// The max is just a simple cap.

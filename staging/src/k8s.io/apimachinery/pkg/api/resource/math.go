@@ -155,6 +155,8 @@ func positiveScaleInt64(base int64, scale Scale) (int64, bool) {
 		return int64MultiplyScale(base, 1000000)
 	case 9:
 		return int64MultiplyScale(base, 1000000000)
+	case 12:
+		return int64MultiplyScale(base, 1000000000000)
 	default:
 		value := base
 		var ok bool

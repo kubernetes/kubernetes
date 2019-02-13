@@ -226,6 +226,7 @@ func TestQuantityParse(t *testing.T) {
 		expect Quantity
 	}{
 		{"0", decQuantity(0, 0, DecimalSI)},
+		{"0p", decQuantity(0, 0, DecimalSI)},
 		{"0n", decQuantity(0, 0, DecimalSI)},
 		{"0u", decQuantity(0, 0, DecimalSI)},
 		{"0m", decQuantity(0, 0, DecimalSI)},
@@ -254,6 +255,7 @@ func TestQuantityParse(t *testing.T) {
 		{"100Ti", decQuantity(100*1024*1024*1024*1024, 0, BinarySI)},
 
 		// Decimal suffixes
+		{"6p", decQuantity(6, -12, DecimalSI)},
 		{"5n", decQuantity(5, -9, DecimalSI)},
 		{"4u", decQuantity(4, -6, DecimalSI)},
 		{"3m", decQuantity(3, -3, DecimalSI)},
@@ -317,15 +319,15 @@ func TestQuantityParse(t *testing.T) {
 		{"1.01E", decQuantity(101, 16, DecimalSI)},
 
 		// Things that saturate/round
-		{"3.001n", decQuantity(4, -9, DecimalSI)},
-		{"1.1E-9", decQuantity(2, -9, DecimalExponent)},
-		{"0.0000000001", decQuantity(1, -9, DecimalSI)},
-		{"0.0000000005", decQuantity(1, -9, DecimalSI)},
-		{"0.00000000050", decQuantity(1, -9, DecimalSI)},
-		{"0.5e-9", decQuantity(1, -9, DecimalExponent)},
-		{"0.9n", decQuantity(1, -9, DecimalSI)},
-		{"0.00000012345", decQuantity(124, -9, DecimalSI)},
-		{"0.00000012354", decQuantity(124, -9, DecimalSI)},
+		{"3.001p", decQuantity(4, -12, DecimalSI)},
+		{"1.1E-12", decQuantity(2, -12, DecimalExponent)},
+		{"0.0000000000001", decQuantity(1, -12, DecimalSI)},
+		{"0.0000000000005", decQuantity(1, -12, DecimalSI)},
+		{"0.00000000000050", decQuantity(1, -12, DecimalSI)},
+		{"0.5e-12", decQuantity(1, -12, DecimalExponent)},
+		{"0.9p", decQuantity(1, -12, DecimalSI)},
+		{"0.00000000012345", decQuantity(124, -12, DecimalSI)},
+		{"0.00000000012354", decQuantity(124, -12, DecimalSI)},
 		{"9Ei", Quantity{d: maxAllowed, Format: BinarySI}},
 		{"9223372036854775807Ki", Quantity{d: maxAllowed, Format: BinarySI}},
 		{"12E", decQuantity(12, 18, DecimalSI)},
@@ -337,7 +339,7 @@ func TestQuantityParse(t *testing.T) {
 		{"0.025Ti", decQuantity(274877906944, -1, BinarySI)},
 
 		// Things written by trolls
-		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI)}, // rounds up, changes format
+		{"0.000000000000001Ki", decQuantity(2, -12, DecimalSI)}, // rounds up, changes format
 		{".001", decQuantity(1, -3, DecimalSI)},
 		{".0001k", decQuantity(100, -3, DecimalSI)},
 		{"1.", decQuantity(1, 0, DecimalSI)},
@@ -683,6 +685,9 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(1, -6, DecimalSI), "1u", ""},
 		{decQuantity(80, -6, DecimalSI), "80u", ""},
 		{decQuantity(1080, -6, DecimalSI), "1080u", ""},
+		{decQuantity(1, -12, DecimalSI), "1p", ""},
+		{decQuantity(80, -12, DecimalSI), "80p", ""},
+		{decQuantity(1080, -12, DecimalSI), "1080p", ""},
 	}
 	for _, item := range table {
 		got := item.in.String()
@@ -741,7 +746,8 @@ func TestQuantityParseEmit(t *testing.T) {
 		{".001Ki", "1024m"},
 		{".000001Ki", "1024u"},
 		{".000000001Ki", "1024n"},
-		{".000000000001Ki", "2n"},
+		{".000000000001Ki", "1024p"},
+		{".000000000000001Ki", "2p"},
 	}
 
 	for _, item := range table {
@@ -974,6 +980,8 @@ func TestNewScaledSet(t *testing.T) {
 		scale  Scale
 		expect string
 	}{
+		{1, Pico, "1p"},
+		{1000, Pico, "1n"},
 		{1, Nano, "1n"},
 		{1000, Nano, "1u"},
 		{1, Micro, "1u"},
@@ -1013,18 +1021,27 @@ func TestScaledValue(t *testing.T) {
 		toScale   Scale
 		expected  int64
 	}{
+		{Pico, Pico, 1},
+		{Pico, Nano, 1},
+		{Pico, Micro, 1},
+		{Pico, Milli, 1},
+		{Pico, 0, 1},
+		{Nano, Pico, 1000},
 		{Nano, Nano, 1},
 		{Nano, Micro, 1},
 		{Nano, Milli, 1},
 		{Nano, 0, 1},
+		{Micro, Pico, 1000 * 1000},
 		{Micro, Nano, 1000},
 		{Micro, Micro, 1},
 		{Micro, Milli, 1},
 		{Micro, 0, 1},
+		{Milli, Pico, 1000 * 1000 * 1000},
 		{Milli, Nano, 1000 * 1000},
 		{Milli, Micro, 1000},
 		{Milli, Milli, 1},
 		{Milli, 0, 1},
+		{0, Pico, 1000 * 1000 * 1000 * 1000},
 		{0, Nano, 1000 * 1000 * 1000},
 		{0, Micro, 1000 * 1000},
 		{0, Milli, 1000},

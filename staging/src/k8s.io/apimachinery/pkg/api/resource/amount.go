@@ -34,6 +34,7 @@ func (s Scale) infScale() inf.Scale {
 }
 
 const (
+	Pico  Scale = -12
 	Nano  Scale = -9
 	Micro Scale = -6
 	Milli Scale = -3

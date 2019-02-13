@@ -89,6 +89,8 @@ func (l fastLookup) interpret(s suffix) (base, exponent int32, format Format, ok
 	switch s {
 	case "":
 		return 10, 0, DecimalSI, true
+	case "p":
+		return 10, -12, DecimalSI, true
 	case "n":
 		return 10, -9, DecimalSI, true
 	case "u":
@@ -120,6 +122,7 @@ func newSuffixer() suffixer {
 	// a suffix for 2^0.
 	sh.decSuffixes.addSuffix("", bePair{2, 0})
 
+	sh.decSuffixes.addSuffix("p", bePair{10, -12})
 	sh.decSuffixes.addSuffix("n", bePair{10, -9})
 	sh.decSuffixes.addSuffix("u", bePair{10, -6})
 	sh.decSuffixes.addSuffix("m", bePair{10, -3})
