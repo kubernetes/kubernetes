@@ -12,7 +12,6 @@ container_image(
 container_bundle(
     name = "hyperkube",
     images = {"k8s.gcr.io/hyperkube-amd64:{STABLE_DOCKER_TAG}": "hyperkube-internal"},
-    stamp = True,
 )
 
 filegroup(
