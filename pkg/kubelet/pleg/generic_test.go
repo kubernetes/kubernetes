@@ -44,11 +44,11 @@ type TestGenericPLEG struct {
 	clock   *clock.FakeClock
 }
 
-func newTestGenericPLEGWithLargeChannel() *TestGenericPLEG {
-	return newTestGenericPLEG(largeChannelCap)
+func newTestGenericPLEG() *TestGenericPLEG {
+	return newTestGenericPLEGWithChannelSize(largeChannelCap)
 }
 
-func newTestGenericPLEG(eventChannelCap int) *TestGenericPLEG {
+func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
 	clock := clock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
@@ -99,7 +99,7 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 }
 
 func TestRelisting(t *testing.T) {
-	testPleg := newTestGenericPLEGWithLargeChannel()
+	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
@@ -165,7 +165,7 @@ func TestRelisting(t *testing.T) {
 
 // TestEventChannelFull test when channel is full, the events will be discard.
 func TestEventChannelFull(t *testing.T) {
-	testPleg := newTestGenericPLEG(4)
+	testPleg := newTestGenericPLEGWithChannelSize(4)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
@@ -233,7 +233,7 @@ func TestDetectingContainerDeaths(t *testing.T) {
 }
 
 func testReportMissingContainers(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEGWithLargeChannel()
+	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -274,7 +274,7 @@ func testReportMissingContainers(t *testing.T, numRelists int) {
 }
 
 func testReportMissingPods(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEGWithLargeChannel()
+	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -410,7 +410,7 @@ func TestRemoveCacheEntry(t *testing.T) {
 }
 
 func TestHealthy(t *testing.T) {
-	testPleg := newTestGenericPLEGWithLargeChannel()
+	testPleg := newTestGenericPLEG()
 
 	// pleg should initially be unhealthy
 	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
@@ -506,7 +506,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 // Test detecting sandbox state changes.
 func TestRelistingWithSandboxes(t *testing.T) {
-	testPleg := newTestGenericPLEGWithLargeChannel()
+	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
