@@ -74,6 +74,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	taintutils "k8s.io/cloud-provider/util/taints"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
@@ -91,7 +93,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/system"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -2839,12 +2840,12 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
+	ExpectNoError(nodehelpers.RemoveTaintOffNode(c, nodeName, nil, &taint))
 	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
+	ExpectNoError(nodehelpers.AddOrUpdateTaintOnNode(c, nodeName, &taint))
 }
 
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,

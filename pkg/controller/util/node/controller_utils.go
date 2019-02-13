@@ -32,8 +32,8 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
 
@@ -187,7 +187,7 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 		taintToAdd.TimeAdded = &now
 	}
 
-	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
+	err := nodehelpers.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
@@ -199,7 +199,7 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 	}
 	klog.V(4).Infof("Added %+v Taint to Node %v", taintsToAdd, node.Name)
 
-	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
+	err = nodehelpers.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(

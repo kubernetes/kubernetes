@@ -52,6 +52,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	utiltaints "k8s.io/cloud-provider/util/taints"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -61,7 +63,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 func init() {
@@ -486,7 +487,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	}
 
 	// Get exist taints of node.
-	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
+	nodeTaints := utiltaints.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
 		// only NoSchedule taints are candidates to be compared with "taints" later
 		if t.Effect != v1.TaintEffectNoSchedule {
 			return false
@@ -499,7 +500,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 		_, found := taintKeyToNodeConditionMap[t.Key]
 		return found
 	})
-	taintsToAdd, taintsToDel := taintutils.TaintSetDiff(taints, nodeTaints)
+	taintsToAdd, taintsToDel := utiltaints.TaintSetDiff(taints, nodeTaints)
 	// If nothing to add not delete, return true directly.
 	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
 		return nil
@@ -647,7 +648,7 @@ func (nc *Controller) monitorNodeHealth() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+					if utiltaints.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
 						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
 							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -674,7 +675,7 @@ func (nc *Controller) monitorNodeHealth() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+					if utiltaints.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
 						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
 							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
@@ -1146,12 +1147,12 @@ func (nc *Controller) markNodeForTainting(node *v1.Node) bool {
 func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
+	err := nodehelpers.RemoveTaintOffNode(nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	if err != nil {
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
-	err = controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
+	err = nodehelpers.RemoveTaintOffNode(nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
 	if err != nil {
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
