@@ -27,7 +27,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -90,9 +89,8 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+				cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

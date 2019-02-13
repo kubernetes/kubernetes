@@ -58,8 +58,9 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		Release : v1.9
 		Testname: DownwardAPI volume, volume mode 0400
 		Description: A Pod is configured with DownwardAPIVolumeSource with the volumesource mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set DefaultMode on files [NodeConformance]", func() {
+	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
@@ -73,8 +74,9 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		Release : v1.9
 		Testname: DownwardAPI volume, file mode 0400
 		Description: A Pod is configured with DownwardAPIVolumeSource and DownwartAPIVolumeFiles contains a item for the Pod name with the file mode set to -r--------. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set mode on item file [NodeConformance]", func() {
+	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)

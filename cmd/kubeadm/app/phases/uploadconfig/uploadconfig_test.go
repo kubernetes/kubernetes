@@ -84,7 +84,7 @@ func TestUploadConfiguration(t *testing.T) {
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
-			cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", initialcfg)
+			cfg, err := configutil.DefaultedInitConfiguration(initialcfg)
 
 			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
 			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}

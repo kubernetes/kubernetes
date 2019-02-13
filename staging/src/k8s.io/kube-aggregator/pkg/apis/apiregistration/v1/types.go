@@ -81,6 +81,7 @@ type APIServiceSpec struct {
 	// Priority int64 `json:"priority" protobuf:"varint,6,opt,name=priority"`
 }
 
+// ConditionStatus indicates the status of a condition (true, false, or unknown).
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -93,7 +94,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// APIConditionConditionType is a valid value for APIServiceCondition.Type
+// APIServiceConditionType is a valid value for APIServiceCondition.Type
 type APIServiceConditionType string
 
 const (
@@ -101,6 +102,7 @@ const (
 	Available APIServiceConditionType = "Available"
 )
 
+// APIServiceCondition describes the state of an APIService at a particular point
 type APIServiceCondition struct {
 	// Type is the type of the condition.
 	Type APIServiceConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=APIServiceConditionType"`

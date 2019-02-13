@@ -55,7 +55,7 @@ type PathRecorderMux struct {
 	pathStacks map[string]string
 }
 
-// pathHandler is an http.Handler that will satify requests first by exact match, then by prefix,
+// pathHandler is an http.Handler that will satisfy requests first by exact match, then by prefix,
 // then by notFoundHandler
 type pathHandler struct {
 	// muxName is used for logging so you can trace requests through

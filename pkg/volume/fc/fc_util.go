@@ -320,7 +320,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	volumeInfo := arr[len(arr)-1]
 
-	// Search symbolick link which matches volumeInfo under /dev/disk/by-path or /dev/disk/by-id
+	// Search symbolic link which matches volumeInfo under /dev/disk/by-path or /dev/disk/by-id
 	// then find destination device path from the link
 	searchPath := byID
 	if strings.Contains(volumeInfo, "-lun-") {

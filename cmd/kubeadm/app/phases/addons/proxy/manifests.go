@@ -69,8 +69,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ""
     spec:
       priorityClassName: system-node-critical
       containers:

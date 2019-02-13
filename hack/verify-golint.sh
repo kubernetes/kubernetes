@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::golang::verify_go_version
 
@@ -49,16 +50,7 @@ array_contains () {
 
 # Check that the file is in alphabetical order
 failure_file="${KUBE_ROOT}/hack/.golint_failures"
-if ! diff -u "${failure_file}" <(LC_ALL=C sort "${failure_file}"); then
-  {
-    echo
-    echo "hack/.golint_failures is not in alphabetical order. Please sort it:"
-    echo
-    echo "  LC_ALL=C sort -o hack/.golint_failures hack/.golint_failures"
-    echo
-  } >&2
-  false
-fi
+kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 export IFS=$'\n'
 # NOTE: when "go list -e ./..." is run within GOPATH, it turns the k8s.io/kubernetes

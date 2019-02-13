@@ -313,7 +313,8 @@ message PodSandboxConfig {
     // operation. The runtime may also use this information to improve UX, such
     // as by constructing a readable name.
     PodSandboxMetadata metadata = 1;
-    // Hostname of the sandbox.
+    // Hostname of the sandbox. Hostname could only be empty when the pod
+    // network namespace is NODE.
     string hostname = 2;
     // Path to the directory on the host in which container log files are
     // stored.
@@ -1237,7 +1238,7 @@ message ContainerStats {
     CpuUsage cpu = 2;
     // Memory usage gathered from the container.
     MemoryUsage memory = 3;
-    // Usage of the writeable layer.
+    // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
 }
 

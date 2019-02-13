@@ -29,9 +29,9 @@ var initRequest func(*request.Request)
 
 // Service information constants
 const (
-	ServiceName = "ecr"       // Name of service.
-	EndpointsID = ServiceName // ID to lookup a service endpoint with.
-	ServiceID   = "ECR"       // ServiceID is a unique identifer of a specific service.
+	ServiceName = "ecr"     // Name of service.
+	EndpointsID = "api.ecr" // ID to lookup a service endpoint with.
+	ServiceID   = "ECR"     // ServiceID is a unique identifer of a specific service.
 )
 
 // New creates a new instance of the ECR client with a session.
@@ -46,6 +46,9 @@ const (
 //     svc := ecr.New(mySession, aws.NewConfig().WithRegion("us-west-2"))
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *ECR {
 	c := p.ClientConfig(EndpointsID, cfgs...)
+	if c.SigningNameDerived || len(c.SigningName) == 0 {
+		c.SigningName = "ecr"
+	}
 	return newClient(*c.Config, c.Handlers, c.Endpoint, c.SigningRegion, c.SigningName)
 }
 

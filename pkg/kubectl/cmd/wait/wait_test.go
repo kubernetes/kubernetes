@@ -311,6 +311,58 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 		},
 		{
+			name: "handles watch delete multiple",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource-1"},
+					},
+					Name:      "name-foo-1",
+					Namespace: "ns-foo",
+				},
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource-2"},
+					},
+					Name:      "name-foo-2",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient.PrependReactor("get", "theresource-1", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-1"), nil
+				})
+				fakeClient.PrependReactor("get", "theresource-2", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-2"), nil
+				})
+				fakeClient.PrependWatchReactor("theresource-1", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Deleted, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-1"))
+					return true, fakeWatch, nil
+				})
+				fakeClient.PrependWatchReactor("theresource-2", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Deleted, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-2"))
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource-1") {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("list", "theresource-2") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
 			name: "ignores watch error",
 			infos: []*resource.Info{
 				{

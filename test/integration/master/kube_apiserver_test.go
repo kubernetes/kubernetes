@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,20 +49,22 @@ func TestRun(t *testing.T) {
 	// test whether the server is really healthy after /healthz told us so
 	t.Logf("Creating Deployment directly after being healthy")
 	var replicas int32 = 1
-	_, err = client.AppsV1beta1().Deployments("default").Create(&appsv1beta1.Deployment{
+	_, err = client.AppsV1().Deployments("default").Create(&appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
-			APIVersion: "apps/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "test",
+			Labels:    map[string]string{"foo": "bar"},
 		},
-		Spec: appsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
-			Strategy: appsv1beta1.DeploymentStrategy{
-				Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},

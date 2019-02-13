@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -114,6 +113,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
 )
@@ -249,7 +249,7 @@ type Dependencies struct {
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
 	CSIClient               csiclientset.Interface
-	DynamicKubeClient       dynamic.Interface
+	NodeAPIClient           nodeapiclientset.Interface
 	Mounter                 mount.Interface
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
@@ -658,8 +658,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeService = runtimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.DynamicKubeClient != nil {
-		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.DynamicKubeClient)
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.NodeAPIClient != nil {
+		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.NodeAPIClient)
 	}
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
@@ -1303,6 +1303,7 @@ func (kl *Kubelet) initializeModules() error {
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
+	metrics.SetNodeName(kl.nodeName)
 
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
@@ -1426,7 +1427,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
-		go kl.runtimeClassManager.Run(wait.NeverStop)
+		kl.runtimeClassManager.Start(wait.NeverStop)
 	}
 
 	// Start the pod lifecycle event generator.
@@ -1660,7 +1661,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff

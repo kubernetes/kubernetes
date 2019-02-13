@@ -34,7 +34,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -56,9 +55,8 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        container.Name,
-			Namespace:   metav1.NamespaceSystem,
-			Annotations: map[string]string{kubetypes.CriticalPodAnnotationKey: ""},
+			Name:      container.Name,
+			Namespace: metav1.NamespaceSystem,
 			// The component and tier labels are useful for quickly identifying the control plane Pods when doing a .List()
 			// against Pods in the kube-system namespace. Can for example be used together with the WaitForPodsWithLabel function
 			Labels: map[string]string{"component": container.Name, "tier": "control-plane"},

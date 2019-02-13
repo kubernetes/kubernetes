@@ -40,6 +40,14 @@ var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDriver,
 	drivers.InitAwsDriver,
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLinkBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeTmpfs),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlock),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlockFS),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeGCELocalSSD),
 }
 
 // List of testSuites to be executed in below loop

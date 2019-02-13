@@ -539,10 +539,24 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
-	go podInformer2.Informer().Run(stopCh)
-	informerFactory2.Start(stopCh)
 
 	sched2 := scheduler.NewFromConfig(schedulerConfig2)
+	scheduler.AddAllEventHandlers(sched2,
+		fooScheduler,
+		context.informerFactory.Core().V1().Nodes(),
+		podInformer2,
+		context.informerFactory.Core().V1().PersistentVolumes(),
+		context.informerFactory.Core().V1().PersistentVolumeClaims(),
+		context.informerFactory.Core().V1().ReplicationControllers(),
+		context.informerFactory.Apps().V1().ReplicaSets(),
+		context.informerFactory.Apps().V1().StatefulSets(),
+		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		context.informerFactory.Storage().V1().StorageClasses(),
+	)
+
+	go podInformer2.Informer().Run(stopCh)
+	informerFactory2.Start(stopCh)
 	sched2.Run()
 
 	//	6. **check point-2**:

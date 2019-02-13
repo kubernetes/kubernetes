@@ -139,6 +139,12 @@ func (a byPriority) Len() int      { return len(a.specs) }
 func (a byPriority) Swap(i, j int) { a.specs[i], a.specs[j] = a.specs[j], a.specs[i] }
 func (a byPriority) Less(i, j int) bool {
 	// All local specs will come first
+	if a.specs[i].apiService.Spec.Service == nil && a.specs[j].apiService.Spec.Service != nil {
+		return true
+	}
+	if a.specs[i].apiService.Spec.Service != nil && a.specs[j].apiService.Spec.Service == nil {
+		return false
+	}
 	// WARNING: This will result in not following priorities for local APIServices.
 	if a.specs[i].apiService.Spec.Service == nil {
 		// Sort local specs with their name. This is the order in the delegation chain (aggregator first).
@@ -190,13 +196,12 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 	}
 	sortByPriority(specs)
 	for _, specInfo := range specs {
-		// TODO: Make kube-openapi.MergeSpec(s) accept nil or empty spec as destination and just clone the spec in that case.
 		if specToReturn == nil {
-			specToReturn, err = aggregator.CloneSpec(specInfo.spec)
-			if err != nil {
-				return nil, err
-			}
-			continue
+			specToReturn = &spec.Swagger{}
+			*specToReturn = *specInfo.spec
+			// Paths and Definitions are set by MergeSpecsIgnorePathConflict
+			specToReturn.Paths = nil
+			specToReturn.Definitions = nil
 		}
 		if err := aggregator.MergeSpecsIgnorePathConflict(specToReturn, specInfo.spec); err != nil {
 			return nil, err
@@ -261,7 +266,7 @@ func (s *specAggregator) UpdateAPIServiceSpec(apiServiceName string, spec *spec.
 	// For APIServices (non-local) specs, only merge their /apis/ prefixed endpoint as it is the only paths
 	// proxy handler delegates.
 	if specInfo.apiService.Spec.Service != nil {
-		aggregator.FilterSpecByPaths(spec, []string{"/apis/"})
+		spec = aggregator.FilterSpecByPathsWithoutSideEffects(spec, []string{"/apis/"})
 	}
 
 	return s.tryUpdatingServiceSpecs(&openAPISpecInfo{

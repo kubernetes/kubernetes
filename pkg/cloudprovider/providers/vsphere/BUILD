@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib/diskmanagers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -27,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/node/helpers:go_default_library",
         "//vendor/github.com/vmware/govmomi/vapi/rest:go_default_library",
         "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
@@ -49,7 +49,6 @@ go_test(
     deps = [
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",

@@ -36,10 +36,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -366,7 +366,7 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 
 		var nodeInstanceType string
 		for k, v := range node.ObjectMeta.Labels {
-			if k == kubeletapis.LabelInstanceType {
+			if k == v1.LabelInstanceType {
 				nodeInstanceType = v
 			}
 		}
@@ -629,7 +629,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
+		if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -688,11 +688,11 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
+				if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]
-				volumeVSet, err := volumeutil.LabelZonesToSet(v)
+				volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
 					continue
@@ -1642,7 +1642,21 @@ func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
 	return c.predicate
 }
 
+func podHasPVCs(pod *v1.Pod) bool {
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	// If pod does not request any PVC, we don't need to do anything.
+	if !podHasPVCs(pod) {
+		return true, nil, nil
+	}
+
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")

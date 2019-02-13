@@ -235,6 +235,10 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
+func (plugin *azureDataDiskPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {

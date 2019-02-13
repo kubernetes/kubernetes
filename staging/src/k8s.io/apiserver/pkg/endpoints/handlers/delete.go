@@ -72,7 +72,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
-			body, err := readBody(req)
+			body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -226,7 +226,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 		options := &metav1.DeleteOptions{}
 		if checkBody {
-			body, err := readBody(req)
+			body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 			if err != nil {
 				scope.err(err, w, req)
 				return

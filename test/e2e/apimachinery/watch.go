@@ -229,7 +229,7 @@ var _ = SIGDescribe("Watchers", func() {
 		By("creating a new watch on configmaps from the last resource version observed by the first watch")
 		lastEventConfigMap, ok := lastEvent.Object.(*v1.ConfigMap)
 		if !ok {
-			framework.Failf("Expected last notfication to refer to a configmap but got: %v", lastEvent)
+			framework.Failf("Expected last notification to refer to a configmap but got: %v", lastEvent)
 		}
 		testWatchRestarted, err := watchConfigMaps(f, lastEventConfigMap.ObjectMeta.ResourceVersion, watchRestartedLabelValue)
 		Expect(err).NotTo(HaveOccurred(), "failed to create a new watch on configmaps from the last resource version %s observed by the first watch", lastEventConfigMap.ObjectMeta.ResourceVersion)

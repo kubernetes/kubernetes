@@ -947,6 +947,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: apiserver
+      branch: master
     - repository: client-go
       branch: master
   - source:
@@ -986,4 +988,6 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: cloud-provider
       branch: master

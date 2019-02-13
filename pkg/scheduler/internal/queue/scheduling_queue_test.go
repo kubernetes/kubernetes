@@ -443,18 +443,26 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 }
 
 func TestPriorityQueue_PendingPods(t *testing.T) {
+	makeSet := func(pods []*v1.Pod) map[*v1.Pod]struct{} {
+		pendingSet := map[*v1.Pod]struct{}{}
+		for _, p := range pods {
+			pendingSet[p] = struct{}{}
+		}
+		return pendingSet
+	}
+
 	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
 	addOrUpdateUnschedulablePod(q, &unschedulablePod)
 	addOrUpdateUnschedulablePod(q, &highPriorityPod)
-	expectedList := []*v1.Pod{&medPriorityPod, &unschedulablePod, &highPriorityPod}
-	if !reflect.DeepEqual(expectedList, q.PendingPods()) {
-		t.Error("Unexpected list of pending Pods for node.")
+	expectedSet := makeSet([]*v1.Pod{&medPriorityPod, &unschedulablePod, &highPriorityPod})
+	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
+		t.Error("Unexpected list of pending Pods.")
 	}
 	// Move all to active queue. We should still see the same set of pods.
 	q.MoveAllToActiveQueue()
-	if !reflect.DeepEqual(expectedList, q.PendingPods()) {
-		t.Error("Unexpected list of pending Pods for node.")
+	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
+		t.Error("Unexpected list of pending Pods...")
 	}
 }
 
@@ -954,8 +962,8 @@ func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
 		},
 	}
 
-	q.unschedulableQ.addOrUpdate(&highPod)
-	q.unschedulableQ.addOrUpdate(&midPod)
+	addOrUpdateUnschedulablePod(q, &highPod)
+	addOrUpdateUnschedulablePod(q, &midPod)
 
 	// Update pod condition to highPod.
 	podutil.UpdatePodCondition(&highPod.Status, &v1.PodCondition{

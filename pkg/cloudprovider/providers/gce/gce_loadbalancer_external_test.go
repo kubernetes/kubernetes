@@ -34,7 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -620,10 +620,10 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 	ipAddr := status.Ingress[0].IP
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
-	ipnet, err := netsets.ParseIPNets("0.0.0.0/0")
+	ipnet, err := utilnet.ParseIPNets("0.0.0.0/0")
 	require.NoError(t, err)
 
-	wrongIpnet, err := netsets.ParseIPNets("1.0.0.0/10")
+	wrongIpnet, err := utilnet.ParseIPNets("1.0.0.0/10")
 	require.NoError(t, err)
 
 	fw, err := gce.GetFirewall(MakeFirewallName(lbName))
@@ -633,7 +633,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 		lbName       string
 		ipAddr       string
 		ports        []v1.ServicePort
-		ipnet        netsets.IPNet
+		ipnet        utilnet.IPNetSet
 		fwIPProtocol string
 		getHook      func(context.Context, *meta.Key, *cloud.MockFirewalls) (bool, *ga.Firewall, error)
 		sourceRange  string
@@ -864,7 +864,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
 	require.NoError(t, err)
-	ipnet, err := netsets.ParseIPNets("10.0.0.0/20")
+	ipnet, err := utilnet.ParseIPNets("10.0.0.0/20")
 	require.NoError(t, err)
 	gce.createFirewall(
 		svc,

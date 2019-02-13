@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -74,6 +75,7 @@ import (
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -86,6 +88,11 @@ const (
 	proxyModeIPVS        = "ipvs"
 	proxyModeKernelspace = "kernelspace"
 )
+
+// proxyRun defines the interface to run a specified ProxyServer
+type proxyRun interface {
+	Run() error
+}
 
 // Options contains everything necessary to create and run a proxy server.
 type Options struct {
@@ -102,6 +109,12 @@ type Options struct {
 	WindowsService bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
+	// watcher is used to watch on the update change of ConfigFile
+	watcher filesystem.FSWatcher
+	// proxyServer is the interface to run the proxy server
+	proxyServer proxyRun
+	// errCh is the channel that errors will be sent
+	errCh chan error
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
 	// config.KubeProxyConfiguration.
@@ -191,6 +204,7 @@ func NewOptions() *Options {
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
+		errCh:       make(chan error),
 	}
 }
 
@@ -209,6 +223,10 @@ func (o *Options) Complete() error {
 		} else {
 			o.config = c
 		}
+
+		if err := o.initWatcher(); err != nil {
+			return err
+		}
 	}
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
@@ -218,8 +236,37 @@ func (o *Options) Complete() error {
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// Creates a new filesystem watcher and adds watches for the config file.
+func (o *Options) initWatcher() error {
+	fswatcher := filesystem.NewFsnotifyWatcher()
+	err := fswatcher.Init(o.eventHandler, o.errorHandler)
+	if err != nil {
+		return err
+	}
+	err = fswatcher.AddWatch(o.ConfigFile)
+	if err != nil {
+		return err
+	}
+	o.watcher = fswatcher
+	return nil
+}
+
+func (o *Options) eventHandler(ent fsnotify.Event) {
+	eventOpIs := func(Op fsnotify.Op) bool {
+		return ent.Op&Op == Op
+	}
+	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
+		// error out when ConfigFile is updated
+		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+	}
+	o.errCh <- nil
+}
+
+func (o *Options) errorHandler(err error) {
+	o.errCh <- err
 }
 
 // processHostnameOverrideFlag processes hostname-override flag
@@ -241,7 +288,6 @@ func (o *Options) Validate(args []string) error {
 	if len(args) != 0 {
 		return errors.New("no arguments are supported")
 	}
-
 	if errs := validation.Validate(o.config); len(errs) != 0 {
 		return errs.ToAggregate()
 	}
@@ -250,6 +296,7 @@ func (o *Options) Validate(args []string) error {
 }
 
 func (o *Options) Run() error {
+	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
@@ -258,8 +305,31 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
+	o.proxyServer = proxyServer
+	return o.runLoop()
+}
 
-	return proxyServer.Run()
+// runLoop will watch on the update change of the proxy server's configuration file.
+// Return an error when updated
+func (o *Options) runLoop() error {
+	if o.watcher != nil {
+		o.watcher.Run()
+	}
+
+	// run the proxy in goroutine
+	go func() {
+		err := o.proxyServer.Run()
+		o.errCh <- err
+	}()
+
+	for {
+		select {
+		case err := <-o.errCh:
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (o *Options) writeConfigFile() error {

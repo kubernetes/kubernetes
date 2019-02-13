@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("100Mi")
+			diskConsumed := resource.MustParse("200Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
@@ -200,7 +200,7 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("100Mi")
+			diskConsumed := resource.MustParse("200Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
@@ -459,10 +459,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			// Sleep so that pods requesting local storage do not fail to schedule
 			time.Sleep(30 * time.Second)
 			By("seting up pods to be used by tests")
+			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {
-				By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
-				f.PodClient().CreateSync(spec.pod)
+				pods = append(pods, spec.pod)
 			}
+			f.PodClient().CreateBatch(pods)
 		})
 
 		It("should eventually evict all of the correct pods", func() {
@@ -831,7 +832,7 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 		path = volumeMountPath
 	}
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
-	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null;", filepath.Join(path, "file")))
+	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")))
 }
 
 func pidConsumingPod(name string, numProcesses int) *v1.Pod {

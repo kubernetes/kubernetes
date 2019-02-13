@@ -20,14 +20,13 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	goruntime "runtime"
 	"strings"
 	"time"
-
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,11 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -61,7 +61,7 @@ type RequestScope struct {
 	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
-	OpenAPIModels  openapiproto.Models
+	FieldManager   *fieldmanager.FieldManager
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -71,6 +71,8 @@ type RequestScope struct {
 
 	// HubGroupVersion indicates what version objects read from etcd or incoming requests should be converted to for in-memory handling.
 	HubGroupVersion schema.GroupVersion
+
+	MaxRequestBodyBytes int64
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
@@ -334,9 +336,23 @@ func summarizeData(data []byte, maxLength int) string {
 	}
 }
 
-func readBody(req *http.Request) ([]byte, error) {
+func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	defer req.Body.Close()
-	return ioutil.ReadAll(req.Body)
+	if limit <= 0 {
+		return ioutil.ReadAll(req.Body)
+	}
+	lr := &io.LimitedReader{
+		R: req.Body,
+		N: limit + 1,
+	}
+	data, err := ioutil.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if lr.N <= 0 {
+		return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
+	}
+	return data, nil
 }
 
 func parseTimeout(str string) time.Duration {

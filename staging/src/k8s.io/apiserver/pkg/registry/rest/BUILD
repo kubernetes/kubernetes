@@ -22,6 +22,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "create.go",
+        "create_update.go",
         "delete.go",
         "doc.go",
         "export.go",
@@ -48,7 +49,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

@@ -29,8 +29,7 @@ import (
 	sets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
@@ -176,7 +175,7 @@ func TestCreatePatch(t *testing.T) {
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -191,7 +190,7 @@ func TestCreatePatch(t *testing.T) {
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1", "2", "3"},
 						},
@@ -306,7 +305,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val3"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -320,7 +319,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val4", "val5"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -345,7 +344,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val3"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1", "2", "3"},
 						},
@@ -359,7 +358,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val5", "val4"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"3", "2", "1"},
 						},
@@ -369,7 +368,7 @@ func TestCreatePatch(t *testing.T) {
 		},
 	}
 
-	zones, _ := volumeutil.ZonesToSet("1,2,3")
+	zones, _ := volumehelpers.ZonesToSet("1,2,3")
 	testCases := map[string]struct {
 		vol              v1.PersistentVolume
 		labels           map[string]string
@@ -407,22 +406,22 @@ func TestCreatePatch(t *testing.T) {
 		},
 		"cloudprovider singlezone": {
 			vol:              awsPV,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: "1"},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: "1"},
 			expectedAffinity: &expectedAffinityZone1MergedWithAWSPV,
 		},
 		"cloudprovider singlezone pre-existing affinity non-conflicting": {
 			vol:              awsPVWithAffinity,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: "1"},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: "1"},
 			expectedAffinity: &expectedAffinityZone1MergedWithAWSPVWithAffinity,
 		},
 		"cloudprovider multizone": {
 			vol:              awsPV,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: volumeutil.ZonesSetToLabelValue(zones)},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: volumehelpers.ZonesSetToLabelValue(zones)},
 			expectedAffinity: &expectedAffinityZonesMergedWithAWSPV,
 		},
 		"cloudprovider multizone pre-existing affinity non-conflicting": {
 			vol:              awsPVWithAffinity,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: volumeutil.ZonesSetToLabelValue(zones)},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: volumehelpers.ZonesSetToLabelValue(zones)},
 			expectedAffinity: &expectedAffinityZonesMergedWithAWSPVWithAffinity,
 		},
 	}

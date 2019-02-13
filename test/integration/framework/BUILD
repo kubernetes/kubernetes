@@ -24,7 +24,6 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -67,6 +66,7 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 

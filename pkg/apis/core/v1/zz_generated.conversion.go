@@ -5989,6 +5989,7 @@ func autoConvert_v1_QuobyteVolumeSource_To_core_QuobyteVolumeSource(in *v1.Quoby
 	out.ReadOnly = in.ReadOnly
 	out.User = in.User
 	out.Group = in.Group
+	out.Tenant = in.Tenant
 	return nil
 }
 
@@ -6003,6 +6004,7 @@ func autoConvert_core_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *core.Quo
 	out.ReadOnly = in.ReadOnly
 	out.User = in.User
 	out.Group = in.Group
+	out.Tenant = in.Tenant
 	return nil
 }
 

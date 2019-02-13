@@ -105,13 +105,16 @@ func makeTestPV(name string, sizeGig int, driverName, volID string) *api.Persist
 }
 
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
-	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
 		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
 	}
 
-	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint, highestSupportedVersion: highestSupportedVersions}
+	csiDrivers.Clear()
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersions,
+	})
 }
 
 func TestPluginGetPluginName(t *testing.T) {
@@ -369,6 +372,36 @@ func TestPluginNewDetacher(t *testing.T) {
 	}
 	if csiDetacher.k8s == nil {
 		t.Error("Kubernetes client not set for detacher")
+	}
+}
+
+func TestPluginCanAttach(t *testing.T) {
+	tests := []struct {
+		name       string
+		driverName string
+		canAttach  bool
+	}{
+		{
+			name:       "attachable",
+			driverName: "attachble-driver",
+			canAttach:  true,
+		},
+	}
+
+	for _, test := range tests {
+		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		t.Run(test.name, func(t *testing.T) {
+			fakeCSIClient := fakecsi.NewSimpleClientset(csiDriver)
+			plug, tmpDir := newTestPlugin(t, nil, fakeCSIClient)
+			defer os.RemoveAll(tmpDir)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driverName, "test-vol"), false)
+
+			pluginCanAttach := plug.CanAttach(spec)
+			if pluginCanAttach != test.canAttach {
+				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
+				return
+			}
+		})
 	}
 }
 
@@ -839,13 +872,16 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 		highestSupportedVersions1, err := highestSupportedVersion(tc.versions1)
 		if err != nil {
 			t.Fatalf("unexpected error parsing version for testcase: %#v", tc)
 		}
 
-		csiDrivers.driversMap[tc.pluginName1] = csiDriver{driverName: tc.pluginName1, driverEndpoint: tc.endpoint1, highestSupportedVersion: highestSupportedVersions1}
+		csiDrivers.Clear()
+		csiDrivers.Set(tc.pluginName1, Driver{
+			endpoint:                tc.endpoint1,
+			highestSupportedVersion: highestSupportedVersions1,
+		})
 
 		// Arrange & Act
 		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)

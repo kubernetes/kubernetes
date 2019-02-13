@@ -45,6 +45,17 @@ func RegisterProvider(name string, factory Factory) {
 	providers[name] = factory
 }
 
+// GetProviders returns the names of all currently registered providers.
+func GetProviders() []string {
+	mutex.Lock()
+	defer mutex.Unlock()
+	var providerNames []string
+	for name := range providers {
+		providerNames = append(providerNames, name)
+	}
+	return providerNames
+}
+
 func init() {
 	// "local" or "skeleton" can always be used.
 	RegisterProvider("local", func() (ProviderInterface, error) {
@@ -53,11 +64,8 @@ func init() {
 	RegisterProvider("skeleton", func() (ProviderInterface, error) {
 		return NullProvider{}, nil
 	})
-	// The empty string also works, but triggers a warning.
-	RegisterProvider("", func() (ProviderInterface, error) {
-		Logf("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-		return NullProvider{}, nil
-	})
+	// The empty string used to be accepted in the past, but is not
+	// a valid value anymore.
 }
 
 // SetupProviderConfig validates the chosen provider and creates

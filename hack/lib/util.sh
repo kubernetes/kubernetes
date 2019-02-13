@@ -339,10 +339,9 @@ kube::util::create-fake-git-tree() {
 kube::util::godep_restored() {
   local -r godeps_json=${1:-Godeps/Godeps.json}
   local -r gopath=${2:-${GOPATH%:*}}
-  if ! which jq &>/dev/null; then
-    echo "jq not found. Please install." 1>&2
-    return 1
-  fi
+
+  kube::util::require-jq
+
   local root
   local old_rev=""
   while read path rev; do
@@ -461,7 +460,7 @@ kube::util::base_ref() {
   fi
 
   full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
-  
+
   # make sure the branch is valid, otherwise the check will pass erroneously.
   if ! git describe "${full_branch}" >/dev/null; then
     # abort!
@@ -479,7 +478,7 @@ kube::util::has_changes() {
   local -r git_branch=$1
   local -r pattern=$2
   local -r not_pattern=${3:-totallyimpossiblepattern}
-  
+
   local base_ref=$(kube::util::base_ref "${git_branch}")
   echo "Checking for '${pattern}' changes against '${base_ref}'"
 
@@ -771,6 +770,32 @@ function kube::util::ensure-gnu-sed {
     SED="gsed"
   else
     kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    return 1
+  fi
+}
+
+# kube::util::check-file-in-alphabetical-order <file>
+# Check that the file is in alphabetical order
+#
+function kube::util::check-file-in-alphabetical-order {
+  local failure_file="$1"
+  if ! diff -u "${failure_file}" <(LC_ALL=C sort "${failure_file}"); then
+    {
+      echo
+      echo "${failure_file} is not in alphabetical order. Please sort it:"
+      echo
+      echo "  LC_ALL=C sort -o ${failure_file} ${failure_file}"
+      echo
+    } >&2
+    false
+  fi
+}
+
+# kube::util::require-jq
+# Checks whether jq is installed.
+function kube::util::require-jq {
+  if ! which jq &>/dev/null; then
+    echo "jq not found. Please install." 1>&2
     return 1
   fi
 }

@@ -106,6 +106,7 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       tolerations:
         - key: "CriticalAddonsOnly"
@@ -114,7 +115,7 @@ spec:
         beta.kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.2.6
+        image: k8s.gcr.io/coredns:1.3.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:

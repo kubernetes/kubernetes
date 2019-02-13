@@ -31,6 +31,17 @@ var (
 	}
 )
 
+// TranslateInTreeStorageClassParametersToCSI takes in-tree storage class
+// parameters and translates them to a set of parameters consumable by CSI plugin
+func TranslateInTreeStorageClassParametersToCSI(inTreePluginName string, scParameters map[string]string) (map[string]string, error) {
+	for _, curPlugin := range inTreePlugins {
+		if inTreePluginName == curPlugin.GetInTreePluginName() {
+			return curPlugin.TranslateInTreeStorageClassParametersToCSI(scParameters)
+		}
+	}
+	return nil, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
+}
+
 // TranslateInTreePVToCSI takes a persistent volume and will translate
 // the in-tree source to a CSI Source if the translation logic
 // has been implemented. The input persistent volume will not

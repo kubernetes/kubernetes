@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -62,8 +61,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+				cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

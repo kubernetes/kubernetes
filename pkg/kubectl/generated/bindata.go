@@ -70,7 +70,9 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _translationsOwners = []byte(`reviewers:
+var _translationsOwners = []byte(`# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
   - brendandburns
 approvers:
   - brendandburns
@@ -213,7 +215,9 @@ func translationsExtractPy() (*asset, error) {
 	return a, nil
 }
 
-var _translationsKubectlOwners = []byte(`approvers:
+var _translationsKubectlOwners = []byte(`# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
 - sig-cli-maintainers
 reviewers:
 - sig-cli

@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -92,6 +94,12 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 
 	// Initializers are a deprecated alpha field and should not be saved
 	objectMeta.SetInitializers(nil)
+
+	// Ensure managedFields is not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		objectMeta.SetManagedFields(nil)
+	}
+
 	// ClusterName is ignored and should not be saved
 	if len(objectMeta.GetClusterName()) > 0 {
 		objectMeta.SetClusterName("")

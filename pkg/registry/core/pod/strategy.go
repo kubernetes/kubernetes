@@ -84,7 +84,9 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+	allErrs := validation.ValidatePod(pod)
+	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -99,7 +101,9 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePod(obj.(*api.Pod))
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
+	return errorList
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten

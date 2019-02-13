@@ -275,8 +275,13 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	return []*metav1.APIResourceList{}, nil
+}
+
+func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
 }
 
 // TestFactory extends cmdutil.Factory

@@ -162,8 +162,9 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 	volType := pattern.VolType
 
 	var (
-		scName   string
-		pvSource *v1.PersistentVolumeSource
+		scName             string
+		pvSource           *v1.PersistentVolumeSource
+		volumeNodeAffinity *v1.VolumeNodeAffinity
 	)
 
 	// Create volume for pre-provisioned volume tests
@@ -177,12 +178,12 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 			scName = fmt.Sprintf("%s-%s-sc-for-file", ns.Name, dInfo.Name)
 		}
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource = pDriver.GetPersistentVolumeSource(false, fsType, s.driverTestResource)
+			pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, s.driverTestResource)
 			if pvSource == nil {
 				framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 			}
 
-			sc, pvConfig, pvcConfig := generateConfigsForPreprovisionedPVTest(scName, volBindMode, volMode, *pvSource)
+			sc, pvConfig, pvcConfig := generateConfigsForPreprovisionedPVTest(scName, volBindMode, volMode, *pvSource, volumeNodeAffinity)
 			s.sc = sc
 			s.pv = framework.MakePersistentVolume(pvConfig)
 			s.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns.Name)
@@ -373,7 +374,7 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 }
 
 func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1.VolumeBindingMode,
-	volMode v1.PersistentVolumeMode, pvSource v1.PersistentVolumeSource) (*storagev1.StorageClass,
+	volMode v1.PersistentVolumeMode, pvSource v1.PersistentVolumeSource, volumeNodeAffinity *v1.VolumeNodeAffinity) (*storagev1.StorageClass,
 	framework.PersistentVolumeConfig, framework.PersistentVolumeClaimConfig) {
 	// StorageClass
 	scConfig := &storagev1.StorageClass{
@@ -386,6 +387,7 @@ func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1
 	// PV
 	pvConfig := framework.PersistentVolumeConfig{
 		PVSource:         pvSource,
+		NodeAffinity:     volumeNodeAffinity,
 		NamePrefix:       pvNamePrefix,
 		StorageClassName: scName,
 		VolumeMode:       &volMode,

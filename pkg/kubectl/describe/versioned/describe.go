@@ -3119,11 +3119,20 @@ func describeHorizontalPodAutoscaler(hpa *autoscalingv2beta2.HorizontalPodAutosc
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
 			case autoscalingv2beta2.ObjectMetricSourceType:
-				current := "<unknown>"
-				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
-					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
+				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, "(target average value):\t%s / %s\n", current, metric.Object.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+					}
+					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
 			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
