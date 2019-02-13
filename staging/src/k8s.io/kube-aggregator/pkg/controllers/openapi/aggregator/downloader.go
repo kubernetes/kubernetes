@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package aggregator
 
 import (
 	"crypto/sha512"
@@ -36,46 +36,6 @@ type Downloader struct {
 // NewDownloader creates a new OpenAPI Downloader.
 func NewDownloader() Downloader {
 	return Downloader{}
-}
-
-// inMemoryResponseWriter is a http.Writer that keep the response in memory.
-type inMemoryResponseWriter struct {
-	writeHeaderCalled bool
-	header            http.Header
-	respCode          int
-	data              []byte
-}
-
-func newInMemoryResponseWriter() *inMemoryResponseWriter {
-	return &inMemoryResponseWriter{header: http.Header{}}
-}
-
-func (r *inMemoryResponseWriter) Header() http.Header {
-	return r.header
-}
-
-func (r *inMemoryResponseWriter) WriteHeader(code int) {
-	r.writeHeaderCalled = true
-	r.respCode = code
-}
-
-func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
-	if !r.writeHeaderCalled {
-		r.WriteHeader(http.StatusOK)
-	}
-	r.data = append(r.data, in...)
-	return len(in), nil
-}
-
-func (r *inMemoryResponseWriter) String() string {
-	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
-	if r.data != nil {
-		s += fmt.Sprintf(", Body: %s", string(r.data))
-	}
-	if r.header != nil {
-		s += fmt.Sprintf(", Header: %s", r.header)
-	}
-	return s
 }
 
 func (s *Downloader) handlerWithUser(handler http.Handler, info user.Info) http.Handler {
@@ -140,4 +100,44 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 	default:
 		return nil, "", 0, fmt.Errorf("failed to retrieve openAPI spec, http error: %s", writer.String())
 	}
+}
+
+// inMemoryResponseWriter is a http.Writer that keep the response in memory.
+type inMemoryResponseWriter struct {
+	writeHeaderCalled bool
+	header            http.Header
+	respCode          int
+	data              []byte
+}
+
+func newInMemoryResponseWriter() *inMemoryResponseWriter {
+	return &inMemoryResponseWriter{header: http.Header{}}
+}
+
+func (r *inMemoryResponseWriter) Header() http.Header {
+	return r.header
+}
+
+func (r *inMemoryResponseWriter) WriteHeader(code int) {
+	r.writeHeaderCalled = true
+	r.respCode = code
+}
+
+func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
+	if !r.writeHeaderCalled {
+		r.WriteHeader(http.StatusOK)
+	}
+	r.data = append(r.data, in...)
+	return len(in), nil
+}
+
+func (r *inMemoryResponseWriter) String() string {
+	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
+	if r.data != nil {
+		s += fmt.Sprintf(", Body: %s", string(r.data))
+	}
+	if r.header != nil {
+		s += fmt.Sprintf(", Header: %s", r.header)
+	}
+	return s
 }

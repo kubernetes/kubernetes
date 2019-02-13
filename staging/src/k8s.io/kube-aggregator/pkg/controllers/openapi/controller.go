@@ -21,13 +21,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-openapi/spec"
-	"k8s.io/klog"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
 const (
@@ -43,27 +42,19 @@ const (
 	syncNothing
 )
 
-// AggregationManager is the interface between this controller and OpenAPI Aggregator service.
-type AggregationManager interface {
-	AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error
-	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
-	RemoveAPIServiceSpec(apiServiceName string) error
-	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
-}
-
 // AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove
 // them if necessary.
 type AggregationController struct {
-	openAPIAggregationManager AggregationManager
+	openAPIAggregationManager aggregator.SpecAggregator
 	queue                     workqueue.RateLimitingInterface
-	downloader                *Downloader
+	downloader                *aggregator.Downloader
 
 	// To allow injection for testing.
 	syncHandler func(key string) (syncAction, error)
 }
 
 // NewAggregationController creates new OpenAPI aggregation controller.
-func NewAggregationController(downloader *Downloader, openAPIAggregationManager AggregationManager) *AggregationController {
+func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregationManager aggregator.SpecAggregator) *AggregationController {
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
 		queue: workqueue.NewNamedRateLimitingQueue(

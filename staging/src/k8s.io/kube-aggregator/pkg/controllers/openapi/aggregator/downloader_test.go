@@ -14,83 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package aggregator
 
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
-
-func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {
-	r := apiregistration.APIService{}
-	r.Spec.Group = group
-	r.Spec.GroupPriorityMinimum = minGroupPriority
-	r.Spec.VersionPriority = versionPriority
-	r.Spec.Service = &apiregistration.ServiceReference{}
-	r.Name = name
-	return r
-}
-
-func newLocalAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {
-	r := apiregistration.APIService{}
-	r.Spec.Group = group
-	r.Spec.GroupPriorityMinimum = minGroupPriority
-	r.Spec.VersionPriority = versionPriority
-	r.Name = name
-	return r
-}
-
-func assertSortedServices(t *testing.T, actual []openAPISpecInfo, expectedNames []string) {
-	actualNames := []string{}
-	for _, a := range actual {
-		actualNames = append(actualNames, a.apiService.Name)
-	}
-	if !reflect.DeepEqual(actualNames, expectedNames) {
-		t.Errorf("Expected %s got %s.", expectedNames, actualNames)
-	}
-}
-
-func TestAPIServiceSort(t *testing.T) {
-	list := []openAPISpecInfo{
-		{
-			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newLocalAPIServiceForTest("FirstLocalSpec", "Group1", 15, 5),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newLocalAPIServiceForTest("SecondLocalSpec", "Group2", 14, 6),
-			spec:       &spec.Swagger{},
-		},
-		{
-			apiService: newLocalAPIServiceForTest("ThirdLocalSpec", "Group3", 16, 3),
-			spec:       &spec.Swagger{},
-		},
-	}
-	sortByPriority(list)
-	assertSortedServices(t, list, []string{"FirstLocalSpec", "SecondLocalSpec", "ThirdLocalSpec", "FirstService", "FirstServiceInternal", "SecondService", "ThirdService"})
-}
 
 type handlerTest struct {
 	etag string
@@ -100,6 +33,32 @@ type handlerTest struct {
 var _ http.Handler = handlerTest{}
 
 func (h handlerTest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if len(h.etag) > 0 {
+		w.Header().Add("Etag", h.etag)
+	}
+	ifNoneMatches := r.Header["If-None-Match"]
+	for _, match := range ifNoneMatches {
+		if match == h.etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+	w.Write(h.data)
+}
+
+type handlerDeprecatedTest struct {
+	etag string
+	data []byte
+}
+
+var _ http.Handler = handlerDeprecatedTest{}
+
+func (h handlerDeprecatedTest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// old server returns 403 on new endpoint
+	if r.URL.Path == "/openapi/v2" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
 	if len(h.etag) > 0 {
 		w.Header().Add("Etag", h.etag)
 	}
@@ -131,7 +90,6 @@ func assertDownloadedSpec(actualSpec *spec.Swagger, actualEtag string, err error
 }
 
 func TestDownloadOpenAPISpec(t *testing.T) {
-
 	s := Downloader{}
 
 	// Test with no eTag
