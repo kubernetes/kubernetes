@@ -77,6 +77,18 @@ function FetchAndImport-ModuleFromMetadata {
   Import-Module -Force C:\$Filename
 }
 
+# Returns true if this node is part of a test cluster (see
+# cluster/gce/config-test.sh).
+#
+# $kube_env must be set before calling this function.
+function Test-IsTestCluster {
+  if ($kube_env.Contains('TEST_CLUSTER') -and `
+      ($kube_env['TEST_CLUSTER'] -eq 'true')) {
+    return $true
+  }
+  return $false
+}
+
 try {
   # Don't use FetchAndImport-ModuleFromMetadata for common.psm1 - the common
   # module includes variables and functions that any other function may depend
@@ -92,6 +104,14 @@ try {
 
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
+
+  if (Test-IsTestCluster) {
+    Log-Output 'Test cluster detected, installing OpenSSH.'
+    FetchAndImport-ModuleFromMetadata 'install-ssh-psm1' 'install-ssh.psm1'
+    InstallAndStart-OpenSsh
+    StartProcess-WriteSshKeys
+  }
+
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
