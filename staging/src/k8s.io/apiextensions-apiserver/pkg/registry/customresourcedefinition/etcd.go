@@ -84,7 +84,6 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 	}
 	if options.Preconditions.UID == nil {
 		options.Preconditions.UID = &crd.UID
-		options.Preconditions.ResourceVersion = &crd.ResourceVersion
 	} else if *options.Preconditions.UID != crd.UID {
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
@@ -92,6 +91,9 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, crd.UID),
 		)
 		return nil, false, err
+	}
+	if options.Preconditions.ResourceVersion == nil {
+		options.Preconditions.ResourceVersion = &crd.ResourceVersion
 	} else if *options.Preconditions.ResourceVersion != crd.ResourceVersion {
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
