@@ -325,7 +325,7 @@ func ParseQuantity(str string) (Quantity, error) {
 						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
+				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 			}
 		}
 	}
