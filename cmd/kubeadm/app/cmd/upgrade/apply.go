@@ -151,37 +151,37 @@ func runApply(flags *applyFlags) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infof("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
-	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
 	if len(flags.criSocket) != 0 {
 		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
-		upgradeVars.cfg.NodeRegistration.CRISocket = flags.criSocket
+		cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
 	// Validate requested and validate actual version
 	klog.V(1).Infof("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
+	if err := configutil.NormalizeKubernetesVersion(&cfg.ClusterConfiguration); err != nil {
 		return err
 	}
 
 	// Use normalized version string in all following code.
-	flags.newK8sVersionStr = upgradeVars.cfg.KubernetesVersion
+	flags.newK8sVersionStr = cfg.KubernetesVersion
 	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
 	if err != nil {
 		return errors.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
 	}
 	flags.newK8sVersion = k8sVer
 
-	if err := features.ValidateVersion(features.InitFeatureGates, upgradeVars.cfg.FeatureGates, upgradeVars.cfg.KubernetesVersion); err != nil {
+	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return err
 	}
 
 	// Enforce the version skew policies
 	klog.V(1).Infof("[upgrade/version] enforcing version skew policies")
-	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
+	if err := EnforceVersionPolicies(flags, versionGetter); err != nil {
 		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
 
@@ -192,12 +192,14 @@ func runApply(flags *applyFlags) error {
 		}
 	}
 
+	waiter := getWaiter(flags.dryRun, client)
+
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
 	klog.V(1).Infof("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
+	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
 	componentsToPrepull := constants.MasterComponents
-	if upgradeVars.cfg.Etcd.External == nil && flags.etcdUpgrade {
+	if cfg.Etcd.External == nil && flags.etcdUpgrade {
 		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
 	}
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
@@ -206,13 +208,13 @@ func runApply(flags *applyFlags) error {
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infof("[upgrade/apply] performing upgrade")
-	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.cfg, flags.newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 

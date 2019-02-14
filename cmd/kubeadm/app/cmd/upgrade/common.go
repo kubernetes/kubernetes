@@ -42,31 +42,22 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-// upgradeVariables holds variables needed for performing an upgrade or planning to do so
-// TODO - Restructure or rename upgradeVariables
-type upgradeVariables struct {
-	client        clientset.Interface
-	cfg           *kubeadmapi.InitConfiguration
-	versionGetter upgrade.VersionGetter
-	waiter        apiclient.Waiter
-}
-
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	// Check if the cluster is self-hosted
 	if upgrade.IsControlPlaneSelfHosted(client) {
-		return nil, errors.Errorf("cannot upgrade a self-hosted control plane")
+		return nil, nil, nil, errors.Errorf("cannot upgrade a self-hosted control plane")
 	}
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
-		return nil, errors.Wrap(err, "[upgrade/health] FATAL")
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
@@ -91,7 +82,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			fmt.Println("")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -103,7 +94,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, errors.Wrap(err, "[upgrade/config] FATAL")
+			return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 		}
 	}
 
@@ -112,7 +103,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		for _, m := range msg {
 			fmt.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
@@ -120,14 +111,8 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
 	}
 
-	return &upgradeVariables{
-		client: client,
-		cfg:    cfg,
-		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion),
-		// Use the waiter conditionally based on the dryrunning variable
-		waiter: getWaiter(dryRun, client),
-	}, nil
+	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
+	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), cfg.KubernetesVersion), cfg, nil
 }
 
 // printConfiguration prints the external version of the API to yaml
