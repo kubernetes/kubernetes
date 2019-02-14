@@ -44,7 +44,7 @@ type IngressUpgradeTest struct {
 	gceController *gce.GCEIngressController
 	// holds GCP resources pre-upgrade
 	resourceStore *GCPResourceStore
-	jig           *ingress.IngressTestJig
+	jig           *ingress.TestJig
 	httpClient    *http.Client
 	ip            string
 	ipName        string
