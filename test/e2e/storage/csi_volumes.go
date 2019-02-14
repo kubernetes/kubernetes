@@ -199,6 +199,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err    error
 			driver testsuites.TestDriver
 		)
 
@@ -238,6 +239,8 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				defer driver.CleanupDriver()
 
 				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driver)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
 					defer destroyCSIDriver(csics, driver)
 				}
 
@@ -273,7 +276,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					return
 				}
 
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				By("Checking if VolumeAttachment was created for the pod")
@@ -299,6 +302,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	Context("CSI workload information using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err            error
 			driver         testsuites.TestDriver
 			podInfoV1      = "v1"
 			podInfoUnknown = "unknown"
@@ -355,6 +359,8 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				defer driver.CleanupDriver()
 
 				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driver)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
 					defer destroyCSIDriver(csics, driver)
 				}
 
@@ -393,7 +399,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				if pod == nil {
 					return
 				}
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 				By("Checking CSI driver logs")
 				// The driver is deployed as a statefulset with stable pod names
@@ -457,6 +463,20 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 		}
 		testsuites.TestDynamicProvisioning(test, cs, claim, class)
 	}
+}
+
+func waitForCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) error {
+	timeout := 2 * time.Minute
+	driverName := testsuites.GetUniqueDriverName(driver)
+
+	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
+		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
 }
 
 func destroyCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) {
