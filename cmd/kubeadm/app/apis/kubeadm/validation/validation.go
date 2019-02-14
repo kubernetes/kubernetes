@@ -416,23 +416,18 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 func isAllowedFlag(flagName string) bool {
-	isAllowed := false
-	switch flagName {
-	case kubeadmcmdoptions.CfgPath,
+	knownFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
 		kubeadmcmdoptions.DryRun,
 		kubeadmcmdoptions.KubeconfigPath,
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
-		"print-join-command", "rootfs", "v":
-		isAllowed = true
-	default:
-		if strings.HasPrefix(flagName, "skip-") {
-			isAllowed = true
-		}
+		"print-join-command", "rootfs", "v")
+	if knownFlags.Has(flagName) {
+		return true
 	}
-	return isAllowed
+	return strings.HasPrefix(flagName, "skip-")
 }
 
 // ValidateFeatureGates validates provided feature gates
