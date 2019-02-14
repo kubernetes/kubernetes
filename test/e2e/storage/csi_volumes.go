@@ -515,7 +515,7 @@ func deleteVolume(cs clientset.Interface, claim *v1.PersistentVolumeClaim) {
 	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	if err == nil {
 		cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, 2*time.Second, 2*time.Minute)
+		framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute)
 	}
 }
 
