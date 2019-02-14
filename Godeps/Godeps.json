@@ -4,6 +4,7 @@
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+		"github.com/bazelbuild/buildtools/buildozer",
 		"github.com/cespare/prettybench",
 		"github.com/client9/misspell/cmd/misspell",
 		"github.com/cloudflare/cfssl/cmd/cfssl",
@@ -472,12 +473,47 @@
 			"Rev": "c728ce9f663e2bff26361ba5978ec5c9e6816a3c"
 		},
 		{
+			"ImportPath": "github.com/bazelbuild/buildtools/api_proto",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
 			"ImportPath": "github.com/bazelbuild/buildtools/build",
 			"Comment": "0.6.0-60-g1a9c38e0df9397",
 			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
 		},
 		{
+			"ImportPath": "github.com/bazelbuild/buildtools/build_proto",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/buildozer",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/edit",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/file",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/lang",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
 			"ImportPath": "github.com/bazelbuild/buildtools/tables",
+			"Comment": "0.6.0-60-g1a9c38e0df9397",
+			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/buildtools/wspace",
 			"Comment": "0.6.0-60-g1a9c38e0df9397",
 			"Rev": "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
 		},
