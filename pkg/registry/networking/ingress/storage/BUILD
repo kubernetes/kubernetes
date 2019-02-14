@@ -13,6 +13,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
@@ -28,13 +29,14 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
-    importpath = "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage",
+    importpath = "k8s.io/kubernetes/pkg/registry/networking/ingress/storage",
     deps = [
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
-        "//pkg/registry/extensions/ingress:go_default_library",
+        "//pkg/registry/networking/ingress:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",

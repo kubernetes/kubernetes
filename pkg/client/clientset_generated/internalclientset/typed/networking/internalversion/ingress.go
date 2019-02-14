@@ -25,7 +25,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -37,15 +37,15 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(*extensions.Ingress) (*extensions.Ingress, error)
-	Update(*extensions.Ingress) (*extensions.Ingress, error)
-	UpdateStatus(*extensions.Ingress) (*extensions.Ingress, error)
+	Create(*networking.Ingress) (*networking.Ingress, error)
+	Update(*networking.Ingress) (*networking.Ingress, error)
+	UpdateStatus(*networking.Ingress) (*networking.Ingress, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*extensions.Ingress, error)
-	List(opts v1.ListOptions) (*extensions.IngressList, error)
+	Get(name string, options v1.GetOptions) (*networking.Ingress, error)
+	List(opts v1.ListOptions) (*networking.IngressList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking.Ingress, err error)
 	IngressExpansion
 }
 
@@ -56,7 +56,7 @@ type ingresses struct {
 }
 
 // newIngresses returns a Ingresses
-func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
+func newIngresses(c *NetworkingClient, namespace string) *ingresses {
 	return &ingresses{
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -64,8 +64,8 @@ func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 }
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(name string, options v1.GetOptions) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
+func (c *ingresses) Get(name string, options v1.GetOptions) (result *networking.Ingress, err error) {
+	result = &networking.Ingress{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -77,12 +77,12 @@ func (c *ingresses) Get(name string, options v1.GetOptions) (result *extensions.
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
+func (c *ingresses) List(opts v1.ListOptions) (result *networking.IngressList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &extensions.IngressList{}
+	result = &networking.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -109,8 +109,8 @@ func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
+func (c *ingresses) Create(ingress *networking.Ingress) (result *networking.Ingress, err error) {
+	result = &networking.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -121,8 +121,8 @@ func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingr
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
+func (c *ingresses) Update(ingress *networking.Ingress) (result *networking.Ingress, err error) {
+	result = &networking.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -136,8 +136,8 @@ func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingr
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
+func (c *ingresses) UpdateStatus(ingress *networking.Ingress) (result *networking.Ingress, err error) {
+	result = &networking.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -177,8 +177,8 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
+func (c *ingresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking.Ingress, err error) {
+	result = &networking.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("ingresses").

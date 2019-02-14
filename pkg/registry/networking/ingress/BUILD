@@ -12,11 +12,11 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/registry/extensions/ingress",
+    importpath = "k8s.io/kubernetes/pkg/registry/networking/ingress",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/extensions/validation:go_default_library",
+        "//pkg/apis/networking:go_default_library",
+        "//pkg/apis/networking/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
@@ -30,7 +30,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
@@ -48,7 +48,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/extensions/ingress/storage:all-srcs",
+        "//pkg/registry/networking/ingress/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -25,12 +25,17 @@ import (
 
 type NetworkingInterface interface {
 	RESTClient() rest.Interface
+	IngressesGetter
 	NetworkPoliciesGetter
 }
 
 // NetworkingClient is used to interact with features provided by the networking.k8s.io group.
 type NetworkingClient struct {
 	restClient rest.Interface
+}
+
+func (c *NetworkingClient) Ingresses(namespace string) IngressInterface {
+	return newIngresses(c, namespace)
 }
 
 func (c *NetworkingClient) NetworkPolicies(namespace string) NetworkPolicyInterface {

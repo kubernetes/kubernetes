@@ -25,34 +25,34 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
 // FakeIngresses implements IngressInterface
 type FakeIngresses struct {
-	Fake *FakeExtensions
+	Fake *FakeNetworking
 	ns   string
 }
 
-var ingressesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "ingresses"}
+var ingressesResource = schema.GroupVersionResource{Group: "networking.k8s.io", Version: "", Resource: "ingresses"}
 
-var ingressesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "Ingress"}
+var ingressesKind = schema.GroupVersionKind{Group: "networking.k8s.io", Version: "", Kind: "Ingress"}
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *networking.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &extensions.Ingress{})
+		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &networking.Ingress{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Ingress), err
+	return obj.(*networking.Ingress), err
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *FakeIngresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
+func (c *FakeIngresses) List(opts v1.ListOptions) (result *networking.IngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &extensions.IngressList{})
+		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &networking.IngressList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeIngresses) List(opts v1.ListOptions) (result *extensions.IngressLis
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &extensions.IngressList{ListMeta: obj.(*extensions.IngressList).ListMeta}
-	for _, item := range obj.(*extensions.IngressList).Items {
+	list := &networking.IngressList{ListMeta: obj.(*networking.IngressList).ListMeta}
+	for _, item := range obj.(*networking.IngressList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Create(ingress *networking.Ingress) (result *networking.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &networking.Ingress{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Ingress), err
+	return obj.(*networking.Ingress), err
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Update(ingress *networking.Ingress) (result *networking.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &networking.Ingress{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Ingress), err
+	return obj.(*networking.Ingress), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
+func (c *FakeIngresses) UpdateStatus(ingress *networking.Ingress) (*networking.Ingress, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &networking.Ingress{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Ingress), err
+	return obj.(*networking.Ingress), err
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
 func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(ingressesResource, c.ns, name), &extensions.Ingress{})
+		Invokes(testing.NewDeleteAction(ingressesResource, c.ns, name), &networking.Ingress{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &extensions.IngressList{})
+	_, err := c.Fake.Invokes(action, &networking.IngressList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *FakeIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), &extensions.Ingress{})
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), &networking.Ingress{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Ingress), err
+	return obj.(*networking.Ingress), err
 }
