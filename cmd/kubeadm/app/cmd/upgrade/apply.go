@@ -140,7 +140,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Gets the configuration from the kubeadm-config ConfigMap in the cluster
 // - Enforces all version skew policies
 // - Asks the user if they really want to upgrade
-// - Makes sure the control plane images are available locally on the master(s)
+// - Makes sure the control plane images are available locally on the control-plane(s)
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
