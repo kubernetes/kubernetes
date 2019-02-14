@@ -303,8 +303,6 @@ pkg/registry/core/service/storage
 pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
-pkg/registry/extensions/ingress
-pkg/registry/extensions/ingress/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest

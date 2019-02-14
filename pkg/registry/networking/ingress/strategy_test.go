@@ -23,30 +23,30 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
-func newIngress() extensions.Ingress {
-	defaultBackend := extensions.IngressBackend{
+func newIngress() networking.Ingress {
+	defaultBackend := networking.IngressBackend{
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
 	}
-	return extensions.Ingress{
+	return networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: networking.IngressSpec{
+			Backend: &networking.IngressBackend{
 				ServiceName: "default-backend",
 				ServicePort: intstr.FromInt(80),
 			},
-			Rules: []extensions.IngressRule{
+			Rules: []networking.IngressRule{
 				{
 					Host: "foo.bar.com",
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{
 								{
 									Path:    "/foo",
 									Backend: defaultBackend,
@@ -57,7 +57,7 @@ func newIngress() extensions.Ingress {
 				},
 			},
 		},
-		Status: extensions.IngressStatus{
+		Status: networking.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{IP: "127.0.0.1"},
@@ -87,7 +87,7 @@ func TestIngressStrategy(t *testing.T) {
 	}
 	invalidIngress := newIngress()
 	invalidIngress.ResourceVersion = "4"
-	invalidIngress.Spec = extensions.IngressSpec{}
+	invalidIngress.Spec = networking.IngressSpec{}
 	Strategy.PrepareForUpdate(ctx, &invalidIngress, &ingress)
 	errs = Strategy.ValidateUpdate(ctx, &invalidIngress, &ingress)
 	if len(errs) == 0 {
@@ -111,7 +111,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 	oldIngress.ResourceVersion = "4"
 	newIngress.ResourceVersion = "4"
 	newIngress.Spec.Backend.ServiceName = "ignore"
-	newIngress.Status = extensions.IngressStatus{
+	newIngress.Status = networking.IngressStatus{
 		LoadBalancer: api.LoadBalancerStatus{
 			Ingress: []api.LoadBalancerIngress{
 				{IP: "127.0.0.2"},

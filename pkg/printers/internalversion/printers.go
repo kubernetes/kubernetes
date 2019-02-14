@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -992,14 +991,14 @@ func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]m
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *extensions.IngressBackend) string {
+func backendStringer(backend *networking.IngressBackend) string {
 	if backend == nil {
 		return ""
 	}
 	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
 }
 
-func formatHosts(rules []extensions.IngressRule) string {
+func formatHosts(rules []networking.IngressRule) string {
 	list := []string{}
 	max := 3
 	more := false
@@ -1021,14 +1020,14 @@ func formatHosts(rules []extensions.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []extensions.IngressTLS) string {
+func formatPorts(tls []networking.IngressTLS) string {
 	if len(tls) != 0 {
 		return "80, 443"
 	}
 	return "80"
 }
 
-func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngress(obj *networking.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1040,7 +1039,7 @@ func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]met
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printIngressList(list *extensions.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngressList(list *networking.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printIngress(&list.Items[i], options)

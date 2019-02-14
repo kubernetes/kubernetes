@@ -25,13 +25,14 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/extensions/ingress"
+	"k8s.io/kubernetes/pkg/registry/networking/ingress"
 )
 
-// rest implements a RESTStorage for replication controllers
+// REST implements a RESTStorage for replication controllers
 type REST struct {
 	*genericregistry.Store
 }
@@ -39,8 +40,8 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &extensions.Ingress{} },
-		NewListFunc:              func() runtime.Object { return &extensions.IngressList{} },
+		NewFunc:                  func() runtime.Object { return &networking.Ingress{} },
+		NewListFunc:              func() runtime.Object { return &networking.IngressList{} },
 		DefaultQualifiedResource: extensions.Resource("ingresses"),
 
 		CreateStrategy: ingress.Strategy,
@@ -72,8 +73,9 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates an instance of the StatusREST object
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.Ingress{}
+	return &networking.Ingress{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

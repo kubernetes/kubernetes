@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/networking/validation"
 )
 
 // ingressStrategy implements verification logic for Replication Ingresss.
@@ -44,17 +44,17 @@ func (ingressStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of an Ingress before creation.
 func (ingressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	ingress := obj.(*extensions.Ingress)
+	ingress := obj.(*networking.Ingress)
 	// create cannot set status
-	ingress.Status = extensions.IngressStatus{}
+	ingress.Status = networking.IngressStatus{}
 
 	ingress.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newIngress := obj.(*extensions.Ingress)
-	oldIngress := old.(*extensions.Ingress)
+	newIngress := obj.(*networking.Ingress)
+	oldIngress := old.(*networking.Ingress)
 	// Update is not allowed to set status
 	newIngress.Status = oldIngress.Status
 
@@ -69,7 +69,7 @@ func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 
 // Validate validates a new Ingress.
 func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	ingress := obj.(*extensions.Ingress)
+	ingress := obj.(*networking.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
 }
@@ -85,8 +85,8 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
-	updateErrorList := validation.ValidateIngressUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
+	validationErrorList := validation.ValidateIngress(obj.(*networking.Ingress))
+	updateErrorList := validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -99,17 +99,18 @@ type ingressStatusStrategy struct {
 	ingressStrategy
 }
 
+// StatusStrategy implements logic used to validate and prepare for updates of the status subresource
 var StatusStrategy = ingressStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (ingressStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newIngress := obj.(*extensions.Ingress)
-	oldIngress := old.(*extensions.Ingress)
+	newIngress := obj.(*networking.Ingress)
+	oldIngress := old.(*networking.Ingress)
 	// status changes are not allowed to update spec
 	newIngress.Spec = oldIngress.Spec
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (ingressStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateIngressStatusUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
+	return validation.ValidateIngressStatusUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
 }
