@@ -145,27 +145,26 @@ func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper
 // GetAPIGroupResources uses the provided discovery client to gather
 // discovery information and populate a slice of APIGroupResources.
 func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources, error) {
-	apiGroups, err := cl.ServerGroups()
-	if err != nil {
-		if apiGroups == nil || len(apiGroups.Groups) == 0 {
-			return nil, err
-		}
+	gs, rs, err := cl.ServerGroupsAndResources()
+	if rs == nil || gs == nil {
+		return nil, err
 		// TODO track the errors and update callers to handle partial errors.
 	}
+	rsm := map[string]*metav1.APIResourceList{}
+	for _, r := range rs {
+		rsm[r.GroupVersion] = r
+	}
+
 	var result []*APIGroupResources
-	for _, group := range apiGroups.Groups {
+	for _, group := range gs {
 		groupResources := &APIGroupResources{
-			Group:              group,
+			Group:              *group,
 			VersionedResources: make(map[string][]metav1.APIResource),
 		}
 		for _, version := range group.Versions {
-			resources, err := cl.ServerResourcesForGroupVersion(version.GroupVersion)
-			if err != nil {
-				// continue as best we can
-				// TODO track the errors and update callers to handle partial errors.
-				if resources == nil || len(resources.APIResources) == 0 {
-					continue
-				}
+			resources, ok := rsm[version.GroupVersion]
+			if !ok {
+				continue
 			}
 			groupResources.VersionedResources[version.Version] = resources.APIResources
 		}

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,32 +28,25 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/join"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -62,7 +55,7 @@ var (
 		* Certificate signing request was sent to apiserver and a response was received.
 		* The Kubelet was informed of the new secure connection details.
 
-		Run 'kubectl get nodes' on the master to see this node join the cluster.
+		Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
 
 		`)
 
@@ -71,7 +64,7 @@ var (
 
 		* Certificate signing request was sent to apiserver and approval was received.
 		* The Kubelet was informed of the new secure connection details.
-		* Master label and taint were applied to the new node.
+		* Control plane (master) label and taint were applied to the new node.
 		* The Kubernetes control plane instances scaled up.
 		{{.etcdMessage}}
 
@@ -88,8 +81,8 @@ var (
 	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
-		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
-		Master trust the Node).
+		trust the Kubernetes Control Plane) and TLS bootstrap (having the 
+		Kubernetes Control Plane trust the Node).
 
 		There are 2 main schemes for discovery. The first is to use a shared
 		token along with the IP address of the API server. The second is to
@@ -104,8 +97,8 @@ var (
 
 		If you use a shared token for discovery, you should also pass the
 		--discovery-token-ca-cert-hash flag to validate the public key of the
-		root certificate authority (CA) presented by the Kubernetes Master. The
-		value of this flag is specified as "<hash-type>:<hex-encoded-value>",
+		root certificate authority (CA) presented by the Kubernetes Control Plane. 
+		The value of this flag is specified as "<hash-type>:<hex-encoded-value>",
 		where the supported hash type is "sha256". The hash is calculated over
 		the bytes of the Subject Public Key Info (SPKI) object (as in RFC7469).
 		This value is available in the output of "kubeadm init" or can be
@@ -115,30 +108,17 @@ var (
 		If you cannot know the CA public key hash ahead of time, you can pass
 		the --discovery-token-unsafe-skip-ca-verification flag to disable this
 		verification. This weakens the kubeadm security model since other nodes
-		can potentially impersonate the Kubernetes Master.
+		can potentially impersonate the Kubernetes Control Plane.
 
 		The TLS bootstrap mechanism is also driven via a shared token. This is
-		used to temporarily authenticate with the Kubernetes Master to submit a
+		used to temporarily authenticate with the Kubernetes Control Plane to submit a
 		certificate signing request (CSR) for a locally created key pair. By
-		default, kubeadm will set up the Kubernetes Master to automatically
+		default, kubeadm will set up the Kubernetes Control Plane to automatically
 		approve these signing requests. This token is passed in with the
 		--tls-bootstrap-token abcdef.1234567890abcdef flag.
 
 		Often times the same token is used for both parts. In this case, the
 		--token flag can be used instead of specifying each token individually.
-		`)
-
-	kubeadmJoinFailMsg = dedent.Dedent(`
-		Unfortunately, an error has occurred:
-			%v
-
-		This error is likely caused by:
-			- The kubelet is not running
-			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-
-		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
-			- 'systemctl status kubelet'
-			- 'journalctl -xeu kubelet'
 		`)
 )
 
@@ -198,9 +178,10 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
 	addJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token)
 
-	joinRunner.AppendPhase(phases.NewPreflightJoinPhase())
+	joinRunner.AppendPhase(phases.NewPreflightPhase())
 	joinRunner.AppendPhase(phases.NewControlPlanePreparePhase())
 	joinRunner.AppendPhase(phases.NewCheckEtcdPhase())
+	joinRunner.AppendPhase(phases.NewKubeletStartPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -250,7 +231,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 	)
 	flagSet.StringVar(
 		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
-		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
+		`Specify the token used to temporarily authenticate with the Kubernetes Control Plane while joining the node.`,
 	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
@@ -353,7 +334,7 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 		klog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
-	cfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(options.cfgPath, options.externalcfg)
+	cfg, err := configutil.LoadOrDefaultJoinConfiguration(options.cfgPath, options.externalcfg)
 	if err != nil {
 		return nil, err
 	}
@@ -438,22 +419,8 @@ func (j *joinData) Run() error {
 	// TODO: individual phases should call these:
 	//   - phases that need initCfg should call joinData.InitCfg().
 	//   - phases that need tlsBootstrapCfg should call joinData.TLSBootstrapCfg().
-	tlsBootstrapCfg, err := j.TLSBootstrapCfg()
-	if err != nil {
-		return err
-	}
 	initCfg, err := j.InitCfg()
 	if err != nil {
-		return err
-	}
-
-	// Executes the kubelet TLS bootstrap process, that completes with the node
-	// joining the cluster with a dedicates set of credentials as required by
-	// the node authorizer.
-	// if the node is hosting a new control plane instance, since it uses static pods for the control plane,
-	// as soon as the kubelet starts it will take charge of creating control plane
-	// components on the node.
-	if err := j.BootstrapKubelet(tlsBootstrapCfg, initCfg); err != nil {
 		return err
 	}
 
@@ -485,81 +452,6 @@ func (j *joinData) Run() error {
 	return nil
 }
 
-// BootstrapKubelet executes the kubelet TLS bootstrap process.
-// This process is executed by the kubelet and completes with the node joining the cluster
-// with a dedicates set of credentials as required by the node authorizer
-func (j *joinData) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config, initConfiguration *kubeadmapi.InitConfiguration) error {
-	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
-
-	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
-	klog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
-	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
-		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
-	}
-
-	// Write the ca certificate to disk so kubelet can use it for authentication
-	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
-	if _, err := os.Stat(j.cfg.CACertPath); os.IsNotExist(err) {
-		if err := certutil.WriteCert(j.cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
-			return errors.Wrap(err, "couldn't save the CA certificate to disk")
-		}
-	}
-
-	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-	if err != nil {
-		return err
-	}
-
-	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
-	if err != nil {
-		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
-	}
-
-	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
-	// Try to stop the kubelet service so no race conditions occur when configuring it
-	klog.V(1).Infof("Stopping the kubelet")
-	kubeletphase.TryStopKubelet()
-
-	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
-	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
-		return err
-	}
-
-	// Write env file with flags for the kubelet to use. We only want to
-	// register the joining node with the specified taints if the node
-	// is not a master. The markmaster phase will register the taints otherwise.
-	registerTaintsUsingFlags := j.cfg.ControlPlane == nil
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&initConfiguration.ClusterConfiguration, &initConfiguration.NodeRegistration, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
-		return err
-	}
-
-	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infof("Starting the kubelet")
-	kubeletphase.TryStartKubelet()
-
-	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
-	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
-	// times out, display a somewhat user-friendly message.
-	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
-	if err := waiter.WaitForKubeletAndFunc(waitForTLSBootstrappedClient); err != nil {
-		fmt.Printf(kubeadmJoinFailMsg, err)
-		return err
-	}
-
-	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
-	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
-	if err != nil {
-		return err
-	}
-
-	klog.V(1).Infof("[join] preserving the crisocket information for the node")
-	if err := patchnodephase.AnnotateCRISocket(client, j.cfg.NodeRegistration.Name, j.cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "error uploading crisocket")
-	}
-
-	return nil
-}
-
 // PostInstallControlPlane marks the new node as master and update the cluster status with information about current node
 func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
@@ -571,6 +463,11 @@ func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitCon
 
 	// in case of local etcd
 	if initConfiguration.Etcd.External == nil {
+		// creates target folder if doesn't exist already
+		if err := os.MkdirAll(initConfiguration.Etcd.Local.DataDir, 0700); err != nil {
+			return errors.Wrapf(err, "failed to create etcd directory %q", initConfiguration.Etcd.Local.DataDir)
+		}
+
 		// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
 		// the existing etcd members before being created.
 		// This operation must be executed after kubelet is already started in order to minimize the time
@@ -597,20 +494,6 @@ func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitCon
 	}
 
 	return nil
-}
-
-// waitForTLSBootstrappedClient waits for the /etc/kubernetes/kubelet.conf file to be available
-func waitForTLSBootstrappedClient() error {
-	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
-
-	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
-		// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
-		// only that the kubeconfig file exists, but that other files required by it also exist (like
-		// client certificate and key)
-		_, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
-		return (err == nil), nil
-	})
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
@@ -647,7 +530,7 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	}
 
 	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "", true)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, os.Stdout, "join", true)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

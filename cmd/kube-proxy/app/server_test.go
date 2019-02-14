@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -415,8 +416,12 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 
 func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
-		tempDir := os.TempDir()
-		file, err := ioutil.TempFile(tempDir, "kube-proxy-config-")
+		tempDir, err := ioutil.TempDir("", "kubeproxy-config-change")
+		if err != nil {
+			return nil, "", fmt.Errorf("Unable to create temporary directory: %v", err)
+		}
+		fullPath := filepath.Join(tempDir, "kube-proxy-config")
+		file, err := os.Create(fullPath)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
 		}

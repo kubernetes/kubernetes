@@ -140,12 +140,7 @@ var InterestingApiServerMetrics = []string{
 	// TODO(krzysied): apiserver_request_latencies_summary is a deprecated metric.
 	// It should be replaced with new metric.
 	"apiserver_request_latencies_summary",
-	"etcd_helper_cache_entry_total",
-	"etcd_helper_cache_hit_total",
-	"etcd_helper_cache_miss_total",
-	"etcd_request_cache_add_latency_seconds",
-	"etcd_request_cache_get_latency_seconds",
-	"etcd_request_latency_seconds",
+	"apiserver_init_events_total",
 }
 
 var InterestingControllerManagerMetrics = []string{
@@ -171,7 +166,7 @@ var InterestingControllerManagerMetrics = []string{
 var InterestingKubeletMetrics = []string{
 	"kubelet_container_manager_latency_microseconds",
 	"kubelet_docker_errors",
-	"kubelet_docker_operations_latency_microseconds",
+	"kubelet_docker_operations_latency_seconds",
 	"kubelet_generate_pod_status_latency_microseconds",
 	"kubelet_pod_start_latency_microseconds",
 	"kubelet_pod_worker_latency_microseconds",

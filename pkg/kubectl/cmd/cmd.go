@@ -73,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/kustomize"
 )
 
 const (
@@ -521,6 +522,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				replace.NewCmdReplace(f, ioStreams),
 				wait.NewCmdWait(f, ioStreams),
 				convert.NewCmdConvert(f, ioStreams),
+				kustomize.NewCmdKustomize(ioStreams),
 			},
 		},
 		{

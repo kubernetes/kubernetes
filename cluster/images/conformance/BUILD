@@ -47,7 +47,6 @@ container_image(
 container_bundle(
     name = "conformance",
     images = {"k8s.gcr.io/conformance-amd64:{STABLE_DOCKER_TAG}": "conformance-internal"},
-    stamp = True,
 )
 
 filegroup(

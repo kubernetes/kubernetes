@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/hack/lib/version.sh"
 kube::version::get_version_vars

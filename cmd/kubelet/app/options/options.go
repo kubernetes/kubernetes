@@ -19,7 +19,7 @@ package options
 
 import (
 	"fmt"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // Enable pprof HTTP handlers.
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -47,10 +47,11 @@ import (
 
 const defaultRootDir = "/var/lib/kubelet"
 
+// KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
-// - its value will never, or cannot safely be changed during the lifetime of a node
-// - its value cannot be safely shared between nodes at the same time (e.g. a hostname)
-//   KubeletConfiguration is intended to be shared between nodes
+// - its value will never, or cannot safely be changed during the lifetime of a node, or
+// - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
+//   KubeletConfiguration is intended to be shared between nodes.
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletFlags struct {
@@ -245,6 +246,7 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 }
 
+// ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
 	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
@@ -336,7 +338,7 @@ func NewKubeletServer() (*KubeletServer, error) {
 	}, nil
 }
 
-// validateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid
+// ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
 func ValidateKubeletServer(s *KubeletServer) error {
 	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
 	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
@@ -588,8 +590,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.ProtectKernelDefaults, "protect-kernel-defaults", c.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
 
 	// Node Allocatable Flags
-	fs.Var(flag.NewMapStringString(&c.SystemReserved), "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
-	fs.Var(flag.NewMapStringString(&c.KubeReserved), "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi) pairs that describe resources reserved for kubernetes system components. Currently cpu, memory and local ephemeral storage for root file system are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
+	fs.Var(flag.NewMapStringString(&c.SystemReserved), "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi,pid=100) pairs that describe resources reserved for non-kubernetes components. Currently only cpu, memory, and pid (process IDs) are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
+	fs.Var(flag.NewMapStringString(&c.KubeReserved), "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi,pid=100) pairs that describe resources reserved for kubernetes system components. Currently cpu, memory, local ephemeral storage for root file system, and pid (process IDs) are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
 	fs.StringSliceVar(&c.EnforceNodeAllocatable, "enforce-node-allocatable", c.EnforceNodeAllocatable, "A comma separated list of levels of node allocatable enforcement to be enforced by kubelet. Acceptable options are 'none', 'pods', 'system-reserved', and 'kube-reserved'. If the latter two options are specified, '--system-reserved-cgroup' and '--kube-reserved-cgroup' must also be set, respectively. If 'none' is specified, no additional options should be set. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details.")
 	fs.StringVar(&c.SystemReservedCgroup, "system-reserved-cgroup", c.SystemReservedCgroup, "Absolute name of the top level cgroup that is used to manage non-kubernetes components for which compute resources were reserved via '--system-reserved' flag. Ex. '/system-reserved'. [default='']")
 	fs.StringVar(&c.KubeReservedCgroup, "kube-reserved-cgroup", c.KubeReservedCgroup, "Absolute name of the top level cgroup that is used to manage kubernetes components for which compute resources were reserved via '--kube-reserved' flag. Ex. '/kube-reserved'. [default='']")

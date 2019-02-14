@@ -16,6 +16,7 @@ go_library(
 go_binary(
     name = "golint",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

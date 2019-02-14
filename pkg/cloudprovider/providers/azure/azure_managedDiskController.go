@@ -30,9 +30,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 )
 
 const (
@@ -239,9 +238,8 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 		return oldSize, fmt.Errorf("DiskProperties of disk(%s) is nil", diskName)
 	}
 
-	requestBytes := newSize.Value()
 	// Azure resizes in chunks of GiB (not GB)
-	requestGiB := int32(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB := int32(volumehelpers.RoundUpToGiB(newSize))
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	klog.V(2).Infof("azureDisk - begin to resize disk(%s) with new size(%d), old size(%v)", diskName, requestGiB, oldSize)
@@ -282,7 +280,7 @@ func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.AzureDisk.DiskName == volume.ProvisionedVolumeName {
+	if pv.Spec.AzureDisk.DiskName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -323,8 +321,8 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 	zone := c.makeZone(zoneID)
 	klog.V(4).Infof("Got zone %q for Azure disk %q", zone, diskName)
 	labels := map[string]string{
-		kubeletapis.LabelZoneRegion:        c.Location,
-		kubeletapis.LabelZoneFailureDomain: zone,
+		v1.LabelZoneRegion:        c.Location,
+		v1.LabelZoneFailureDomain: zone,
 	}
 	return labels, nil
 }

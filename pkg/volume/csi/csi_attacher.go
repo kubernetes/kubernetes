@@ -69,16 +69,6 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", err
 	}
 
-	skip, err := c.plugin.skipAttach(csiSource.Driver)
-	if err != nil {
-		klog.Error(log("attacher.Attach failed to find if driver is attachable: %v", err))
-		return "", err
-	}
-	if skip {
-		klog.V(4).Infof(log("skipping attach for driver %s", csiSource.Driver))
-		return "", nil
-	}
-
 	node := string(nodeName)
 	pvName := spec.PersistentVolume.GetName()
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, node)
@@ -130,16 +120,6 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, ti
 	}
 
 	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
-
-	skip, err := c.plugin.skipAttach(source.Driver)
-	if err != nil {
-		klog.Error(log("attacher.Attach failed to find if driver is attachable: %v", err))
-		return "", err
-	}
-	if skip {
-		klog.V(4).Infof(log("Driver is not attachable, skip waiting for attach"))
-		return "", nil
-	}
 
 	return c.waitForVolumeAttachment(source.VolumeHandle, attachID, timeout)
 }

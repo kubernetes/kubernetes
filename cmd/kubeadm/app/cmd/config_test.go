@@ -275,7 +275,7 @@ func TestMigrate(t *testing.T) {
 		t.Fatalf("failed to set new-config flag")
 	}
 	command.Run(nil, nil)
-	if _, err := configutil.ConfigFileAndDefaultsToInternalConfig(newConfigPath, &kubeadmapiv1beta1.InitConfiguration{}); err != nil {
+	if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
 		t.Fatalf("Could not read output back into internal type: %v", err)
 	}
 }

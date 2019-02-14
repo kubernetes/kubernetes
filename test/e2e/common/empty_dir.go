@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"path"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
@@ -204,6 +205,79 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	*/
 	framework.ConformanceIt("should support (non-root,0777,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
+	})
+
+	It("pod should support shared volumes between containers", func() {
+		var (
+			volumeName                 = "shared-data"
+			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
+			busyBoxSubVolumeMountPath  = "/pod-data"
+			busyBoxMainVolumeFilePath  = fmt.Sprintf("%s/shareddata.txt", busyBoxMainVolumeMountPath)
+			busyBoxSubVolumeFilePath   = fmt.Sprintf("%s/shareddata.txt", busyBoxSubVolumeMountPath)
+			message                    = "Hello from the busy-box sub-container"
+			busyBoxMainContainerName   = "busybox-main-container"
+			busyBoxSubContainerName    = "busybox-sub-container"
+			resultString               = ""
+		)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-sharedvolume-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: new(v1.EmptyDirVolumeSource),
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    busyBoxMainContainerName,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", "sleep 10"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: busyBoxMainVolumeMountPath,
+							},
+						},
+					},
+					{
+						Name:    busyBoxSubContainerName,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", fmt.Sprintf("echo %s > %s", message, busyBoxSubVolumeFilePath)},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: busyBoxSubVolumeMountPath,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		var err error
+		By("Creating Pod")
+		pod = f.PodClient().CreateSync(pod)
+
+		By("Waiting for the pod running")
+		err = f.WaitForPodRunning(pod.Name)
+		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
+
+		By("Geting the pod")
+		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+
+		By("Reading file content from the nginx-container")
+		resultString, err = framework.LookForStringInFile(f.Namespace.Name, pod.Name, busyBoxMainContainerName, busyBoxMainVolumeFilePath, message, 30*time.Second)
+		framework.ExpectNoError(err, "failed to match expected string %s with %s", message, resultString)
 	})
 })
 

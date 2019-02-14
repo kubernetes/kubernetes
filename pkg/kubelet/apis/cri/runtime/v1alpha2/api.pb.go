@@ -736,7 +736,8 @@ type PodSandboxConfig struct {
 	// operation. The runtime may also use this information to improve UX, such
 	// as by constructing a readable name.
 	Metadata *PodSandboxMetadata `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	// Hostname of the sandbox.
+	// Hostname of the sandbox. Hostname could only be empty when the pod
+	// network namespace is NODE.
 	Hostname string `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
 	// Path to the directory on the host in which container log files are
 	// stored.

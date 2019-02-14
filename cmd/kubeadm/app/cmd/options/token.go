@@ -46,7 +46,7 @@ type BootstrapTokenOptions struct {
 func (bto *BootstrapTokenOptions) AddTokenFlag(fs *pflag.FlagSet) {
 	fs.StringVar(
 		&bto.TokenStr, TokenStr, "",
-		"The token to use for establishing bidirectional trust between nodes and masters. The format is [a-z0-9]{6}\\.[a-z0-9]{16} - e.g. abcdef.0123456789abcdef",
+		"The token to use for establishing bidirectional trust between nodes and control-plane nodes. The format is [a-z0-9]{6}\\.[a-z0-9]{16} - e.g. abcdef.0123456789abcdef",
 	)
 }
 

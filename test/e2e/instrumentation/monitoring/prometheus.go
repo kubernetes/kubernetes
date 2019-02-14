@@ -111,7 +111,7 @@ func consumeCPUResources(f *framework.Framework, consumerName string, cpuUsage i
 func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
 	podAnnotations := map[string]string{
 		"prometheus.io/scrape": "true",
-		"prometheus.io/path":   "/Metrics",
+		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
 	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
@@ -120,7 +120,7 @@ func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metr
 func exportCustomMetricFromService(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
 	serviceAnnotations := map[string]string{
 		"prometheus.io/scrape": "true",
-		"prometheus.io/path":   "/Metrics",
+		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
 	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)

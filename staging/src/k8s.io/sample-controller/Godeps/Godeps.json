@@ -12,7 +12,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "d4020504c68b6bfa818032bedfb48e33e9638506"
+			"Rev": "5858425f75500d40c52783dce87d085a483ce135"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
@@ -47,12 +47,8 @@
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
-			"ImportPath": "github.com/google/btree",
-			"Rev": "7d79101e329e5a3adf994758c578dab82b90c017"
-		},
-		{
 			"ImportPath": "github.com/google/gofuzz",
-			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
+			"Rev": "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 		},
 		{
 			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
@@ -65,14 +61,6 @@
 		{
 			"ImportPath": "github.com/googleapis/gnostic/extensions",
 			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache/diskcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
@@ -97,10 +85,6 @@
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
 			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
-		},
-		{
-			"ImportPath": "github.com/peterbourgon/diskv",
-			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
@@ -1152,7 +1136,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
+			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
@@ -1165,6 +1149,26 @@
 		{
 			"ImportPath": "k8s.io/utils/trace",
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
+			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
+			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
+			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
+			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
+			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

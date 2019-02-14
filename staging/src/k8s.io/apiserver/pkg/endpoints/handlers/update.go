@@ -70,7 +70,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			return
 		}
 
-		body, err := readBody(req)
+		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -121,7 +121,16 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		var transformers []rest.TransformFunc
+		transformers := []rest.TransformFunc{}
+		if scope.FieldManager != nil {
+			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
+				obj, err := scope.FieldManager.Update(liveObj, newObj, prefixFromUserAgent(req.UserAgent()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)
+				}
+				return obj, nil
+			})
+		}
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)

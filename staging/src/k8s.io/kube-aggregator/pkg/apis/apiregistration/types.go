@@ -57,7 +57,7 @@ type APIServiceSpec struct {
 	// +optional
 	CABundle []byte
 
-	// GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
+	// GroupPriorityMinimum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority.
 	// The primary sort is based on GroupPriorityMinimum, ordered highest number to lowest (20 before 10).
 	// The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
@@ -78,6 +78,7 @@ type APIServiceSpec struct {
 	VersionPriority int32
 }
 
+// ConditionStatus indicates the status of a condition (true, false, or unknown).
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -90,7 +91,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// APIConditionConditionType is a valid value for APIServiceCondition.Type
+// APIServiceConditionType is a valid value for APIServiceCondition.Type
 type APIServiceConditionType string
 
 const (

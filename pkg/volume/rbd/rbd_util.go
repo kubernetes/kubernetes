@@ -36,11 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
-	volutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -580,9 +580,8 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
 	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Convert to MB that rbd defaults on.
-	sz, err := volutil.RoundUpSizeInt(volSizeBytes, 1024*1024)
+	sz, err := volumehelpers.RoundUpToMiBInt(capacity)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -641,9 +640,9 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	var output []byte
 	var err error
-	volSizeBytes := newSize.Value()
+
 	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	sz := int(volumehelpers.RoundUpToMiB(newSize))
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 

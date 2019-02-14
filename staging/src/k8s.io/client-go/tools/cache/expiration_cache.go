@@ -144,13 +144,13 @@ func (c *ExpirationCache) ListKeys() []string {
 // Add timestamps an item and inserts it into the cache, overwriting entries
 // that might exist under the same key.
 func (c *ExpirationCache) Add(obj interface{}) error {
-	c.expirationLock.Lock()
-	defer c.expirationLock.Unlock()
-
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
+	c.expirationLock.Lock()
+	defer c.expirationLock.Unlock()
+
 	c.cacheStorage.Add(key, &timestampedEntry{obj, c.clock.Now()})
 	return nil
 }
@@ -163,12 +163,12 @@ func (c *ExpirationCache) Update(obj interface{}) error {
 
 // Delete removes an item from the cache.
 func (c *ExpirationCache) Delete(obj interface{}) error {
-	c.expirationLock.Lock()
-	defer c.expirationLock.Unlock()
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
+	c.expirationLock.Lock()
+	defer c.expirationLock.Unlock()
 	c.cacheStorage.Delete(key)
 	return nil
 }
@@ -177,8 +177,6 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 // before attempting the replace operation. The replace operation will
 // delete the contents of the ExpirationCache `c`.
 func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) error {
-	c.expirationLock.Lock()
-	defer c.expirationLock.Unlock()
 	items := make(map[string]interface{}, len(list))
 	ts := c.clock.Now()
 	for _, item := range list {
@@ -188,6 +186,8 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 		}
 		items[key] = &timestampedEntry{item, ts}
 	}
+	c.expirationLock.Lock()
+	defer c.expirationLock.Unlock()
 	c.cacheStorage.Replace(items, resourceVersion)
 	return nil
 }

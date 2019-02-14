@@ -45,7 +45,7 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	// Creates a Master Configuration pointing to the pkidir folder
+	// Creates an InitConfiguration pointing to the pkidir folder
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			CertificatesDir: tmpdir,
@@ -66,7 +66,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	// Adds a pki folder with a ca certs to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-	// Creates Master Configurations pointing to the pkidir folder
+	// Creates InitConfigurations pointing to the pkidir folder
 	cfgs := []*kubeadmapi.InitConfiguration{
 		{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
@@ -305,7 +305,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 		// Adds a pki folder with a ca certs to the temp folder
 		pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-		// Creates a Master Configuration pointing to the pkidir folder
+		// Creates an InitConfiguration pointing to the pkidir folder
 		cfg := &kubeadmapi.InitConfiguration{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
@@ -335,7 +335,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	// Creates a Master Configuration pointing to the tmpdir folder
+	// Creates an InitConfiguration pointing to the tmpdir folder
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			CertificatesDir: tmpdir,
@@ -382,7 +382,7 @@ func TestWriteKubeConfig(t *testing.T) {
 		t.Fatalf("couldn't retrieve ca cert: %v", err)
 	}
 
-	// Creates a Master Configuration pointing to the pkidir folder
+	// Creates an InitConfiguration pointing to the pkidir folder
 	cfg := &kubeadmapi.InitConfiguration{
 		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{

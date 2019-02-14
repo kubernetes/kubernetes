@@ -415,9 +415,6 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
-		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {
@@ -873,6 +870,10 @@ func validateQuobyteVolumeSource(quobyte *core.QuobyteVolumeSource, fldPath *fie
 	allErrs := field.ErrorList{}
 	if len(quobyte.Registry) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("registry"), "must be a host:port pair or multiple pairs separated by commas"))
+	} else if len(quobyte.Tenant) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID provided by the configuration and may not be omitted "))
+	} else if len(quobyte.Tenant) >= 65 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID and may not exceed a length of 64 characters"))
 	} else {
 		for _, hostPortPair := range strings.Split(quobyte.Registry, ",") {
 			if _, _, err := net.SplitHostPort(hostPortPair); err != nil {
@@ -1968,8 +1969,6 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
@@ -2081,13 +2080,6 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	}
 
 	return allErrs
-}
-
-func fsResourceIsEphemeralStorage(resource string) bool {
-	if resource == "limits.ephemeral-storage" || resource == "requests.ephemeral-storage" {
-		return true
-	}
-	return false
 }
 
 func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
@@ -2925,19 +2917,17 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-		hugePageResources := sets.NewString()
-		for i := range pod.Spec.Containers {
-			resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
-			for resourceStr := range resourceSet {
-				if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
-					hugePageResources.Insert(resourceStr)
-				}
+	hugePageResources := sets.NewString()
+	for i := range pod.Spec.Containers {
+		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+		for resourceStr := range resourceSet {
+			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+				hugePageResources.Insert(resourceStr)
 			}
 		}
-		if len(hugePageResources) > 1 {
-			allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
-		}
+	}
+	if len(hugePageResources) > 1 {
+		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
 	}
 
 	return allErrs
@@ -3725,9 +3715,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
-			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
@@ -3826,8 +3814,6 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
@@ -4021,7 +4007,7 @@ func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path)
 		vol := &volumes[i]
 		idxPath := fldPath.Index(i)
 		if vol.GCEPersistentDisk != nil {
-			if vol.GCEPersistentDisk.ReadOnly == false {
+			if !vol.GCEPersistentDisk.ReadOnly {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
 			}
 		}
@@ -4365,15 +4351,6 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		}
 	}
 	return allErrs
-}
-
-// isLocalStorageResource checks whether the resource is local ephemeral storage
-func isLocalStorageResource(name string) bool {
-	if name == string(core.ResourceEphemeralStorage) || name == string(core.ResourceRequestsEphemeralStorage) ||
-		name == string(core.ResourceLimitsEphemeralStorage) {
-		return true
-	}
-	return false
 }
 
 // Validate resource names that can go in a resource quota
@@ -4726,11 +4703,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
 		if helper.IsHugePageResourceName(resourceName) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
-			} else {
-				limContainsHugePages = true
-			}
+			limContainsHugePages = true
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
@@ -4986,10 +4959,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
-		allErrs = append(allErrs, err)
-	}
-
+	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
 	return allErrs
 }
 
@@ -5134,8 +5104,6 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}

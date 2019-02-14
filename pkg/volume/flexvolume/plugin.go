@@ -256,6 +256,10 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 	return plugin.NewDetacher()
 }
 
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
 func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	flexVolume := &api.Volume{

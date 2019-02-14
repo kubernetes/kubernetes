@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "doc.go",
         "endpoints_controller.go",
+        "trigger_time_tracker.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
@@ -39,7 +40,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["endpoints_controller_test.go"],
+    srcs = [
+        "endpoints_controller_test.go",
+        "trigger_time_tracker_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",

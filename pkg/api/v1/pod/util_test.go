@@ -340,6 +340,11 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	case reflect.Ptr:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
+		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
+		// it contains cycles so it's easiest to just skip it.
+		if name == "ObjectMeta" {
+			break
+		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
 			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)

@@ -84,6 +84,62 @@ func TestParsePortsAndNew(t *testing.T) {
 			},
 		},
 		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "::1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "all"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "127.0.0.1", "::1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "127.0.0.1", "10.10.10.1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "all"},
+				{protocol: "tcp4", address: "10.10.10.1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"127.0.0.1", "::1", "localhost"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"10.0.0.1", "127.0.0.1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "10.0.0.1", failureMode: "any"},
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+			},
+		},
+		{
 			input:     []string{"5000", "5000:5000", "8888:5000", "5000:8888", ":5000", "0:5000"},
 			addresses: []string{"127.0.0.1", "::1"},
 			expectedPorts: []ForwardedPort{

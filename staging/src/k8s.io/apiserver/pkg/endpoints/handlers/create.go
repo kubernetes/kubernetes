@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -84,7 +85,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
 
-		body, err := readBody(req)
+		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -133,6 +134,20 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			}
 		}
 
+		if scope.FieldManager != nil {
+			liveObj, err := scope.Creater.New(scope.Kind)
+			if err != nil {
+				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
+				return
+			}
+
+			obj, err = scope.FieldManager.Update(liveObj, obj, prefixFromUserAgent(req.UserAgent()))
+			if err != nil {
+				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
+				return
+			}
+		}
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Create(
@@ -176,4 +191,8 @@ type namedCreaterAdapter struct {
 
 func (c *namedCreaterAdapter) Create(ctx context.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj, createValidatingAdmission, options)
+}
+
+func prefixFromUserAgent(u string) string {
+	return strings.Split(u, "/")[0]
 }

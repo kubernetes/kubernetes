@@ -52,7 +52,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -709,8 +708,8 @@ func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
-				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelZoneFailureDomain] ==
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			g.updateNodeZones(prevNode, newNode)
@@ -741,7 +740,7 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 	g.nodeZonesLock.Lock()
 	defer g.nodeZonesLock.Unlock()
 	if prevNode != nil {
-		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok {
 			g.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if g.nodeZones[prevZone].Len() == 0 {
@@ -750,7 +749,7 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 		}
 	}
 	if newNode != nil {
-		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok {
 			if g.nodeZones[newZone] == nil {
 				g.nodeZones[newZone] = sets.NewString()

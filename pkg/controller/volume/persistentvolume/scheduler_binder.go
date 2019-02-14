@@ -29,6 +29,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -97,7 +98,8 @@ type SchedulerVolumeBinder interface {
 }
 
 type volumeBinder struct {
-	ctrl *PersistentVolumeController
+	kubeClient  clientset.Interface
+	classLister storagelisters.StorageClassLister
 
 	nodeInformer coreinformers.NodeInformer
 	pvcCache     PVCAssumeCache
@@ -120,14 +122,9 @@ func NewVolumeBinder(
 	storageClassInformer storageinformers.StorageClassInformer,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 
-	// TODO: find better way...
-	ctrl := &PersistentVolumeController{
-		kubeClient:  kubeClient,
-		classLister: storageClassInformer.Lister(),
-	}
-
 	b := &volumeBinder{
-		ctrl:            ctrl,
+		kubeClient:      kubeClient,
+		classLister:     storageClassInformer.Lister(),
 		nodeInformer:    nodeInformer,
 		pvcCache:        NewPVCAssumeCache(pvcInformer.Informer()),
 		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
@@ -291,8 +288,8 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	// Assume PV
 	newBindings := []*bindingInfo{}
 	for _, binding := range claimsToBind {
-		newPV, dirty, err := b.ctrl.getBindVolumeToClaim(binding.pv, binding.pvc)
-		klog.V(5).Infof("AssumePodVolumes: getBindVolumeToClaim for pod %q, PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
+		newPV, dirty, err := GetBindVolumeToClaim(binding.pv, binding.pvc)
+		klog.V(5).Infof("AssumePodVolumes: GetBindVolumeToClaim for pod %q, PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
 			podName,
 			binding.pv.Name,
 			binding.pvc.Name,
@@ -411,9 +408,13 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 	for _, binding = range bindings {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, binding PV %q to PVC %q", podName, binding.pv.Name, binding.pvc.Name)
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
-		if newPV, err := b.ctrl.updateBindVolumeToClaim(binding.pv, binding.pvc, false); err != nil {
+		claimKey := claimToClaimKey(binding.pvc)
+		klog.V(2).Infof("claim %q bound to volume %q", claimKey, binding.pv.Name)
+		if newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(binding.pv); err != nil {
+			klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", binding.pv.Name, claimKey, err)
 			return err
 		} else {
+			klog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", binding.pv.Name, claimKey)
 			// Save updated object from apiserver for later checking.
 			binding.pv = newPV
 		}
@@ -424,7 +425,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 	// PV controller is expect to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, PVC %q", podName, getPVCName(claim))
-		if newClaim, err := b.ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claim); err != nil {
+		if newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claim); err != nil {
 			return err
 		} else {
 			// Save updated object from apiserver for later checking.
@@ -627,7 +628,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		if volumeBound {
 			boundClaims = append(boundClaims, pvc)
 		} else {
-			delayBindingMode, err := b.ctrl.isDelayBindingMode(pvc)
+			delayBindingMode, err := IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -726,7 +727,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			return false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
 
-		class, err := b.ctrl.classLister.Get(className)
+		class, err := b.classLister.Get(className)
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}

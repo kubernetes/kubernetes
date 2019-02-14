@@ -30,6 +30,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

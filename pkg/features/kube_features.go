@@ -163,6 +163,7 @@ const (
 
 	// owner: @derekwaynecarr
 	// beta: v1.10
+	// GA: v1.14
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
@@ -405,6 +406,12 @@ const (
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
 
+	// owner: @RobertKrawitz
+	// alpha: v1.14
+	//
+	// Implement support for limiting pids in nodes
+	SupportNodePidsLimit utilfeature.Feature = "SupportNodePidsLimit"
+
 	// owner: @wk8
 	// alpha: v1.14
 	//
@@ -430,7 +437,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
-	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	HugePages:                                   {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
@@ -455,6 +462,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: true, PreRelease: utilfeature.Beta},
+	SupportNodePidsLimit:                        {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
@@ -490,6 +498,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

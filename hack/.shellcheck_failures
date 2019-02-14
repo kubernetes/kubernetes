@@ -89,8 +89,6 @@
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
 ./hack/make-rules/vet.sh
-./hack/print-workspace-status.sh
-./hack/run-in-gopath.sh
 ./hack/test-go.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
@@ -127,7 +125,6 @@
 ./hack/verify-description.sh
 ./hack/verify-generated-device-plugin.sh
 ./hack/verify-generated-docs.sh
-./hack/verify-generated-files-remake.sh
 ./hack/verify-generated-files.sh
 ./hack/verify-generated-kms.sh
 ./hack/verify-generated-kubelet-plugin-registration.sh
@@ -158,17 +155,8 @@
 ./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
-./staging/src/k8s.io/csi-api/hack/update-codegen.sh
-./staging/src/k8s.io/csi-api/hack/verify-codegen.sh
-./staging/src/k8s.io/kube-aggregator/hack/build-image.sh
-./staging/src/k8s.io/kube-aggregator/hack/local-up-kube-aggregator.sh
-./staging/src/k8s.io/kube-aggregator/hack/register-all-apis-from.sh
-./staging/src/k8s.io/kube-aggregator/hack/update-codegen.sh
-./staging/src/k8s.io/kube-aggregator/hack/verify-codegen.sh
 ./staging/src/k8s.io/metrics/hack/update-codegen.sh
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
-./staging/src/k8s.io/node-api/hack/update-codegen.sh
-./staging/src/k8s.io/node-api/hack/verify-codegen.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
@@ -177,6 +165,7 @@
 ./test/cmd/core.sh
 ./test/cmd/crd.sh
 ./test/cmd/create.sh
+./test/cmd/delete.sh
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
 ./test/cmd/generic-resources.sh

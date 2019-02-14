@@ -93,6 +93,14 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				// Driver name is expected to be the same
 				// as the provisioner here.
 				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
+			case o.SnapshotterContainerName:
+				// Driver name is expected to be the same
+				// as the snapshotter here.
+				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
+			case o.ClusterRegistrarContainerName:
+				if o.PodInfoVersion != nil {
+					container.Args = append(container.Args, "--pod-info-mount-version="+*o.PodInfoVersion)
+				}
 			}
 		}
 	}
@@ -145,6 +153,16 @@ type PatchCSIOptions struct {
 	// If non-empty, --provisioner with new name will be appended
 	// to the argument list.
 	ProvisionerContainerName string
+	// The name of the container which has the snapshotter binary.
+	// If non-empty, --snapshotter with new name will be appended
+	// to the argument list.
+	SnapshotterContainerName string
+	// The name of the container which has the cluster-driver-registrar
+	// binary.
+	ClusterRegistrarContainerName string
 	// If non-empty, all pods are forced to run on this node.
 	NodeName string
+	// If not nil, the argument to pass to the cluster-driver-registrar's
+	// pod-info-mount-version argument.
+	PodInfoVersion *string
 }

@@ -106,6 +106,7 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       tolerations:
         - key: "CriticalAddonsOnly"

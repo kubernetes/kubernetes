@@ -955,6 +955,11 @@ type QuobyteVolumeSource struct {
 	// Default is no group
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,5,opt,name=group"`
+
+	// Tenant owning the given Quobyte volume in the Backend
+	// Used with dynamically provisioned Quobyte volumes, value is set by the plugin
+	// +optional
+	Tenant string `json:"tenant,omitempty" protobuf:"bytes,6,opt,name=tenant"`
 }
 
 // FlexPersistentVolumeSource represents a generic persistent volume resource that is
@@ -3451,6 +3456,9 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +patchMergeKey=port
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=port
+	// +listMapKey=protocol
 	Ports []ServicePort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this

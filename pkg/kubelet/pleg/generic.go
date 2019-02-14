@@ -265,7 +265,12 @@ func (g *GenericPLEG) relist() {
 			if events[i].Type == ContainerChanged {
 				continue
 			}
-			g.eventChannel <- events[i]
+			select {
+			case g.eventChannel <- events[i]:
+			default:
+				metrics.PLEGDiscardEvents.WithLabelValues().Inc()
+				klog.Error("event channel is full, discard this relist() cycle event")
+			}
 		}
 	}
 
@@ -337,7 +342,7 @@ func (g *GenericPLEG) cacheEnabled() bool {
 	return g.cache != nil
 }
 
-// Preserve an older cached status' pod IP if the new status has no pod IP
+// getPodIP preserves an older cached status' pod IP if the new status has no pod IP
 // and its sandboxes have exited
 func (g *GenericPLEG) getPodIP(pid types.UID, status *kubecontainer.PodStatus) string {
 	if status.IP != "" {

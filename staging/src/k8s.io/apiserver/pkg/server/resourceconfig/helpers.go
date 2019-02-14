@@ -51,18 +51,6 @@ func MergeResourceEncodingConfigs(
 	return resourceEncodingConfig
 }
 
-// MergeGroupEncodingConfigs merges the given defaultResourceConfig with specific GroupVersion overrides.
-func MergeGroupEncodingConfigs(
-	defaultResourceEncoding *serverstore.DefaultResourceEncodingConfig,
-	storageEncodingOverrides map[string]schema.GroupVersion,
-) *serverstore.DefaultResourceEncodingConfig {
-	resourceEncodingConfig := defaultResourceEncoding
-	for group, storageEncodingVersion := range storageEncodingOverrides {
-		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
-	}
-	return resourceEncodingConfig
-}
-
 // MergeAPIResourceConfigs merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
 // Exclude the groups not registered in registry, and check if version is
 // not registered in group, then it will fail.

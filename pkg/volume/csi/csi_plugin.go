@@ -23,7 +23,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"context"
@@ -84,17 +83,6 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // volume.VolumePlugin methods
 var _ volume.VolumePlugin = &csiPlugin{}
 
-type csiDriver struct {
-	driverName              string
-	driverEndpoint          string
-	highestSupportedVersion *utilversion.Version
-}
-
-type csiDriversStore struct {
-	driversMap map[string]csiDriver
-	sync.RWMutex
-}
-
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
 }
@@ -102,7 +90,7 @@ type RegistrationHandler struct {
 // TODO (verult) consider using a struct instead of global variables
 // csiDrivers map keep track of all registered CSI drivers on the node and their
 // corresponding sockets
-var csiDrivers csiDriversStore
+var csiDrivers = &DriversStore{}
 
 var nim nodeinfomanager.Interface
 
@@ -141,17 +129,12 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	func() {
-		// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-		// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-
-		// It's not necessary to lock the entire RegistrationCallback() function because only the CSI
-		// client depends on this driver map, and the CSI client does not depend on node information
-		// updated in the rest of the function.
-		csiDrivers.Lock()
-		defer csiDrivers.Unlock()
-		csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint, highestSupportedVersion: highestSupportedVersion}
-	}()
+	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersion,
+	})
 
 	// Get node info from the driver.
 	csi, err := newCsiDriverClient(csiDriverName(pluginName))
@@ -200,15 +183,7 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 		return nil, err
 	}
 
-	// Check for existing drivers with the same name
-	var existingDriver csiDriver
-	driverExists := false
-	func() {
-		csiDrivers.RLock()
-		defer csiDrivers.RUnlock()
-		existingDriver, driverExists = csiDrivers.driversMap[pluginName]
-	}()
-
+	existingDriver, driverExists := csiDrivers.Get(pluginName)
 	if driverExists {
 		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
 			err := fmt.Errorf("%s for CSI driver %q failed. Another driver with the same name is already registered with a higher supported version: %q", callerName, pluginName, existingDriver.highestSupportedVersion)
@@ -245,8 +220,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	// Initializing csiDrivers map and label management channels
-	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
+	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 
 	// TODO(#70514) Init CSINodeInfo object if the CRD exists and create Driver
@@ -465,6 +439,29 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
+func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
+	if spec.PersistentVolume == nil {
+		klog.Error(log("plugin.CanAttach test failed, spec missing PersistentVolume"))
+		return false
+	}
+
+	var driverName string
+	if spec.PersistentVolume.Spec.CSI != nil {
+		driverName = spec.PersistentVolume.Spec.CSI.Driver
+	} else {
+		klog.Error(log("plugin.CanAttach test failed, spec missing CSIPersistentVolume"))
+		return false
+	}
+
+	skipAttach, err := p.skipAttach(driverName)
+
+	if err != nil {
+		klog.Error(log("plugin.CanAttach error when calling plugin.skipAttach for driver %s: %s", driverName, err))
+	}
+
+	return !skipAttach
+}
+
 func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return p.NewDetacher()
 }
@@ -657,11 +654,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 }
 
 func unregisterDriver(driverName string) error {
-	func() {
-		csiDrivers.Lock()
-		defer csiDrivers.Unlock()
-		delete(csiDrivers.driversMap, driverName)
-	}()
+	csiDrivers.Delete(driverName)
 
 	if err := nim.UninstallCSIDriver(driverName); err != nil {
 		klog.Errorf("Error uninstalling CSI driver: %v", err)

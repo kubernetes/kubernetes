@@ -25,7 +25,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"path"
@@ -83,6 +82,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -118,7 +118,10 @@ func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: componentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
-node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
+node. It can register the node with the apiserver using one of: the hostname; a flag to
+override the hostname; or specific logic for a cloud provider.
+
+The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
 that describes a pod. The kubelet takes a set of PodSpecs that are provided through
 various mechanisms (primarily through the apiserver) and ensures that the containers
 described in those PodSpecs are running and healthy. The kubelet doesn't manage
@@ -989,7 +992,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := CreateAndInitKubelet(&kubeServer.KubeletConfiguration,
+	k, err := createAndInitKubelet(&kubeServer.KubeletConfiguration,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		kubeServer.ContainerRuntime,
@@ -1065,7 +1068,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
@@ -1150,16 +1153,18 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	rl := make(v1.ResourceList)
 	for k, v := range m {
 		switch v1.ResourceName(k) {
-		// CPU, memory and local storage resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, err
+		// CPU, memory, local storage, and PID resources are supported.
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
+			if v1.ResourceName(k) != pidlimit.PIDs || utilfeature.DefaultFeatureGate.Enabled(features.SupportNodePidsLimit) {
+				q, err := resource.ParseQuantity(v)
+				if err != nil {
+					return nil, err
+				}
+				if q.Sign() == -1 {
+					return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+				}
+				rl[v1.ResourceName(k)] = q
 			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

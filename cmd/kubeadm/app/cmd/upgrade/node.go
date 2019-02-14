@@ -229,7 +229,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 
 	// Fetches the cluster configuration
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "", false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", false)
 	if err != nil {
 		return errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
