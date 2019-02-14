@@ -40,6 +40,16 @@ gcs_upload(
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes",
     ],
     tags = ["manual"],
+    # Use for_platforms to format the upload path based on the configured
+    # platform (os/arch).
+    # For example, this will turn into something like
+    # upload_paths = select({
+    #    "@io_bazel_rules_go//go/platform:windows_386": {
+    #        ...,"//:binary-artifacts-and-hashes": "bin/windows/386"},
+    #    "@io_bazel_rules_go//go/platform:linux_ppc64le": {
+    #        ...,"//:binary-artifacts-and-hashes": "bin/linux/ppc64le"},
+    #})
+    # and bazel will select the correct entry.
     upload_paths = select(for_platforms(for_all = {
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes": "extra/gce",

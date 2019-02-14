@@ -12,6 +12,36 @@ load(
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 
+# Bazel doesn't make the output filename
+# (such as kubernetes-server-{OS}-{ARCH}.tar.gz) configurable, so we instead
+# create rules for all platforms and tag them manual.
+# We then select the correct set of platform-specific tarballs in this filegroup
+# using a select() statement.
+# Thus the release-tars target always selects the correct set of tarballs
+# for the configured platform being built.
+release_filegroup(
+    name = "release-tars",
+    conditioned_srcs = for_platforms(
+        for_all = [
+            ":kubernetes.tar.gz",
+            ":kubernetes-src.tar.gz",
+        ],
+        for_client = [":kubernetes-client-{OS}-{ARCH}.tar.gz"],
+        for_node = [":kubernetes-node-{OS}-{ARCH}.tar.gz"],
+        for_server = [
+            ":kubernetes-server-{OS}-{ARCH}.tar.gz",
+            ":kubernetes-manifests.tar.gz",
+        ],
+        for_test = [
+            ":kubernetes-test-portable.tar.gz",
+            ":kubernetes-test-{OS}-{ARCH}.tar.gz",
+            # TODO(ixdy): remove once the "mondo-test" tarball is deprecated.
+            # It isn't really mondo under Bazel anyway.
+            ":kubernetes-test.tar.gz",
+        ],
+    ),
+)
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -267,7 +297,6 @@ pkg_tar(
         "manual",
         "no-cache",
     ],
-    tags = ["no-cache"],
     deps = select({go_platform_constraint(os, arch): [":_test-bin"]}),
 ) for arch in archs] for os, archs in TEST_PLATFORMS.items()]
 
@@ -310,27 +339,4 @@ pkg_tar(
     deps = [
         "//cluster:manifests",
     ],
-)
-
-release_filegroup(
-    name = "release-tars",
-    srcs = [
-        ":kubernetes.tar.gz",
-        ":kubernetes-src.tar.gz",
-    ],
-    conditioned_srcs = for_platforms(
-        for_all = [
-        ],
-        for_client = [":kubernetes-client-{OS}-{ARCH}.tar.gz"],
-        for_node = [":kubernetes-node-{OS}-{ARCH}.tar.gz"],
-        for_server = [
-            ":kubernetes-server-{OS}-{ARCH}.tar.gz",
-            ":kubernetes-manifests.tar.gz",
-        ],
-        for_test = [
-            ":kubernetes-test-portable.tar.gz",
-            ":kubernetes-test-{OS}-{ARCH}.tar.gz",
-            ":kubernetes-test.tar.gz",  # FIXME
-        ],
-    ),
 )
