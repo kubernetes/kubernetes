@@ -62,8 +62,10 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			client, err = getClientset(kubeConfigFile, false)
-			kubeadmutil.CheckErr(err)
+			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
+				client, err = getClientset(kubeConfigFile, false)
+				kubeadmutil.CheckErr(err)
+			}
 
 			if criSocketPath == "" {
 				criSocketPath, err = resetDetectCRISocket(client)
@@ -298,10 +300,12 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 }
 
 func resetDetectCRISocket(client clientset.Interface) (string, error) {
-	// first try to connect to the cluster for the CRI socket
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
-	if err == nil {
-		return cfg.NodeRegistration.CRISocket, nil
+	if client != nil {
+		// first try to connect to the cluster for the CRI socket
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+		if err == nil {
+			return cfg.NodeRegistration.CRISocket, nil
+		}
 	}
 
 	// if this fails, try to detect it
