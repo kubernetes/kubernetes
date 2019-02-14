@@ -22,4 +22,5 @@ labels: kind/bug
 - OS (e.g. from /etc/os-release):
 - Kernel (e.g. `uname -a`):
 - Install tools:
+- Network plugin and version (if this is a network-related bug):
 - Others:
