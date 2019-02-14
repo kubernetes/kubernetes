@@ -19,6 +19,7 @@ package stats
 import (
 	"math/rand"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -648,7 +649,7 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 
 func TestGetContainerUsageNanoCores(t *testing.T) {
 	var value0 uint64
-	var value1 uint64 = 10000000000
+	var value1 = 10000000000 / uint64(runtime.NumCPU())
 
 	tests := []struct {
 		desc          string
@@ -749,6 +750,10 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
 		real := provider.getContainerUsageNanoCores(test.stats)
-		assert.Equal(t, test.expected, real, test.desc)
+		if test.expected == nil {
+			assert.Equal(t, test.expected, real, test.desc)
+		} else {
+			assert.Equal(t, strconv.FormatUint(*test.expected, 10), strconv.FormatUint(*real, 10), test.desc)
+		}
 	}
 }

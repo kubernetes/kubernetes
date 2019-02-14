@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -560,7 +561,8 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 	}
 
 	nanoSeconds := stats.Cpu.Timestamp - cached.Timestamp
-	usageNanoCores := (stats.Cpu.UsageCoreNanoSeconds.Value - cached.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
+	usagePerCPU := (stats.Cpu.UsageCoreNanoSeconds.Value - cached.UsageCoreNanoSeconds.Value) / uint64(runtime.NumCPU())
+	usageNanoCores := usagePerCPU * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
 	return &usageNanoCores
 }
 
