@@ -31,7 +31,7 @@ import (
 )
 
 func TestGetEtcdPodSpec(t *testing.T) {
-	// Creates a Master Configuration
+	// Creates a ClusterConfiguration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.7.0",
 		Etcd: kubeadmapi.Etcd{
