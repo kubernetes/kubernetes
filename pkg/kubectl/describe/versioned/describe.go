@@ -40,6 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -173,6 +174,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: extensionsv1beta1.GroupName, Kind: "DaemonSet"}:                   &DaemonSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
