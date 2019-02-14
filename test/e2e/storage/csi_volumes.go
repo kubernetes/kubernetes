@@ -235,10 +235,10 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 				driver = drivers.InitMockCSIDriver(config, test.driverExists, test.driverAttachable, nil)
 				driver.CreateDriver()
+				defer driver.CleanupDriver()
 
 				if test.driverExists {
 					defer destroyCSIDriver(csics, driver)
-					defer driver.CleanupDriver()
 				}
 
 				By("Creating pod")
@@ -352,10 +352,10 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 				driver = drivers.InitMockCSIDriver(config, test.driverExists, true, test.podInfoOnMountVersion)
 				driver.CreateDriver()
+				defer driver.CleanupDriver()
 
 				if test.driverExists {
 					defer destroyCSIDriver(csics, driver)
-					defer driver.CleanupDriver()
 				}
 
 				By("Creating pod")
