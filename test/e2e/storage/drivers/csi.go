@@ -166,15 +166,39 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 
 // mockCSI
 type mockCSIDriver struct {
-	cleanup    func()
-	driverInfo testsuites.DriverInfo
+	cleanup        func()
+	driverInfo     testsuites.DriverInfo
+	manifests      []string
+	podInfoVersion *string
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
-func InitMockCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitMockCSIDriver(config testsuites.TestConfig, registerDriver, driverAttachable bool, podInfoVersion *string) testsuites.TestDriver {
+	driverManifests := []string{
+		"test/e2e/testing-manifests/storage-csi/cluster-driver-registrar/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml",
+	}
+
+	config.ServerConfig = &framework.VolumeTestConfig{}
+
+	if registerDriver {
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-cluster-driver-registrar.yaml")
+	}
+
+	if driverAttachable {
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-attacher.yaml")
+	} else {
+		config.ServerConfig.ServerArgs = append(config.ServerConfig.ServerArgs, "--disable-attach")
+	}
+
 	return &mockCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "csi-mock",
@@ -190,6 +214,8 @@ func InitMockCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			},
 			Config: config,
 		},
+		manifests:      driverManifests,
+		podInfoVersion: podInfoVersion,
 	}
 }
 
@@ -223,26 +249,28 @@ func (m *mockCSIDriver) CreateDriver() {
 	node := nodes.Items[rand.Intn(len(nodes.Items))]
 	m.driverInfo.Config.ClientNodeName = node.Name
 
+	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
+
+	if m.driverInfo.Config.ServerConfig != nil && m.driverInfo.Config.ServerConfig.ServerArgs != nil {
+		containerArgs = append(containerArgs, m.driverInfo.Config.ServerConfig.ServerArgs...)
+	}
+
 	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
 	// settings are ignored for this test. We could patch the image definitions.
 	o := utils.PatchCSIOptions{
-		OldDriverName:            "csi-mock",
-		NewDriverName:            "csi-mock-" + f.UniqueName,
-		DriverContainerName:      "mock",
-		DriverContainerArguments: []string{"--name=csi-mock-" + f.UniqueName},
-		ProvisionerContainerName: "csi-provisioner",
-		NodeName:                 m.driverInfo.Config.ClientNodeName,
+		OldDriverName:                 "csi-mock",
+		NewDriverName:                 "csi-mock-" + f.UniqueName,
+		DriverContainerName:           "mock",
+		DriverContainerArguments:      containerArgs,
+		ProvisionerContainerName:      "csi-provisioner",
+		ClusterRegistrarContainerName: "csi-cluster-driver-registrar",
+		NodeName:                      m.driverInfo.Config.ClientNodeName,
+		PodInfoVersion:                m.podInfoVersion,
 	}
 	cleanup, err := f.CreateFromManifests(func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)
 	},
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml",
-	)
+		m.manifests...)
 	m.cleanup = cleanup
 	if err != nil {
 		framework.Failf("deploying csi mock driver: %v", err)

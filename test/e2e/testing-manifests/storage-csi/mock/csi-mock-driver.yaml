@@ -16,18 +16,6 @@ spec:
       containers:
 
 
-        - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.0.1
-          args:
-            - --v=5
-            - --csi-address=$(ADDRESS)
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
-          imagePullPolicy: Always
-          volumeMounts:
-          - mountPath: /csi
-            name: socket-dir
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.0.1
           args:
