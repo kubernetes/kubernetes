@@ -29,8 +29,8 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	nodetestutil "k8s.io/cloud-provider/node/testutil"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 type FakeController struct{}
@@ -112,7 +112,7 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
+		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*nodetestutil.NewNode("node")}})
 		gcc, podInformer := NewFromClient(client, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex

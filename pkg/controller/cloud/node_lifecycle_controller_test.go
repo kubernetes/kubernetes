@@ -30,21 +30,21 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	nodetestutil "k8s.io/cloud-provider/node/testutil"
 	"k8s.io/klog"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 func Test_NodesDeleted(t *testing.T) {
 	testcases := []struct {
 		name        string
-		fnh         *testutil.FakeNodeHandler
+		fnh         *nodetestutil.FakeNodeHandler
 		fakeCloud   *fakecloud.FakeCloud
 		deleteNodes []*v1.Node
 	}{
 		{
 			name: "node is not ready and does not exist",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -70,12 +70,12 @@ func Test_NodesDeleted(t *testing.T) {
 				ExistsByProviderID: false,
 			},
 			deleteNodes: []*v1.Node{
-				testutil.NewNode("node0"),
+				nodetestutil.NewNode("node0"),
 			},
 		},
 		{
 			name: "node is not ready and provider returns err",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -108,7 +108,7 @@ func Test_NodesDeleted(t *testing.T) {
 		},
 		{
 			name: "node is not ready but still exists",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +140,7 @@ func Test_NodesDeleted(t *testing.T) {
 		},
 		{
 			name: "node ready condition is unknown, node doesn't exist",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -166,12 +166,12 @@ func Test_NodesDeleted(t *testing.T) {
 				ExistsByProviderID: false,
 			},
 			deleteNodes: []*v1.Node{
-				testutil.NewNode("node0"),
+				nodetestutil.NewNode("node0"),
 			},
 		},
 		{
 			name: "node ready condition is unknown, node exists",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +204,7 @@ func Test_NodesDeleted(t *testing.T) {
 		},
 		{
 			name: "node is ready, but provider said it is deleted (maybe a bug in provider)",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -269,13 +269,13 @@ func Test_NodesDeleted(t *testing.T) {
 func Test_NodesShutdown(t *testing.T) {
 	testcases := []struct {
 		name         string
-		fnh          *testutil.FakeNodeHandler
+		fnh          *nodetestutil.FakeNodeHandler
 		fakeCloud    *fakecloud.FakeCloud
 		updatedNodes []*v1.Node
 	}{
 		{
 			name: "node is not ready and was shutdown",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -327,7 +327,7 @@ func Test_NodesShutdown(t *testing.T) {
 		},
 		{
 			name: "node is not ready, but there is error checking if node is shutdown",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -357,7 +357,7 @@ func Test_NodesShutdown(t *testing.T) {
 		},
 		{
 			name: "node is not ready and is not shutdown",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -387,7 +387,7 @@ func Test_NodesShutdown(t *testing.T) {
 		},
 		{
 			name: "node is ready but provider says it's shutdown (maybe a bug by provider)",
-			fnh: &testutil.FakeNodeHandler{
+			fnh: &nodetestutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -447,7 +447,7 @@ func Test_NodesShutdown(t *testing.T) {
 	}
 }
 
-func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *testutil.FakeNodeHandler) error {
+func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *nodetestutil.FakeNodeHandler) error {
 	nodes, err := f.List(metav1.ListOptions{})
 	if err != nil {
 		return err

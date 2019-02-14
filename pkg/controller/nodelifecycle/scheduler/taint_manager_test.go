@@ -24,11 +24,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/controller/testutil"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	nodetestutil "k8s.io/cloud-provider/node/testutil"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 var timeForControllerToProgress = 500 * time.Millisecond
@@ -140,19 +140,19 @@ func TestCreatePod(t *testing.T) {
 	}{
 		{
 			description:  "not scheduled - ignore",
-			pod:          testutil.NewPod("pod1", ""),
+			pod:          nodetestutil.NewPod("pod1", ""),
 			taintedNodes: map[string][]v1.Taint{},
 			expectDelete: false,
 		},
 		{
 			description:  "scheduled on untainted Node",
-			pod:          testutil.NewPod("pod1", "node1"),
+			pod:          nodetestutil.NewPod("pod1", "node1"),
 			taintedNodes: map[string][]v1.Taint{},
 			expectDelete: false,
 		},
 		{
 			description: "schedule on tainted Node",
-			pod:         testutil.NewPod("pod1", "node1"),
+			pod:         nodetestutil.NewPod("pod1", "node1"),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -160,7 +160,7 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with finite toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			pod:         addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 100),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -168,7 +168,7 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with infinite toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+			pod:         addToleration(nodetestutil.NewPod("pod1", "node1"), 1, -1),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -176,7 +176,7 @@ func TestCreatePod(t *testing.T) {
 		},
 		{
 			description: "schedule on tainted Node with infinite ivalid toleration",
-			pod:         addToleration(testutil.NewPod("pod1", "node1"), 2, -1),
+			pod:         addToleration(nodetestutil.NewPod("pod1", "node1"), 2, -1),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -217,7 +217,7 @@ func TestDeletePod(t *testing.T) {
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
-	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
+	controller.PodUpdated(nodetestutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
 	time.Sleep(timeForControllerToProgress)
 	close(stopCh)
@@ -234,8 +234,8 @@ func TestUpdatePod(t *testing.T) {
 	}{
 		{
 			description: "scheduling onto tainted Node",
-			prevPod:     testutil.NewPod("pod1", ""),
-			newPod:      testutil.NewPod("pod1", "node1"),
+			prevPod:     nodetestutil.NewPod("pod1", ""),
+			newPod:      nodetestutil.NewPod("pod1", "node1"),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -243,8 +243,8 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description: "scheduling onto tainted Node with toleration",
-			prevPod:     addToleration(testutil.NewPod("pod1", ""), 1, -1),
-			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+			prevPod:     addToleration(nodetestutil.NewPod("pod1", ""), 1, -1),
+			newPod:      addToleration(nodetestutil.NewPod("pod1", "node1"), 1, -1),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -252,8 +252,8 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description: "removing toleration",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
-			newPod:      testutil.NewPod("pod1", "node1"),
+			prevPod:     addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 100),
+			newPod:      nodetestutil.NewPod("pod1", "node1"),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -261,8 +261,8 @@ func TestUpdatePod(t *testing.T) {
 		},
 		{
 			description: "lengthening toleration shouldn't work",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
-			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			prevPod:     addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 1),
+			newPod:      addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 100),
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -315,25 +315,25 @@ func TestCreateNode(t *testing.T) {
 		{
 			description: "Creating Node matching already assigned Pod",
 			pods: []v1.Pod{
-				*testutil.NewPod("pod1", "node1"),
+				*nodetestutil.NewPod("pod1", "node1"),
 			},
-			node:         testutil.NewNode("node1"),
+			node:         nodetestutil.NewNode("node1"),
 			expectDelete: false,
 		},
 		{
 			description: "Creating tainted Node matching already assigned Pod",
 			pods: []v1.Pod{
-				*testutil.NewPod("pod1", "node1"),
+				*nodetestutil.NewPod("pod1", "node1"),
 			},
-			node:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			node:         addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectDelete: true,
 		},
 		{
 			description: "Creating tainted Node matching already assigned tolerating Pod",
 			pods: []v1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
+				*addToleration(nodetestutil.NewPod("pod1", "node1"), 1, -1),
 			},
-			node:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			node:         addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectDelete: false,
 		},
 	}
@@ -370,7 +370,7 @@ func TestDeleteNode(t *testing.T) {
 		"node1": {createNoExecuteTaint(1)},
 	}
 	go controller.Run(stopCh)
-	controller.NodeUpdated(testutil.NewNode("node1"), nil)
+	controller.NodeUpdated(nodetestutil.NewNode("node1"), nil)
 	// wait a bit to see if nothing will panic
 	time.Sleep(timeForControllerToProgress)
 	controller.taintedNodesLock.Lock()
@@ -393,37 +393,37 @@ func TestUpdateNode(t *testing.T) {
 		{
 			description: "Added taint",
 			pods: []v1.Pod{
-				*testutil.NewPod("pod1", "node1"),
+				*nodetestutil.NewPod("pod1", "node1"),
 			},
-			oldNode:      testutil.NewNode("node1"),
-			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			oldNode:      nodetestutil.NewNode("node1"),
+			newNode:      addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectDelete: true,
 		},
 		{
 			description: "Added tolerated taint",
 			pods: []v1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+				*addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 100),
 			},
-			oldNode:      testutil.NewNode("node1"),
-			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			oldNode:      nodetestutil.NewNode("node1"),
+			newNode:      addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectDelete: false,
 		},
 		{
 			description: "Only one added taint tolerated",
 			pods: []v1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+				*addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 100),
 			},
-			oldNode:      testutil.NewNode("node1"),
-			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			oldNode:      nodetestutil.NewNode("node1"),
+			newNode:      addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
 			expectDelete: true,
 		},
 		{
 			description: "Taint removed",
 			pods: []v1.Pod{
-				*addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
+				*addToleration(nodetestutil.NewPod("pod1", "node1"), 1, 1),
 			},
-			oldNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
-			newNode:         testutil.NewNode("node1"),
+			oldNode:         addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			newNode:         nodetestutil.NewNode("node1"),
 			expectDelete:    false,
 			additionalSleep: 1500 * time.Millisecond,
 		},
@@ -452,8 +452,8 @@ func TestUpdateNode(t *testing.T) {
 					},
 				},
 			},
-			oldNode:         testutil.NewNode("node1"),
-			newNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			oldNode:         nodetestutil.NewNode("node1"),
+			newNode:         addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
 			expectDelete:    true,
 			additionalSleep: 1500 * time.Millisecond,
 		},
@@ -496,12 +496,12 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		{
 			description: "Pods with different toleration times are evicted appropriately",
 			pods: []v1.Pod{
-				*testutil.NewPod("pod1", "node1"),
-				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
-				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+				*nodetestutil.NewPod("pod1", "node1"),
+				*addToleration(nodetestutil.NewPod("pod2", "node1"), 1, 1),
+				*addToleration(nodetestutil.NewPod("pod3", "node1"), 1, -1),
 			},
-			oldNode: testutil.NewNode("node1"),
-			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			oldNode: nodetestutil.NewNode("node1"),
+			newNode: addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
 			expectedDeleteTimes: durationSlice{
 				{[]string{"pod1"}, 0},
 				{[]string{"pod2"}, time.Second},
@@ -510,12 +510,12 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		{
 			description: "Evict all pods not matching all taints instantly",
 			pods: []v1.Pod{
-				*testutil.NewPod("pod1", "node1"),
-				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
-				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
+				*nodetestutil.NewPod("pod1", "node1"),
+				*addToleration(nodetestutil.NewPod("pod2", "node1"), 1, 1),
+				*addToleration(nodetestutil.NewPod("pod3", "node1"), 1, -1),
 			},
-			oldNode: testutil.NewNode("node1"),
-			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			oldNode: nodetestutil.NewNode("node1"),
+			newNode: addTaintsToNode(nodetestutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
 			expectedDeleteTimes: durationSlice{
 				{[]string{"pod1", "pod2", "pod3"}, 0},
 			},

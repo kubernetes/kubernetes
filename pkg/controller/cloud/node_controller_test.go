@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	nodetestutil "k8s.io/cloud-provider/node/testutil"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
@@ -165,7 +165,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized
 func TestNodeInitialized(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -239,7 +239,7 @@ func TestNodeInitialized(t *testing.T) {
 
 // This test checks that a node without the external cloud provider taint are NOT cloudprovider initialized
 func TestNodeIgnored(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -302,7 +302,7 @@ func TestNodeIgnored(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // the GCE route condition is added if cloudprovider is GCE
 func TestGCECondition(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -386,7 +386,7 @@ func TestGCECondition(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and that zone labels are added correctly
 func TestZoneInitialized(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -471,7 +471,7 @@ func TestZoneInitialized(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and nodeAddresses are updated from the cloudprovider
 func TestNodeAddresses(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -574,7 +574,7 @@ func TestNodeAddresses(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and the provided node ip is validated with the cloudprovider and nodeAddresses are updated from the cloudprovider
 func TestNodeProvidedIPAddresses(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -806,7 +806,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and node addresses will not be updated when node isn't present according to the cloudprovider
 func TestNodeAddressesNotUpdate(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -874,7 +874,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 
 // This test checks that a node is set with the correct providerID
 func TestNodeProviderID(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -956,7 +956,7 @@ func TestNodeProviderID(t *testing.T) {
 
 // This test checks that a node's provider ID will not be overwritten
 func TestNodeProviderIDAlreadySet(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
+	fnh := &nodetestutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
