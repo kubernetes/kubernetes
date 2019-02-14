@@ -77,6 +77,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			Name:                 "default",
 			ClaimSize:            "2Gi",
 			AllowVolumeExpansion: true,
+			DelayBinding:         true,
 		}
 		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class")
@@ -107,16 +108,21 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 	})
 
 	It("Should verify mounted devices can be resized", func() {
-		By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
-		Expect(len(pvs)).To(Equal(1))
 
-		By("Creating a deployment with the provisioned volume")
+		// The reason we use a node selector is because we do not want pod to move to different node when pod is deleted.
+		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
+		// We should consider adding a unit test that exercises this better.
+		By("Creating a deployment with selected PVC")
 		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		Expect(err).NotTo(HaveOccurred(), "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
+
+		// PVC should be bound at this point
+		By("Checking for bound PVC")
+		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
+		Expect(len(pvs)).To(Equal(1))
 
 		By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
