@@ -134,6 +134,7 @@ release_filegroup(
 release_filegroup(
     name = "node-targets",
     conditioned_srcs = for_platforms(for_node = [
+        "//cmd/cri-dockerd",
         "//cmd/kube-proxy",
         "//cmd/kubeadm",
         "//cmd/kubelet",

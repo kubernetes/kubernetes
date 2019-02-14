@@ -72,6 +72,7 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/cloud-controller-manager
+    cmd/cri-dockerd
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube
@@ -122,6 +123,7 @@ readonly KUBE_CONFORMANCE_IMAGE_TARGETS
 # If you update this list, please also update build/BUILD.
 kube::golang::node_targets() {
   local targets=(
+    cmd/cri-dockerd
     cmd/kube-proxy
     cmd/kubeadm
     cmd/kubelet
@@ -331,6 +333,7 @@ readonly KUBE_STATIC_LIBRARIES=(
 
 # Fully-qualified package names that we want to instrument for coverage information.
 readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
+  k8s.io/kubernetes/cmd/cri-dockerd
   k8s.io/kubernetes/cmd/kube-apiserver
   k8s.io/kubernetes/cmd/kube-controller-manager
   k8s.io/kubernetes/cmd/kube-scheduler

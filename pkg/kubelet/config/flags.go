@@ -46,8 +46,6 @@ type ContainerRuntimeOptions struct {
 	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
 	// /var/lib/dockershim if unset. Exposed for integration testing (e.g. in OpenShift).
 	DockershimRootDirectory string
-	// Enable dockershim only mode.
-	ExperimentalDockershim bool
 	// PodSandboxImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodSandboxImage string
@@ -87,8 +85,6 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RedirectContainerStreaming, "redirect-container-streaming", s.RedirectContainerStreaming, "Enables container streaming redirect. If false, kubelet will proxy container streaming data between apiserver and container runtime; if true, kubelet will return an http redirect to apiserver, and apiserver will access container runtime directly. The proxy approach is more secure, but introduces some overhead. The redirect approach is more performant, but less secure because the connection between apiserver and container runtime may not be authenticated.")
 
 	// Docker-specific settings.
-	fs.BoolVar(&s.ExperimentalDockershim, "experimental-dockershim", s.ExperimentalDockershim, "Enable dockershim only mode. In this mode, kubelet will only start dockershim without any other functionalities. This flag only serves test purpose, please do not use it unless you are conscious of what you are doing. [default=false]")
-	fs.MarkHidden("experimental-dockershim")
 	fs.StringVar(&s.DockershimRootDirectory, "experimental-dockershim-root-directory", s.DockershimRootDirectory, "Path to the dockershim root directory.")
 	fs.MarkHidden("experimental-dockershim-root-directory")
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("The image whose network/ipc namespaces containers in each pod will use. %s", dockerOnlyWarning))

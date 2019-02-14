@@ -51,6 +51,19 @@ genrule(
 ]]
 
 [pkg_rpm_for_goarch(
+    name = "cri-dockerd",
+    changelog = "//:CHANGELOG.md",
+    data = [
+        "cri-dockerd.service",
+        "//cmd/cri-dockerd",
+    ],
+    goarch = arch,
+    spec_file = "kubelet.spec",
+    tags = ["manual"],
+    version_file = "//build:os_package_version",
+) for arch in NODE_PLATFORMS["linux"]]
+
+[pkg_rpm_for_goarch(
     name = "kubectl",
     changelog = "//:CHANGELOG.md",
     data = [

@@ -111,6 +111,24 @@ genrule(
 ) for arch in NODE_PLATFORMS["linux"]]
 
 [deb_data(
+    name = "cri-dockerd",
+    data = [
+        {
+            "files": ["//cmd/cri-dockerd"],
+            "mode": "0755",
+            "dir": "/usr/bin",
+        },
+        {
+            "files": ["cri-dockerd.service"],
+            "mode": "644",
+            "dir": "/lib/systemd/system",
+        },
+    ],
+    goarch = arch,
+    tags = ["manual"],
+) for arch in NODE_PLATFORMS["linux"]]
+
+[deb_data(
     name = "kubeadm",
     data = [
         {
