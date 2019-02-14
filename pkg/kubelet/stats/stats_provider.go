@@ -28,6 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -94,6 +95,11 @@ type containerStatsProvider interface {
 
 type rlimitStatsProvider interface {
 	RlimitStats() (*statsapi.RlimitStats, error)
+}
+
+// RlimitStats returns base information about process count
+func (p *StatsProvider) RlimitStats() (*statsapi.RlimitStats, error) {
+	return pidlimit.Stats()
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that

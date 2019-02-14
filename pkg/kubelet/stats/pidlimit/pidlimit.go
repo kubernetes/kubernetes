@@ -1,7 +1,5 @@
-// +build !linux
-
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stats
+package pidlimit
 
 import (
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/api/core/v1"
 )
 
-func (p *StatsProvider) RlimitStats() (*statsapi.RlimitStats, error) {
-	return nil, nil
-}
+const (
+	// PIDs is the (internal) name for this resource
+	PIDs v1.ResourceName = "pid"
+)

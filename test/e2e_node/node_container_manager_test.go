@@ -29,8 +29,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -38,14 +40,17 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
+	initialConfig.FeatureGates[string(features.SupportNodePidsLimit)] = true
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
+		string(pidlimit.PIDs):     "1000",
 	}
 	initialConfig.KubeReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
+		string(pidlimit.PIDs):     "738",
 	}
 	initialConfig.EvictionHard = map[string]string{"memory.available": "100Mi"}
 	// Necessary for allocatable cgroup creation.
@@ -81,8 +86,8 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 	return nil
 }
 
-func getAllocatableLimits(cpu, memory string, capacity v1.ResourceList) (*resource.Quantity, *resource.Quantity) {
-	var allocatableCPU, allocatableMemory *resource.Quantity
+func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*resource.Quantity, *resource.Quantity, *resource.Quantity) {
+	var allocatableCPU, allocatableMemory, allocatablePIDs *resource.Quantity
 	// Total cpu reservation is 200m.
 	for k, v := range capacity {
 		if k == v1.ResourceCPU {
@@ -94,7 +99,13 @@ func getAllocatableLimits(cpu, memory string, capacity v1.ResourceList) (*resour
 			allocatableMemory.Sub(resource.MustParse(memory))
 		}
 	}
-	return allocatableCPU, allocatableMemory
+	// Process IDs are not a node allocatable, so we have to do this ad hoc
+	pidlimits, err := pidlimit.Stats()
+	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
+		allocatablePIDs = resource.NewQuantity(int64(*pidlimits.MaxPID), resource.DecimalSI)
+		allocatablePIDs.Sub(resource.MustParse(pids))
+	}
+	return allocatableCPU, allocatableMemory, allocatablePIDs
 }
 
 const (
@@ -189,7 +200,7 @@ func runTest(f *framework.Framework) error {
 		}
 		node := nodeList.Items[0]
 		capacity := node.Status.Capacity
-		allocatableCPU, allocatableMemory := getAllocatableLimits("200m", "200Mi", capacity)
+		allocatableCPU, allocatableMemory, allocatablePIDs := getAllocatableLimits("200m", "200Mi", "1738", capacity)
 		// Total Memory reservation is 200Mi excluding eviction thresholds.
 		// Expect CPU shares on node allocatable cgroup to equal allocatable.
 		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), int64(cm.MilliCPUToShares(allocatableCPU.MilliValue())), 10); err != nil {
@@ -199,11 +210,16 @@ func runTest(f *framework.Framework) error {
 		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], "kubepods", "memory.limit_in_bytes"), allocatableMemory.Value(), 0); err != nil {
 			return err
 		}
+		// Expect PID limit on node allocatable cgroup to equal allocatable.
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], "kubepods", "pids.max"), allocatablePIDs.Value(), 0); err != nil {
+			return err
+		}
 
 		// Check that Allocatable reported to scheduler includes eviction thresholds.
 		schedulerAllocatable := node.Status.Allocatable
 		// Memory allocatable should take into account eviction thresholds.
-		allocatableCPU, allocatableMemory = getAllocatableLimits("200m", "300Mi", capacity)
+		// Process IDs are not a scheduler resource and as such cannot be tested here.
+		allocatableCPU, allocatableMemory, _ = getAllocatableLimits("200m", "300Mi", "1738", capacity)
 		// Expect allocatable to include all resources in capacity.
 		if len(schedulerAllocatable) != len(capacity) {
 			return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
@@ -232,6 +248,11 @@ func runTest(f *framework.Framework) error {
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], cgroupManager.Name(kubeReservedCgroupName), "memory.limit_in_bytes"), kubeReservedMemory.Value(), 0); err != nil {
 		return err
 	}
+	// Expect process ID limit kube reserved cgroup to equal configured value `738`.
+	kubeReservedPIDs := resource.MustParse(currentConfig.KubeReserved[string(pidlimit.PIDs)])
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupManager.Name(kubeReservedCgroupName), "pids.max"), kubeReservedPIDs.Value(), 0); err != nil {
+		return err
+	}
 	systemReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
 	if !cgroupManager.Exists(systemReservedCgroupName) {
 		return fmt.Errorf("Expected system reserved cgroup Does not exist")
@@ -244,6 +265,11 @@ func runTest(f *framework.Framework) error {
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.
 	systemReservedMemory := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceMemory)])
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], cgroupManager.Name(systemReservedCgroupName), "memory.limit_in_bytes"), systemReservedMemory.Value(), 0); err != nil {
+		return err
+	}
+	// Expect process ID limit system reserved cgroup to equal configured value `1000`.
+	systemReservedPIDs := resource.MustParse(currentConfig.SystemReserved[string(pidlimit.PIDs)])
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupManager.Name(systemReservedCgroupName), "pids.max"), systemReservedPIDs.Value(), 0); err != nil {
 		return err
 	}
 	return nil

@@ -73,6 +73,7 @@ go_library(
             "//pkg/kubelet/events:go_default_library",
             "//pkg/kubelet/metrics:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//pkg/kubelet/types:go_default_library",
             "//pkg/util/mount:go_default_library",
             "//pkg/util/oom:go_default_library",
