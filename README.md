@@ -39,7 +39,7 @@ and documentation, who to contact about what, etc.
 
 If you want to build Kubernetes right away there are two options:
 
-##### You have a working [Go environment], Note: Go version 1.11 or 1.11+.
+##### You have a working [Go environment], Note: `Go version 1.11 or 1.11+`.
 
 ```
 $ go get -d k8s.io/kubernetes
