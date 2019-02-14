@@ -47,10 +47,6 @@
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
-			"ImportPath": "github.com/google/btree",
-			"Rev": "7d79101e329e5a3adf994758c578dab82b90c017"
-		},
-		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 		},
@@ -65,14 +61,6 @@
 		{
 			"ImportPath": "github.com/googleapis/gnostic/extensions",
 			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache/diskcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
@@ -97,10 +85,6 @@
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
 			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
-		},
-		{
-			"ImportPath": "github.com/peterbourgon/diskv",
-			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",

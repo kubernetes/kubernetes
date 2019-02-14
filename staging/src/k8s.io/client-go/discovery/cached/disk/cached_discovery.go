@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package disk
 
 import (
 	"errors"
@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 )
@@ -38,7 +39,7 @@ import (
 // CachedDiscoveryClient implements the functions that discovery server-supported API groups,
 // versions and resources.
 type CachedDiscoveryClient struct {
-	delegate DiscoveryInterface
+	delegate discovery.DiscoveryInterface
 
 	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 	cacheDirectory string
@@ -57,7 +58,7 @@ type CachedDiscoveryClient struct {
 	fresh bool
 }
 
-var _ CachedDiscoveryInterface = &CachedDiscoveryClient{}
+var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -92,13 +93,13 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 // ServerResources returns the supported resources for all groups and versions.
 // Deprecated: use ServerGroupsAndResources instead.
 func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := ServerGroupsAndResources(d)
+	_, rs, err := discovery.ServerGroupsAndResources(d)
 	return rs, err
 }
 
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return ServerGroupsAndResources(d)
+	return discovery.ServerGroupsAndResources(d)
 }
 
 // ServerGroups returns the supported groups, with information like supported versions and the
@@ -220,13 +221,13 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 // ServerPreferredResources returns the supported resources with the version preferred by the
 // server.
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return ServerPreferredResources(d)
+	return discovery.ServerPreferredResources(d)
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return ServerPreferredNamespacedResources(d)
+	return discovery.ServerPreferredNamespacedResources(d)
 }
 
 // ServerVersion retrieves and parses the server's version (git version).
@@ -279,7 +280,7 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 		})
 	}
 
-	discoveryClient, err := NewDiscoveryClientForConfig(config)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +289,7 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
-func newCachedDiscoveryClient(delegate DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
+func newCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
 	return &CachedDiscoveryClient{
 		delegate:       delegate,
 		cacheDirectory: cacheDirectory,

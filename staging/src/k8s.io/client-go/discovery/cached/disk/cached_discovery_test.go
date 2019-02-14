@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package disk
 
 import (
 	"io/ioutil"
@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
@@ -104,7 +105,7 @@ type fakeDiscoveryClient struct {
 	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
 }
 
-var _ DiscoveryInterface = &fakeDiscoveryClient{}
+var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
 
 func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
 	return &fake.RESTClient{}
