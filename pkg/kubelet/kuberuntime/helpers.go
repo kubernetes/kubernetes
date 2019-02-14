@@ -141,9 +141,14 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 	return new(int64), "", nil
 }
 
-// isContainerFailed returns true if container has exited and exitcode is not zero.
-func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
+// isInitContainerFailed returns true if container has exited and exitcode is not zero
+// or is in unknown state.
+func isInitContainerFailed(status *kubecontainer.ContainerStatus) bool {
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+		return true
+	}
+
+	if status.State == kubecontainer.ContainerStateUnknown {
 		return true
 	}
 
