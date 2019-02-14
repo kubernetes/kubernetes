@@ -85,6 +85,8 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
+
+		// NOTE: If the following Expect is failed, please check StorageObjectInUseProtection plugin of admission controller on k8s cluster.
 		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue(), "PV Protection finalizer(%v) is not set in %v", volumeutil.PVProtectionFinalizer, pv.ObjectMeta.Finalizers)
 	})
 
