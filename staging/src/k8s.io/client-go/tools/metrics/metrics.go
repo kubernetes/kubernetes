@@ -39,15 +39,18 @@ type ResultMetric interface {
 var (
 	// RequestLatency is the latency metric that rest clients will update.
 	RequestLatency LatencyMetric = noopLatency{}
+	// ThrottleLatency is the throttle latency metric that rest clients will update.
+	ThrottleLatency LatencyMetric = noopLatency{}
 	// RequestResult is the result metric that rest clients will update.
 	RequestResult ResultMetric = noopResult{}
 )
 
 // Register registers metrics for the rest client to use. This can
 // only be called once.
-func Register(lm LatencyMetric, rm ResultMetric) {
+func Register(lm LatencyMetric, tm LatencyMetric, rm ResultMetric) {
 	registerMetrics.Do(func() {
 		RequestLatency = lm
+		ThrottleLatency = tm
 		RequestResult = rm
 	})
 }

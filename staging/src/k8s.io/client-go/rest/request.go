@@ -526,7 +526,9 @@ func (r *Request) tryThrottle() {
 	if r.throttle != nil {
 		r.throttle.Accept()
 	}
-	if latency := time.Since(now); latency > longThrottleLatency {
+	latency := time.Since(now)
+	metrics.ThrottleLatency.Observe(r.verb, r.finalURLTemplate(), latency)
+	if latency > longThrottleLatency {
 		klog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 }

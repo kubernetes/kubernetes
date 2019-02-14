@@ -39,6 +39,17 @@ var (
 		[]string{"verb", "url"},
 	)
 
+	// throttleLatency is a Prometheus Summary metric type partitioned by
+	// "verb" and "url" labels. It is used for the rest client throttle latency metrics.
+	throttleLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "rest_client_throttle_latency_seconds",
+			Help:    "Throttle latency in seconds. Broken down by verb and URL.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
+		},
+		[]string{"verb", "url"},
+	)
+
 	requestResult = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "rest_client_requests_total",
@@ -51,7 +62,7 @@ var (
 func init() {
 	prometheus.MustRegister(requestLatency)
 	prometheus.MustRegister(requestResult)
-	metrics.Register(&latencyAdapter{requestLatency}, &resultAdapter{requestResult})
+	metrics.Register(&latencyAdapter{requestLatency}, &latencyAdapter{throttleLatency}, &resultAdapter{requestResult})
 }
 
 type latencyAdapter struct {
