@@ -388,7 +388,7 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 	}
 
 	for _, v := range addressSet2 {
-		if addressMap2[v.Type] != v.Address {
+		if addressMap1[v.Type] != v.Address {
 			return true
 		}
 	}
