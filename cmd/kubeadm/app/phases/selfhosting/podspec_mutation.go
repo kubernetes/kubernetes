@@ -95,11 +95,11 @@ func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
 // setMasterTolerationOnPodSpec makes the Pod tolerate the master taint
 func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
 	if podSpec.Tolerations == nil {
-		podSpec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
+		podSpec.Tolerations = []v1.Toleration{kubeadmconstants.ControlPlaneToleration}
 		return
 	}
 
-	podSpec.Tolerations = append(podSpec.Tolerations, kubeadmconstants.MasterToleration)
+	podSpec.Tolerations = append(podSpec.Tolerations, kubeadmconstants.ControlPlaneToleration)
 }
 
 // setHostIPOnPodSpec sets the environment variable HOST_IP using downward API

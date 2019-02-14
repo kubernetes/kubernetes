@@ -143,7 +143,7 @@ const (
 	// the TLS bootstrap to get itself an unique credential
 	KubeletBootstrapKubeConfigFileName = "bootstrap-kubelet.conf"
 
-	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the master kubelet will use for talking
+	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the control-plane kubelet will use for talking
 	// to the API server
 	KubeletKubeConfigFileName = "kubelet.conf"
 	// ControllerManagerKubeConfigFileName defines the file name for the controller manager's kubeconfig file
@@ -157,9 +157,9 @@ const (
 	ControllerManagerUser = "system:kube-controller-manager"
 	// SchedulerUser defines the well-known user the scheduler should be authenticated as
 	SchedulerUser = "system:kube-scheduler"
-	// MastersGroup defines the well-known group for the apiservers. This group is also superuser by default
+	// SystemPrivilegedGroup defines the well-known group for the apiservers. This group is also superuser by default
 	// (i.e. bound to the cluster-admin ClusterRole)
-	MastersGroup = "system:masters"
+	SystemPrivilegedGroup = "system:masters"
 	// NodesGroup defines the well-known group for all nodes.
 	NodesGroup = "system:nodes"
 	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
@@ -171,9 +171,9 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
-	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
+	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the control-plane when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
 	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
@@ -198,7 +198,7 @@ const (
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
 
-	// LabelNodeRoleMaster specifies that a node is a master
+	// LabelNodeRoleMaster specifies that a node is a control-plane
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
@@ -357,22 +357,22 @@ const (
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 
-	// MasterNumCPU is the number of CPUs required on master
-	MasterNumCPU = 2
+	// ControlPlaneNumCPU is the number of CPUs required on control-plane
+	ControlPlaneNumCPU = 2
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
 )
 
 var (
-	// MasterTaint is the taint to apply on the PodSpec for being able to run that Pod on the master
-	MasterTaint = v1.Taint{
+	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
-	MasterToleration = v1.Toleration{
+	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneToleration = v1.Toleration{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
@@ -383,8 +383,8 @@ var (
 	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
 	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
 
-	// MasterComponents defines the master component names
-	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+	// ControlPlaneComponents defines the control-plane component names
+	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.12.0")
