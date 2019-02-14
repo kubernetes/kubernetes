@@ -191,16 +191,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		s.serviceResolver,
 	)
 
-	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(context.StopCh)
 		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
 		go apiserviceRegistrationController.Run(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
 		// if we end up blocking for long periods of time, we may need to increase threadiness.
 		go availableController.Run(5, context.StopCh)
 		return nil
@@ -219,7 +219,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
 
-		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
 			return nil
 		})
