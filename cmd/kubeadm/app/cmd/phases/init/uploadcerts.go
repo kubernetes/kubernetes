@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadcerts"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 )
 
 // NewUploadCertsPhase returns the uploadCerts phase
@@ -59,14 +59,14 @@ func runUploadCerts(c workflow.RunData) error {
 	}
 
 	if len(data.CertificateKey()) == 0 {
-		certificateKey, err := uploadcerts.CreateCertificateKey()
+		certificateKey, err := copycerts.CreateCertificateKey()
 		if err != nil {
 			return err
 		}
 		data.SetCertificateKey(certificateKey)
 	}
 
-	if err := uploadcerts.UploadCerts(client, data.Cfg(), data.CertificateKey()); err != nil {
+	if err := copycerts.UploadCerts(client, data.Cfg(), data.CertificateKey()); err != nil {
 		return errors.Wrap(err, "error uploading certs")
 	}
 	return nil

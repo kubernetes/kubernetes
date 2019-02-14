@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package uploadcerts
+package copycerts
 
 import (
 	"encoding/hex"
@@ -38,7 +38,7 @@ func TestUploadCerts(t *testing.T) {
 }
 
 //teste cert name, teste cert can be decrypted
-func TestGetSecretData(t *testing.T) {
+func TestGetDataFromInitConfig(t *testing.T) {
 	certData := []byte("cert-data")
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
@@ -58,14 +58,14 @@ func TestGetSecretData(t *testing.T) {
 		t.Fatalf(dedent.Dedent("failed to create etcd cert dir.\nfatal error: %v"), err)
 	}
 
-	certs := certsToUpload(cfg)
+	certs := certsToTransfer(cfg)
 	for name, path := range certs {
 		if err := ioutil.WriteFile(path, certData, 0644); err != nil {
 			t.Fatalf(dedent.Dedent("failed to write cert: %s\nfatal error: %v"), name, err)
 		}
 	}
 
-	secretData, err := getSecretData(cfg, decodedKey)
+	secretData, err := getDataFromDisk(cfg, decodedKey)
 	if err != nil {
 		t.Fatalf("failed to get secret data. fatal error: %v", err)
 	}
@@ -83,34 +83,76 @@ func TestGetSecretData(t *testing.T) {
 	}
 }
 
-func TestCertsToUpload(t *testing.T) {
+func TestCertsToTransfer(t *testing.T) {
 	localEtcdCfg := &kubeadmapi.InitConfiguration{}
 	externalEtcdCfg := &kubeadmapi.InitConfiguration{}
 	externalEtcdCfg.Etcd = kubeadmapi.Etcd{}
 	externalEtcdCfg.Etcd.External = &kubeadmapi.ExternalEtcd{}
+
+	commonExpectedCerts := []string{
+		kubeadmconstants.CACertName,
+		kubeadmconstants.CAKeyName,
+		kubeadmconstants.FrontProxyCACertName,
+		kubeadmconstants.FrontProxyCAKeyName,
+		kubeadmconstants.ServiceAccountPublicKeyName,
+		kubeadmconstants.ServiceAccountPrivateKeyName,
+	}
 
 	tests := map[string]struct {
 		config        *kubeadmapi.InitConfiguration
 		expectedCerts []string
 	}{
 		"local etcd": {
-			config:        localEtcdCfg,
-			expectedCerts: []string{kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName},
+			config: localEtcdCfg,
+			expectedCerts: append(
+				[]string{kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName},
+				commonExpectedCerts...,
+			),
 		},
 		"external etcd": {
-			config:        externalEtcdCfg,
-			expectedCerts: []string{externalEtcdCA, externalEtcdCert, externalEtcdKey},
+			config: externalEtcdCfg,
+			expectedCerts: append(
+				[]string{externalEtcdCA, externalEtcdCert, externalEtcdKey},
+				commonExpectedCerts...,
+			),
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t2 *testing.T) {
-			certList := certsToUpload(test.config)
+			certList := certsToTransfer(test.config)
 			for _, cert := range test.expectedCerts {
 				if _, found := certList[cert]; !found {
 					t2.Fatalf(dedent.Dedent("failed to get list of certs to upload\ncert %s not found"), cert)
 				}
 			}
 		})
+	}
+}
+
+func TestCertOrKeyNameToSecretName(t *testing.T) {
+	tests := []struct {
+		keyName            string
+		expectedSecretName string
+	}{
+		{
+			keyName:            "apiserver-kubelet-client.crt",
+			expectedSecretName: "apiserver-kubelet-client.crt",
+		},
+		{
+			keyName:            "etcd/ca.crt",
+			expectedSecretName: "etcd-ca.crt",
+		},
+		{
+			keyName:            "etcd/healthcheck-client.crt",
+			expectedSecretName: "etcd-healthcheck-client.crt",
+		},
+	}
+
+	for _, tc := range tests {
+		secretName := certOrKeyNameToSecretName(tc.keyName)
+		if secretName != tc.expectedSecretName {
+			t.Fatalf("secret name %s didn't match expected name %s", secretName, tc.expectedSecretName)
+		}
 	}
 }

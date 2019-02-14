@@ -31,6 +31,7 @@ type testJoinData struct{}
 // testJoinData must satisfy JoinData.
 var _ JoinData = &testJoinData{}
 
+func (j *testJoinData) CertificateKey() string                                      { return "" }
 func (j *testJoinData) Cfg() *kubeadmapi.JoinConfiguration                          { return nil }
 func (j *testJoinData) KubeConfigPath() string                                      { return "" }
 func (j *testJoinData) TLSBootstrapCfg() (*clientcmdapi.Config, error)              { return nil, nil }
