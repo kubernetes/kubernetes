@@ -61,6 +61,7 @@ var (
 
 func init() {
 	prometheus.MustRegister(requestLatency)
+	prometheus.MustRegister(throttleLatency)
 	prometheus.MustRegister(requestResult)
 	metrics.Register(&latencyAdapter{requestLatency}, &latencyAdapter{throttleLatency}, &resultAdapter{requestResult})
 }
