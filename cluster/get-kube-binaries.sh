@@ -174,21 +174,8 @@ echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SE
 echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
 echo
 
-# TODO: remove this check and default to true when we stop shipping server
-# tarballs in kubernetes.tar.gz
-DOWNLOAD_SERVER_TAR=false
-if [[ ! -e "${KUBE_ROOT}/server/${SERVER_TAR}" ]]; then
-  DOWNLOAD_SERVER_TAR=true
-  echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
-
-# TODO: remove this check and default to true when we stop shipping kubectl
-# in kubernetes.tar.gz
-DOWNLOAD_CLIENT_TAR=false
-if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]; then
-  DOWNLOAD_CLIENT_TAR=true
-  echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
+echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
+echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 
 DOWNLOAD_NODE_TAR=false
 if [[ -n "${NODE_TAR:-}" ]]; then
@@ -202,13 +189,6 @@ if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
   echo "Will download and extract kubernetes-test tarball(s) from ${DOWNLOAD_URL_PREFIX}"
 fi
 
-if [[ "${DOWNLOAD_CLIENT_TAR}" == false && \
-      "${DOWNLOAD_SERVER_TAR}" == false && \
-      "${DOWNLOAD_TESTS_TAR}" == false ]]; then
-  echo "Nothing additional to download."
-  exit 0
-fi
-
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
   read -r confirm
@@ -218,20 +198,16 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   fi
 fi
 
-if "${DOWNLOAD_SERVER_TAR}"; then
-  download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
-fi
+download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
 
 if "${DOWNLOAD_NODE_TAR}"; then
   download_tarball "${KUBE_ROOT}/node" "${NODE_TAR}"
 fi
 
-if "${DOWNLOAD_CLIENT_TAR}"; then
-  download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
-  extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
-  ln -s "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}" "${KUBE_ROOT}/client/bin"
-  echo "Add '${KUBE_ROOT}/client/bin' to your PATH to use newly-installed binaries."
-fi
+download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
+extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+ln -s "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}" "${KUBE_ROOT}/client/bin"
+echo "Add '${KUBE_ROOT}/client/bin' to your PATH to use newly-installed binaries."
 
 if "${DOWNLOAD_TESTS_TAR}"; then
   TESTS_PORTABLE_TAR="kubernetes-test-portable.tar.gz"
