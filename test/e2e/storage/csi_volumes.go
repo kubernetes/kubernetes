@@ -205,22 +205,22 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		tests := []struct {
 			name             string
 			driverAttachable bool
-			driverExists     bool
+			deployDriverCRD  bool
 		}{
 			{
 				name:             "should not require VolumeAttach for drivers without attachment",
 				driverAttachable: false,
-				driverExists:     true,
+				deployDriverCRD:  true,
 			},
 			{
 				name:             "should require VolumeAttach for drivers with attachment",
 				driverAttachable: true,
-				driverExists:     true,
+				deployDriverCRD:  true,
 			},
 			{
 				name:             "should preserve attachment policy when no CSIDriver present",
 				driverAttachable: true,
-				driverExists:     false,
+				deployDriverCRD:  false,
 			},
 		}
 
@@ -233,11 +233,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Prefix:    "csi-attach",
 				}
 
-				driver = drivers.InitMockCSIDriver(config, test.driverExists, test.driverAttachable, nil)
+				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, test.driverAttachable, nil)
 				driver.CreateDriver()
 				defer driver.CleanupDriver()
 
-				if test.driverExists {
+				if test.deployDriverCRD {
 					defer destroyCSIDriver(csics, driver)
 				}
 
@@ -308,37 +308,37 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		tests := []struct {
 			name                  string
 			podInfoOnMountVersion *string
-			driverExists          bool
+			deployDriverCRD       bool
 			expectPodInfo         bool
 		}{
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=nil",
 				podInfoOnMountVersion: nil,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should be passed when podInfoOnMountVersion=v1",
 				podInfoOnMountVersion: &podInfoV1,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         true,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<empty string>",
 				podInfoOnMountVersion: &podInfoEmpty,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<unknown string>",
 				podInfoOnMountVersion: &podInfoUnknown,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
-				name:          "should not be passed when CSIDriver does not exist",
-				driverExists:  false,
-				expectPodInfo: false,
+				name:            "should not be passed when CSIDriver does not exist",
+				deployDriverCRD: false,
+				expectPodInfo:   false,
 			},
 		}
 		for _, t := range tests {
@@ -350,11 +350,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Prefix:    "csi-workload",
 				}
 
-				driver = drivers.InitMockCSIDriver(config, test.driverExists, true, test.podInfoOnMountVersion)
+				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, true, test.podInfoOnMountVersion)
 				driver.CreateDriver()
 				defer driver.CleanupDriver()
 
-				if test.driverExists {
+				if test.deployDriverCRD {
 					defer destroyCSIDriver(csics, driver)
 				}
 
