@@ -261,22 +261,6 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	}
 
 	scheduledTime := times[len(times)-1]
-	tooLate := false
-	if sj.Spec.StartingDeadlineSeconds != nil {
-		tooLate = scheduledTime.Add(time.Second * time.Duration(*sj.Spec.StartingDeadlineSeconds)).Before(now)
-	}
-	if tooLate {
-		klog.V(4).Infof("Missed starting window for %s", nameForLog)
-		recorder.Eventf(sj, v1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
-		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
-		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
-		// the sj again and again, we could set a Status.LastMissedTime when we notice a miss.
-		// Then, when we call getRecentUnmetScheduleTimes, we can take max(creationTimestamp,
-		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
-		// and event the next time we process it, and also so the user looking at the status
-		// can see easily that there was a missed execution.
-		return
-	}
 	if sj.Spec.ConcurrencyPolicy == batchv1beta1.ForbidConcurrent && len(sj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
 		// there is some risk that we won't see an active job when there is one.
