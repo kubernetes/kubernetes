@@ -39,6 +39,7 @@
 		{
 			"SelectorRegexp": "k8s[.]io/utils",
 			"AllowedPrefixes": [
+				"k8s.io/utils/diff"
 				"k8s.io/utils/exec",
 				"k8s.io/utils/integer",
 				"k8s.io/utils/path",
