@@ -1643,7 +1643,7 @@ var (
 			"ext2",
 			"ext3",
 			"ext4",
-			"xfs",
+			//"xfs", disabled see issue https://github.com/kubernetes/kubernetes/issues/74095
 		),
 	}
 	// max file size
