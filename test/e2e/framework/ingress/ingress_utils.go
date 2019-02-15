@@ -54,7 +54,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -760,7 +759,7 @@ func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]
 	svcPorts := make(map[string]v1.ServicePort)
 	if includeDefaultBackend {
 		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		svcPorts[defaultBackendName] = defaultSvc.Spec.Ports[0]
 	}
 
@@ -775,7 +774,7 @@ func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]
 	}
 	for _, svcName := range backendSvcs {
 		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
 	return svcPorts

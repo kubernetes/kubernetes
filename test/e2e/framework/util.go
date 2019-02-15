@@ -829,7 +829,7 @@ func LogContainersInPodsWithLabels(c clientset.Interface, ns string, match map[s
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), "Failed to get namespace list")
+	ExpectNoError(err, "Failed to get namespace list")
 	var deleted []string
 	var wg sync.WaitGroup
 OUTER:
@@ -1835,7 +1835,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		Expect(err).NotTo(HaveOccurred(), "Failed to get endpoints for %s/%s", ns, name)
+		ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
@@ -1867,7 +1867,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
-	Expect(err).NotTo(HaveOccurred(), "Failed to get list of currentPods in namespace: %s", r.ns)
+	ExpectNoError(err, "Failed to get list of currentPods in namespace: %s", r.ns)
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
 		if !isElementOf(pod.UID, currentPods) {
@@ -2303,7 +2303,7 @@ func (b kubectlBuilder) ExecOrDie() string {
 		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return str
 }
 
@@ -2498,7 +2498,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred(), "failed to list events in namespace %q", namespace)
+	ExpectNoError(err, "failed to list events in namespace %q", namespace)
 
 	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
@@ -3481,7 +3481,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		tweak(execPod)
 	}
 	created, err := client.CoreV1().Pods(ns).Create(execPod)
-	Expect(err).NotTo(HaveOccurred(), "failed to create new exec pod in namespace: %s", ns)
+	ExpectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
@@ -3492,7 +3492,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return created.Name
 }
 
@@ -3517,13 +3517,13 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 		},
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace %s", name, ns)
+	ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	Expect(err).NotTo(HaveOccurred(), "failed to delete pod %s in namespace %s", name, ns)
+	ExpectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
