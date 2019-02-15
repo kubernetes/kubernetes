@@ -25,11 +25,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 func TestAddGlobalFlags(t *testing.T) {
-	namedFlagSets := &apiserverflag.NamedFlagSets{}
+	namedFlagSets := &cliflag.NamedFlagSets{}
 	nfs := namedFlagSets.FlagSet("global")
 	AddGlobalFlags(nfs, "test-cmd")
 

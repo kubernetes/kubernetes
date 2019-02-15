@@ -27,8 +27,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
@@ -431,11 +431,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	}
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
+	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
@@ -456,7 +456,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(utilflag.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 

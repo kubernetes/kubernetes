@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 )
 
@@ -48,7 +48,7 @@ func main() {
 	m := newMasqTestProxy()
 	m.AddFlags(pflag.CommandLine)
 
-	flag.InitFlags()
+	cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

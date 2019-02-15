@@ -27,11 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -289,7 +289,7 @@ func TestAddFlags(t *testing.T) {
 			CloudProvider:   "azure",
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
-			RuntimeConfig: utilflag.ConfigurationMap{},
+			RuntimeConfig: cliflag.ConfigurationMap{},
 		},
 		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,

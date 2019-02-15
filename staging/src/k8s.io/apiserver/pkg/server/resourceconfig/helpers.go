@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
 )
 
@@ -56,7 +56,7 @@ func MergeResourceEncodingConfigs(
 // not registered in group, then it will fail.
 func MergeAPIResourceConfigs(
 	defaultAPIResourceConfig *serverstore.ResourceConfig,
-	resourceConfigOverrides utilflag.ConfigurationMap,
+	resourceConfigOverrides cliflag.ConfigurationMap,
 	registry GroupVersionRegistry,
 ) (*serverstore.ResourceConfig, error) {
 	resourceConfig := defaultAPIResourceConfig
@@ -134,7 +134,7 @@ func MergeAPIResourceConfigs(
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+func getRuntimeConfigValue(overrides cliflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {
@@ -150,7 +150,7 @@ func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, d
 }
 
 // ParseGroups takes in resourceConfig and returns parsed groups.
-func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
+func ParseGroups(resourceConfig cliflag.ConfigurationMap) ([]string, error) {
 	groups := []string{}
 	for key := range resourceConfig {
 		if key == "api/all" {
