@@ -146,7 +146,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
 			// the ingress before the controller is ready we will leak.
-			// By("restaring glbc")
+			// By("restarting glbc")
 			// restarter := NewRestartConfig(
 			//	 framework.GetMasterHost(), "glbc", glbcHealthzPort, restartPollInterval, restartTimeout)
 			// restarter.restart()

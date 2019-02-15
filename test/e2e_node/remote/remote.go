@@ -69,7 +69,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	// Create the temp staging directory
 	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
-	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
+	// Do not sudo here, so that we can use scp to copy test archive to the directory.
 	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to create workspace directory %q on host %q: %v output: %q", workspace, host, err, output)
