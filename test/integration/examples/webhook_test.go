@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestWebhookLoopback(t *testing.T) {
@@ -40,7 +41,7 @@ func TestWebhookLoopback(t *testing.T) {
 
 	called := int32(0)
 
-	client, _ := startTestServer(t, stopCh, TestServerSetup{
+	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *master.Config) {
