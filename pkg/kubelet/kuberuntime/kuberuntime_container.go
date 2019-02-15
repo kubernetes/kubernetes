@@ -635,7 +635,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 	for name := range initContainerNames {
 		count := 0
 		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) ||
+			if status.Name != name ||
 				(status.State != kubecontainer.ContainerStateExited &&
 					status.State != kubecontainer.ContainerStateUnknown) {
 				continue
@@ -676,7 +676,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 	for name := range initContainerNames {
 		count := 0
 		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) {
+			if status.Name != name {
 				continue
 			}
 			count++
