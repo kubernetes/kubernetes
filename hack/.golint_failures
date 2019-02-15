@@ -225,7 +225,6 @@ pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubelet/util
-pkg/kubelet/util/cache
 pkg/kubelet/util/pluginwatcher
 pkg/kubelet/util/queue
 pkg/kubelet/util/sliceutils
