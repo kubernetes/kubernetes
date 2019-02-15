@@ -76,12 +76,13 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 ) error {
 	c.t.Log("calling fake.NodePublishVolume...")
 	req := &csipbv1.NodePublishVolumeRequest{
-		VolumeId:       volID,
-		TargetPath:     targetPath,
-		Readonly:       readOnly,
-		PublishContext: publishContext,
-		VolumeContext:  volumeContext,
-		Secrets:        secrets,
+		VolumeId:          volID,
+		TargetPath:        targetPath,
+		StagingTargetPath: stagingTargetPath,
+		Readonly:          readOnly,
+		PublishContext:    publishContext,
+		VolumeContext:     volumeContext,
+		Secrets:           secrets,
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
 				Mode: asCSIAccessModeV1(accessMode),
