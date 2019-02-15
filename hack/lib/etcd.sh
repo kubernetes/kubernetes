@@ -105,13 +105,18 @@ kube::etcd::cleanup() {
 kube::etcd::install() {
   (
     local os
+    local arch
+
+    os=$(kube::util::host_os)
+    arch=$(kube::util::host_arch)
+
     cd "${KUBE_ROOT}/third_party"
-    os=$(uname | tr "[:upper:]" "[:lower:]")
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
       kube::log::info "etcd v${ETCD_VERSION} already installed at path:"
       kube::log::info "$(pwd)/$(readlink etcd)"
       return  # already installed
     fi
+
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
@@ -120,11 +125,11 @@ kube::etcd::install() {
       ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
       rm "${download_file}"
     else
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
-      download_file="etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
       kube::util::download_file "${url}" "${download_file}"
       tar xzf "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+      ln -fns "etcd-v${ETCD_VERSION}-linux-${arch}" etcd
       rm "${download_file}"
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
