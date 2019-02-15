@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
 	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
@@ -336,6 +337,46 @@ func TestPrepareRun(t *testing.T) {
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+func TestUpdateOpenAPISpec(t *testing.T) {
+	s, _, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
+	server := httptest.NewServer(s.Handler.Director)
+	defer server.Close()
+
+	// verify the static spec in record is what we currently serve
+	oldSpec, err := json.Marshal(s.StaticOpenAPISpec)
+	assert.NoError(err)
+
+	resp, err := http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(oldSpec, body)
+	resp.Body.Close()
+
+	// verify we are able to update the served spec using the exposed service
+	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
+	swagger := new(spec.Swagger)
+	err = json.Unmarshal(newSpec, swagger)
+	assert.NoError(err)
+
+	err = s.OpenAPIVersionedService.UpdateSpec(swagger)
+	assert.NoError(err)
+
+	resp, err = http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	defer resp.Body.Close()
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err = ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(newSpec, body)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
