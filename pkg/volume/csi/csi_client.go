@@ -263,6 +263,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	fsType string,
 	mountOptions []string,
 ) error {
+	fmt.Println("************ stagingTargetPath:", stagingTargetPath)
 	klog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
