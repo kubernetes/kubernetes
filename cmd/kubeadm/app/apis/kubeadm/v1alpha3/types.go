@@ -42,7 +42,7 @@ type InitConfiguration struct {
 	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
 	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
 
-	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
 	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
@@ -144,7 +144,7 @@ type APIEndpoint struct {
 	BindPort int32 `json:"bindPort"`
 }
 
-// NodeRegistrationOptions holds fields that relate to registering a new master or node to the cluster, either via "kubeadm init" or "kubeadm join"
+// NodeRegistrationOptions holds fields that relate to registering a new control-plane or node to the cluster, either via "kubeadm init" or "kubeadm join"
 type NodeRegistrationOptions struct {
 
 	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
@@ -156,7 +156,7 @@ type NodeRegistrationOptions struct {
 	CRISocket string `json:"criSocket,omitempty"`
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
-	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an
+	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
 	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint `json:"taints,omitempty"`
 
@@ -178,7 +178,7 @@ type Networking struct {
 
 // BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
 type BootstrapToken struct {
-	// Token is used for establishing bidirectional trust between nodes and masters.
+	// Token is used for establishing bidirectional trust between nodes and control-planes.
 	// Used for joining nodes in the cluster.
 	Token *BootstrapTokenString `json:"token"`
 	// Description sets a human-friendly message why this token exists and what it's used
@@ -251,18 +251,18 @@ type ExternalEtcd struct {
 type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
 
 	// CACertPath is the path to the SSL certificate authority used to
-	// secure comunications between node and master.
+	// secure comunications between node and control-plane.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
 	CACertPath string `json:"caCertPath"`
 	// DiscoveryFile is a file or url to a kubeconfig file from which to
 	// load cluster information.
 	DiscoveryFile string `json:"discoveryFile"`
 	// DiscoveryToken is a token used to validate cluster information
-	// fetched from the master.
+	// fetched from the control-plane.
 	DiscoveryToken string `json:"discoveryToken"`
 	// DiscoveryTokenAPIServers is a set of IPs to API servers from which info
 	// will be fetched. Currently we only pay attention to one API server but
@@ -291,7 +291,7 @@ type JoinConfiguration struct {
 
 	// DiscoveryTokenUnsafeSkipCAVerification allows token-based discovery
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
-	// the security of kubeadm since other nodes can impersonate the master.
+	// the security of kubeadm since other nodes can impersonate the control-plane.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
 
 	// ControlPlane flag specifies that the joining node should host an additional

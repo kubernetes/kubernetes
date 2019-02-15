@@ -101,7 +101,7 @@ const (
 	// TokenDescription flag sets the description of the token
 	TokenDescription = "description"
 
-	// TLSBootstrapToken flag sets the token used to temporarily authenticate with the Kubernetes Master to submit a certificate signing request (CSR) for a locally created key pair
+	// TLSBootstrapToken flag sets the token used to temporarily authenticate with the Kubernetes Control Plane to submit a certificate signing request (CSR) for a locally created key pair
 	TLSBootstrapToken = "tls-bootstrap-token"
 
 	// TokenDiscovery flag sets the token used to validate cluster information fetched from the API server (for token-based discovery)
