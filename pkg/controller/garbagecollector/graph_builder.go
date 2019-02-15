@@ -180,9 +180,8 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 		// need to clone because it's from a shared cache
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
 		return shared.Informer().GetController(), shared.Informer().GetStore(), nil
-	} else {
-		klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 	}
+	klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 
 	// TODO: consider store in one storage.
 	klog.V(5).Infof("create storage for resource %s", resource)

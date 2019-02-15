@@ -204,10 +204,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 
 	// set the source, retry a few times in case we are competing with other writers
 	Eventually(func() error {
-		if err := setNodeConfigSource(f, src); err != nil {
-			return err
-		}
-		return nil
+		return setNodeConfigSource(f, src)
 	}, time.Minute, time.Second).Should(BeNil())
 
 	// poll for new config, for a maximum wait of restartGap
@@ -427,9 +424,8 @@ func restartKubelet() {
 func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
-	} else {
-		return cgroupName.ToCgroupfs()
 	}
+	return cgroupName.ToCgroupfs()
 }
 
 // reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)

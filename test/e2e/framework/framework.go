@@ -551,13 +551,12 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	portsFunc := func() []v1.ServicePort {
 		if contPort < 1 || svcPort < 1 {
 			return nil
-		} else {
-			return []v1.ServicePort{{
-				Protocol:   v1.ProtocolTCP,
-				Port:       int32(svcPort),
-				TargetPort: intstr.FromInt(contPort),
-			}}
 		}
+		return []v1.ServicePort{{
+			Protocol:   v1.ProtocolTCP,
+			Port:       int32(svcPort),
+			TargetPort: intstr.FromInt(contPort),
+		}}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
@@ -746,15 +745,13 @@ func passesPodNameFilter(pod v1.Pod, name string) bool {
 func passesVerifyFilter(pod v1.Pod, verify func(p v1.Pod) (bool, error)) (bool, error) {
 	if verify == nil {
 		return true, nil
-	} else {
-		verified, err := verify(pod)
-		// If an error is returned, by definition, pod verification fails
-		if err != nil {
-			return false, err
-		} else {
-			return verified, nil
-		}
 	}
+	verified, err := verify(pod)
+	// If an error is returned, by definition, pod verification fails
+	if err != nil {
+		return false, err
+	}
+	return verified, nil
 }
 
 func passesPhasesFilter(pod v1.Pod, validPhases []v1.PodPhase) bool {

@@ -363,10 +363,7 @@ func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path s
 		return err
 	}
 	// write the file
-	if err := ioutil.WriteFile(path, data, 0755); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(path, data, 0755)
 }
 
 // createPodDirectory creates pod directory.
@@ -400,19 +397,15 @@ contexts:
   name: local-context
 current-context: local-context`)
 
-	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(path, kubeconfig, 0666)
 }
 
 func createRootDirectory(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return os.MkdirAll(path, os.FileMode(0755))
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }

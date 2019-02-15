@@ -243,9 +243,8 @@ func (s *server) Start(stayUp bool) error {
 	s.config.BaseURL.Host = listener.Addr().String()
 	if s.config.TLSConfig != nil {
 		return s.server.ServeTLS(listener, "", "") // Use certs from TLSConfig.
-	} else {
-		return s.server.Serve(listener)
 	}
+	return s.server.Serve(listener)
 }
 
 func (s *server) Stop() error {

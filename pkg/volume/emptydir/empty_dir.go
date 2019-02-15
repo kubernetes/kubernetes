@@ -399,11 +399,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 func (ed *emptyDir) teardownDefault(dir string) error {
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err := os.RemoveAll(dir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
@@ -413,10 +409,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(dir); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func (ed *emptyDir) getMetaDir() string {

@@ -363,11 +363,7 @@ func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	// Call Portworx Detach Volume.
-	if err := c.manager.DetachVolume(c); err != nil {
-		return err
-	}
-
-	return nil
+	return c.manager.DetachVolume(c)
 }
 
 type portworxVolumeDeleter struct {

@@ -35,9 +35,8 @@ func TestTolerateBootstrapFailure(t *testing.T) {
 		defer fakeGetSucceedLock.RUnlock()
 		if fakeGetSucceed {
 			return nil, nil
-		} else {
-			return nil, fmt.Errorf("this error shouldn't be exposed to caller")
 		}
+		return nil, fmt.Errorf("this error shouldn't be exposed to caller")
 	}
 	poller := newPoller(fakeGetFn)
 	poller.bootstrapGracePeriod = 100 * time.Second

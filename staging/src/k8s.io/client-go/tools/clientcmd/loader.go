@@ -414,10 +414,7 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 		}
 	}
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(filename, content, 0600)
 }
 
 func lockFile(filename string) error {
@@ -505,11 +502,7 @@ func RelativizeClusterLocalPaths(cluster *clientcmdapi.Cluster) error {
 	if err := ResolvePaths(GetClusterFileReferences(cluster), base); err != nil {
 		return err
 	}
-	if err := RelativizePathWithNoBacksteps(GetClusterFileReferences(cluster), base); err != nil {
-		return err
-	}
-
-	return nil
+	return RelativizePathWithNoBacksteps(GetClusterFileReferences(cluster), base)
 }
 
 // RelativizeAuthInfoLocalPaths first absolutizes the paths by calling ResolveLocalPaths.  This assumes that any NEW path is already
@@ -526,11 +519,7 @@ func RelativizeAuthInfoLocalPaths(authInfo *clientcmdapi.AuthInfo) error {
 	if err := ResolvePaths(GetAuthInfoFileReferences(authInfo), base); err != nil {
 		return err
 	}
-	if err := RelativizePathWithNoBacksteps(GetAuthInfoFileReferences(authInfo), base); err != nil {
-		return err
-	}
-
-	return nil
+	return RelativizePathWithNoBacksteps(GetAuthInfoFileReferences(authInfo), base)
 }
 
 func RelativizeConfigPaths(config *clientcmdapi.Config, base string) error {

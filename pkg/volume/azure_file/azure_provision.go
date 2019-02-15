@@ -74,20 +74,20 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 		return nil, err
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName
-	if accountName, accountKey, err := util.GetAzureCredentials(plugin.host, secretNamespace, secretName); err != nil {
+	accountName, accountKey, err := util.GetAzureCredentials(plugin.host, secretNamespace, secretName)
+	if err != nil {
 		return nil, err
-	} else {
-		return &azureFileDeleter{
-			azureFile: &azureFile{
-				volName: spec.Name(),
-				plugin:  plugin,
-			},
-			shareName:     shareName,
-			accountName:   accountName,
-			accountKey:    accountKey,
-			azureProvider: azure,
-		}, nil
 	}
+	return &azureFileDeleter{
+		azureFile: &azureFile{
+			volName: spec.Name(),
+			plugin:  plugin,
+		},
+		shareName:     shareName,
+		accountName:   accountName,
+		accountKey:    accountKey,
+		azureProvider: azure,
+	}, nil
 }
 
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {

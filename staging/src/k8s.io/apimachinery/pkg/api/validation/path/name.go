@@ -62,7 +62,6 @@ func IsValidPathSegmentPrefix(name string) []string {
 func ValidatePathSegmentName(name string, prefix bool) []string {
 	if prefix {
 		return IsValidPathSegmentPrefix(name)
-	} else {
-		return IsValidPathSegmentName(name)
 	}
+	return IsValidPathSegmentName(name)
 }

@@ -470,18 +470,18 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 				}
 			}
 			return false, nil
-		} else {
-			for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
-				if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-					Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						set.Status.UpdateRevision,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
-					return false, nil
-				}
+		}
+		for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
+			if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+				Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					set.Status.UpdateRevision,
+					pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
+				return false, nil
 			}
 		}
+
 		return true, nil
 	})
 	return set, pods

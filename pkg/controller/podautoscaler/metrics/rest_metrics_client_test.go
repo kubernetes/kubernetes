@@ -156,41 +156,41 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				}
 
 				return true, &metrics, nil
-			} else {
-				name := getForAction.GetName()
-				mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
-				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
-				gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
-				mapping, err := mapper.RESTMapping(gk)
-				if err != nil {
-					return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
-				}
-				groupResource := mapping.Resource.GroupResource()
-
-				assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
-				assert.Equal(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
-				metricPoint := tc.reportedMetricPoints[0]
-				timestamp := offsetTimestampBy(metricPoint.timestamp)
-
-				metrics := &cmapi.MetricValueList{
-					Items: []cmapi.MetricValue{
-						{
-							DescribedObject: v1.ObjectReference{
-								Kind:       tc.singleObject.Kind,
-								APIVersion: tc.singleObject.APIVersion,
-								Name:       tc.singleObject.Name,
-							},
-							Timestamp: metav1.Time{Time: timestamp},
-							Metric: cmapi.MetricIdentifier{
-								Name: tc.metricName,
-							},
-							Value: *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
-						},
-					},
-				}
-
-				return true, metrics, nil
 			}
+			name := getForAction.GetName()
+			mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+			assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
+			gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
+			mapping, err := mapper.RESTMapping(gk)
+			if err != nil {
+				return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
+			}
+			groupResource := mapping.Resource.GroupResource()
+
+			assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
+			assert.Equal(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
+			metricPoint := tc.reportedMetricPoints[0]
+			timestamp := offsetTimestampBy(metricPoint.timestamp)
+
+			metrics := &cmapi.MetricValueList{
+				Items: []cmapi.MetricValue{
+					{
+						DescribedObject: v1.ObjectReference{
+							Kind:       tc.singleObject.Kind,
+							APIVersion: tc.singleObject.APIVersion,
+							Name:       tc.singleObject.Name,
+						},
+						Timestamp: metav1.Time{Time: timestamp},
+						Metric: cmapi.MetricIdentifier{
+							Name: tc.metricName,
+						},
+						Value: *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
+					},
+				},
+			}
+
+			return true, metrics, nil
+
 		})
 	}
 

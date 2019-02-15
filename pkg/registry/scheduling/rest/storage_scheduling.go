@@ -87,9 +87,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 						_, err := schedClientSet.PriorityClasses().Create(pc)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
-						} else {
-							klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 						}
+						klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)

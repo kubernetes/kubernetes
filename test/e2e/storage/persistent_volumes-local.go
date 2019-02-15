@@ -1248,20 +1248,18 @@ func createWriteCmd(testDir string, testFile string, writeTestFileContent string
 		// Cleanup the file containing testFileContent.
 		deleteTestFileCmd := fmt.Sprintf("rm %s", testFilePath)
 		return fmt.Sprintf("%s && %s && %s && %s", writeTestFileCmd, sudoCmd, writeBlockCmd, deleteTestFileCmd)
-	} else {
-		testFilePath := filepath.Join(testDir, testFile)
-		return fmt.Sprintf("mkdir -p %s; echo %s > %s", testDir, writeTestFileContent, testFilePath)
 	}
+	testFilePath := filepath.Join(testDir, testFile)
+	return fmt.Sprintf("mkdir -p %s; echo %s > %s", testDir, writeTestFileContent, testFilePath)
 }
 func createReadCmd(testFileDir string, testFile string, volumeType localVolumeType) string {
 	if volumeType == BlockLocalVolumeType {
 		// Create the command to read the beginning of the block device and print it in ascii.
 		return fmt.Sprintf("hexdump -n 100 -e '100 \"%%_p\"' %s | head -1", testFileDir)
-	} else {
-		// Create the command to read (aka cat) a file.
-		testFilePath := filepath.Join(testFileDir, testFile)
-		return fmt.Sprintf("cat %s", testFilePath)
 	}
+	// Create the command to read (aka cat) a file.
+	testFilePath := filepath.Join(testFileDir, testFile)
+	return fmt.Sprintf("cat %s", testFilePath)
 }
 
 // Read testFile and evaluate whether it contains the testFileContent

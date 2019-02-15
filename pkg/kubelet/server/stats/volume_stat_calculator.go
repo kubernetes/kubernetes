@@ -79,11 +79,11 @@ func (s *volumeStatCalculator) StopOnce() *volumeStatCalculator {
 
 // getLatest returns the most recent PodVolumeStats from the cache
 func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
-	if result := s.latest.Load(); result == nil {
+	result := s.latest.Load()
+	if result == nil {
 		return PodVolumeStats{}, false
-	} else {
-		return result.(PodVolumeStats), true
 	}
+	return result.(PodVolumeStats), true
 }
 
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.

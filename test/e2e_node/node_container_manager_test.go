@@ -269,8 +269,5 @@ func runTest(f *framework.Framework) error {
 	}
 	// Expect process ID limit system reserved cgroup to equal configured value `1000`.
 	systemReservedPIDs := resource.MustParse(currentConfig.SystemReserved[string(pidlimit.PIDs)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupManager.Name(systemReservedCgroupName), "pids.max"), systemReservedPIDs.Value(), 0); err != nil {
-		return err
-	}
-	return nil
+	return expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupManager.Name(systemReservedCgroupName), "pids.max"), systemReservedPIDs.Value(), 0)
 }

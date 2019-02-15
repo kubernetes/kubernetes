@@ -574,9 +574,8 @@ func waitForStatefulSetReplicasNotReady(statefulSetName, ns string, c clientset.
 				framework.Logf("%d replicas are ready out of a total of %d replicas in StatefulSet %s. (%v)",
 					sts.Status.ReadyReplicas, *sts.Spec.Replicas, statefulSetName, time.Since(start))
 				return nil
-			} else {
-				framework.Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 			}
+			framework.Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 		}
 	}
 	return fmt.Errorf("All replicas in StatefulSet %s are still ready within %v", statefulSetName, timeout)

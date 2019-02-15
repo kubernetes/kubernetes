@@ -57,15 +57,10 @@ func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.Dyna
 func (prober *flexVolumeProber) Init() error {
 	prober.testAndSetProbeAllNeeded(true)
 	prober.eventsMap = map[string]volume.ProbeOperation{}
-
 	if err := prober.createPluginDir(); err != nil {
 		return err
 	}
-	if err := prober.initWatcher(); err != nil {
-		return err
-	}
-
-	return nil
+	return prober.initWatcher()
 }
 
 // If probeAllNeeded is true, probe all pluginDir

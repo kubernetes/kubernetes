@@ -344,10 +344,7 @@ func ValidateKubeletServer(s *KubeletServer) error {
 	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
 		return err
 	}
-	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {
-		return err
-	}
-	return nil
+	return ValidateKubeletFlags(&s.KubeletFlags)
 }
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet

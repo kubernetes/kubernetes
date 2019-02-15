@@ -283,11 +283,11 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		}
 		keyCert.CertFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".crt")
 		keyCert.KeyFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".key")
-		if canRead, err := certutil.CanReadCertAndKey(keyCert.CertFile, keyCert.KeyFile); err != nil {
+		canRead, err := certutil.CanReadCertAndKey(keyCert.CertFile, keyCert.KeyFile)
+		if err != nil {
 			return err
-		} else {
-			canReadCertAndKey = canRead
 		}
+		canReadCertAndKey = canRead
 	}
 
 	if !canReadCertAndKey {

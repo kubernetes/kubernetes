@@ -1793,13 +1793,11 @@ var _ = SIGDescribe("Services", func() {
 				if strings.Contains(strings.ToLower(err.Error()), expectedErr) {
 					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
 					return true, nil
-				} else {
-					framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
-					return false, nil
 				}
-			} else {
-				return true, errors.New("expected wget call to fail")
+				framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
+				return false, nil
 			}
+			return true, errors.New("expected wget call to fail")
 		}); pollErr != nil {
 			Expect(pollErr).NotTo(HaveOccurred())
 		}

@@ -160,10 +160,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletc
 	}
 
 	// Need to SNAT outbound traffic from cluster
-	if err = plugin.ensureMasqRule(); err != nil {
-		return err
-	}
-	return nil
+	return plugin.ensureMasqRule()
 }
 
 // TODO: move thic logic into cni bridge plugin and remove this from kubenet

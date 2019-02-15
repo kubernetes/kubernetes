@@ -970,9 +970,8 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 			if pv.Status.Phase == phase {
 				Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
 				return nil
-			} else {
-				Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 			}
+			Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 		}
 	}
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
@@ -990,9 +989,8 @@ func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Int
 			if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
 				Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
 				return nil
-			} else {
-				Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 			}
+			Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 		}
 	}
 	return fmt.Errorf("StatefulSet %s still has unready pods within %v", statefulSetName, timeout)
@@ -1010,9 +1008,8 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 			if apierrs.IsNotFound(err) {
 				Logf("PersistentVolume %s was removed", pvName)
 				return nil
-			} else {
-				Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 			}
+			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 		}
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
@@ -1615,9 +1612,8 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 		if pod.Status.Phase == v1.PodFailed {
 			if pod.Status.Reason == reason { // short-circuit waitForPodCondition's loop
 				return true, nil
-			} else {
-				return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 			}
+			return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 		}
 		return false, nil
 	})
@@ -2126,9 +2122,8 @@ func LoadConfig() (*restclient.Config, error) {
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
@@ -3601,41 +3596,40 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				if wantTrue {
 					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
 						return true
-					} else {
-						msg := ""
-						if !hasNodeControllerTaints {
-							msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-						} else {
-							msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-						}
-						if !silent {
-							Logf(msg)
-						}
-						return false
 					}
-				} else {
-					// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-					if cond.Status != v1.ConditionTrue {
-						return true
+					msg := ""
+					if !hasNodeControllerTaints {
+						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					} else {
+						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+						Logf(msg)
 					}
 					return false
+
 				}
-			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
-				return true
-			} else {
+				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
+				if cond.Status != v1.ConditionTrue {
+					return true
+				}
 				if !silent {
 					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
+
 			}
+			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
+				return true
+			}
+			if !silent {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+			}
+			return false
 		}
 
 	}

@@ -264,10 +264,7 @@ func validateVolume(src *v1.GitRepoVolumeSource) error {
 	if err := validateNonFlagArgument(src.Revision, "revision"); err != nil {
 		return err
 	}
-	if err := validateNonFlagArgument(src.Directory, "directory"); err != nil {
-		return err
-	}
-	return nil
+	return validateNonFlagArgument(src.Directory, "directory")
 }
 
 // gitRepoVolumeUnmounter cleans git repo volumes.

@@ -258,8 +258,7 @@ func checkPodAge(pod *v1.Pod) error {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		klog.Warningf(message)
 		return errors.New(message)
-	} else {
-		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		return nil
 	}
+	klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+	return nil
 }

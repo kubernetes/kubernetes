@@ -640,15 +640,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
-					} else {
-						framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
-						return false, nil
 					}
-
-				} else {
-					framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+					framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
 					return false, nil
 				}
+				framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+				return false, nil
 			})
 		})
 

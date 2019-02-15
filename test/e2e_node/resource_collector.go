@@ -459,12 +459,12 @@ const kubeletProcessName = "kubelet"
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
 	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
+		pid, err := getPidFromPidFile(pidFile)
+		if err == nil {
 			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
 		}
+		// log the error and fall back to pidof
+		runtime.HandleError(err)
 	}
 	return procfs.PidOf(name)
 }

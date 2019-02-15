@@ -650,10 +650,8 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 		}
 		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 			return err
-		} else {
-			set = obj.(*apps.StatefulSet)
 		}
-
+		set = obj.(*apps.StatefulSet)
 	}
 	return assertMonotonicInvariants(set, spc)
 }
@@ -703,9 +701,8 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 		fakeWorker(ssc)
 		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 			return err
-		} else {
-			set = obj.(*apps.StatefulSet)
 		}
+		set = obj.(*apps.StatefulSet)
 	}
 	return assertMonotonicInvariants(set, spc)
 }

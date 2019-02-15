@@ -221,10 +221,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
-		return err
-	}
-	return nil
+	return c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile)
 }
 
 // createPortAndServiceSpec creates an array of service ports.

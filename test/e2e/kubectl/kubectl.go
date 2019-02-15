@@ -2105,9 +2105,8 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		framework.Logf("Unmarshalled json jpg/img => %s , expecting %s .", data, jpgExpected)
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
-		} else {
-			return fmt.Errorf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected)
 		}
+		return fmt.Errorf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected)
 	}
 }
 

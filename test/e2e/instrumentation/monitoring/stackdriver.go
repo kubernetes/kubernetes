@@ -154,9 +154,8 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
-				} else {
-					correctUtilization = true
 				}
+				correctUtilization = true
 			}
 		}
 		if counter < 9 || !correctUtilization {

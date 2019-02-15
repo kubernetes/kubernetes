@@ -68,9 +68,8 @@ var timestamp = getTimestamp()
 func getConformanceTestImageName(systemSpecName string) string {
 	if systemSpecName == "" {
 		return fmt.Sprintf("%s/node-test-%s:%s", conformanceRegistry, conformanceArch, timestamp)
-	} else {
-		return fmt.Sprintf("%s/node-test-%s-%s:%s", conformanceRegistry, systemSpecName, conformanceArch, timestamp)
 	}
+	return fmt.Sprintf("%s/node-test-%s-%s:%s", conformanceRegistry, systemSpecName, conformanceArch, timestamp)
 }
 
 // buildConformanceTest builds node conformance test image tarball into binDir.

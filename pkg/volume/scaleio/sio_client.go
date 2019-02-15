@@ -269,10 +269,7 @@ func (c *sioClient) DetachVolume(id sioVolumeID) error {
 	}
 	volClient := sio.NewVolume(c.client)
 	volClient.Volume = &siotypes.Volume{ID: string(id)}
-	if err := volClient.UnmapVolumeSdc(params); err != nil {
-		return err
-	}
-	return nil
+	return volClient.UnmapVolumeSdc(params)
 }
 
 // DeleteVolume deletes the volume with the specified id
@@ -287,10 +284,7 @@ func (c *sioClient) DeleteVolume(id sioVolumeID) error {
 	}
 	volClient := sio.NewVolume(c.client)
 	volClient.Volume = vol
-	if err := volClient.RemoveVolume("ONLY_ME"); err != nil {
-		return err
-	}
-	return nil
+	return volClient.RemoveVolume("ONLY_ME")
 }
 
 // IID returns the scaleio instance id for node

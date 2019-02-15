@@ -359,9 +359,8 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 
 		if failIfNonEmpty {
 			return len(curr.Status.Active) == 0, nil
-		} else {
-			return len(curr.Status.Active) != 0, nil
 		}
+		return len(curr.Status.Active) != 0, nil
 	})
 }
 

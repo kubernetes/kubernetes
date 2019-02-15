@@ -156,37 +156,37 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 
 	if e.nodeCacheCapable {
 		return e.filterUsingNodeCache(args)
-	} else {
-		for _, node := range args.Nodes.Items {
-			fits := true
-			for _, predicate := range e.predicates {
-				fit, err := predicate(args.Pod, &node)
-				if err != nil {
-					return &schedulerapi.ExtenderFilterResult{
-						Nodes:       &v1.NodeList{},
-						NodeNames:   nil,
-						FailedNodes: schedulerapi.FailedNodesMap{},
-						Error:       err.Error(),
-					}, err
-				}
-				if !fit {
-					fits = false
-					break
-				}
+	}
+	for _, node := range args.Nodes.Items {
+		fits := true
+		for _, predicate := range e.predicates {
+			fit, err := predicate(args.Pod, &node)
+			if err != nil {
+				return &schedulerapi.ExtenderFilterResult{
+					Nodes:       &v1.NodeList{},
+					NodeNames:   nil,
+					FailedNodes: schedulerapi.FailedNodesMap{},
+					Error:       err.Error(),
+				}, err
 			}
-			if fits {
-				filtered = append(filtered, node)
-			} else {
-				failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
+			if !fit {
+				fits = false
+				break
 			}
 		}
-
-		return &schedulerapi.ExtenderFilterResult{
-			Nodes:       &v1.NodeList{Items: filtered},
-			NodeNames:   nil,
-			FailedNodes: failedNodesMap,
-		}, nil
+		if fits {
+			filtered = append(filtered, node)
+		} else {
+			failedNodesMap[node.Name] = fmt.Sprintf("extender failed: %s", e.name)
+		}
 	}
+
+	return &schedulerapi.ExtenderFilterResult{
+		Nodes:       &v1.NodeList{Items: filtered},
+		NodeNames:   nil,
+		FailedNodes: failedNodesMap,
+	}, nil
+
 }
 
 func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.HostPriorityList, error) {

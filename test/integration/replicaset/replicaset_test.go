@@ -450,10 +450,9 @@ func TestAdoption(t *testing.T) {
 				}
 				if e, a := tc.expectedOwnerReferences(rs), updatedPod.OwnerReferences; reflect.DeepEqual(e, a) {
 					return true, nil
-				} else {
-					t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
-					return false, nil
 				}
+				t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
+				return false, nil
 			}); err != nil {
 				t.Fatalf("test %q failed: %v", tc.name, err)
 			}

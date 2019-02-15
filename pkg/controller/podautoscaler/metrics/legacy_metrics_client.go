@@ -217,9 +217,8 @@ func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) 
 
 		if newest.FloatValue != nil {
 			return int64(floatSum / float64(floatSumCount) * 1000), newest.Timestamp, true
-		} else {
-			return (intSum * 1000) / int64(intSumCount), newest.Timestamp, true
 		}
+		return (intSum * 1000) / int64(intSumCount), newest.Timestamp, true
 	}
 
 	return 0, time.Time{}, false

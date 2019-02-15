@@ -204,11 +204,11 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 }
 
 func ReadDockerConfigFileFromUrl(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
-	if contents, err := ReadUrl(url, client, header); err != nil {
+	contents, err := ReadUrl(url, client, header)
+	if err != nil {
 		return nil, err
-	} else {
-		return readDockerConfigFileFromBytes(contents)
 	}
+	return readDockerConfigFileFromBytes(contents)
 }
 
 func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {

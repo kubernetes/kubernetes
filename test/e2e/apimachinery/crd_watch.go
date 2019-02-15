@@ -159,8 +159,6 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return client.Resource(gvr).Namespace(ns)
-	} else {
-		return client.Resource(gvr)
 	}
-
+	return client.Resource(gvr)
 }

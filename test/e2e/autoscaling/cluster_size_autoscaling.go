@@ -1064,12 +1064,11 @@ func getGKEClusterURL(apiVersion string) string {
 			framework.TestContext.CloudConfig.ProjectID,
 			framework.TestContext.CloudConfig.Region,
 			framework.TestContext.CloudConfig.Cluster))
-	} else {
-		return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
-			framework.TestContext.CloudConfig.ProjectID,
-			framework.TestContext.CloudConfig.Zone,
-			framework.TestContext.CloudConfig.Cluster))
 	}
+	return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
+		framework.TestContext.CloudConfig.ProjectID,
+		framework.TestContext.CloudConfig.Zone,
+		framework.TestContext.CloudConfig.Cluster))
 }
 
 func getCluster(apiVersion string) (string, error) {
@@ -1107,9 +1106,8 @@ func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 func getClusterLocation() string {
 	if isRegionalCluster() {
 		return "--region=" + framework.TestContext.CloudConfig.Region
-	} else {
-		return "--zone=" + framework.TestContext.CloudConfig.Zone
 	}
+	return "--zone=" + framework.TestContext.CloudConfig.Zone
 }
 
 func getGcloudCommandFromTrack(commandTrack string, args []string) []string {

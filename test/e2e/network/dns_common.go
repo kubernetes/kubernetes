@@ -137,9 +137,8 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 
 	if stdout == "" {
 		return []string{}
-	} else {
-		return strings.Split(stdout, "\n")
 	}
+	return strings.Split(stdout, "\n")
 }
 
 func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {

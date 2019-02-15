@@ -57,7 +57,6 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
 func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols framework.PVMap, claims framework.PVCMap, expectPhase v1.PersistentVolumePhase) error {
-	var err error
 
 	// 1. verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
@@ -82,10 +81,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 
 	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
 	By("Deleting PVCs to invoke reclaim policy")
-	if err = framework.DeletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase); err != nil {
-		return err
-	}
-	return nil
+	return framework.DeletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase)
 }
 
 var _ = utils.SIGDescribe("PersistentVolumes", func() {

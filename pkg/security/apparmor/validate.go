@@ -199,12 +199,10 @@ func getAppArmorFS() (string, error) {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {
 					return "", fmt.Errorf("%s: %v", msg, err)
-				} else {
-					return "", errors.New(msg)
 				}
-			} else {
-				return appArmorFS, nil
+				return "", errors.New(msg)
 			}
+			return appArmorFS, nil
 		}
 	}
 	if err := scanner.Err(); err != nil {

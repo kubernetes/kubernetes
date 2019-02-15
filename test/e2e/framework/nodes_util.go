@@ -187,11 +187,7 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	}
 
 	// move .config to .config.<version>
-	if err := os.Rename(originalConfigPath, updatedConfigPath); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Rename(originalConfigPath, updatedConfigPath)
 }
 
 func NodeUpgrade(f *Framework, v string, img string) error {

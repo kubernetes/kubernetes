@@ -643,8 +643,5 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 	if err := runtime.FieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
 		return err
 	}
-	if err := runtime.FieldPtr(v, "Kind", &a.kind); err != nil {
-		return err
-	}
-	return nil
+	return runtime.FieldPtr(v, "Kind", &a.kind)
 }

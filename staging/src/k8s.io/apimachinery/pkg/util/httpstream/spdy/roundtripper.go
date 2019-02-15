@@ -202,9 +202,8 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 		if s.Dialer == nil {
 			var d net.Dialer
 			return d.DialContext(ctx, "tcp", dialAddr)
-		} else {
-			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
 		}
+		return s.Dialer.DialContext(ctx, "tcp", dialAddr)
 	}
 
 	// TODO validate the TLSClientConfig is set up?

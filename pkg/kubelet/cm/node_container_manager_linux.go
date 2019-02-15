@@ -135,10 +135,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 	if !cgroupManager.Exists(cgroupConfig.Name) {
 		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
 	}
-	if err := cgroupManager.Update(cgroupConfig); err != nil {
-		return err
-	}
-	return nil
+	return cgroupManager.Update(cgroupConfig)
 }
 
 // getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.

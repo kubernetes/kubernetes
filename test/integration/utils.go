@@ -57,13 +57,11 @@ func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, in
 		_, err := podClient.Get(podName, metav1.GetOptions{})
 		if err == nil {
 			return false, nil
-		} else {
-			if errors.IsNotFound(err) {
-				return true, nil
-			} else {
-				return false, err
-			}
 		}
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
 	})
 }
 

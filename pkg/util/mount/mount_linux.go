@@ -898,10 +898,7 @@ func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error 
 			}
 
 			// pass through errors and let doCleanSubPath handle them
-			if err = doCleanSubPath(mounter, fullContainerDirPath, filepath.Base(path)); err != nil {
-				return err
-			}
-			return nil
+			return doCleanSubPath(mounter, fullContainerDirPath, filepath.Base(path))
 		})
 		if err != nil {
 			return fmt.Errorf("error processing %s: %s", fullContainerDirPath, err)
@@ -952,11 +949,7 @@ func cleanSubPath(mounter Interface, subpath Subpath) error {
 	}
 
 	// Recusively remove directories if empty
-	if err := removeEmptyDirs(subpath.PodDir, containerDir); err != nil {
-		return err
-	}
-
-	return nil
+	return removeEmptyDirs(subpath.PodDir, containerDir)
 }
 
 // removeEmptyDirs works backwards from endDir to baseDir and removes each directory

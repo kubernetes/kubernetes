@@ -443,10 +443,7 @@ func strategicPatchObject(
 		return errors.NewBadRequest(err.Error())
 	}
 
-	if err := applyPatchToObject(defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj); err != nil {
-		return err
-	}
-	return nil
+	return applyPatchToObject(defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj)
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,

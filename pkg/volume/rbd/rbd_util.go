@@ -223,10 +223,10 @@ func execRbdMap(b rbdMounter, rbdCmd string, mon string) ([]byte, error) {
 	if b.Secret != "" {
 		return b.exec.Run(rbdCmd,
 			"map", imgPath, "--id", b.Id, "-m", mon, "--key="+b.Secret)
-	} else {
-		return b.exec.Run(rbdCmd,
-			"map", imgPath, "--id", b.Id, "-m", mon, "-k", b.Keyring)
 	}
+	return b.exec.Run(rbdCmd,
+		"map", imgPath, "--id", b.Id, "-m", mon, "-k", b.Keyring)
+
 }
 
 // Check if rbd-nbd tools are installed.
@@ -783,8 +783,7 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	if strings.Contains(output, imageWatcherStr) {
 		klog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
 		return true, output, nil
-	} else {
-		klog.Warningf("rbd: no watchers on %s", b.Image)
-		return false, output, nil
 	}
+	klog.Warningf("rbd: no watchers on %s", b.Image)
+	return false, output, nil
 }

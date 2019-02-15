@@ -67,9 +67,5 @@ func WriteConfigFile(fileName string, cfg *kubeschedulerconfig.KubeSchedulerConf
 		return err
 	}
 	defer configFile.Close()
-	if err := encoder.Encode(cfg, configFile); err != nil {
-		return err
-	}
-
-	return nil
+	return encoder.Encode(cfg, configFile)
 }

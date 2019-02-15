@@ -243,9 +243,8 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 
 	if !metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
-	} else {
-		return ctrl.syncBoundClaim(claim)
 	}
+	return ctrl.syncBoundClaim(claim)
 }
 
 // checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
@@ -347,91 +346,89 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				return err
 			}
 			return nil
-		} else /* pv != nil */ {
-			// Found a PV for this claim
-			// OBSERVATION: pvc is "Pending", pv is "Available"
-			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), volume.Name, getVolumeStatusForLogging(volume))
-			if err = ctrl.bind(volume, claim); err != nil {
-				// On any error saving the volume or the claim, subsequent
-				// syncClaim will finish the binding.
-				return err
-			}
-			// OBSERVATION: claim is "Bound", pv is "Bound"
-			return nil
-		}
-	} else /* pvc.Spec.VolumeName != nil */ {
-		// [Unit test set 2]
-		// User asked for a specific PV.
-		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested", claimToClaimKey(claim), claim.Spec.VolumeName)
-		obj, found, err := ctrl.volumes.store.GetByKey(claim.Spec.VolumeName)
-		if err != nil {
+		} /* pv != nil */
+		// Found a PV for this claim
+		// OBSERVATION: pvc is "Pending", pv is "Available"
+		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), volume.Name, getVolumeStatusForLogging(volume))
+		if err = ctrl.bind(volume, claim); err != nil {
+			// On any error saving the volume or the claim, subsequent
+			// syncClaim will finish the binding.
 			return err
 		}
-		if !found {
-			// User asked for a PV that does not exist.
-			// OBSERVATION: pvc is "Pending"
-			// Retry later.
-			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and not found, will try again next time", claimToClaimKey(claim), claim.Spec.VolumeName)
+		// OBSERVATION: claim is "Bound", pv is "Bound"
+		return nil
+
+	} /* pvc.Spec.VolumeName != nil */
+	// [Unit test set 2]
+	// User asked for a specific PV.
+	klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested", claimToClaimKey(claim), claim.Spec.VolumeName)
+	obj, found, err := ctrl.volumes.store.GetByKey(claim.Spec.VolumeName)
+	if err != nil {
+		return err
+	}
+	if !found {
+		// User asked for a PV that does not exist.
+		// OBSERVATION: pvc is "Pending"
+		// Retry later.
+		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and not found, will try again next time", claimToClaimKey(claim), claim.Spec.VolumeName)
+		if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
+			return err
+		}
+		return nil
+	}
+	volume, ok := obj.(*v1.PersistentVolume)
+	if !ok {
+		return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
+	}
+	klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
+	if volume.Spec.ClaimRef == nil {
+		// User asked for a PV that is not claimed
+		// OBSERVATION: pvc is "Pending", pv is "Available"
+		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
+		if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
+			klog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
+			// send an event
+			msg := fmt.Sprintf("Cannot bind to requested volume %q: %s", volume.Name, err)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, msg)
+			// volume does not satisfy the requirements of the claim
+			if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
+				return err
+			}
+		} else if err = ctrl.bind(volume, claim); err != nil {
+			// On any error saving the volume or the claim, subsequent
+			// syncClaim will finish the binding.
+			return err
+		}
+		// OBSERVATION: pvc is "Bound", pv is "Bound"
+		return nil
+	} else if IsVolumeBoundToClaim(volume, claim) {
+		// User asked for a PV that is claimed by this PVC
+		// OBSERVATION: pvc is "Pending", pv is "Bound"
+		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound, finishing the binding", claimToClaimKey(claim))
+
+		// Finish the volume binding by adding claim UID.
+		if err = ctrl.bind(volume, claim); err != nil {
+			return err
+		}
+		// OBSERVATION: pvc is "Bound", pv is "Bound"
+		return nil
+	} else {
+		// User asked for a PV that is claimed by someone else
+		// OBSERVATION: pvc is "Pending", pv is "Bound"
+		if !metav1.HasAnnotation(claim.ObjectMeta, annBoundByController) {
+			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
+			// User asked for a specific PV, retry later
 			if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 				return err
 			}
 			return nil
-		} else {
-			volume, ok := obj.(*v1.PersistentVolume)
-			if !ok {
-				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
-			}
-			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
-			if volume.Spec.ClaimRef == nil {
-				// User asked for a PV that is not claimed
-				// OBSERVATION: pvc is "Pending", pv is "Available"
-				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
-				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
-					klog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
-					// send an event
-					msg := fmt.Sprintf("Cannot bind to requested volume %q: %s", volume.Name, err)
-					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, msg)
-					// volume does not satisfy the requirements of the claim
-					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
-						return err
-					}
-				} else if err = ctrl.bind(volume, claim); err != nil {
-					// On any error saving the volume or the claim, subsequent
-					// syncClaim will finish the binding.
-					return err
-				}
-				// OBSERVATION: pvc is "Bound", pv is "Bound"
-				return nil
-			} else if IsVolumeBoundToClaim(volume, claim) {
-				// User asked for a PV that is claimed by this PVC
-				// OBSERVATION: pvc is "Pending", pv is "Bound"
-				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound, finishing the binding", claimToClaimKey(claim))
-
-				// Finish the volume binding by adding claim UID.
-				if err = ctrl.bind(volume, claim); err != nil {
-					return err
-				}
-				// OBSERVATION: pvc is "Bound", pv is "Bound"
-				return nil
-			} else {
-				// User asked for a PV that is claimed by someone else
-				// OBSERVATION: pvc is "Pending", pv is "Bound"
-				if !metav1.HasAnnotation(claim.ObjectMeta, annBoundByController) {
-					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
-					// User asked for a specific PV, retry later
-					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
-						return err
-					}
-					return nil
-				} else {
-					// This should never happen because someone had to remove
-					// annBindCompleted annotation on the claim.
-					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
-					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
-				}
-			}
 		}
+		// This should never happen because someone had to remove
+		// annBindCompleted annotation on the claim.
+		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
+		return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 	}
+
 }
 
 // syncBoundClaim is the main controller method to decide what to do with a

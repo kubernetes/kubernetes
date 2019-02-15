@@ -292,10 +292,9 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		if found {
 			klog.V(4).Infof("GetVolume: found %s", volume.Name)
 			return true, volume.DeepCopy(), nil
-		} else {
-			klog.V(4).Infof("GetVolume: volume %s not found", name)
-			return true, nil, fmt.Errorf("Cannot find volume %s", name)
 		}
+		klog.V(4).Infof("GetVolume: volume %s not found", name)
+		return true, nil, fmt.Errorf("Cannot find volume %s", name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
@@ -303,10 +302,9 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		if found {
 			klog.V(4).Infof("GetClaim: found %s", claim.Name)
 			return true, claim.DeepCopy(), nil
-		} else {
-			klog.V(4).Infof("GetClaim: claim %s not found", name)
-			return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
 		}
+		klog.V(4).Infof("GetClaim: claim %s not found", name)
+		return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("delete", "persistentvolumes"):
 		name := action.(core.DeleteAction).GetName()
@@ -319,9 +317,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			}
 			r.changedSinceLastSync++
 			return true, nil, nil
-		} else {
-			return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
 		}
+		return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
 
 	case action.Matches("delete", "persistentvolumeclaims"):
 		name := action.(core.DeleteAction).GetName()
@@ -334,9 +331,8 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			}
 			r.changedSinceLastSync++
 			return true, nil, nil
-		} else {
-			return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
 		}
+		return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
 	}
 
 	return false, nil, nil
@@ -975,9 +971,8 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 func wrapTestWithReclaimCalls(operation operationType, expectedOperationCalls []error, toWrap testCall) testCall {
 	if operation == operationDelete {
 		return wrapTestWithPluginCalls(nil, expectedOperationCalls, nil, toWrap)
-	} else {
-		return wrapTestWithPluginCalls(expectedOperationCalls, nil, nil, toWrap)
 	}
+	return wrapTestWithPluginCalls(expectedOperationCalls, nil, nil, toWrap)
 }
 
 // wrapTestWithProvisionCalls returns a testCall that:
@@ -1294,9 +1289,8 @@ func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.P
 		klog.V(4).Infof("mock plugin NewProvisioner called, returning mock provisioner")
 		plugin.provisionOptions = options
 		return plugin, nil
-	} else {
-		return nil, fmt.Errorf("Mock plugin error: no provisionCalls configured")
 	}
+	return nil, fmt.Errorf("Mock plugin error: no provisionCalls configured")
 }
 
 func (plugin *mockVolumePlugin) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
@@ -1347,9 +1341,8 @@ func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) 
 		// mockVolumePlugin directly implements Deleter interface
 		klog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")
 		return plugin, nil
-	} else {
-		return nil, fmt.Errorf("Mock plugin error: no deleteCalls configured")
 	}
+	return nil, fmt.Errorf("Mock plugin error: no deleteCalls configured")
 }
 
 func (plugin *mockVolumePlugin) Delete() error {

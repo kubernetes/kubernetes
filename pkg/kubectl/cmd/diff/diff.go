@@ -371,10 +371,7 @@ func (d *Differ) Diff(obj Object, printer Printer) error {
 	if err := d.From.Print(obj, printer); err != nil {
 		return err
 	}
-	if err := d.To.Print(obj, printer); err != nil {
-		return err
-	}
-	return nil
+	return d.To.Print(obj, printer)
 }
 
 // Run runs the diff program against both directories.

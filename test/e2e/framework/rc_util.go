@@ -180,10 +180,9 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
-		} else {
-			Logf("ReplicationController %s in namespace %s found.", name, namespace)
-			return exist, nil
 		}
+		Logf("ReplicationController %s in namespace %s found.", name, namespace)
+		return exist, nil
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}

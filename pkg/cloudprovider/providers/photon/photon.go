@@ -375,46 +375,45 @@ func (pc *PCCloud) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 			if err != nil {
 				klog.Errorf("Photon Cloud Provider: GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
 				return nodeAddrs, err
-			} else {
-				task, err = photonClient.Tasks.Wait(task.ID)
-				if err != nil {
-					klog.Errorf("Photon Cloud Provider: Wait task for GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
-					return nodeAddrs, err
-				} else {
-					networkConnections := task.ResourceProperties.(map[string]interface{})
-					networks := networkConnections["networkConnections"].([]interface{})
-					for _, nt := range networks {
-						ipAddr := "-"
-						macAddr := "-"
-						network := nt.(map[string]interface{})
-						if val, ok := network["ipAddress"]; ok && val != nil {
-							ipAddr = val.(string)
-						}
-						if val, ok := network["macAddress"]; ok && val != nil {
-							macAddr = val.(string)
-						}
-						if ipAddr != "-" {
-							if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
-								strings.HasPrefix(macAddr, MAC_OUI_ESX) {
-								nodehelpers.AddToNodeAddresses(&nodeAddrs,
-									v1.NodeAddress{
-										Type:    v1.NodeExternalIP,
-										Address: ipAddr,
-									},
-								)
-							} else {
-								nodehelpers.AddToNodeAddresses(&nodeAddrs,
-									v1.NodeAddress{
-										Type:    v1.NodeInternalIP,
-										Address: ipAddr,
-									},
-								)
-							}
-						}
+			}
+			task, err = photonClient.Tasks.Wait(task.ID)
+			if err != nil {
+				klog.Errorf("Photon Cloud Provider: Wait task for GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
+				return nodeAddrs, err
+			}
+			networkConnections := task.ResourceProperties.(map[string]interface{})
+			networks := networkConnections["networkConnections"].([]interface{})
+			for _, nt := range networks {
+				ipAddr := "-"
+				macAddr := "-"
+				network := nt.(map[string]interface{})
+				if val, ok := network["ipAddress"]; ok && val != nil {
+					ipAddr = val.(string)
+				}
+				if val, ok := network["macAddress"]; ok && val != nil {
+					macAddr = val.(string)
+				}
+				if ipAddr != "-" {
+					if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
+						strings.HasPrefix(macAddr, MAC_OUI_ESX) {
+						nodehelpers.AddToNodeAddresses(&nodeAddrs,
+							v1.NodeAddress{
+								Type:    v1.NodeExternalIP,
+								Address: ipAddr,
+							},
+						)
+					} else {
+						nodehelpers.AddToNodeAddresses(&nodeAddrs,
+							v1.NodeAddress{
+								Type:    v1.NodeInternalIP,
+								Address: ipAddr,
+							},
+						)
 					}
-					return nodeAddrs, nil
 				}
 			}
+			return nodeAddrs, nil
+
 		}
 	}
 

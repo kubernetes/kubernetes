@@ -126,9 +126,9 @@ func (s *server) start() error {
 		if err != nil {
 			errCh <- fmt.Errorf("failed to create file %q for `%s` %v.", outPath, s, err)
 			return
-		} else {
-			klog.Infof("Output file for server %q: %v", s.name, outfile.Name())
 		}
+		klog.Infof("Output file for server %q: %v", s.name, outfile.Name())
+
 		defer outfile.Close()
 		defer outfile.Sync()
 

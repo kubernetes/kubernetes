@@ -338,10 +338,7 @@ func (g *Cloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string,
 				return err
 			}
 			klog.Infof("ensureExternalLoadBalancerDeleted(%s): Deleting target pool.", lbRefStr)
-			if err := g.DeleteExternalTargetPoolAndChecks(service, loadBalancerName, g.region, clusterID, hcNames...); err != nil {
-				return err
-			}
-			return nil
+			return g.DeleteExternalTargetPoolAndChecks(service, loadBalancerName, g.region, clusterID, hcNames...)
 		},
 	)
 	if errs != nil {
@@ -1072,10 +1069,7 @@ func (g *Cloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredN
 	if err := deleteFWDRuleWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier); err != nil {
 		return err
 	}
-	if err := deleteAddressWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier); err != nil {
-		return err
-	}
-	return nil
+	return deleteAddressWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier)
 }
 
 // deleteFWDRuleWithWrongTier checks the network tier of existing forwarding

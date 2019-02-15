@@ -552,10 +552,7 @@ func TestSafeMakeDir(t *testing.T) {
 				if err := os.Symlink(filepath.Join(base, "test2"), filepath.Join(base, "test1/dir")); err != nil {
 					return err
 				}
-				if err := os.Symlink(filepath.Join(base, "test1"), filepath.Join(base, "test2/dir")); err != nil {
-					return err
-				}
-				return nil
+				return os.Symlink(filepath.Join(base, "test1"), filepath.Join(base, "test2/dir"))
 			},
 			"test1/dir/dir/dir/dir/dir/dir/dir/foo",
 			"test2/foo",
@@ -1724,10 +1721,7 @@ func TestFindExistingPrefix(t *testing.T) {
 				if err := os.Symlink(filepath.Join(base, "test2"), filepath.Join(base, "test1/dir")); err != nil {
 					return err
 				}
-				if err := os.Symlink(filepath.Join(base, "test1"), filepath.Join(base, "test2/dir")); err != nil {
-					return err
-				}
-				return nil
+				return os.Symlink(filepath.Join(base, "test1"), filepath.Join(base, "test2/dir"))
 			},
 			"test1/dir/dir/foo/bar",
 			"test1/dir/dir",

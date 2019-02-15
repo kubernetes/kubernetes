@@ -186,9 +186,8 @@ func (o TaintOptions) validateFlags() error {
 	if !o.all && o.selector == "" {
 		if len(o.resources) < 2 {
 			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
-		} else {
-			return nil
 		}
+		return nil
 	}
 	return nil
 }

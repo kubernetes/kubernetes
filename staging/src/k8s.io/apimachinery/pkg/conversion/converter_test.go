@@ -115,10 +115,9 @@ func TestConverter_MismatchedTypes(t *testing.T) {
 		func(in *[]string, out *int, s Scope) error {
 			if str, err := strconv.Atoi((*in)[0]); err != nil {
 				return err
-			} else {
-				*out = str
-				return nil
 			}
+			*out = str
+			return nil
 		},
 	)
 	if err != nil {
@@ -549,10 +548,9 @@ func TestConverter_MapElemAddr(t *testing.T) {
 		func(in *string, out *int, s Scope) error {
 			if str, err := strconv.Atoi(*in); err != nil {
 				return err
-			} else {
-				*out = str
-				return nil
 			}
+			*out = str
+			return nil
 		},
 	)
 	if err != nil {

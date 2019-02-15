@@ -329,9 +329,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			// stasis.
 			if len(pods.Items) > 0 {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc to create some pods: %v", err)
 		}
@@ -383,9 +382,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -449,9 +447,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -631,9 +628,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -663,13 +659,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("%d pods has nil DeletionTimestamp", count)
 				framework.Logf("")
 				return false, nil
-			} else {
-				if errors.IsNotFound(err) {
-					return true, nil
-				} else {
-					return false, err
-				}
 			}
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
 		}); err != nil {
 			pods, err2 := podClient.List(metav1.ListOptions{})
 			if err2 != nil {
@@ -729,9 +723,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			if rc1.Status.Replicas == *rc1.Spec.Replicas {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -768,13 +761,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("%d pods has nil DeletionTimestamp", count)
 				framework.Logf("")
 				return false, nil
-			} else {
-				if errors.IsNotFound(err) {
-					return true, nil
-				} else {
-					return false, err
-				}
 			}
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
 		}); err != nil {
 			pods, err2 := podClient.List(metav1.ListOptions{})
 			if err2 != nil {
@@ -860,9 +851,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			if len(pods.Items) == 0 {
 				return true, nil
-			} else {
-				return false, nil
 			}
+			return false, nil
 		}); err != nil {
 			framework.Logf("pods are %#v", pods.Items)
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)

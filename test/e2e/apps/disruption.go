@@ -207,9 +207,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 					err = cs.CoreV1().Pods(ns).Evict(e)
 					if err != nil {
 						return false, nil
-					} else {
-						return true, nil
 					}
+					return true, nil
 				})
 				Expect(err).NotTo(HaveOccurred())
 			}

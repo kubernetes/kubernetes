@@ -97,11 +97,11 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
 // is eagerly populated in the background, and never calculated on the fly.
 func (s *fsResourceAnalyzer) GetPodVolumeStats(uid types.UID) (PodVolumeStats, bool) {
 	cache := s.cachedVolumeStats.Load().(Cache)
-	if statCalc, found := cache[uid]; !found {
+	statCalc, found := cache[uid]
+	if !found {
 		// TODO: Differentiate between stats being empty
 		// See issue #20679
 		return PodVolumeStats{}, false
-	} else {
-		return statCalc.GetLatest()
 	}
+	return statCalc.GetLatest()
 }

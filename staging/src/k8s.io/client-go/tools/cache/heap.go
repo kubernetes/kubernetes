@@ -251,9 +251,8 @@ func (h *Heap) Pop() (interface{}, error) {
 	obj := heap.Pop(h.data)
 	if obj != nil {
 		return obj, nil
-	} else {
-		return nil, fmt.Errorf("object was removed from heap data")
 	}
+	return nil, fmt.Errorf("object was removed from heap data")
 }
 
 // List returns a list of all the items.

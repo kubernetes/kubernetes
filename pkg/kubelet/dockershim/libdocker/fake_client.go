@@ -698,11 +698,11 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 }
 
 func (f *FakeDockerClient) isAuthorizedForImage(image string, auth dockertypes.AuthConfig) bool {
-	if reqd, exists := f.ImageIDsNeedingAuth[image]; !exists {
+	reqd, exists := f.ImageIDsNeedingAuth[image]
+	if !exists {
 		return true // no auth needed
-	} else {
-		return auth.Username == reqd.Username && auth.Password == reqd.Password
 	}
+	return auth.Username == reqd.Username && auth.Password == reqd.Password
 }
 
 // PullImage is a test-spy implementation of Interface.PullImage.

@@ -622,12 +622,11 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 			return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
 		}
 		return nil
-	} else {
-		if foundAttributes.Len() != 0 {
-			return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
-		}
-		return nil
 	}
+	if foundAttributes.Len() != 0 {
+		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
+	}
+	return nil
 }
 
 func addSingleCSIZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *storagev1.StorageClass, zone string) {

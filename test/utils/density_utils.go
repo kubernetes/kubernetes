@@ -78,9 +78,8 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 		if err != nil {
 			if !apierrs.IsConflict(err) {
 				return err
-			} else {
-				klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
 			}
+			klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
 		} else {
 			break
 		}

@@ -137,11 +137,11 @@ func (s *sourceFile) produceWatchEvent(e *inotify.Event) error {
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 	switch e.eventType {
 	case podAdd, podModify:
-		if pod, err := s.extractFromFile(e.fileName); err != nil {
+		pod, err := s.extractFromFile(e.fileName)
+		if err != nil {
 			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
-		} else {
-			return s.store.Add(pod)
 		}
+		return s.store.Add(pod)
 	case podDelete:
 		if objKey, keyExist := s.fileKeyMapping[e.fileName]; keyExist {
 			pod, podExist, err := s.store.GetByKey(objKey)
@@ -152,9 +152,8 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 			} else {
 				if err = s.store.Delete(pod); err != nil {
 					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
-				} else {
-					delete(s.fileKeyMapping, e.fileName)
 				}
+				delete(s.fileKeyMapping, e.fileName)
 			}
 		}
 	}

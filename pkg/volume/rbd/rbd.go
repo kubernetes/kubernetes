@@ -196,9 +196,8 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 	expandedSize, err := expander.ResizeImage(oldSize, newSize)
 	if err != nil {
 		return oldSize, err
-	} else {
-		return expandedSize, nil
 	}
+	return expandedSize, nil
 }
 
 func (plugin *rbdPlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
@@ -640,9 +639,8 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			for _, f := range arr {
 				if !supportedFeatures.Has(f) {
 					return nil, fmt.Errorf("invalid feature %q for volume plugin %s, supported features are: %v", f, r.plugin.GetPluginName(), supportedFeatures)
-				} else {
-					r.imageFeatures = append(r.imageFeatures, f)
 				}
+				r.imageFeatures = append(r.imageFeatures, f)
 			}
 		case volume.VolumeParameterFSType:
 			fstype = v
@@ -1070,9 +1068,8 @@ func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, e
 	if spec.PersistentVolume != nil {
 		if spec.PersistentVolume.Spec.RBD != nil {
 			return spec.PersistentVolume.Spec.AccessModes, nil
-		} else {
-			return nil, fmt.Errorf("Spec does not reference a RBD volume type")
 		}
+		return nil, fmt.Errorf("Spec does not reference a RBD volume type")
 	}
 
 	return nil, nil

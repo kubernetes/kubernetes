@@ -1553,9 +1553,8 @@ func TestServePortForward(t *testing.T) {
 			if test.redirect {
 				assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
 				return
-			} else {
-				assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 			}
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
 			require.NoError(t, err, "creating streaming connection")

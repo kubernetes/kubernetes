@@ -1187,9 +1187,8 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 		}
 		if len(remainingPVs) > 0 {
 			return false, nil // Poll until no PVs remain
-		} else {
-			return true, nil // No PVs remain
 		}
+		return true, nil // No PVs remain
 	})
 	return remainingPVs, err
 }

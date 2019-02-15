@@ -420,9 +420,8 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 						err = cs.CoreV1().Pods(ns).Evict(evictTarget)
 						if err != nil {
 							return false, nil
-						} else {
-							return true, nil
 						}
+						return true, nil
 					})
 					Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to evict host0Pod after %v", podEvictTimeout))
 				}

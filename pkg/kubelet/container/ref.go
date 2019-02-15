@@ -54,9 +54,8 @@ func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 		if here.Name == container.Name {
 			if here.Name == "" {
 				return fmt.Sprintf("spec.containers[%d]", i), nil
-			} else {
-				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
 			}
+			return fmt.Sprintf("spec.containers{%s}", here.Name), nil
 		}
 	}
 	for i := range pod.Spec.InitContainers {
@@ -64,9 +63,8 @@ func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 		if here.Name == container.Name {
 			if here.Name == "" {
 				return fmt.Sprintf("spec.initContainers[%d]", i), nil
-			} else {
-				return fmt.Sprintf("spec.initContainers{%s}", here.Name), nil
 			}
+			return fmt.Sprintf("spec.initContainers{%s}", here.Name), nil
 		}
 	}
 	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)

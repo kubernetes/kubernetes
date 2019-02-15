@@ -2220,9 +2220,8 @@ func TestUpdateNode(t *testing.T) {
 				expectedCreates: func() int {
 					if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 						return 0
-					} else {
-						return 1
 					}
+					return 1
 				},
 			},
 		}

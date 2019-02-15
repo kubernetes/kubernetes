@@ -80,11 +80,11 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
-	if server, ok := servers[name]; !ok {
+	server, ok := servers[name]
+	if !ok {
 		return nil, fmt.Errorf("Component not found: %s", name)
-	} else {
-		return rs.getComponentStatus(name, server), nil
 	}
+	return rs.getComponentStatus(name, server), nil
 }
 
 func ToConditionStatus(s probe.Result) api.ConditionStatus {

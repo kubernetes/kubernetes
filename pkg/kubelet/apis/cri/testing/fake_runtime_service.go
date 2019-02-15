@@ -496,9 +496,5 @@ func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 
 	r.Called = append(r.Called, "ReopenContainerLog")
 
-	if err := r.popError("ReopenContainerLog"); err != nil {
-		return err
-	}
-
-	return nil
+	return r.popError("ReopenContainerLog")
 }

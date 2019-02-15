@@ -400,11 +400,7 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 	// invoke cmd binary relaying the current environment and args given
 	// remainingArgs will always have at least one element.
 	// execve will make remainingArgs[0] the "binary name".
-	if err := pluginHandler.Execute(foundBinaryPath, append([]string{foundBinaryPath}, cmdArgs[len(remainingArgs):]...), os.Environ()); err != nil {
-		return err
-	}
-
-	return nil
+	return pluginHandler.Execute(foundBinaryPath, append([]string{foundBinaryPath}, cmdArgs[len(remainingArgs):]...), os.Environ())
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.

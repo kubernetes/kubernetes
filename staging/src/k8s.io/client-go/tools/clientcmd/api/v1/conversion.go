@@ -71,10 +71,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return err
 			}
 			out.Extensions = make(map[string]runtime.Object)
-			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
-				return err
-			}
-			return nil
+			return s.Convert(&in.Extensions, &out.Extensions, 0)
 		},
 		func(in *api.Config, out *Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
@@ -95,10 +92,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return err
 			}
 			out.Extensions = make([]NamedExtension, 0, 0)
-			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
-				return err
-			}
-			return nil
+			return s.Convert(&in.Extensions, &out.Extensions, 0)
 		},
 		func(in *[]NamedCluster, out *map[string]*api.Cluster, s conversion.Scope) error {
 			for _, curr := range *in {

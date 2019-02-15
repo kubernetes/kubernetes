@@ -207,9 +207,9 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 }
 
 func GetBool(params map[string]string, key string, defValue bool) (bool, error) {
-	if val, found := params[key]; !found {
+	val, found := params[key]
+	if !found {
 		return defValue, nil
-	} else {
-		return strconv.ParseBool(val)
 	}
+	return strconv.ParseBool(val)
 }

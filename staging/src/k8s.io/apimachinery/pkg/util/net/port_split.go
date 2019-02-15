@@ -51,9 +51,8 @@ func SplitSchemeNamePort(id string) (scheme, name, port string, valid bool) {
 
 	if len(name) > 0 && validSchemes.Has(scheme) {
 		return scheme, name, port, true
-	} else {
-		return "", "", "", false
 	}
+	return "", "", "", false
 }
 
 // JoinSchemeNamePort returns a string that specifies the scheme, name, and port:

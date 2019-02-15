@@ -114,10 +114,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err := AddFieldLabelConversionsForNamespace(scheme); err != nil {
 		return err
 	}
-	if err := AddFieldLabelConversionsForSecret(scheme); err != nil {
-		return err
-	}
-	return nil
+	return AddFieldLabelConversionsForSecret(scheme)
 }
 
 func Convert_v1_ReplicationController_To_apps_ReplicaSet(in *v1.ReplicationController, out *apps.ReplicaSet, s conversion.Scope) error {
@@ -125,10 +122,7 @@ func Convert_v1_ReplicationController_To_apps_ReplicaSet(in *v1.ReplicationContr
 	if err := Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
-	return nil
+	return Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus(&in.Status, &out.Status, s)
 }
 
 func Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
@@ -176,10 +170,7 @@ func Convert_apps_ReplicaSet_To_v1_ReplicationController(in *apps.ReplicaSet, ou
 		}
 		out.Annotations[v1.NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
 	}
-	if err := Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
-	return nil
+	return Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus(&in.Status, &out.Status, s)
 }
 
 func Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(in *apps.ReplicaSetSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {

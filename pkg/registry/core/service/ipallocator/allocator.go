@@ -19,10 +19,11 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"math/big"
 	"net"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -271,9 +272,8 @@ func RangeSize(subnet *net.IPNet) int64 {
 	// the bitmap to 64k.
 	if bits == 128 && (bits-ones) >= 16 {
 		return int64(1) << uint(16)
-	} else {
-		return int64(1) << uint(bits-ones)
 	}
+	return int64(1) << uint(bits-ones)
 }
 
 // GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.

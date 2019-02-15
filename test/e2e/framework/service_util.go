@@ -1290,10 +1290,7 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
-	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {
-		return err
-	}
-	return nil
+	return clientset.CoreV1().Services(ns).Delete(name, nil)
 }
 
 // VerifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the
@@ -1497,12 +1494,12 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 	var tracker affinityTracker
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		if execPod != nil {
-			if stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+			stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			if err != nil {
 				Logf("Failed to get response from %s. Retry until timeout", targetIpPort)
 				return false, nil
-			} else {
-				tracker.recordHost(stdout)
 			}
+			tracker.recordHost(stdout)
 		} else {
 			rawResponse := jig.GetHTTPContent(targetIp, targetPort, timeout, "")
 			tracker.recordHost(rawResponse.String())
@@ -1525,17 +1522,17 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 		if pollErr != wait.ErrWaitTimeout {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
-		} else {
-			if !trackerFulfilled {
-				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
-			}
-			if shouldHold {
-				checkAffinityFailed(tracker, "Affinity should hold but didn't.")
-			} else {
-				checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
-			}
-			return true
 		}
+		if !trackerFulfilled {
+			checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
+		}
+		if shouldHold {
+			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
+		} else {
+			checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
+		}
+		return true
+
 	}
 	return true
 }

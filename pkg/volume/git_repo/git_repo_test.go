@@ -330,11 +330,10 @@ func doTestPlugin(scenario struct {
 			allErrs = append(allErrs,
 				fmt.Errorf("SetUp() failed, volume path not created: %s", path))
 			return allErrs
-		} else {
-			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed: %v", err))
-			return allErrs
 		}
+		allErrs = append(allErrs,
+			fmt.Errorf("SetUp() failed: %v", err))
+		return allErrs
 	}
 
 	// gitRepo volume should create its own empty wrapper path

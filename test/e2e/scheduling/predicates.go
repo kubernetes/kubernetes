@@ -726,9 +726,8 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 		if !printed {
 			printed = true
 			return msg
-		} else {
-			return ""
 		}
+		return ""
 	}
 
 	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
@@ -745,9 +744,8 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 		if !printed {
 			printed = true
 			return msg
-		} else {
-			return ""
 		}
+		return ""
 	}
 
 	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))

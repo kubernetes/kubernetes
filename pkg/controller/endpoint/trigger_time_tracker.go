@@ -123,10 +123,9 @@ func (t *TriggerTimeTracker) ComputeEndpointsLastChangeTriggerTime(
 	if !wasKnown {
 		// New Endpoints object / new Service, use Service creationTimestamp.
 		return service.CreationTimestamp.Time
-	} else {
-		// Regular update of the Endpoints object, return min of changed trigger times.
-		return minChangedTriggerTime
 	}
+	// Regular update of the Endpoints object, return min of changed trigger times.
+	return minChangedTriggerTime
 }
 
 // DeleteEndpoints deletes endpoints state stored in this util.

@@ -217,9 +217,8 @@ func getMatchingGlobalIP(addrs []net.Addr, family AddressFamily) (net.IP, error)
 				if ip.IsGlobalUnicast() {
 					klog.V(4).Infof("IP found %v", ip)
 					return ip, nil
-				} else {
-					klog.V(4).Infof("Non-global unicast address found %v", ip)
 				}
+				klog.V(4).Infof("Non-global unicast address found %v", ip)
 			} else {
 				klog.V(4).Infof("%v is not an IPv%d address", ip, int(family))
 			}
@@ -258,9 +257,8 @@ func getIPFromInterface(intfName string, forFamily AddressFamily, nw networkInte
 func memberOf(ip net.IP, family AddressFamily) bool {
 	if ip.To4() != nil {
 		return family == familyIPv4
-	} else {
-		return family == familyIPv6
 	}
+	return family == familyIPv6
 }
 
 // chooseIPFromHostInterfaces looks at all system interfaces, trying to find one that is up that

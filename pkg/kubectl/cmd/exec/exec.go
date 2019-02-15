@@ -325,9 +325,5 @@ func (p *ExecOptions) Run() error {
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
 
-	if err := t.Safe(fn); err != nil {
-		return err
-	}
-
-	return nil
+	return t.Safe(fn)
 }

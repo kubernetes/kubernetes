@@ -109,10 +109,7 @@ func (s *sshTunnel) Close() error {
 	if s.client == nil {
 		return errors.New("Cannot close tunnel. Tunnel was not opened.")
 	}
-	if err := s.client.Close(); err != nil {
-		return err
-	}
-	return nil
+	return s.client.Close()
 }
 
 // Interface to allow mocking of ssh.Dial, for testing SSH

@@ -66,48 +66,47 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				},
 			},
 		}
-	} else {
-		if tolerationSeconds <= 0 {
-			return &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:                       podName,
-					Namespace:                  ns,
-					Labels:                     map[string]string{"group": podLabel},
-					DeletionGracePeriodSeconds: &grace,
-					// default - tolerate forever
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "pause",
-							Image: "k8s.gcr.io/pause:3.1",
-						},
+	}
+	if tolerationSeconds <= 0 {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:                       podName,
+				Namespace:                  ns,
+				Labels:                     map[string]string{"group": podLabel},
+				DeletionGracePeriodSeconds: &grace,
+				// default - tolerate forever
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "pause",
+						Image: "k8s.gcr.io/pause:3.1",
 					},
-					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
 				},
-			}
-		} else {
-			ts := int64(tolerationSeconds)
-			return &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:                       podName,
-					Namespace:                  ns,
-					Labels:                     map[string]string{"group": podLabel},
-					DeletionGracePeriodSeconds: &grace,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "pause",
-							Image: "k8s.gcr.io/pause:3.1",
-						},
-					},
-					// default - tolerate forever
-					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &ts}},
-				},
-			}
+				Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
+			},
 		}
 	}
+	ts := int64(tolerationSeconds)
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       podName,
+			Namespace:                  ns,
+			Labels:                     map[string]string{"group": podLabel},
+			DeletionGracePeriodSeconds: &grace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: "k8s.gcr.io/pause:3.1",
+				},
+			},
+			// default - tolerate forever
+			Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &ts}},
+		},
+	}
+
 }
 
 // Creates and starts a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
