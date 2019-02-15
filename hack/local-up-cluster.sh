@@ -749,6 +749,14 @@ function start_kubelet {
       image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
     fi
 
+    cgroups_per_qos_args=""
+    if [[ "${DOCKERIZE_KUBELET}" == "true" ]]; then
+        # temporary fix for https://github.com/kubernetes/kubernetes/issues/74144
+      cgroups_per_qos_args="--cgroups-per-qos=false"
+    else
+      cgroups_per_qos_args="--cgroups-per-qos=${CGROUPS_PER_QOS}  --enforce-node-allocatable=pods"
+    fi
+
     all_kubelet_flags=(
       ${priv_arg}
       --v="${LOG_LEVEL}"
@@ -762,7 +770,7 @@ function start_kubelet {
       --feature-gates="${FEATURE_GATES}"
       --cpu-cfs-quota="${CPU_CFS_QUOTA}"
       --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
-      --cgroups-per-qos="${CGROUPS_PER_QOS}"
+      ${cgroups_per_qos_args}
       --cgroup-driver="${CGROUP_DRIVER}"
       --cgroup-root="${CGROUP_ROOT}"
       --eviction-hard="${EVICTION_HARD}"
