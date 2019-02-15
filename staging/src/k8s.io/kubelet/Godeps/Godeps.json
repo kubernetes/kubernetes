@@ -145,6 +145,10 @@
 		{
 			"ImportPath": "k8s.io/klog",
 			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+		},
+		{
+			"ImportPath": "k8s.io/utils/field",
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
 		}
 	]
 }

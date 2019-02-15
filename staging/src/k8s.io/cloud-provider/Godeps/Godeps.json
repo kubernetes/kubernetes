@@ -371,10 +371,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apimachinery/pkg/util/diff",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/errors",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -964,19 +960,27 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
+		},
+		{
+			"ImportPath": "k8s.io/utils/diff",
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
+		},
+		{
+			"ImportPath": "k8s.io/utils/field",
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
 		},
 		{
 			"ImportPath": "k8s.io/utils/net",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "cdba02414f767c89d729b1b9e61d9891f4e82b35"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
