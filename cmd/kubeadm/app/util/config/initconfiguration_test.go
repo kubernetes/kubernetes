@@ -34,16 +34,16 @@ import (
 )
 
 const (
-	master_v1alpha3YAML          = "testdata/conversion/master/v1alpha3.yaml"
-	master_v1alpha3YAMLNonLinux  = "testdata/conversion/master/v1alpha3_non_linux.yaml"
-	master_v1beta1YAML           = "testdata/conversion/master/v1beta1.yaml"
-	master_v1beta1YAMLNonLinux   = "testdata/conversion/master/v1beta1_non_linux.yaml"
-	master_internalYAML          = "testdata/conversion/master/internal.yaml"
-	master_internalYAMLNonLinux  = "testdata/conversion/master/internal_non_linux.yaml"
-	master_incompleteYAML        = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML         = "testdata/defaulting/master/defaulted.yaml"
-	master_defaultedYAMLNonLinux = "testdata/defaulting/master/defaulted_non_linux.yaml"
-	master_invalidYAML           = "testdata/validation/invalid_mastercfg.yaml"
+	masterV1alpha3YAML          = "testdata/conversion/master/v1alpha3.yaml"
+	masterV1alpha3YAMLNonLinux  = "testdata/conversion/master/v1alpha3_non_linux.yaml"
+	masterV1beta1YAML           = "testdata/conversion/master/v1beta1.yaml"
+	masterV1beta1YAMLNonLinux   = "testdata/conversion/master/v1beta1_non_linux.yaml"
+	masterInternalYAML          = "testdata/conversion/master/internal.yaml"
+	masterInternalYAMLNonLinux  = "testdata/conversion/master/internal_non_linux.yaml"
+	masterIncompleteYAML        = "testdata/defaulting/master/incomplete.yaml"
+	masterDefaultedYAML         = "testdata/defaulting/master/defaulted.yaml"
+	masterDefaultedYAMLNonLinux = "testdata/defaulting/master/defaulted_non_linux.yaml"
+	masterInvalidYAML           = "testdata/validation/invalid_mastercfg.yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -131,15 +131,15 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 }
 
 func TestInitConfigurationMarshallingFromFile(t *testing.T) {
-	master_v1alpha3YAMLAbstracted := master_v1alpha3YAML
-	master_v1beta1YAMLAbstracted := master_v1beta1YAML
-	master_internalYAMLAbstracted := master_internalYAML
-	master_defaultedYAMLAbstracted := master_defaultedYAML
+	masterV1alpha3YAMLAbstracted := masterV1alpha3YAML
+	masterV1beta1YAMLAbstracted := masterV1beta1YAML
+	masterInternalYAMLAbstracted := masterInternalYAML
+	masterDefaultedYAMLAbstracted := masterDefaultedYAML
 	if runtime.GOOS != "linux" {
-		master_v1alpha3YAMLAbstracted = master_v1alpha3YAMLNonLinux
-		master_v1beta1YAMLAbstracted = master_v1beta1YAMLNonLinux
-		master_internalYAMLAbstracted = master_internalYAMLNonLinux
-		master_defaultedYAMLAbstracted = master_defaultedYAMLNonLinux
+		masterV1alpha3YAMLAbstracted = masterV1alpha3YAMLNonLinux
+		masterV1beta1YAMLAbstracted = masterV1beta1YAMLNonLinux
+		masterInternalYAMLAbstracted = masterInternalYAMLNonLinux
+		masterDefaultedYAMLAbstracted = masterDefaultedYAMLNonLinux
 	}
 
 	var tests = []struct {
@@ -151,39 +151,39 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
 			name:         "v1alpha3ToInternal",
-			in:           master_v1alpha3YAMLAbstracted,
-			out:          master_internalYAMLAbstracted,
+			in:           masterV1alpha3YAMLAbstracted,
+			out:          masterInternalYAMLAbstracted,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
-			in:           master_v1beta1YAMLAbstracted,
-			out:          master_internalYAMLAbstracted,
+			in:           masterV1beta1YAMLAbstracted,
+			out:          masterInternalYAMLAbstracted,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
 		{ // v1alpha3 -> internal -> v1beta1
 			name:         "v1alpha3Tov1beta1",
-			in:           master_v1alpha3YAMLAbstracted,
-			out:          master_v1beta1YAMLAbstracted,
+			in:           masterV1alpha3YAMLAbstracted,
+			out:          masterV1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
-			in:           master_v1beta1YAMLAbstracted,
-			out:          master_v1beta1YAMLAbstracted,
+			in:           masterV1beta1YAMLAbstracted,
+			out:          masterV1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadInitConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1beta1 -> default -> validate -> internal -> v1beta1
 			name:         "incompleteYAMLToDefaultedv1beta1",
-			in:           master_incompleteYAML,
-			out:          master_defaultedYAMLAbstracted,
+			in:           masterIncompleteYAML,
+			out:          masterDefaultedYAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		{ // v1alpha3 -> validation should fail
 			name:        "invalidYAMLShouldFail",
-			in:          master_invalidYAML,
+			in:          masterInvalidYAML,
 			expectedErr: true,
 		},
 	}
