@@ -154,19 +154,22 @@ func (c *CSIMaxVolumeLimitChecker) getCSIDriver(pvc *v1.PersistentVolumeClaim) (
 	placeHolderCSIDriver := ""
 	placeHolderHandle := ""
 	if pvName == "" {
-		klog.V(4).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+		klog.V(5).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
 		return c.getDriverNameFromSC(pvc)
 	}
 	pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 
 	if err != nil {
 		klog.V(4).Infof("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
-		return placeHolderCSIDriver, placeHolderHandle
+		// If we can't fetch PV associated with PVC, may be it got deleted
+		// or PVC was prebound to a PVC that hasn't been created yet.
+		// fallback to using StorageClass for volume counting
+		return c.getDriverNameFromSC(pvc)
 	}
 
 	csiSource := pv.Spec.PersistentVolumeSource.CSI
 	if csiSource == nil {
-		klog.V(4).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
+		klog.V(5).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
 		return placeHolderCSIDriver, placeHolderHandle
 	}
 	return csiSource.Driver, csiSource.VolumeHandle
@@ -175,21 +178,26 @@ func (c *CSIMaxVolumeLimitChecker) getCSIDriver(pvc *v1.PersistentVolumeClaim) (
 func (c *CSIMaxVolumeLimitChecker) getDriverNameFromSC(pvc *v1.PersistentVolumeClaim) (string, string) {
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
-	scName := *pvc.Spec.StorageClassName
+	scName := pvc.Spec.StorageClassName
 
 	placeHolderCSIDriver := ""
 	placeHolderHandle := ""
-	if scName == "" {
-		klog.V(4).Infof("pvc %s/%s has no storageClass", namespace, pvcName)
+	if scName == nil {
+		// if StorageClass is not set or found, then PVC must be using immediate binding mode
+		// and hence it must be bound before scheduling. So it is safe to not count it.
+		klog.V(5).Infof("pvc %s/%s has no storageClass", namespace, pvcName)
 		return placeHolderCSIDriver, placeHolderHandle
 	}
 
-	storageClass, err := c.scInfo.GetStorageClassInfo(scName)
+	storageClass, err := c.scInfo.GetStorageClassInfo(*scName)
 	if err != nil {
-		klog.V(4).Infof("no storage %s found for pvc %s/%s", scName, namespace, pvcName)
+		klog.V(5).Infof("no storage %s found for pvc %s/%s", *scName, namespace, pvcName)
 		return placeHolderCSIDriver, placeHolderHandle
 	}
 
+	// We use random prefix to avoid conflict with volume-ids. If PVC is bound in the middle
+	// predicate and there is another pod(on same node) that uses same volume then we will overcount
+	// the volume and consider both volumes as different.
 	volumeHandle := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
 	return storageClass.Provisioner, volumeHandle
 }
