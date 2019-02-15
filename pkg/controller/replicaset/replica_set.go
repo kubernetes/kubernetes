@@ -595,12 +595,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	// Ignore inactive pods.
-	var filteredPods []*v1.Pod
-	for _, pod := range allPods {
-		if controller.IsPodActive(pod) {
-			filteredPods = append(filteredPods, pod)
-		}
-	}
+	filteredPods := controller.FilterActivePods(allPods)
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
