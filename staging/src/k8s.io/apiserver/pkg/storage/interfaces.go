@@ -128,8 +128,14 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 			objMeta.GetUID())
 		return NewInvalidObjError(key, err)
 	}
+	if p.ResourceVersion != nil && *p.ResourceVersion != objMeta.GetResourceVersion() {
+		err := fmt.Sprintf(
+			"Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v",
+			*p.ResourceVersion,
+			objMeta.GetResourceVersion())
+		return NewInvalidObjError(key, err)
+	}
 	return nil
-
 }
 
 // Interface offers a common interface for object marshaling/unmarshaling operations and
