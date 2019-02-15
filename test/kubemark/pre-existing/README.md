@@ -43,7 +43,7 @@ Requirement checklist:
 
 ## Example Configuration
 
-_test/Kubemark/cloud-provider-config.sh_
+_test/kubemark/cloud-provider-config.sh_
 
 ```
 CLOUD_PROVIDER="pre-existing"
