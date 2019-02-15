@@ -31,8 +31,8 @@ import (
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
-	clientset "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
+	clientset "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
