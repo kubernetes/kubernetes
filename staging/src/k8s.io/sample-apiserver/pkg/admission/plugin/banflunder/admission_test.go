@@ -28,8 +28,8 @@ import (
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	wardle "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	"k8s.io/sample-apiserver/pkg/client/clientset/versioned/fake"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
+	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/fake"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
 )
 
 // TestBanfluderAdmissionPlugin tests various test cases against
