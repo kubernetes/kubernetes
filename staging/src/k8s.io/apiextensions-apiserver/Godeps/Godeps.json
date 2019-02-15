@@ -7,14 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/Azure/go-ansiterm",
-			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
-			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
-		},
-		{
 			"ImportPath": "github.com/NYTimes/gziphandler",
 			"Rev": "56545f4a5d46df9a6648819d1664c3a03a13ffdb"
 		},
@@ -353,14 +345,6 @@
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
 			"Rev": "01aeca54ebda6e0fbfafd0a524d234159c05ec20"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/term",
-			"Rev": "a9fbbdc8dd8794b20af358382ab780559bca589d"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/term/windows",
-			"Rev": "a9fbbdc8dd8794b20af358382ab780559bca589d"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
@@ -1607,10 +1591,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apiserver/pkg/util/flag",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apiserver/pkg/util/flushwriter",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -2228,6 +2208,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/util/retry",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/component-base/cli/flag",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
