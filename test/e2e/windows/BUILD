@@ -13,6 +13,7 @@ go_library(
         "networking.go",
         "service.go",
         "volumes.go",
+        "dns.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/windows",
     visibility = ["//visibility:public"],
