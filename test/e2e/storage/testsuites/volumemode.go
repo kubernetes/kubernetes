@@ -26,6 +26,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -62,14 +63,20 @@ func (t *volumeModeTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	var (
-		dInfo       = driver.GetDriverInfo()
+	type local struct {
 		config      *PerTestConfig
 		testCleanup func()
-		sc          *storagev1.StorageClass
-		pvc         *v1.PersistentVolumeClaim
-		pv          *v1.PersistentVolume
-		volume      TestVolume
+
+		cs     clientset.Interface
+		ns     *v1.Namespace
+		sc     *storagev1.StorageClass
+		pvc    *v1.PersistentVolumeClaim
+		pv     *v1.PersistentVolume
+		volume TestVolume
+	}
+	var (
+		dInfo = driver.GetDriverInfo()
+		l     local
 	)
 
 	// No preconditions to test. Normally they would be in a BeforeEach here.
@@ -81,10 +88,13 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	f := framework.NewDefaultFramework("volumemode")
 
 	init := func() {
-		// Now do the more expensive test initialization.
-		config, testCleanup = driver.PrepareTest(f)
+		l = local{}
+		l.ns = f.Namespace
+		l.cs = f.ClientSet
 
-		ns := f.Namespace
+		// Now do the more expensive test initialization.
+		l.config, l.testCleanup = driver.PrepareTest(f)
+
 		fsType := pattern.FsType
 		volBindMode := storagev1.VolumeBindingImmediate
 
@@ -95,38 +105,38 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		)
 
 		// Create volume for pre-provisioned volume tests
-		volume = CreateVolume(driver, config, pattern.VolType)
+		l.volume = CreateVolume(driver, l.config, pattern.VolType)
 
 		switch pattern.VolType {
 		case testpatterns.PreprovisionedPV:
 			if pattern.VolMode == v1.PersistentVolumeBlock {
-				scName = fmt.Sprintf("%s-%s-sc-for-block", ns.Name, dInfo.Name)
+				scName = fmt.Sprintf("%s-%s-sc-for-block", l.ns.Name, dInfo.Name)
 			} else if pattern.VolMode == v1.PersistentVolumeFilesystem {
-				scName = fmt.Sprintf("%s-%s-sc-for-file", ns.Name, dInfo.Name)
+				scName = fmt.Sprintf("%s-%s-sc-for-file", l.ns.Name, dInfo.Name)
 			}
 			if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-				pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, volume)
+				pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, l.volume)
 				if pvSource == nil {
 					framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 				}
 
 				storageClass, pvConfig, pvcConfig := generateConfigsForPreprovisionedPVTest(scName, volBindMode, pattern.VolMode, *pvSource, volumeNodeAffinity)
-				sc = storageClass
-				pv = framework.MakePersistentVolume(pvConfig)
-				pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns.Name)
+				l.sc = storageClass
+				l.pv = framework.MakePersistentVolume(pvConfig)
+				l.pvc = framework.MakePersistentVolumeClaim(pvcConfig, l.ns.Name)
 			}
 		case testpatterns.DynamicPV:
 			if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-				sc = dDriver.GetDynamicProvisionStorageClass(config, fsType)
-				if sc == nil {
+				l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, fsType)
+				if l.sc == nil {
 					framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 				}
-				sc.VolumeBindingMode = &volBindMode
+				l.sc.VolumeBindingMode = &volBindMode
 
 				claimSize := dDriver.GetClaimSize()
-				pvc = getClaim(claimSize, ns.Name)
-				pvc.Spec.StorageClassName = &sc.Name
-				pvc.Spec.VolumeMode = &pattern.VolMode
+				l.pvc = getClaim(claimSize, l.ns.Name)
+				l.pvc.Spec.StorageClassName = &l.sc.Name
+				l.pvc.Spec.VolumeMode = &pattern.VolMode
 			}
 		default:
 			framework.Failf("Volume mode test doesn't support: %s", pattern.VolType)
@@ -134,30 +144,30 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	}
 
 	cleanup := func() {
-		if pv != nil || pvc != nil {
+		if l.pv != nil || l.pvc != nil {
 			By("Deleting pv and pvc")
-			errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, pv, pvc)
+			errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, l.pv, l.pvc)
 			if len(errs) > 0 {
 				framework.Logf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
 			}
-			pv = nil
-			pvc = nil
+			l.pv = nil
+			l.pvc = nil
 		}
 
-		if sc != nil {
+		if l.sc != nil {
 			By("Deleting sc")
-			deleteStorageClass(f.ClientSet, sc.Name)
-			sc = nil
+			deleteStorageClass(f.ClientSet, l.sc.Name)
+			l.sc = nil
 		}
 
-		if volume != nil {
-			volume.DeleteVolume()
-			volume = nil
+		if l.volume != nil {
+			l.volume.DeleteVolume()
+			l.volume = nil
 		}
 
-		if testCleanup != nil {
-			testCleanup()
-			testCleanup = nil
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
 		}
 	}
 
@@ -170,31 +180,29 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				init()
 				defer cleanup()
 
-				cs := f.ClientSet
-				ns := f.Namespace
 				var err error
 
 				By("Creating sc")
-				sc, err = cs.StorageV1().StorageClasses().Create(sc)
+				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pv and pvc")
-				pv, err = cs.CoreV1().PersistentVolumes().Create(pv)
+				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Prebind pv
-				pvc.Spec.VolumeName = pv.Name
-				pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+				l.pvc.Spec.VolumeName = l.pv.Name
+				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				Expect(err).NotTo(HaveOccurred())
 
-				framework.ExpectNoError(framework.WaitOnPVandPVC(cs, ns.Name, pv, pvc))
+				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(cs, ns.Name, []*v1.PersistentVolumeClaim{pvc},
+				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, config.ClientNodeName, framework.PodStartTimeout)
+					nil, l.config.ClientNodeName, framework.PodStartTimeout)
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
 				Expect(err).To(HaveOccurred())
 			})
@@ -203,31 +211,29 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				init()
 				defer cleanup()
 
-				cs := f.ClientSet
-				ns := f.Namespace
 				var err error
 
 				By("Creating sc")
-				sc, err = cs.StorageV1().StorageClasses().Create(sc)
+				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pv and pvc")
-				pv, err = cs.CoreV1().PersistentVolumes().Create(pv)
+				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Prebind pv
-				pvc.Spec.VolumeName = pv.Name
-				pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+				l.pvc.Spec.VolumeName = l.pv.Name
+				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				Expect(err).NotTo(HaveOccurred())
 
-				framework.ExpectNoError(framework.WaitOnPVandPVC(cs, ns.Name, pv, pvc))
+				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(cs, ns.Name, []*v1.PersistentVolumeClaim{pvc},
+				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, config.ClientNodeName, framework.PodStartTimeout)
+					nil, l.config.ClientNodeName, framework.PodStartTimeout)
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
 				Expect(err).NotTo(HaveOccurred())
 
@@ -245,19 +251,17 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				init()
 				defer cleanup()
 
-				cs := f.ClientSet
-				ns := f.Namespace
 				var err error
 
 				By("Creating sc")
-				sc, err = cs.StorageV1().StorageClasses().Create(sc)
+				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pv and pvc")
-				pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 				Expect(err).To(HaveOccurred())
 			})
 		} else {
@@ -265,33 +269,31 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				init()
 				defer cleanup()
 
-				cs := f.ClientSet
-				ns := f.Namespace
 				var err error
 
 				By("Creating sc")
-				sc, err = cs.StorageV1().StorageClasses().Create(sc)
+				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pv and pvc")
-				pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(pvc)
+				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 				Expect(err).NotTo(HaveOccurred())
 
-				pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(l.pvc.Name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
-				pv, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+				l.pv, err = l.cs.CoreV1().PersistentVolumes().Get(l.pvc.Spec.VolumeName, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(cs, ns.Name, []*v1.PersistentVolumeClaim{pvc},
+				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, config.ClientNodeName, framework.PodStartTimeout)
+					nil, l.config.ClientNodeName, framework.PodStartTimeout)
 				defer func() {
-					framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
 				Expect(err).NotTo(HaveOccurred())
 

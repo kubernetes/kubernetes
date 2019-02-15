@@ -80,15 +80,19 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	var (
-		dInfo       = driver.GetDriverInfo()
-		dDriver     DynamicPVTestDriver
+	type local struct {
 		config      *PerTestConfig
 		testCleanup func()
-		testCase    *StorageClassTest
-		cs          clientset.Interface
-		pvc         *v1.PersistentVolumeClaim
-		sc          *storage.StorageClass
+
+		testCase *StorageClassTest
+		cs       clientset.Interface
+		pvc      *v1.PersistentVolumeClaim
+		sc       *storage.StorageClass
+	}
+	var (
+		dInfo   = driver.GetDriverInfo()
+		dDriver DynamicPVTestDriver
+		l       local
 	)
 
 	BeforeEach(func() {
@@ -110,30 +114,32 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	f := framework.NewDefaultFramework("provisioning")
 
 	init := func() {
+		l = local{}
+
 		// Now do the more expensive test initialization.
-		config, testCleanup = driver.PrepareTest(f)
-		cs = config.Framework.ClientSet
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.cs = l.config.Framework.ClientSet
 		claimSize := dDriver.GetClaimSize()
-		sc = dDriver.GetDynamicProvisionStorageClass(config, "")
-		if sc == nil {
+		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, "")
+		if l.sc == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
-		pvc = getClaim(claimSize, config.Framework.Namespace.Name)
-		pvc.Spec.StorageClassName = &sc.Name
-		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", sc, pvc)
-		testCase = &StorageClassTest{
-			Client:       config.Framework.ClientSet,
-			Claim:        pvc,
-			Class:        sc,
+		l.pvc = getClaim(claimSize, l.config.Framework.Namespace.Name)
+		l.pvc.Spec.StorageClassName = &l.sc.Name
+		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.sc, l.pvc)
+		l.testCase = &StorageClassTest{
+			Client:       l.config.Framework.ClientSet,
+			Claim:        l.pvc,
+			Class:        l.sc,
 			ClaimSize:    claimSize,
 			ExpectedSize: claimSize,
 		}
 	}
 
 	cleanup := func() {
-		if testCleanup != nil {
-			testCleanup()
-			testCleanup = nil
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
 		}
 	}
 
@@ -141,7 +147,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
-		testCase.TestDynamicProvisioning()
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should provision storage with mount options", func() {
@@ -152,8 +158,8 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
-		testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
-		testCase.TestDynamicProvisioning()
+		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should access volume from different nodes", func() {
@@ -164,19 +170,19 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		// locked onto a single node, then the driver is
 		// usable on all of them *and* supports accessing a volume
 		// from any node.
-		if config.ClientNodeName != "" {
+		if l.config.ClientNodeName != "" {
 			framework.Skipf("Driver %q only supports testing on one node - skipping", dInfo.Name)
 		}
 
 		// Ensure that we actually have more than one node.
-		nodes := framework.GetReadySchedulableNodesOrDie(cs)
+		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
 		if len(nodes.Items) <= 1 {
 			framework.Skipf("need more than one node - skipping")
 		}
-		testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			PVMultiNodeCheck(cs, claim, volume, NodeSelection{Name: config.ClientNodeName})
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			PVMultiNodeCheck(l.cs, claim, volume, NodeSelection{Name: l.config.ClientNodeName})
 		}
-		testCase.TestDynamicProvisioning()
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should create and delete block persistent volumes", func() {
@@ -188,9 +194,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		block := v1.PersistentVolumeBlock
-		testCase.VolumeMode = &block
-		pvc.Spec.VolumeMode = &block
-		testCase.TestDynamicProvisioning()
+		l.testCase.VolumeMode = &block
+		l.pvc.Spec.VolumeMode = &block
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func() {
@@ -206,18 +212,18 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
-		dc := config.Framework.DynamicClient
-		vsc := sDriver.GetSnapshotClass(config)
-		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: config.ClientNodeName}, cs, dc, pvc, sc, vsc)
+		dc := l.config.Framework.DynamicClient
+		vsc := sDriver.GetSnapshotClass(l.config)
+		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
-		pvc.Spec.DataSource = dataSource
-		testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		l.pvc.Spec.DataSource = dataSource
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: config.ClientNodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: l.config.ClientNodeName})
 		}
-		testCase.TestDynamicProvisioning()
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should allow concurrent writes on the same node", func() {
@@ -228,7 +234,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
-		testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			// We start two pods concurrently on the same node,
 			// using the same PVC. Both wait for other to create a
 			// file before returning. The pods are forced onto the
@@ -241,7 +247,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 				defer GinkgoRecover()
 				defer wg.Done()
 				node := NodeSelection{
-					Name: config.ClientNodeName,
+					Name: l.config.ClientNodeName,
 				}
 				if podName == secondPodName {
 					node.Affinity = &v1.Affinity{
@@ -259,13 +265,13 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 						},
 					}
 				}
-				RunInPodWithVolume(cs, claim.Namespace, claim.Name, podName, command, node)
+				RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, podName, command, node)
 			}
 			go run(firstPodName, "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
 			go run(secondPodName, "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
 			wg.Wait()
 		}
-		testCase.TestDynamicProvisioning()
+		l.testCase.TestDynamicProvisioning()
 	})
 }
 

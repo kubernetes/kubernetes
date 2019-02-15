@@ -75,11 +75,15 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	var (
-		dInfo       = driver.GetDriverInfo()
+	type local struct {
 		config      *PerTestConfig
 		testCleanup func()
-		resource    *genericVolumeTestResource
+
+		resource *genericVolumeTestResource
+	}
+	var (
+		dInfo = driver.GetDriverInfo()
+		l     local
 	)
 
 	// No preconditions to test. Normally they would be in a BeforeEach here.
@@ -91,23 +95,25 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 	f := framework.NewDefaultFramework("volumeio")
 
 	init := func() {
+		l = local{}
+
 		// Now do the more expensive test initialization.
-		config, testCleanup = driver.PrepareTest(f)
-		resource = createGenericVolumeTestResource(driver, config, pattern)
-		if resource.volSource == nil {
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		if l.resource.volSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 	}
 
 	cleanup := func() {
-		if resource != nil {
-			resource.cleanupResource()
-			resource = nil
+		if l.resource != nil {
+			l.resource.cleanupResource()
+			l.resource = nil
 		}
 
-		if testCleanup != nil {
-			testCleanup()
-			testCleanup = nil
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
 		}
 	}
 
@@ -126,7 +132,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		podSec := v1.PodSecurityContext{
 			FSGroup: fsGroup,
 		}
-		err := testVolumeIO(f, cs, convertTestConfig(config), *resource.volSource, &podSec, testFile, fileSizes)
+		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }

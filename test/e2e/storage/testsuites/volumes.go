@@ -90,12 +90,14 @@ func skipExecTest(driver TestDriver) {
 }
 
 func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	var (
-		dInfo       = driver.GetDriverInfo()
+	type local struct {
 		config      *PerTestConfig
 		testCleanup func()
-		resource    *genericVolumeTestResource
-	)
+
+		resource *genericVolumeTestResource
+	}
+	var dInfo = driver.GetDriverInfo()
+	var l local
 
 	// No preconditions to test. Normally they would be in a BeforeEach here.
 
@@ -106,23 +108,25 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	f := framework.NewDefaultFramework("volumeio")
 
 	init := func() {
+		l = local{}
+
 		// Now do the more expensive test initialization.
-		config, testCleanup = driver.PrepareTest(f)
-		resource = createGenericVolumeTestResource(driver, config, pattern)
-		if resource.volSource == nil {
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		if l.resource.volSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 	}
 
 	cleanup := func() {
-		if resource != nil {
-			resource.cleanupResource()
-			resource = nil
+		if l.resource != nil {
+			l.resource.cleanupResource()
+			l.resource = nil
 		}
 
-		if testCleanup != nil {
-			testCleanup()
-			testCleanup = nil
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
 		}
 	}
 
@@ -130,20 +134,20 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		skipPersistenceTest(driver)
 		init()
 		defer func() {
-			framework.VolumeTestCleanup(f, convertTestConfig(config))
+			framework.VolumeTestCleanup(f, convertTestConfig(l.config))
 			cleanup()
 		}()
 
 		tests := []framework.VolumeTest{
 			{
-				Volume: *resource.volSource,
+				Volume: *l.resource.volSource,
 				File:   "index.html",
 				// Must match content
 				ExpectedContent: fmt.Sprintf("Hello from %s from namespace %s",
 					dInfo.Name, f.Namespace.Name),
 			},
 		}
-		config := convertTestConfig(config)
+		config := convertTestConfig(l.config)
 		framework.InjectHtml(f.ClientSet, config, tests[0].Volume, tests[0].ExpectedContent)
 		var fsGroup *int64
 		if dInfo.Capabilities[CapFsGroup] {
@@ -158,7 +162,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 
-		testScriptInPod(f, resource.volType, resource.volSource, config.ClientNodeSelector)
+		testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config.ClientNodeSelector)
 	})
 }
 
