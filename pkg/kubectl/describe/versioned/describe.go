@@ -642,6 +642,9 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings descri
 			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
+			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
+				ref.UID = types.UID(pod.Annotations[corev1.MirrorPodAnnotationKey])
+			}
 			events, _ = d.Core().Events(namespace).Search(scheme.Scheme, ref)
 		}
 	}
