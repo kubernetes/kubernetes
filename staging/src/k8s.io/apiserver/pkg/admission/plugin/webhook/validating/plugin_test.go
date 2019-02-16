@@ -22,24 +22,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/admission/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 // TestValidate tests that ValidatingWebhook#Validate works as expected
 func TestValidate(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1beta1.AddToScheme(scheme))
-	require.NoError(t, corev1.AddToScheme(scheme))
-
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
 	defer testServer.Close()
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
 
 	serverURL, err := url.ParseRequestURI(testServer.URL)
 	if err != nil {
@@ -61,7 +55,6 @@ func TestValidate(t *testing.T) {
 
 		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
 		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
-		wh.SetScheme(scheme)
 		wh.SetExternalKubeClientSet(client)
 		wh.SetExternalKubeInformerFactory(informer)
 
@@ -74,7 +67,7 @@ func TestValidate(t *testing.T) {
 		}
 
 		attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
-		err = wh.Validate(attr)
+		err = wh.Validate(attr, objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
@@ -102,10 +95,6 @@ func TestValidate(t *testing.T) {
 
 // TestValidateCachedClient tests that ValidatingWebhook#Validate should cache restClient
 func TestValidateCachedClient(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1beta1.AddToScheme(scheme))
-	require.NoError(t, corev1.AddToScheme(scheme))
-
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
 	defer testServer.Close()
@@ -113,6 +102,8 @@ func TestValidateCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -122,7 +113,6 @@ func TestValidateCachedClient(t *testing.T) {
 		t.Fatalf("Failed to create validating webhook: %v", err)
 	}
 	wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
-	wh.SetScheme(scheme)
 
 	for _, tt := range webhooktesting.NewCachedClientTestcases(serverURL) {
 		ns := "webhook-test"
@@ -142,7 +132,7 @@ func TestValidateCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, false))
+		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

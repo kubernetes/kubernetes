@@ -43,7 +43,6 @@ type Webhook struct {
 
 	hookSource       Source
 	clientManager    *webhook.ClientManager
-	convertor        *convertor
 	namespaceMatcher *namespace.Matcher
 	dispatcher       Dispatcher
 }
@@ -79,7 +78,6 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		Handler:          handler,
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
-		convertor:        &convertor{},
 		namespaceMatcher: &namespace.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
 	}, nil
@@ -100,9 +98,6 @@ func (a *Webhook) SetServiceResolver(sr webhook.ServiceResolver) {
 
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *Webhook) SetScheme(scheme *runtime.Scheme) {
-	if scheme != nil {
-		a.convertor.Scheme = scheme
-	}
 }
 
 // SetExternalKubeClientSet implements the WantsExternalKubeInformerFactory interface.
@@ -132,9 +127,6 @@ func (a *Webhook) ValidateInitialization() error {
 	if err := a.clientManager.Validate(); err != nil {
 		return fmt.Errorf("clientManager is not properly setup: %v", err)
 	}
-	if err := a.convertor.Validate(); err != nil {
-		return fmt.Errorf("convertor is not properly setup: %v", err)
-	}
 	return nil
 }
 
@@ -156,7 +148,7 @@ func (a *Webhook) ShouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) 
 }
 
 // Dispatch is called by the downstream Validate or Admit methods.
-func (a *Webhook) Dispatch(attr admission.Attributes) error {
+func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if rules.IsWebhookConfigurationResource(attr) {
 		return nil
 	}
@@ -188,14 +180,14 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		Attributes: attr,
 	}
 	if oldObj := attr.GetOldObject(); oldObj != nil {
-		out, err := a.convertor.ConvertToGVK(oldObj, attr.GetKind())
+		out, err := ConvertToGVK(oldObj, attr.GetKind(), o)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
 		versionedAttr.VersionedOldObject = out
 	}
 	if obj := attr.GetObject(); obj != nil {
-		out, err := a.convertor.ConvertToGVK(obj, attr.GetKind())
+		out, err := ConvertToGVK(obj, attr.GetKind(), o)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}

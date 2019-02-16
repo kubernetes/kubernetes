@@ -91,6 +91,6 @@ func (a *Plugin) ValidateInitialization() error {
 }
 
 // Admit makes an admission decision based on the request attributes.
-func (a *Plugin) Admit(attr admission.Attributes) error {
-	return a.Webhook.Dispatch(attr)
+func (a *Plugin) Admit(attr admission.Attributes, o admission.ObjectInterfaces) error {
+	return a.Webhook.Dispatch(attr, o)
 }

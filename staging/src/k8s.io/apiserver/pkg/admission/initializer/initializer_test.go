@@ -85,7 +85,9 @@ type WantExternalKubeInformerFactory struct {
 func (self *WantExternalKubeInformerFactory) SetExternalKubeInformerFactory(sf informers.SharedInformerFactory) {
 	self.sf = sf
 }
-func (self *WantExternalKubeInformerFactory) Admit(a admission.Attributes) error { return nil }
+func (self *WantExternalKubeInformerFactory) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
 func (self *WantExternalKubeInformerFactory) Handles(o admission.Operation) bool { return false }
 func (self *WantExternalKubeInformerFactory) ValidateInitialization() error      { return nil }
 
@@ -98,9 +100,11 @@ type WantExternalKubeClientSet struct {
 }
 
 func (self *WantExternalKubeClientSet) SetExternalKubeClientSet(cs kubernetes.Interface) { self.cs = cs }
-func (self *WantExternalKubeClientSet) Admit(a admission.Attributes) error               { return nil }
-func (self *WantExternalKubeClientSet) Handles(o admission.Operation) bool               { return false }
-func (self *WantExternalKubeClientSet) ValidateInitialization() error                    { return nil }
+func (self *WantExternalKubeClientSet) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
+func (self *WantExternalKubeClientSet) Handles(o admission.Operation) bool { return false }
+func (self *WantExternalKubeClientSet) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &WantExternalKubeClientSet{}
 var _ initializer.WantsExternalKubeClientSet = &WantExternalKubeClientSet{}
@@ -111,9 +115,11 @@ type WantAuthorizerAdmission struct {
 }
 
 func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) { self.auth = a }
-func (self *WantAuthorizerAdmission) Admit(a admission.Attributes) error    { return nil }
-func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool    { return false }
-func (self *WantAuthorizerAdmission) ValidateInitialization() error         { return nil }
+func (self *WantAuthorizerAdmission) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
+func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
+func (self *WantAuthorizerAdmission) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
@@ -130,8 +136,10 @@ type clientCertWanter struct {
 	gotCert, gotKey []byte
 }
 
-func (s *clientCertWanter) SetClientCert(cert, key []byte)     { s.gotCert, s.gotKey = cert, key }
-func (s *clientCertWanter) Admit(a admission.Attributes) error { return nil }
+func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
+func (s *clientCertWanter) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
 func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
 func (s *clientCertWanter) ValidateInitialization() error      { return nil }
 
@@ -140,8 +148,10 @@ type WantSchemeAdmission struct {
 	scheme *runtime.Scheme
 }
 
-func (self *WantSchemeAdmission) SetScheme(s *runtime.Scheme)        { self.scheme = s }
-func (self *WantSchemeAdmission) Admit(a admission.Attributes) error { return nil }
+func (self *WantSchemeAdmission) SetScheme(s *runtime.Scheme) { self.scheme = s }
+func (self *WantSchemeAdmission) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
 func (self *WantSchemeAdmission) Handles(o admission.Operation) bool { return false }
 func (self *WantSchemeAdmission) ValidateInitialization() error      { return nil }
 
