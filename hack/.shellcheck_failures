@@ -86,6 +86,5 @@
 ./test/e2e_node/environment/setup_host.sh
 ./test/e2e_node/gubernator.sh
 ./test/images/image-util.sh
-./test/images/volume/gluster/run_gluster.sh
 ./test/images/volume/iscsi/create_block.sh
 ./test/images/volume/nfs/run_nfs.sh
