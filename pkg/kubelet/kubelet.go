@@ -1614,14 +1614,13 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubepod.IsStaticPod(pod) {
-		podFullName := kubecontainer.GetPodFullName(pod)
 		deleted := false
 		if mirrorPod != nil {
 			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 				// The mirror pod is semantically different from the static pod. Remove
 				// it. The mirror pod will get recreated later.
 				klog.Warningf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
-				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
+				if err := kl.podManager.DeleteMirrorPod(mirrorPod); err != nil {
 					klog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
 				} else {
 					deleted = true

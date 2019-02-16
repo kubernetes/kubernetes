@@ -47,13 +47,13 @@ func (_m *MockManager) CreateMirrorPod(_a0 *v1.Pod) error {
 	return r0
 }
 
-// DeleteMirrorPod provides a mock function with given fields: podFullName
-func (_m *MockManager) DeleteMirrorPod(podFullName string) error {
-	ret := _m.Called(podFullName)
+// DeleteMirrorPod provides a mock function with given fields: _a0
+func (_m *MockManager) DeleteMirrorPod(_a0 *v1.Pod) error {
+	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(podFullName)
+	if rf, ok := ret.Get(0).(func(*v1.Pod) error); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
 	}

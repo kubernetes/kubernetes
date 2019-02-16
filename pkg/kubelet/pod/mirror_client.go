@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -33,9 +32,8 @@ type MirrorClient interface {
 	// as the given pod as well as an extra annotation containing the hash of
 	// the static pod.
 	CreateMirrorPod(pod *v1.Pod) error
-	// DeleteMirrorPod deletes the mirror pod with the given full name from
-	// the API server or returns an error.
-	DeleteMirrorPod(podFullName string) error
+	// DeleteMirrorPod deletes the mirror pod from the API server or returns an error.
+	DeleteMirrorPod(pod *v1.Pod) error
 }
 
 // basicMirrorClient is a functional MirrorClient.  Mirror pods are stored in
@@ -73,19 +71,16 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	return err
 }
 
-func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
+func (mc *basicMirrorClient) DeleteMirrorPod(pod *v1.Pod) error {
 	if mc.apiserverClient == nil {
 		return nil
 	}
-	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
-	if err != nil {
-		klog.Errorf("Failed to parse a pod full name %q", podFullName)
-		return err
-	}
-	klog.V(2).Infof("Deleting a mirror pod %q", podFullName)
-	// TODO(random-liu): Delete the mirror pod with uid precondition in mirror pod manager
-	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
-		klog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
+
+	klog.V(2).Infof("Deleting a mirror pod %s/%s(%s)", pod.Namespace, pod.Name, pod.UID)
+	deleteOpt := metav1.NewDeleteOptions(0)
+	deleteOpt.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
+	if err := mc.apiserverClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOpt); err != nil && !errors.IsNotFound(err) {
+		klog.Errorf("Failed deleting a mirror pod %s/%s(%s): %v", pod.Namespace, pod.Name, pod.UID, err)
 	}
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -158,14 +159,14 @@ func TestDeletePods(t *testing.T) {
 		t.Fatalf("Run DeletePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
 	}
 
-	orphanedMirrorPodNames := podManager.getOrphanedMirrorPodNames()
+	orphanedMirrorPods := podManager.getOrphanedMirrorPods()
 	expectedOrphanedMirrorPodNameNum := 1
-	if len(orphanedMirrorPodNames) != expectedOrphanedMirrorPodNameNum {
-		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected %d orphaned mirror pods, got %d orphaned mirror pods; ", expectedOrphanedMirrorPodNameNum, len(orphanedMirrorPodNames))
+	if len(orphanedMirrorPods) != expectedOrphanedMirrorPodNameNum {
+		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected %d orphaned mirror pods, got %d orphaned mirror pods; ", expectedOrphanedMirrorPodNameNum, len(orphanedMirrorPods))
 	}
 
 	expectedOrphanedMirrorPodName := mirrorPod.Name + "_" + mirrorPod.Namespace
-	if orphanedMirrorPodNames[0] != expectedOrphanedMirrorPodName {
-		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected orphaned mirror pod name : %s, got orphaned mirror pod name %s; ", expectedOrphanedMirrorPodName, orphanedMirrorPodNames[0])
+	if kubecontainer.GetPodFullName(orphanedMirrorPods[0]) != expectedOrphanedMirrorPodName {
+		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected orphaned mirror pod name : %s, got orphaned mirror pod name %s; ", expectedOrphanedMirrorPodName, kubecontainer.GetPodFullName(orphanedMirrorPods[0]))
 	}
 }

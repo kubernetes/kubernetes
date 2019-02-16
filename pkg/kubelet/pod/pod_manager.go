@@ -303,22 +303,22 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	return podToMirror, mirrorToPod
 }
 
-func (pm *basicManager) getOrphanedMirrorPodNames() []string {
+func (pm *basicManager) getOrphanedMirrorPods() []*v1.Pod {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	var podFullNames []string
-	for podFullName := range pm.mirrorPodByFullName {
+	var pods []*v1.Pod
+	for podFullName, pod := range pm.mirrorPodByFullName {
 		if _, ok := pm.podByFullName[podFullName]; !ok {
-			podFullNames = append(podFullNames, podFullName)
+			pods = append(pods, pod)
 		}
 	}
-	return podFullNames
+	return pods
 }
 
 func (pm *basicManager) DeleteOrphanedMirrorPods() {
-	podFullNames := pm.getOrphanedMirrorPodNames()
-	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName)
+	pods := pm.getOrphanedMirrorPods()
+	for _, p := range pods {
+		pm.MirrorClient.DeleteMirrorPod(p)
 	}
 }
 

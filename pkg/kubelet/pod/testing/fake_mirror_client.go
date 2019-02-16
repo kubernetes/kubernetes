@@ -52,9 +52,10 @@ func (fmc *FakeMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	return nil
 }
 
-func (fmc *FakeMirrorClient) DeleteMirrorPod(podFullName string) error {
+func (fmc *FakeMirrorClient) DeleteMirrorPod(pod *v1.Pod) error {
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
+	podFullName := kubecontainer.GetPodFullName(pod)
 	fmc.mirrorPods.Delete(podFullName)
 	fmc.deleteCounts[podFullName]++
 	return nil
