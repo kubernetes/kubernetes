@@ -13,6 +13,9 @@ go_library(
         "nodemanager.go",
         "vsphere.go",
         "vsphere_util.go",
+        "vsphere_util_linux.go",
+        "vsphere_util_unsupported.go",
+        "vsphere_util_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
     deps = [
