@@ -51,7 +51,6 @@ go_library(
         "//plugin/pkg/admission/storage/persistentvolume/resize:go_default_library",
         "//plugin/pkg/admission/storage/storageclass/setdefault:go_default_library",
         "//plugin/pkg/admission/storage/storageobjectinuseprotection:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
