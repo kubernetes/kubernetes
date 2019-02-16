@@ -440,6 +440,8 @@ message PodSandboxStatus {
     // MUST be identical to that of the corresponding PodSandboxConfig used to
     // instantiate the pod sandbox this status represents.
     map<string, string> annotations = 8;
+    // runtime configuration used for this PodSandbox.
+    string runtime_handler = 9;
 }
 
 message PodSandboxStatusResponse {
@@ -494,6 +496,8 @@ message PodSandbox {
     // MUST be identical to that of the corresponding PodSandboxConfig used to
     // instantiate this PodSandbox.
     map<string, string> annotations = 6;
+    // runtime configuration used for this PodSandbox.
+    string runtime_handler = 7;
 }
 
 message ListPodSandboxResponse {
