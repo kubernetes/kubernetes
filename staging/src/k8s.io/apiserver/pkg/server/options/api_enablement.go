@@ -84,6 +84,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 
 // ApplyTo override MergedResourceConfig with defaults and registry
 func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *serverstore.ResourceConfig, registry resourceconfig.GroupVersionRegistry) error {
+
 	if s == nil {
 		return nil
 	}

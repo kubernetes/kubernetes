@@ -346,7 +346,7 @@ func newHandlerForTest(c kubernetes.Interface) (*podTolerationsPlugin, informers
 		return nil, nil, err
 	}
 	handler := NewPodTolerationsPlugin(pluginConfig)
-	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

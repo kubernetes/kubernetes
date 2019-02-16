@@ -788,7 +788,7 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

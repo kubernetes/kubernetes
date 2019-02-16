@@ -138,6 +138,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 				admission.Create,
 				false,
 				nil),
+				nil,
 			)
 
 			// validate

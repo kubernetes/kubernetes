@@ -20,7 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -29,22 +28,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TestWantsScheme ensures that the scheme is injected when
-// the WantsScheme interface is implemented by a plugin.
-func TestWantsScheme(t *testing.T) {
-	scheme := runtime.NewScheme()
-	target := initializer.New(nil, nil, nil, scheme)
-	wantSchemeAdmission := &WantSchemeAdmission{}
-	target.Initialize(wantSchemeAdmission)
-	if wantSchemeAdmission.scheme != scheme {
-		t.Errorf("expected scheme to be initialized")
-	}
-}
-
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target := initializer.New(nil, nil, &TestAuthorizer{}, nil)
+	target := initializer.New(nil, nil, &TestAuthorizer{})
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	target.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
@@ -56,7 +43,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target := initializer.New(cs, nil, &TestAuthorizer{}, nil)
+	target := initializer.New(cs, nil, &TestAuthorizer{})
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
 	if wantExternalKubeClientSet.cs != cs {
@@ -69,7 +56,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target := initializer.New(cs, sf, &TestAuthorizer{}, nil)
+	target := initializer.New(cs, sf, &TestAuthorizer{})
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
@@ -142,18 +129,3 @@ func (s *clientCertWanter) Admit(a admission.Attributes, o admission.ObjectInter
 }
 func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
 func (s *clientCertWanter) ValidateInitialization() error      { return nil }
-
-// WantSchemeAdmission is a test stub that fulfills the WantsScheme interface.
-type WantSchemeAdmission struct {
-	scheme *runtime.Scheme
-}
-
-func (self *WantSchemeAdmission) SetScheme(s *runtime.Scheme) { self.scheme = s }
-func (self *WantSchemeAdmission) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
-	return nil
-}
-func (self *WantSchemeAdmission) Handles(o admission.Operation) bool { return false }
-func (self *WantSchemeAdmission) ValidateInitialization() error      { return nil }
-
-var _ admission.Interface = &WantSchemeAdmission{}
-var _ initializer.WantsScheme = &WantSchemeAdmission{}
