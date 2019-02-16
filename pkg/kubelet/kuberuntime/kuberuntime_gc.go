@@ -375,16 +375,20 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+	errors := []error{}
 	// Remove evictable containers
 	if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictTerminatedPods); err != nil {
-		return err
+		errors = append(errors, err)
 	}
 
 	// Remove sandboxes with zero containers
 	if err := cgc.evictSandboxes(evictTerminatedPods); err != nil {
-		return err
+		errors = append(errors, err)
 	}
 
 	// Remove pod sandbox log directory
-	return cgc.evictPodLogsDirectories(allSourcesReady)
+	if err := cgc.evictPodLogsDirectories(allSourcesReady); err != nul {
+		errors = append(errors, err)
+	}
+	return utilerrors.NewAggregate(errors)
 }
