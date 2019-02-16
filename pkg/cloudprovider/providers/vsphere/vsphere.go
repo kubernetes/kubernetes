@@ -555,12 +555,15 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 		return nil, err
 	}
 	for _, i := range ifaces {
+		if i.Flags&net.FlagLoopback != 0 {
+			continue
+		}
 		localAddrs, err := i.Addrs()
 		if err != nil {
 			klog.Warningf("Failed to extract addresses for NodeAddresses - %v", err)
 		} else {
 			for _, addr := range localAddrs {
-				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet, ok := addr.(*net.IPNet); ok {
 					if ipnet.IP.To4() != nil {
 						// Filter external IP by MAC address OUIs from vCenter and from ESX
 						vmMACAddr := strings.ToLower(i.HardwareAddr.String())
