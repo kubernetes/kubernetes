@@ -114,7 +114,6 @@
 ./test/e2e_node/jenkins/copy-e2e-image.sh
 ./test/e2e_node/jenkins/e2e-node-jenkins.sh
 ./test/e2e_node/jenkins/ubuntu-14.04-nvidia-install.sh
-./test/images/volume/rbd/osd.sh
 ./third_party/forked/shell2junit/sh2ju.sh
 ./third_party/intemp/intemp.sh
 ./third_party/multiarch/qemu-user-static/register/qemu-binfmt-conf.sh
