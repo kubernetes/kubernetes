@@ -6,7 +6,7 @@ This image is designed to be used as part of the [Kubernetes][kubernetes]
 cluster bring up process. The image resides at GCR under the name
 [k8s.gcr.io/fluentd-elasticsearch][image].
 
-[fluentd]: http://www.fluentd.org/
+[fluentd]: https://www.fluentd.org/
 [elasticsearch]: https://www.elastic.co/products/elasticsearch
 [kubernetes]: https://kubernetes.io
 [image]: https://k8s.gcr.io/fluentd-elasticsearch
