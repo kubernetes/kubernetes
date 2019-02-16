@@ -92,9 +92,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		)
 		return nil, false, err
 	}
-	if options.Preconditions.ResourceVersion == nil {
-		options.Preconditions.ResourceVersion = &crd.ResourceVersion
-	} else if *options.Preconditions.ResourceVersion != crd.ResourceVersion {
+	if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != crd.ResourceVersion {
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
 			name,

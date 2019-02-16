@@ -147,9 +147,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		)
 		return nil, false, err
 	}
-	if options.Preconditions.ResourceVersion == nil {
-		options.Preconditions.ResourceVersion = &namespace.ResourceVersion
-	} else if *options.Preconditions.ResourceVersion != namespace.ResourceVersion {
+	if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != namespace.ResourceVersion {
 		err = apierrors.NewConflict(
 			api.Resource("namespaces"),
 			name,
