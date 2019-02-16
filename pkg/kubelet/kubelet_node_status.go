@@ -37,6 +37,7 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -148,10 +149,10 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelZoneFailureDomain,
 		v1.LabelZoneRegion,
 		v1.LabelInstanceType,
-		v1.LabelOS,
-		v1.LabelArch,
-		v1.LegacyLabelOS,
-		v1.LegacyLabelArch,
+		v1.LabelOSStable,
+		v1.LabelArchStable,
+		kubeletapis.LabelOS,
+		kubeletapis.LabelArch,
 	}
 
 	needsUpdate := false
@@ -214,11 +215,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				v1.LabelHostname:   kl.hostname,
-				v1.LabelOS:         goruntime.GOOS,
-				v1.LabelArch:       goruntime.GOARCH,
-				v1.LegacyLabelOS:   goruntime.GOOS,
-				v1.LegacyLabelArch: goruntime.GOARCH,
+				v1.LabelHostname:      kl.hostname,
+				v1.LabelOSStable:      goruntime.GOOS,
+				v1.LabelArchStable:    goruntime.GOARCH,
+				kubeletapis.LabelOS:   goruntime.GOOS,
+				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
