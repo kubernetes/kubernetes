@@ -79,9 +79,8 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, featureGatesString string
+	var cfgPath, featureGatesString, kubeConfigFile string
 	forcePivot, certsInSecrets := false, false
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
 	// Creates the UX Command
 	cmd := &cobra.Command{
@@ -119,7 +118,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 			}
 
 			// Gets the Kubernetes client
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
