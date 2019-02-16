@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/component-base/logs"
 	"k8s.io/klog"
 )
@@ -62,4 +63,21 @@ func Register(local *pflag.FlagSet, globalName string) {
 	} else {
 		panic(fmt.Sprintf("failed to find flag in global flagset (flag): %s", globalName))
 	}
+}
+
+// RegisterPflag adds a flag to local that targets the Value associated with the Flag
+// named globalName in pflag.CommandLine.
+func RegisterPflag(fs *pflag.FlagSet, globalName string) {
+	if f := pflag.CommandLine.Lookup(globalName); f != nil {
+		f.Name = normalize(f.Name)
+		fs.AddFlag(f)
+	} else {
+		panic(fmt.Sprintf("failed to find flag in global flagset (pflag): %s", globalName))
+	}
+}
+
+// RegisterDeprecated registers the flag with register, and then marks it deprecated.
+func RegisterDeprecated(fs *pflag.FlagSet, globalName, deprecated string) {
+	Register(fs, globalName)
+	fs.Lookup(normalize(globalName)).Deprecated = deprecated
 }

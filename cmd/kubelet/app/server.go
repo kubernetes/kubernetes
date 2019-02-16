@@ -35,7 +35,6 @@ import (
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,6 +59,8 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/klog"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -275,8 +276,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	// keep cleanFlagSet separate, so Cobra doesn't pollute it with the global flags
 	kubeletFlags.AddFlags(cleanFlagSet)
 	options.AddKubeletConfigFlags(cleanFlagSet, kubeletConfig)
-	options.AddGlobalFlags(cleanFlagSet)
-	cleanFlagSet.BoolP("help", "h", false, fmt.Sprintf("help for %s", cmd.Name()))
+	globalflag.AddGlobalFlags(cleanFlagSet, cmd.Name())
+	options.AddCustomGlobalFlags(cleanFlagSet)
 
 	// ugly, but necessary, because Cobra's default UsageFunc and HelpFunc pollute the flagset with global flags
 	const usageFmt = "Usage:\n  %s\n\nFlags:\n%s"
@@ -298,7 +299,8 @@ func newFlagSetWithGlobals() *pflag.FlagSet {
 	// set the normalize func, similar to k8s.io/component-base/cli//flags.go:InitFlags
 	fs.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	// explicitly add flags from libs that register global flags
-	options.AddGlobalFlags(fs)
+	globalflag.AddGlobalFlags(fs, componentKubelet)
+	options.AddCustomGlobalFlags(fs)
 	return fs
 }
 
