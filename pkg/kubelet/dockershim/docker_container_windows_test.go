@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
-	"strings"
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
@@ -129,18 +129,16 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
 
-		if assert.NotNil(t, err) {
-			assert.True(t, strings.Contains(err.Error(), "unable to generate random registry value name"))
-		}
+		require.NotNil(t, err)
+		assert.Contains(t, err.Error(), "error when generating gMSA registry value name: unable to generate random string")
 	})
 	t.Run("if there's an error opening the registry key", func(t *testing.T) {
 		defer setRegistryCreateKeyFunc(t, &dummyRegistryKey{}, fmt.Errorf("dummy error"))()
 
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
 
-		if assert.NotNil(t, err) {
-			assert.True(t, strings.Contains(err.Error(), "unable to open registry key"))
-		}
+		require.NotNil(t, err)
+		assert.Contains(t, err.Error(), "unable to open registry key")
 	})
 	t.Run("if there's an error writing to the registry key", func(t *testing.T) {
 		key := &dummyRegistryKey{}
@@ -150,7 +148,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
 
 		if assert.NotNil(t, err) {
-			assert.True(t, strings.Contains(err.Error(), "unable to write into registry value"))
+			assert.Contains(t, err.Error(), "unable to write into registry value")
 		}
 		assert.True(t, key.closed)
 	})
@@ -187,9 +185,8 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 
 		err := removeGMSARegistryValue(cleanupInfoWithValue)
 
-		if assert.NotNil(t, err) {
-			assert.True(t, strings.Contains(err.Error(), "unable to open registry key"))
-		}
+		require.NotNil(t, err)
+		assert.Contains(t, err.Error(), "unable to open registry key")
 	})
 	t.Run("if there's an error deleting from the registry key", func(t *testing.T) {
 		key := &dummyRegistryKey{}
@@ -199,7 +196,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 		err := removeGMSARegistryValue(cleanupInfoWithValue)
 
 		if assert.NotNil(t, err) {
-			assert.True(t, strings.Contains(err.Error(), "unable to remove registry value"))
+			assert.Contains(t, err.Error(), "unable to remove registry value")
 		}
 		assert.True(t, key.closed)
 	})
@@ -247,7 +244,7 @@ func TestRemoveAllGMSARegistryValues(t *testing.T) {
 
 		assert.Equal(t, 2, len(errors))
 		for _, err := range errors {
-			assert.True(t, strings.Contains(err.Error(), "unable to remove registry value"))
+			assert.Contains(t, err.Error(), "unable to remove registry value")
 		}
 		assert.Equal(t, []string{cred1, cred2, cred3, cred4}, key.deleteValueArgs)
 		assert.Equal(t, []int{0}, key.readValueNamesArgs)
@@ -258,9 +255,8 @@ func TestRemoveAllGMSARegistryValues(t *testing.T) {
 
 		errors := removeAllGMSARegistryValues()
 
-		if assert.Equal(t, 1, len(errors)) {
-			assert.True(t, strings.Contains(errors[0].Error(), "unable to open registry key"))
-		}
+		require.Equal(t, 1, len(errors))
+		assert.Contains(t, errors[0].Error(), "unable to open registry key")
 	})
 	t.Run("if it's unable to list the registry values", func(t *testing.T) {
 		key := &dummyRegistryKey{readValueNamesError: fmt.Errorf("dummy error")}
@@ -269,7 +265,7 @@ func TestRemoveAllGMSARegistryValues(t *testing.T) {
 		errors := removeAllGMSARegistryValues()
 
 		if assert.Equal(t, 1, len(errors)) {
-			assert.True(t, strings.Contains(errors[0].Error(), "unable to list values under registry key"))
+			assert.Contains(t, errors[0].Error(), "unable to list values under registry key")
 		}
 		assert.True(t, key.closed)
 	})

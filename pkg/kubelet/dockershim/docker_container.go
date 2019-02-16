@@ -114,8 +114,9 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	if iSpec := config.GetImage(); iSpec != nil {
 		image = iSpec.Image
 	}
+	containerName := makeContainerName(sandboxConfig, config)
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: makeContainerName(sandboxConfig, config),
+		Name: containerName,
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Entrypoint: dockerstrslice.StrSlice(config.Command),
@@ -166,18 +167,15 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		for _, err := range ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo) {
+			klog.Warningf("error when cleaning up after container %v's creation: %v", containerName, err)
+		}
+	}()
 
 	createResp, createErr := ds.client.CreateContainer(createConfig)
 	if createErr != nil {
 		createResp, createErr = recoverFromCreationConflictIfNeeded(ds.client, createConfig, createErr)
-	}
-
-	if err = ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo); err != nil {
-		if createErr != nil {
-			// that one is more important to surface
-			return nil, createErr
-		}
-		return nil, err
 	}
 
 	if createResp != nil {

@@ -30,7 +30,6 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
@@ -92,7 +91,9 @@ const (
 	gMSARegistryValueNameSuffixRandomBytes = 40
 )
 
-// useful to allow mocking the registry in tests
+// registryKey is an interface wrapper around `registry.Key`,
+// listing only the methods we care about here.
+// It's mainly useful to easily allow mocking the registry in tests.
 type registryKey interface {
 	SetStringValue(name, value string) error
 	DeleteValue(name string) error
@@ -104,8 +105,13 @@ var registryCreateKeyFunc = func(baseKey registry.Key, path string, access uint3
 	return registry.CreateKey(baseKey, path, access)
 }
 
-// and same for random
+// randomReader is only meant to ever be overriden for testing purposes,
+// same idea as for `registryKey` above
 var randomReader = rand.Reader
+
+// gMSARegistryValueNamesRegex is the regex used to detect gMSA cred spec
+// registry values in `removeAllGMSARegistryValues` below.
+var gMSARegistryValueNamesRegex = regexp.MustCompile(fmt.Sprintf("^%s[0-9a-f]{%d}$", gMSARegistryValueNamePrefix, 2*gMSARegistryValueNameSuffixRandomBytes))
 
 // copyGMSACredSpecToRegistryKey copies the credential specs to a unique registry value, and returns its name.
 func copyGMSACredSpecToRegistryValue(credSpec string) (string, error) {
@@ -117,45 +123,53 @@ func copyGMSACredSpecToRegistryValue(credSpec string) (string, error) {
 	// write to the registry
 	key, _, err := registryCreateKeyFunc(registry.LOCAL_MACHINE, credentialSpecRegistryLocation, registry.SET_VALUE)
 	if err != nil {
-		return "", fmt.Errorf("unable to open registry key %s: %v", credentialSpecRegistryLocation, err)
+		return "", fmt.Errorf("unable to open registry key %q: %v", credentialSpecRegistryLocation, err)
 	}
 	defer key.Close()
 	if err = key.SetStringValue(valueName, credSpec); err != nil {
-		return "", fmt.Errorf("unable to write into registry value %s/%s: %v", credentialSpecRegistryLocation, valueName, err)
+		return "", fmt.Errorf("unable to write into registry value %q/%q: %v", credentialSpecRegistryLocation, valueName, err)
 	}
 
 	return valueName, nil
 }
 
 // gMSARegistryValueName computes the name of the registry value where to store the GMSA cred spec contents.
-// The value's name is purely random.
+// The value's name is a purely random suffix appended to `gMSARegistryValueNamePrefix`.
 func gMSARegistryValueName() (string, error) {
-	randBytes := make([]byte, gMSARegistryValueNameSuffixRandomBytes)
+	randomSuffix, err := randomString(gMSARegistryValueNameSuffixRandomBytes)
 
-	if n, err := randomReader.Read(randBytes); err != nil || n != gMSARegistryValueNameSuffixRandomBytes {
-		if err == nil {
-			err = fmt.Errorf("only got %v random bytes, expected %v", n, len(randBytes))
-		}
-		return "", fmt.Errorf("unable to generate random registry value name: %v", err)
+	if err != nil {
+		return "", fmt.Errorf("error when generating gMSA registry value name: %v", err)
 	}
 
-	return gMSARegistryValueNamePrefix + hex.EncodeToString(randBytes), nil
+	return gMSARegistryValueNamePrefix + randomSuffix, nil
+}
+
+// randomString returns a random hex string.
+func randomString(length int) (string, error) {
+	randBytes := make([]byte, length)
+
+	if n, err := randomReader.Read(randBytes); err != nil || n != length {
+		if err == nil {
+			err = fmt.Errorf("only got %v random bytes, expected %v", n, length)
+		}
+		return "", fmt.Errorf("unable to generate random string: %v", err)
+	}
+
+	return hex.EncodeToString(randBytes), nil
 }
 
 // performPlatformSpecificContainerCreationCleanup is responsible for doing any platform-specific cleanup
-// after a container creation.
-func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanupInfo *containerCreationCleanupInfo) error {
+// after a container creation. Any errors it returns are simply logged, but do not fail the container
+// creation.
+func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanupInfo *containerCreationCleanupInfo) (errors []error) {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		// this is best effort, we don't bubble errors upstream as failing to remove the GMSA registry keys shouldn't
-		// prevent k8s from working correctly, and the leaked registry keys are not a major concern anyway:
-		// they don't contain any secret, and they're sufficiently random to prevent collisions with
-		// future ones
 		if err := removeGMSARegistryValue(cleanupInfo); err != nil {
-			klog.Warningf("won't remove GMSA cred spec registry value: %v", err)
+			errors = append(errors, err)
 		}
 	}
 
-	return nil
+	return
 }
 
 func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
@@ -165,19 +179,20 @@ func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
 
 	key, _, err := registryCreateKeyFunc(registry.LOCAL_MACHINE, credentialSpecRegistryLocation, registry.SET_VALUE)
 	if err != nil {
-		return fmt.Errorf("unable to open registry key %s: %v", credentialSpecRegistryLocation, err)
+		return fmt.Errorf("unable to open registry key %q: %v", credentialSpecRegistryLocation, err)
 	}
 	defer key.Close()
 	if err = key.DeleteValue(cleanupInfo.gMSARegistryValueName); err != nil {
-		return fmt.Errorf("unable to remove registry value %s/%s: %v", credentialSpecRegistryLocation, cleanupInfo.gMSARegistryValueName, err)
+		return fmt.Errorf("unable to remove registry value %q/%q: %v", credentialSpecRegistryLocation, cleanupInfo.gMSARegistryValueName, err)
 	}
 
 	return nil
 }
 
-// platformSpecificContainerCreationKubeletInitCleanup is called when the kubelet
-// is starting, and is meant to clean up any cruft left by previous runs;
-// errors are simply logged, but don't prevent the kubelet from starting.
+// platformSpecificContainerCreationInitCleanup is called when dockershim
+// is starting, and is meant to clean up any cruft left by previous runs
+// creating containers.
+// Errors are simply logged, but don't prevent dockershim from starting.
 func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
 		errors = removeAllGMSARegistryValues()
@@ -185,25 +200,22 @@ func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors 
 	return
 }
 
-// This is the regex used to detect gMSA cred spec registry values.
-var gMSARegistryValueNamesRegex = regexp.MustCompile(fmt.Sprintf("^%s[0-9a-f]{%d}$", gMSARegistryValueNamePrefix, 2*gMSARegistryValueNameSuffixRandomBytes))
-
 func removeAllGMSARegistryValues() (errors []error) {
 	key, _, err := registryCreateKeyFunc(registry.LOCAL_MACHINE, credentialSpecRegistryLocation, registry.SET_VALUE)
 	if err != nil {
-		return []error{fmt.Errorf("unable to open registry key %s: %v", credentialSpecRegistryLocation, err)}
+		return []error{fmt.Errorf("unable to open registry key %q: %v", credentialSpecRegistryLocation, err)}
 	}
 	defer key.Close()
 
 	valueNames, err := key.ReadValueNames(0)
 	if err != nil {
-		return []error{fmt.Errorf("unable to list values under registry key %s: %v", credentialSpecRegistryLocation, err)}
+		return []error{fmt.Errorf("unable to list values under registry key %q: %v", credentialSpecRegistryLocation, err)}
 	}
 
 	for _, valueName := range valueNames {
 		if gMSARegistryValueNamesRegex.MatchString(valueName) {
 			if err = key.DeleteValue(valueName); err != nil {
-				errors = append(errors, fmt.Errorf("unable to remove registry value %s/%s: %v", credentialSpecRegistryLocation, valueName, err))
+				errors = append(errors, fmt.Errorf("unable to remove registry value %q/%q: %v", credentialSpecRegistryLocation, valueName, err))
 			}
 		}
 	}
