@@ -16,7 +16,9 @@ limitations under the License.
 
 package workflow
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/pflag"
+)
 
 // Phase provides an implementation of a workflow phase that allows
 // creation of new phases by simply instantiating a variable of this type.

@@ -16,7 +16,9 @@ limitations under the License.
 
 package kubeadm
 
-import "testing"
+import (
+	"testing"
+)
 
 // kubeadmReset executes "kubeadm reset" and restarts kubelet.
 func kubeadmReset() error {

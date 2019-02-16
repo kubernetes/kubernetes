@@ -16,7 +16,9 @@ limitations under the License.
 
 package kubeadm
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestCmdCompletion(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
