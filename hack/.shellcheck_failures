@@ -114,7 +114,6 @@
 ./test/e2e_node/jenkins/copy-e2e-image.sh
 ./test/e2e_node/jenkins/e2e-node-jenkins.sh
 ./test/e2e_node/jenkins/ubuntu-14.04-nvidia-install.sh
-./test/images/pets/zookeeper-installer/install.sh
 ./test/images/pets/zookeeper-installer/on-start.sh
 ./test/images/volume/gluster/run_gluster.sh
 ./test/images/volume/iscsi/create_block.sh
