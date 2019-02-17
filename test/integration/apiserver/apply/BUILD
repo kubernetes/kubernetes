@@ -2,9 +2,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "apply_test.go",
         "main_test.go",
+    ],
+    tags = [
+        "etcd",
+        "integration",
     ],
     deps = [
         "//pkg/master:go_default_library",

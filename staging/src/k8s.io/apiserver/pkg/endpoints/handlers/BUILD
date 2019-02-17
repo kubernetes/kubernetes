@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "create_test.go",
         "namer_test.go",
         "rest_test.go",
     ],

@@ -30,8 +30,6 @@ import (
 	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
-const applyManager = "apply"
-
 // FieldManager updates the managed fields and merge applied
 // configurations.
 type FieldManager struct {
@@ -141,7 +139,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
-func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (runtime.Object, error) {
+func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
 	// If the object doesn't have metadata, apply isn't allowed.
 	if _, err := meta.Accessor(liveObj); err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
@@ -168,7 +166,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-	manager, err := f.buildManagerInfo(applyManager, metav1.ManagedFieldsOperationApply)
+	manager, err := f.buildManagerInfo(fieldManager, metav1.ManagedFieldsOperationApply)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}

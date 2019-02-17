@@ -320,7 +320,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, prefixFromUserAgent(p.userAgent)); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (json PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -387,7 +387,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, prefixFromUserAgent(p.userAgent)); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (smp PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -414,7 +414,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.fieldManager == nil {
 		panic("FieldManager must be installed to run apply")
 	}
-	return p.fieldManager.Apply(obj, p.patch, force)
+	return p.fieldManager.Apply(obj, p.patch, p.options.FieldManager, force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
