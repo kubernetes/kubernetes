@@ -233,8 +233,12 @@ var stripSet = fieldpath.NewSet(
 	fieldpath.MakePathOrDie("metadata", "name"),
 	fieldpath.MakePathOrDie("metadata", "namespace"),
 	fieldpath.MakePathOrDie("metadata", "creationTimestamp"),
+	fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),
 	fieldpath.MakePathOrDie("metadata", "selfLink"),
 	fieldpath.MakePathOrDie("metadata", "uid"),
+	fieldpath.MakePathOrDie("metadata", "clusterName"),
+	fieldpath.MakePathOrDie("metadata", "generation"),
+	fieldpath.MakePathOrDie("metadata", "managedFields"),
 	fieldpath.MakePathOrDie("metadata", "resourceVersion"),
 )
 
