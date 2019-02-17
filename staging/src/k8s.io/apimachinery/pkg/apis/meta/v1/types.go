@@ -528,6 +528,12 @@ type PatchOptions struct {
 	// flag must be unset for non-apply patch requests.
 	// +optional
 	Force *bool `json:"force,omitempty" protobuf:"varint,2,opt,name=force"`
+
+	// ApplyManager is the name of the applier. This field is required
+	// for apply requests (application/apply-patch) but forbidden
+	// for non-apply patch types (jsonpatch, mergepatch, smp).
+	// +optional
+	ApplyManager string `json:"applyManager,omitempty" protobuf:"bytes,3,name=applyManager"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

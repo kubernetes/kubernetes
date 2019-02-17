@@ -91,7 +91,7 @@ func TestApplyStripsFields(t *testing.T) {
 			"uid": "b",
 			"resourceVersion": "b"
 		}
-	}`), false)
+	}`), "apply", false)
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}
@@ -105,6 +105,7 @@ func TestApplyStripsFields(t *testing.T) {
 		t.Fatalf("fields did not get stripped on apply: %v", m)
 	}
 }
+
 func TestApplyDoesNotStripLabels(t *testing.T) {
 	f := NewTestFieldManager(t)
 
@@ -125,7 +126,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 				"a": "b"
 			},
 		}
-	}`), false)
+	}`), "apply", false)
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}

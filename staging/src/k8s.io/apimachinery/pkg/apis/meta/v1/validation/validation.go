@@ -100,8 +100,17 @@ func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if patchType != types.ApplyPatchType && options.Force != nil {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+	if patchType != types.ApplyPatchType {
+		if options.Force != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+		}
+		if options.ApplyManager != "" {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("applyManager"), "may not be specified for non-apply patch"))
+		}
+	} else {
+		if options.ApplyManager == "" {
+			allErrs = append(allErrs, field.Required(field.NewPath("applyManager"), "is required for apply patch"))
+		}
 	}
 	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
 	return allErrs

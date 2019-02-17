@@ -106,6 +106,7 @@ func TestApplyAlsoCreates(t *testing.T) {
 			Namespace("default").
 			Resource(tc.resource).
 			Name(tc.name).
+			Param("applyManager", "apply").
 			Body([]byte(tc.body)).
 			Do().
 			Get()
@@ -132,6 +133,7 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 		Namespace("default").
 		Resource("pods").
 		Name("test-pod-uid").
+		Param("applyManager", "apply").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -194,6 +196,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
+		Param("applyManager", "apply").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
@@ -214,6 +217,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
+		Param("applyManager", "apply").
 		Body([]byte(obj)).Do().Get()
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object")
@@ -232,6 +236,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Resource("deployments").
 		Name("deployment").
 		Param("force", "true").
+		Param("applyManager", "apply").
 		Body([]byte(obj)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to apply object with force: %v", err)
@@ -249,6 +254,7 @@ func TestApplyManagedFields(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
+		Param("applyManager", "apply").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -360,6 +366,7 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
+		Param("applyManager", "apply").
 		Body(obj).
 		Do().
 		Get()
@@ -371,6 +378,7 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
+		Param("applyManager", "apply").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
@@ -388,5 +396,106 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 
 	if managed := accessor.GetManagedFields(); managed != nil {
 		t.Fatalf("Object contains unexpected managedFields: %v", managed)
+	}
+}
+
+func TestApplyRequiresApplyManager(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "test-cm",
+			"namespace": "default"
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body(obj).
+		Do().
+		Get()
+	if err == nil {
+		t.Fatalf("Apply should fail to create without applyManager")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("applyManager", "apply").
+		Body(obj).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Apply failed to create with applyManager: %v", err)
+	}
+}
+
+func TestApplyForbiddenMergePatch(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "test-cm",
+			"namespace": "default"
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body(obj).
+		Do().
+		Get()
+	if err == nil {
+		t.Fatalf("Apply should fail to create without applyManager")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("applyManager", "apply").
+		Body(obj).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Apply failed to create object: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body([]byte(`{"data":{"key": "value"}}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("MergePatch failed to update without applyManager: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("applyManager", "apply").
+		Body([]byte(`{"data":{"key": "value"}}`)).
+		Do().
+		Get()
+	if err == nil {
+		t.Fatalf("MergePatch succeeded to update with applyManager")
 	}
 }

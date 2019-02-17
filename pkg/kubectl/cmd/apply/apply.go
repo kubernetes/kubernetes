@@ -68,6 +68,7 @@ type ApplyOptions struct {
 
 	ServerSideApply bool
 	ForceConflicts  bool
+	ApplyManager    string
 	Selector        string
 	DryRun          bool
 	ServerDryRun    bool
@@ -194,6 +195,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	o.ApplyManager = cmdutil.GetApplyManagerFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
@@ -387,7 +389,8 @@ func (o *ApplyOptions) Run() error {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
 			options := metav1.PatchOptions{
-				Force: &o.ForceConflicts,
+				Force:        &o.ForceConflicts,
+				ApplyManager: o.ApplyManager,
 			}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}

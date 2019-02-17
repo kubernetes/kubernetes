@@ -414,7 +414,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.fieldManager == nil {
 		panic("FieldManager must be installed to run apply")
 	}
-	return p.fieldManager.Apply(obj, p.patch, force)
+	return p.fieldManager.Apply(obj, p.patch, p.options.ApplyManager, force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {

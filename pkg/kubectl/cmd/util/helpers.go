@@ -402,6 +402,7 @@ func AddDryRunFlag(cmd *cobra.Command) {
 func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().String("apply-manager", "kubectl", "Name of the manager used to track applied field ownership. This is an alpha feature and flag.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -483,6 +484,10 @@ func GetServerSideApplyFlag(cmd *cobra.Command) bool {
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "force-conflicts")
+}
+
+func GetApplyManagerFlag(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "apply-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {

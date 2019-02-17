@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -124,4 +126,92 @@ func TestInvalidDryRun(t *testing.T) {
 		})
 	}
 
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestValidPatchOptions(t *testing.T) {
+	tests := []struct {
+		opts      metav1.PatchOptions
+		patchType types.PatchType
+	}{
+		{
+			opts: metav1.PatchOptions{
+				Force:        boolPtr(true),
+				ApplyManager: "kubectl",
+			},
+			patchType: types.ApplyPatchType,
+		},
+		{
+			opts: metav1.PatchOptions{
+				ApplyManager: "kubectl",
+			},
+			patchType: types.ApplyPatchType,
+		},
+		{
+			opts:      metav1.PatchOptions{},
+			patchType: types.MergePatchType,
+		},
+		{
+			opts: metav1.PatchOptions{
+				ApplyManager: "", // same as non-specified.
+			},
+			patchType: types.MergePatchType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.opts), func(t *testing.T) {
+			errs := ValidatePatchOptions(&test.opts, test.patchType)
+			if len(errs) != 0 {
+				t.Fatalf("Expected no failures, got: %v", errs)
+			}
+		})
+	}
+}
+
+func TestInvalidPatchOptions(t *testing.T) {
+	tests := []struct {
+		opts      metav1.PatchOptions
+		patchType types.PatchType
+	}{
+		// missing manager
+		{
+			opts:      metav1.PatchOptions{},
+			patchType: types.ApplyPatchType,
+		},
+		// force on non-apply
+		{
+			opts: metav1.PatchOptions{
+				Force: boolPtr(true),
+			},
+			patchType: types.MergePatchType,
+		},
+		// manager on non-apply
+		{
+			opts: metav1.PatchOptions{
+				ApplyManager: "kubectl",
+			},
+			patchType: types.MergePatchType,
+		},
+		// manager and force on non-apply
+		{
+			opts: metav1.PatchOptions{
+				ApplyManager: "kubectl",
+				Force:        boolPtr(false),
+			},
+			patchType: types.MergePatchType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.opts), func(t *testing.T) {
+			errs := ValidatePatchOptions(&test.opts, test.patchType)
+			if len(errs) == 0 {
+				t.Fatal("Expected failures, got none.")
+			}
+		})
+	}
 }
