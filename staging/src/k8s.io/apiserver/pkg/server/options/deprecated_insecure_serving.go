@@ -61,23 +61,6 @@ func (s *DeprecatedInsecureServingOptions) Validate() []error {
 	return errors
 }
 
-// AddFlags adds flags related to insecure serving to the specified FlagSet.
-func (s *DeprecatedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
-	if s == nil {
-		return
-	}
-
-	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
-	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
-	fs.Lookup("insecure-bind-address").Hidden = false
-
-	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
-		"The port on which to serve unsecured, unauthenticated access.")
-	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
-	fs.Lookup("insecure-port").Hidden = false
-}
-
 // AddUnqualifiedFlags adds flags related to insecure serving without the --insecure prefix to the specified FlagSet.
 func (s *DeprecatedInsecureServingOptions) AddUnqualifiedFlags(fs *pflag.FlagSet) {
 	if s == nil {
