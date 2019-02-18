@@ -25,7 +25,7 @@ deploy a bundle.
 You will need to
 [install the Juju client](https://jujucharms.com/get-started) and
 `juju-quickstart` as prerequisites.  To deploy the bundle use
-`juju-quickstart` which runs on Mac OS (`brew install
+`juju-quickstart` which runs on macOS (`brew install
 juju-quickstart`) or Ubuntu (`apt-get install juju-quickstart`).
 
 ### Deploy a Kubernetes Bundle

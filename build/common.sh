@@ -173,7 +173,7 @@ function kube::build::docker_available_on_osx() {
 
     kube::log::status "No docker host is set. Checking options for setting one..."
     if [[ -z "$(which docker-machine)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac nor docker-machine can be found."
+      kube::log::status "It looks like you're running macOS, yet neither Docker for Mac nor docker-machine can be found."
       kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
@@ -286,7 +286,7 @@ function kube::build::ensure_tar() {
   fi
   if ! "${TAR}" --version | grep -q GNU; then
     echo "  !!! Cannot find GNU tar. Build on Linux or install GNU tar"
-    echo "      on Mac OS X (brew install gnu-tar)."
+    echo "      on macOS (brew install gnu-tar)."
     return 1
   fi
 }

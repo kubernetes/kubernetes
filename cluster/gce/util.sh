@@ -1481,7 +1481,7 @@ function create-certs {
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
-  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
+  # Note 'base64 -w0' doesn't work on macOS, which has different flags.
   CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
   CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')

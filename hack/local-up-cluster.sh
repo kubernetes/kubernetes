@@ -292,7 +292,7 @@ function detect_binary {
         host_os=linux
         ;;
       *)
-        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        echo "Unsupported host OS. Must be Linux or macOS." >&2
         exit 1
         ;;
     esac
@@ -1099,7 +1099,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         start_kubelet
         ;;
       *)
-        print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+        print_color "Unsupported host OS. Must be Linux or macOS, kubelet aborted."
         ;;
     esac
 fi

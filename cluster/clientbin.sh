@@ -29,7 +29,7 @@ case "$(uname -s)" in
     host_os=linux
     ;;
   *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+    echo "Unsupported host OS. Must be Linux or macOS." >&2
     exit 1
     ;;
 esac
