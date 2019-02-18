@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
@@ -37,42 +37,62 @@ import (
 	"k8s.io/klog"
 )
 
-// main demonstrates a leader elected process that will step down if interrupted.
+func buildConfig(kubeconfig string) (*rest.Config, error) {
+	if kubeconfig != "" {
+		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+		return cfg, nil
+	}
+
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func main() {
 	klog.InitFlags(nil)
+
+	var kubeconfig string
+	var resourceName string
+	var ttlSeconds int
+
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	flag.StringVar(&resourceName, "resource-name", "example", "The leader election resource name (Configmap or Endpoint name)")
+	flag.IntVar(&ttlSeconds, "ttl", 30, "TTL for leader election in seconds")
 	flag.Parse()
-	args := flag.Args()
-	if len(args) != 3 {
-		log.Fatalf("requires three arguments: ID NAMESPACE CONFIG_MAP_NAME (%d)", len(args))
+
+	podName := os.Getenv("POD_NAME")
+	podNamespace := os.Getenv("POD_NAMESPACE")
+
+	if podName == "" || podNamespace == "" {
+		klog.Fatal("unable to get POD information (missing POD_NAME or POD_NAMESPACE environment variable")
 	}
 
 	// leader election uses the Kubernetes API by writing to a ConfigMap or Endpoints
 	// object. Conflicting writes are detected and each client handles those actions
 	// independently.
-	var config *rest.Config
-	var err error
-	if kubeconfig := os.Getenv("KUBECONFIG"); len(kubeconfig) > 0 {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
-	}
+	config, err := buildConfig(kubeconfig)
 	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
+		klog.Fatal(err)
 	}
+	client := clientset.NewForConfigOrDie(config)
 
-	// we use the ConfigMap lock type since edits to ConfigMaps are less common
+	// We use the ConfigMap lock type since edits to ConfigMaps are less common
 	// and fewer objects in the cluster watch "all ConfigMaps" (unlike the older
 	// Endpoints lock type, where quite a few system agents like the kube-proxy
 	// and ingress controllers must watch endpoints).
-	id := args[0]
 	lock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: args[1],
-			Name:      args[2],
+			Namespace: podNamespace,
+			Name:      resourceName,
 		},
-		Client: kubernetes.NewForConfigOrDie(config).CoreV1(),
+		Client: client.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity: id,
+			Identity: podName,
 		},
 	}
 
@@ -83,7 +103,6 @@ func main() {
 
 	// use a client that will stop allowing new requests once the context ends
 	config.Wrap(transport.ContextCanceller(ctx, fmt.Errorf("the leader is shutting down")))
-	exampleClient := kubernetes.NewForConfigOrDie(config).CoreV1()
 
 	// listen for interrupts or the Linux SIGTERM signal and cancel
 	// our context, which the leader election code will observe and
@@ -96,7 +115,30 @@ func main() {
 		cancel()
 	}()
 
+	// events from Kubernetes
+	callbacks := leaderelection.LeaderCallbacks{
+		OnStartedLeading: func(ctx context.Context) {
+			// we're notified when we start - this is where you would
+			// usually put your code
+			klog.Infof("%s: leading", podName)
+		},
+		OnStoppedLeading: func() {
+			// we can do cleanup here, or after the RunOrDie method
+			// returns
+			klog.Infof("%s: lost", podName)
+		},
+		OnNewLeader: func(identity string) {
+			// we're notified when new leader elected
+			if identity == podName {
+				// I just got the lock
+				return
+			}
+			klog.Infof("new leader elected: %v", identity)
+		},
+	}
+
 	// start the leader election code loop
+	ttl := time.Duration(ttlSeconds) * time.Second
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock: lock,
 		// IMPORTANT: you MUST ensure that any code you have that
@@ -106,30 +148,19 @@ func main() {
 		// get elected before your background loop finished, violating
 		// the stated goal of the lease.
 		ReleaseOnCancel: true,
-		LeaseDuration:   60 * time.Second,
-		RenewDeadline:   15 * time.Second,
-		RetryPeriod:     5 * time.Second,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				// we're notified when we start - this is where you would
-				// usually put your code
-				log.Printf("%s: leading", id)
-			},
-			OnStoppedLeading: func() {
-				// we can do cleanup here, or after the RunOrDie method
-				// returns
-				log.Printf("%s: lost", id)
-			},
-		},
+		LeaseDuration:   ttl,
+		RenewDeadline:   ttl / 2,
+		RetryPeriod:     ttl / 4,
+		Callbacks:       callbacks,
 	})
 
 	// because the context is closed, the client should report errors
-	_, err = exampleClient.ConfigMaps(args[1]).Get(args[2], metav1.GetOptions{})
+	_, err = client.CoreV1().ConfigMaps(podNamespace).Get(resourceName, metav1.GetOptions{})
 	if err == nil || !strings.Contains(err.Error(), "the leader is shutting down") {
-		log.Fatalf("%s: expected to get an error when trying to make a client call: %v", id, err)
+		log.Fatalf("%s: expected to get an error when trying to make a client call: %v", podName, err)
 	}
 
 	// we no longer hold the lease, so perform any cleanup and then
 	// exit
-	log.Printf("%s: done", id)
+	log.Printf("%s: done", podName)
 }
