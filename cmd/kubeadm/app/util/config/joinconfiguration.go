@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -83,6 +84,12 @@ func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguratio
 		return nil, err
 	}
 
+	return documentMapToJoinConfiguration(gvkmap)
+}
+
+// documentMapToJoinConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
+// finds a JoinConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
+func documentMapToJoinConfiguration(gvkmap map[schema.GroupVersionKind][]byte) (*kubeadmapi.JoinConfiguration, error) {
 	joinBytes := []byte{}
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than JoinConfiguration
@@ -102,7 +109,7 @@ func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguratio
 	}
 
 	if len(joinBytes) == 0 {
-		return nil, errors.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
+		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.JoinConfiguration{}
