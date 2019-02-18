@@ -490,22 +490,8 @@ func initDiskControllers(az *Cloud) error {
 		cloud:                 az,
 	}
 
-	// BlobDiskController: contains the function needed to
-	// create/attach/detach/delete blob based (unmanaged disks)
-	blobController, err := newBlobDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
-	}
-
-	// ManagedDiskController: contains the functions needed to
-	// create/attach/detach/delete managed disks
-	managedController, err := newManagedDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
-	}
-
-	az.BlobDiskController = blobController
-	az.ManagedDiskController = managedController
+	az.BlobDiskController = &BlobDiskController{common: common}
+	az.ManagedDiskController = &ManagedDiskController{common: common}
 	az.controllerCommon = common
 
 	return nil
