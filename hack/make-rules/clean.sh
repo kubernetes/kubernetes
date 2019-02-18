@@ -24,7 +24,9 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 CLEAN_PATTERNS=(
   "_tmp"
   "doc_tmp"
-  "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
+  "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/client\/openapi).)*/zz_generated.openapi.go"
+  "((?!staging\/src\/k8s\.io\/kube-aggregator\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
+  "((?!pkg\/generated\/openapi).)*/zz_generated.openapi.go"
   "test/e2e/generated/bindata.go"
 )
 

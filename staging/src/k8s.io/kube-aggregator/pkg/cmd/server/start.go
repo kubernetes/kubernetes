@@ -32,6 +32,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	aggregatoropenapi "k8s.io/kube-aggregator/pkg/client/openapi"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"

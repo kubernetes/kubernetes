@@ -7,6 +7,7 @@ gen_openapi(
     outs = ["zz_generated.openapi.go"],
     exclude_pkgs = [
         "staging/src/k8s.io/code-generator",
+        "staging/src/k8s.io/kube-aggregator",
         "staging/src/k8s.io/sample-apiserver",
     ],
     output_pkg = "k8s.io/kubernetes/pkg/generated/openapi",
