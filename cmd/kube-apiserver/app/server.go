@@ -142,7 +142,7 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
+func Run(completeOptions CompletedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -155,7 +155,7 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
+func CreateServerChain(completedOptions CompletedServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
 	nodeTunneler, proxyTransport, err := CreateNodeDialer(completedOptions)
 	if err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 }
 
 // CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
-func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+func CreateNodeDialer(s CompletedServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
@@ -269,7 +269,7 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
 func CreateKubeAPIServerConfig(
-	s completedServerRunOptions,
+	s CompletedServerRunOptions,
 	nodeTunneler tunneler.Tunneler,
 	proxyTransport *http.Transport,
 ) (
@@ -524,15 +524,15 @@ func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinf
 	return authorizationConfig.New()
 }
 
-// completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
-type completedServerRunOptions struct {
+// CompletedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
+type CompletedServerRunOptions struct {
 	*options.ServerRunOptions
 }
 
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
-func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
-	var options completedServerRunOptions
+func Complete(s *options.ServerRunOptions) (CompletedServerRunOptions, error) {
+	var options CompletedServerRunOptions
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
 		return options, err
