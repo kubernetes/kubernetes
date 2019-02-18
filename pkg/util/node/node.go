@@ -225,13 +225,3 @@ func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, n
 	}
 	return patchBytes, nil
 }
-
-// IsNodeReady returns true if a node is ready; false otherwise.
-func IsNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
-}
