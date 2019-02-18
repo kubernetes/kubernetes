@@ -496,7 +496,7 @@ func TestServerRunWithSNI(t *testing.T) {
 
 			// add poststart hook to know when the server is up.
 			startedCh := make(chan struct{})
-			s.AddPostStartHook("test-notifier", func(context PostStartHookContext) error {
+			s.AddPostStartHookOrDie("test-notifier", func(context PostStartHookContext) error {
 				close(startedCh)
 				return nil
 			})
