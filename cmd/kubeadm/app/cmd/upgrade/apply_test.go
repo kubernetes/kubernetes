@@ -48,11 +48,6 @@ func TestSetImplicitFlags(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			actualErr := SetImplicitFlags(rt.flags)
 
-			// If an error was returned; make newK8sVersion nil so it's easy to match using reflect.DeepEqual later (instead of a random pointer)
-			if actualErr != nil {
-				rt.flags.newK8sVersion = nil
-			}
-
 			if !reflect.DeepEqual(*rt.flags, rt.expectedFlags) {
 				t.Errorf(
 					"failed SetImplicitFlags:\n\texpected flags: %v\n\t  actual: %v",
