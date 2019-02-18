@@ -168,13 +168,14 @@ func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (
 	return context.WithTimeout(parent, timeout)
 }
 
-// ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
-// if timeout is exceeded without all conditions returning true, or an error if an error occurs.
-// TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
-// TODO: remove when no longer used
-//
-// Deprecated: Use UntilWithSync instead.
-func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
+// ListWatchUntil first lists objects, converts them into synthetic ADDED events
+// and checks conditions for those synthetic events. If the conditions have not been reached so far
+// it continues by calling Until which establishes a watch from resourceVersion of the list call
+// to evaluate those conditions based on new events.
+// ListWatchUntil provides the same guarantees as Until and replaces the old WATCH from RV "" (or "0")
+// which was mixing list and watch calls internally and having severe design issues. (see #74022)
+// There is no resourceVersion order guarantee for the initial list and those synthetic events.
+func ListWatchUntil(ctx context.Context, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
 	if len(conditions) == 0 {
 		return nil, nil
 	}
@@ -231,17 +232,5 @@ func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ..
 	}
 	currResourceVersion := metaObj.GetResourceVersion()
 
-	watchInterface, err := lw.Watch(metav1.ListOptions{ResourceVersion: currResourceVersion})
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	evt, err := UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
-	if err == ErrWatchClosed {
-		// present a consistent error interface to callers
-		err = wait.ErrWaitTimeout
-	}
-	return evt, err
+	return Until(ctx, currResourceVersion, lw, remainingConditions...)
 }
