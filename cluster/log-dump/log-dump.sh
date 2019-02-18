@@ -329,8 +329,13 @@ function find_non_logexported_nodes() {
 }
 
 function dump_nodes_with_logexporter() {
-  echo "Detecting nodes in the cluster"
-  detect-node-names &> /dev/null
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
+    NODE_NAMES=( $(log_dump_custom_get_instances node) )
+  else
+    echo "Detecting nodes in the cluster"
+    detect-node-names &> /dev/null
+  fi
 
   if [[ -z "${NODE_NAMES:-}" ]]; then
     echo "No nodes found!"
