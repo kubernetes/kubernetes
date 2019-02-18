@@ -219,7 +219,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
-			klog.V(4).Infof("failed to acquire lease %v", desc)
+			klog.Infof("failed to acquire lease %v", desc)
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
@@ -301,17 +301,20 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 
 	// 1. obtain or create the ElectionRecord
 	oldLeaderElectionRecord, err := le.config.Lock.Get()
+
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
 			return false
 		}
+		// Try to create the lock
 		if err = le.config.Lock.Create(leaderElectionRecord); err != nil {
 			klog.Errorf("error initially creating leader election record: %v", err)
 			return false
 		}
 		le.observedRecord = leaderElectionRecord
 		le.observedTime = le.clock.Now()
+		klog.Info("Created a new lock, and acquired it succesfully at time: %v", le.observedTime)
 		return true
 	}
 
