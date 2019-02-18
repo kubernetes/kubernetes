@@ -824,7 +824,7 @@ func setupLocalVolumeDirectory(config *localTestConfig, node *v1.Node) *localTes
 // launchNodeExecPodForLocalPV launches a hostexec pod for local PV and waits
 // until it's Running.
 func launchNodeExecPodForLocalPV(client clientset.Interface, ns, node string) *v1.Pod {
-	hostExecPod := framework.NewHostExecPodSpec(ns, fmt.Sprintf("hostexec-%s", node))
+	hostExecPod := framework.NewExecPodSpec(ns, fmt.Sprintf("hostexec-%s", node), true)
 	hostExecPod.Spec.NodeName = node
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
