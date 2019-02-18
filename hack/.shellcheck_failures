@@ -149,10 +149,6 @@
 ./hack/verify-staging-meta-files.sh
 ./hack/verify-symbols.sh
 ./hack/verify-test-featuregates.sh
-./hack/verify-test-images.sh
-./hack/verify-test-owners.sh
-./hack/verify-typecheck.sh
-./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
 ./staging/src/k8s.io/metrics/hack/update-codegen.sh
