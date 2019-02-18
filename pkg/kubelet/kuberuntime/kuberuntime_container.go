@@ -669,29 +669,27 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
 func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
-	initContainerNames := sets.NewString()
+	initContainerNames := make(map[string]int, len(pod.Spec.InitContainers))
 	for _, container := range pod.Spec.InitContainers {
-		initContainerNames.Insert(container.Name)
+		initContainerNames[container.Name] = 0
 	}
-	for name := range initContainerNames {
-		count := 0
-		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) {
-				continue
-			}
-			count++
-			// Purge all init containers that match this container name
-			klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.removeContainer(status.ID.ID); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
-				continue
-			}
-			// Remove any references to this container
-			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
-				m.containerRefManager.ClearRef(status.ID)
-			} else {
-				klog.Warningf("No ref for container %q", status.ID)
-			}
+	for _, status := range podStatus.ContainerStatuses {
+		if count, ok := initContainerNames[status.Name]; !ok {
+			continue
+		}
+		count++
+		initContainerNames[status.Name] = count
+		// Purge all init containers that match this container name
+		klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
+		if err := m.removeContainer(status.ID.ID); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+			continue
+		}
+		// Remove any references to this container
+		if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+			m.containerRefManager.ClearRef(status.ID)
+		} else {
+			klog.Warningf("No ref for container %q", status.ID)
 		}
 	}
 }
