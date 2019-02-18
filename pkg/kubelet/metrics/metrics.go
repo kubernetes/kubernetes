@@ -98,6 +98,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      "containers_per_pod_count",
 			Help:      "The number of containers per pod.",
+			Buckets:   prometheus.DefBuckets,
 		},
 	)
 	PodWorkerLatency = prometheus.NewHistogramVec(
@@ -105,6 +106,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PodWorkerLatencyKey,
 			Help:      "Latency in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
@@ -113,6 +115,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PodStartLatencyKey,
 			Help:      "Latency in seconds for a single pod to go from pending to running.",
+			Buckets:   prometheus.DefBuckets,
 		},
 	)
 	CgroupManagerLatency = prometheus.NewHistogramVec(
@@ -120,6 +123,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      CgroupManagerOperationsKey,
 			Help:      "Latency in seconds for cgroup manager operations. Broken down by method.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
@@ -128,6 +132,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PodWorkerStartLatencyKey,
 			Help:      "Latency in seconds from seeing a pod to starting a worker.",
+			Buckets:   prometheus.DefBuckets,
 		},
 	)
 	PLEGRelistLatency = prometheus.NewHistogram(
@@ -135,6 +140,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PLEGRelistLatencyKey,
 			Help:      "Latency in seconds for relisting pods in PLEG.",
+			Buckets:   prometheus.DefBuckets,
 		},
 	)
 	PLEGDiscardEvents = prometheus.NewCounterVec(
@@ -150,6 +156,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      PLEGRelistIntervalKey,
 			Help:      "Interval in seconds between relisting in PLEG.",
+			Buckets:   prometheus.DefBuckets,
 		},
 	)
 	// Metrics of remote runtime operations.
@@ -166,6 +173,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      RuntimeOperationsLatencyKey,
 			Help:      "Latency in seconds of runtime operations. Broken down by operation type.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
@@ -182,6 +190,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      EvictionStatsAgeKey,
 			Help:      "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"eviction_signal"},
 	)
@@ -198,6 +207,7 @@ var (
 			Subsystem: KubeletSubsystem,
 			Name:      DevicePluginAllocationLatencyKey,
 			Help:      "Latency in seconds to serve a device plugin Allocation request. Broken down by resource name.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"resource_name"},
 	)
