@@ -334,6 +334,13 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		chanSize = 1000
 	}
 
+	// With some events already sent, update resourceVersion so that
+	// events that were buffered and not yet processed won't be delivered
+	// to this watcher second time causing going back in time.
+	if len(initEvents) > 0 {
+		watchRV = initEvents[len(initEvents)-1].ResourceVersion
+	}
+
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
@@ -403,10 +410,15 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 // Implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
+	hasContinuation := pagingEnabled && len(pred.Continue) > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	if resourceVersion == "" || hasContinuation || hasLimit {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation or limit is
+		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
+		// Limits are only sent to storage when resourceVersion is non-zero
+		// since the watch cache isn't able to perform continuations, and
+		// limits are ignored when resource version is zero
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
