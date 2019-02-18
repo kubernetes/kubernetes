@@ -47,10 +47,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
     deps = [
         "//pkg/api/v1/service:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud/filter:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud/mock:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -80,6 +76,10 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
@@ -112,9 +112,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/service:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
-        "//pkg/cloudprovider/providers/gce/cloud/mock:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/net/sets:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -123,6 +120,9 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta:go_default_library",
+        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
@@ -142,9 +142,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/cloudprovider/providers/gce/cloud:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

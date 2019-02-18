@@ -384,7 +384,6 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
-	// TODO(vmarmol): Handle better.
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
 	hostname := pod.Name

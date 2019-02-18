@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 const awsChinaRegionPrefix = "cn-"
@@ -169,6 +170,10 @@ func (p *ecrProvider) Enabled() bool {
 		Credentials: nil,
 		Region:      &p.region,
 	}))}
+	getter.svc.Handlers.Build.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/user-agent",
+		Fn:   request.MakeAddToUserAgentHandler("kubernetes", version.Get().String()),
+	})
 	getter.svc.Handlers.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
 		Fn:   awsHandlerLogger,

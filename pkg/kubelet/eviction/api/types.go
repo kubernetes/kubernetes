@@ -63,6 +63,7 @@ var OpForSignal = map[Signal]ThresholdOperator{
 	SignalNodeFsInodesFree:  OpLessThan,
 	SignalImageFsAvailable:  OpLessThan,
 	SignalImageFsInodesFree: OpLessThan,
+	SignalPIDAvailable:      OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity

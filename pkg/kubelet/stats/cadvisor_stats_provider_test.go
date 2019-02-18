@@ -22,12 +22,16 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 )
 
 func TestRemoveTerminatedContainerInfo(t *testing.T) {
@@ -196,10 +200,17 @@ func TestCadvisorListPodStats(t *testing.T) {
 		EphemeralVolumes:  ephemeralVolumes,
 		PersistentVolumes: persistentVolumes,
 	}
+	p0Time := metav1.Now()
+	p1Time := metav1.Now()
+	p2Time := metav1.Now()
+	mockStatus := new(statustest.MockStatusProvider)
+	mockStatus.On("GetPodStatus", types.UID("UID"+pName0)).Return(v1.PodStatus{StartTime: &p0Time}, true)
+	mockStatus.On("GetPodStatus", types.UID("UID"+pName1)).Return(v1.PodStatus{StartTime: &p1Time}, true)
+	mockStatus.On("GetPodStatus", types.UID("UID"+pName2)).Return(v1.PodStatus{StartTime: &p2Time}, true)
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime)
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus)
 	pods, err := p.ListPodStats()
 	assert.NoError(t, err)
 
@@ -227,7 +238,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
 
-	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
+	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
 	if ps.CPU != nil {
@@ -349,7 +360,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil)
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, nil)
 	pods, err := p.ListPodCPUAndMemoryStats()
 	assert.NoError(t, err)
 
@@ -435,7 +446,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	mockCadvisor.On("ImagesFsInfo").Return(imageFsInfo, nil)
 	mockRuntime.On("ImageStats").Return(imageStats, nil)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil)
 	stats, err := provider.ImageFsStats()
 	assert.NoError(err)
 

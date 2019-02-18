@@ -479,19 +479,22 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+	var errs []error
 	estimate := int64(0)
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
+
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
-		return estimate, err
+		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
+		errs = append(errs, err)
 	}
 	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
 	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
-		return estimate, err
+		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
+		errs = append(errs, err)
 	}
-	var errs []error
 	for gvr := range groupVersionResources {
 		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
 		if err != nil {

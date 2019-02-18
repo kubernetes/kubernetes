@@ -136,14 +136,14 @@ func (m *MetricsForE2E) SummaryKind() string {
 var SchedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
 
 var InterestingApiServerMetrics = []string{
-	"apiserver_request_count",
-	"apiserver_request_latencies_summary",
-	"etcd_helper_cache_entry_count",
-	"etcd_helper_cache_hit_count",
-	"etcd_helper_cache_miss_count",
-	"etcd_request_cache_add_latencies_summary",
-	"etcd_request_cache_get_latencies_summary",
-	"etcd_request_latencies_summary",
+	"apiserver_request_total",
+	"apiserver_request_latency_seconds_summary",
+	"etcd_helper_cache_entry_total",
+	"etcd_helper_cache_hit_total",
+	"etcd_helper_cache_miss_total",
+	"etcd_request_cache_add_latency_seconds",
+	"etcd_request_cache_get_latency_seconds",
+	"etcd_request_latency_seconds",
 }
 
 var InterestingControllerManagerMetrics = []string{
@@ -475,10 +475,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 
 	for _, sample := range samples {
 		// Example line:
-		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		// apiserver_request_count{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
-			sample.Metric[model.MetricNameLabel] != "apiserver_request_count" {
+		// apiserver_request_latency_seconds_summary{resource="namespaces",verb="LIST",quantile="0.99"} 0.000908
+		// apiserver_request_total{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latency_seconds_summary" &&
+			sample.Metric[model.MetricNameLabel] != "apiserver_request_total" {
 			continue
 		}
 
@@ -491,14 +491,14 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		}
 
 		switch sample.Metric[model.MetricNameLabel] {
-		case "apiserver_request_latencies_summary":
+		case "apiserver_request_latency_seconds_summary":
 			latency := sample.Value
 			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
 			if err != nil {
 				return nil, err
 			}
-			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Microsecond)
-		case "apiserver_request_count":
+			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Second)
+		case "apiserver_request_total":
 			count := sample.Value
 			a.addMetricRequestCount(resource, subresource, verb, scope, int(count))
 

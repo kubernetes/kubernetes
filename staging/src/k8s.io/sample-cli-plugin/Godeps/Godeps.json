@@ -7,6 +7,10 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
+		},
+		{
 			"ImportPath": "github.com/evanphx/json-patch",
 			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 		},
@@ -256,6 +260,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/api/certificates/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/api/coordination/v1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

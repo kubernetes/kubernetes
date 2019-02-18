@@ -50,7 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = ["apply_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
         "//test/fixtures",
     ],
     embed = [":go_default_library"],
@@ -59,8 +59,8 @@ go_test(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

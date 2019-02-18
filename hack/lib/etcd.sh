@@ -47,12 +47,12 @@ kube::etcd::validate() {
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
-   export PATH=$KUBE_ROOT/third_party/etcd:$PATH
+  if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+   export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
-   echo $PATH
+   echo "${PATH}"
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
+   if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
@@ -70,8 +70,8 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
-  if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
-    ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
+  if [[ -d "${ARTIFACTS:-}" ]]; then
+    ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi

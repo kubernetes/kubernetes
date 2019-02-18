@@ -25,8 +25,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -242,7 +242,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 
 		// create a replicaset
 		rs := newReplicaset()
-		persistedRS, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(rs)
+		persistedRS, err := c.AppsV1().ReplicaSets(ns).Create(rs)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replicaset %s in namespace: %s", persistedRS.Name, ns)
 		// wait for replicaset controller to confirm that it has handled the creation
 		err = waitForRSObservedGeneration(c, persistedRS.Namespace, persistedRS.Name, persistedRS.Generation)
@@ -250,7 +250,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 
 		// update the replicaset spec to trigger a resync
 		patch := []byte(`{"spec":{"minReadySeconds":5}}`)
-		persistedRS, err = c.ExtensionsV1beta1().ReplicaSets(ns).Patch(persistedRS.Name, types.StrategicMergePatchType, patch)
+		persistedRS, err = c.AppsV1().ReplicaSets(ns).Patch(persistedRS.Name, types.StrategicMergePatchType, patch)
 		Expect(err).NotTo(HaveOccurred(), "failed to apply to replicaset %s in namespace %s a strategic merge patch: %s", persistedRS.Name, ns, patch)
 
 		// wait for replicaset controller to confirm that it has handle the spec update
@@ -302,15 +302,15 @@ func newUninitializedPod(podName string) *v1.Pod {
 	return pod
 }
 
-func newReplicaset() *v1beta1.ReplicaSet {
+func newReplicaset() *apps.ReplicaSet {
 	name := "initializer-test-replicaset"
 	replicas := int32(1)
 	labels := map[string]string{"initializer-test": "single-replicaset"}
-	return &v1beta1.ReplicaSet{
+	return &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1beta1.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: &replicas,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -411,7 +411,7 @@ func cleanupInitializer(c clientset.Interface, initializerConfigName, initialize
 // waits till the RS status.observedGeneration matches metadata.generation.
 func waitForRSObservedGeneration(c clientset.Interface, ns, name string, generation int64) error {
 	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

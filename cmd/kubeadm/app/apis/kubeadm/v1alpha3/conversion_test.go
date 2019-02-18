@@ -46,13 +46,15 @@ func TestJoinConfigurationConversion(t *testing.T) {
 			expectedError: true,
 		},
 	}
-	for _, tc := range testcases {
-		internal := &kubeadm.JoinConfiguration{}
-		err := Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(tc.old, internal, nil)
-		if (err != nil) != tc.expectedError {
-			t.Errorf("ImageToImageMeta returned unexpected error: %v, saw: %v", tc.expectedError, (err != nil))
-			return
-		}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			internal := &kubeadm.JoinConfiguration{}
+			err := Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(tc.old, internal, nil)
+			if (err != nil) != tc.expectedError {
+				t.Errorf("ImageToImageMeta returned unexpected error: %v, saw: %v", tc.expectedError, (err != nil))
+				return
+			}
+		})
 	}
 }
 
@@ -76,12 +78,14 @@ func TestInitConfigurationConversion(t *testing.T) {
 			expectedErr: true,
 		},
 	}
-	for _, tc := range testcases {
-		internal := &kubeadm.InitConfiguration{}
-		err := Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(tc.old, internal, nil)
-		if (err != nil) != tc.expectedErr {
-			t.Errorf("no error was expected but '%s' was found", err)
-		}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			internal := &kubeadm.InitConfiguration{}
+			err := Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(tc.old, internal, nil)
+			if (err != nil) != tc.expectedErr {
+				t.Errorf("no error was expected but '%s' was found", err)
+			}
+		})
 	}
 }
 

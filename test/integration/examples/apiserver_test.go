@@ -98,7 +98,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 		kubeAPIServerOptions.InsecureServing.BindPort = 0
-		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
+		kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 		kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 		kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}

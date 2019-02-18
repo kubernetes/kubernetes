@@ -29,8 +29,8 @@ spec:
     spec:
       serviceAccountName: csi-provisioner
       containers:
-        - name: csi-provisioner-v0
-          image: gcr.io/gke-release/csi-provisioner:v0.4.1-gke.0
+        - name: csi-provisioner
+          image: quay.io/k8scsi/csi-provisioner:v0.4.1
           args:
             - "--provisioner=csi-hostpath-v0"
             - "--csi-address=$(ADDRESS)"

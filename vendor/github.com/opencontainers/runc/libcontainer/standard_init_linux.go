@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"syscall" //only for Exec
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
@@ -14,6 +15,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
 )
@@ -43,17 +45,31 @@ func (l *linuxStandardInit) getSessionRingParams() (string, uint32, uint32) {
 }
 
 func (l *linuxStandardInit) Init() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	if !l.config.Config.NoNewKeyring {
 		ringname, keepperms, newperms := l.getSessionRingParams()
 
 		// Do not inherit the parent's session keyring.
-		sessKeyId, err := keys.JoinSessionKeyring(ringname)
-		if err != nil {
-			return err
-		}
-		// Make session keyring searcheable.
-		if err := keys.ModKeyringPerm(sessKeyId, keepperms, newperms); err != nil {
-			return err
+		if sessKeyId, err := keys.JoinSessionKeyring(ringname); err != nil {
+			// If keyrings aren't supported then it is likely we are on an
+			// older kernel (or inside an LXC container). While we could bail,
+			// the security feature we are using here is best-effort (it only
+			// really provides marginal protection since VFS credentials are
+			// the only significant protection of keyrings).
+			//
+			// TODO(cyphar): Log this so people know what's going on, once we
+			//               have proper logging in 'runc init'.
+			if errors.Cause(err) != unix.ENOSYS {
+				return errors.Wrap(err, "join session keyring")
+			}
+		} else {
+			// Make session keyring searcheable. If we've gotten this far we
+			// bail on any error -- we don't want to have a keyring with bad
+			// permissions.
+			if err := keys.ModKeyringPerm(sessKeyId, keepperms, newperms); err != nil {
+				return errors.Wrap(err, "mod keyring permissions")
+			}
 		}
 	}
 
@@ -76,7 +92,7 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 		if err := system.Setctty(); err != nil {
-			return err
+			return errors.Wrap(err, "setctty")
 		}
 	}
 
@@ -89,46 +105,47 @@ func (l *linuxStandardInit) Init() error {
 
 	if hostname := l.config.Config.Hostname; hostname != "" {
 		if err := unix.Sethostname([]byte(hostname)); err != nil {
-			return err
+			return errors.Wrap(err, "sethostname")
 		}
 	}
 	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
-		return err
-	}
-	if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
-		return err
+		return errors.Wrap(err, "apply apparmor profile")
 	}
 
 	for key, value := range l.config.Config.Sysctl {
 		if err := writeSystemProperty(key, value); err != nil {
-			return err
+			return errors.Wrapf(err, "write sysctl key %s", key)
 		}
 	}
 	for _, path := range l.config.Config.ReadonlyPaths {
 		if err := readonlyPath(path); err != nil {
-			return err
+			return errors.Wrapf(err, "readonly path %s", path)
 		}
 	}
 	for _, path := range l.config.Config.MaskPaths {
 		if err := maskPath(path, l.config.Config.MountLabel); err != nil {
-			return err
+			return errors.Wrapf(err, "mask path %s", path)
 		}
 	}
 	pdeath, err := system.GetParentDeathSignal()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "get pdeath signal")
 	}
 	if l.config.NoNewPrivileges {
 		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
-			return err
+			return errors.Wrap(err, "set nonewprivileges")
 		}
 	}
 	// Tell our parent that we're ready to Execv. This must be done before the
 	// Seccomp rules have been applied, because we need to be able to read and
 	// write to a socket.
 	if err := syncParentReady(l.pipe); err != nil {
-		return err
+		return errors.Wrap(err, "sync ready")
 	}
+	if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
+		return errors.Wrap(err, "set process label")
+	}
+	defer label.SetProcessLabel("")
 	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
 	// do this before dropping capabilities; otherwise do it as late as possible
 	// just before execve so as few syscalls take place after it as possible.
@@ -143,7 +160,7 @@ func (l *linuxStandardInit) Init() error {
 	// finalizeNamespace can change user/group which clears the parent death
 	// signal, so we restore it here.
 	if err := pdeath.Restore(); err != nil {
-		return err
+		return errors.Wrap(err, "restore pdeath signal")
 	}
 	// Compare the parent from the initial start of the init process and make
 	// sure that it did not change.  if the parent changes that means it died

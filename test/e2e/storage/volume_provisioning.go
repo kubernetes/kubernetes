@@ -39,6 +39,7 @@ import (
 	storagebeta "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
@@ -57,85 +58,6 @@ const (
 	// Number of PVCs for multi PVC tests
 	multiPVCcount = 3
 )
-
-func testBindingWaitForFirstConsumer(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolume, *v1.Node) {
-	pvs, node := testBindingWaitForFirstConsumerMultiPVC(client, []*v1.PersistentVolumeClaim{claim}, class)
-	return pvs[0], node
-}
-
-func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims []*v1.PersistentVolumeClaim, class *storage.StorageClass) ([]*v1.PersistentVolume, *v1.Node) {
-	var err error
-	Expect(len(claims)).ToNot(Equal(0))
-	namespace := claims[0].Namespace
-
-	By("creating a storage class " + class.Name)
-	class, err = client.StorageV1().StorageClasses().Create(class)
-	Expect(err).NotTo(HaveOccurred())
-	defer deleteStorageClass(client, class.Name)
-
-	By("creating claims")
-	var claimNames []string
-	var createdClaims []*v1.PersistentVolumeClaim
-	for _, claim := range claims {
-		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-		claimNames = append(claimNames, c.Name)
-		createdClaims = append(createdClaims, c)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	defer func() {
-		var errors map[string]error
-		for _, claim := range createdClaims {
-			err := framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace)
-			if err != nil {
-				errors[claim.Name] = err
-			}
-		}
-		if len(errors) > 0 {
-			for claimName, err := range errors {
-				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
-			}
-		}
-	}()
-
-	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
-	By("checking the claims are in pending state")
-	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, client, namespace, claimNames, 2*time.Second, framework.ClaimProvisionShortTimeout, true)
-	Expect(err).To(HaveOccurred())
-	for _, claim := range createdClaims {
-		// Get new copy of the claim
-		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
-	}
-
-	By("creating a pod referring to the claims")
-	// Create a pod referring to the claim and wait for it to get to running
-	pod, err := framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
-	}()
-	// collect node details
-	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("re-checking the claims to see they binded")
-	var pvs []*v1.PersistentVolume
-	for _, claim := range createdClaims {
-		// Get new copy of the claim
-		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		// make sure claim did bind
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
-
-		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		pvs = append(pvs, pv)
-	}
-	Expect(len(pvs)).ToNot(Equal(0))
-	return pvs, node
-}
 
 func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zone), matchZone)
@@ -295,7 +217,7 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 		if specifyAllowedTopology {
 			action += " and allowedTopologies"
 			suffix += "-topo"
-			topoZone = getRandomCloudZone(c)
+			topoZone = getRandomClusterZone(c)
 			addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
 		}
 		By(action)
@@ -305,7 +227,7 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 			claim.Spec.StorageClassName = &class.Name
 			claims = append(claims, claim)
 		}
-		pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
+		pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
 		if node == nil {
 			framework.Failf("unexpected nil node found")
 		}
@@ -336,7 +258,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	Describe("DynamicProvisioner [Slow]", func() {
 		It("should provision storage with different parameters", func() {
-			cloudZone := getRandomCloudZone(c)
+			cloudZone := getRandomClusterZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
 			// that can be used to persist data among pods.
@@ -922,7 +844,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}
 			}()
 
-			// Watch events until the message about invalid key appears
+			// Watch events until the message about invalid key appears.
+			// Event delivery is not reliable and it's used only as a quick way how to check if volume with wrong KMS
+			// key was not provisioned. If the event is not delivered, we check that the volume is not Bound for whole
+			// ClaimProvisionTimeout in the very same loop.
 			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -931,8 +856,22 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						return true, nil
 					}
 				}
+
+				pvc, err := c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+				if err != nil {
+					return true, err
+				}
+				if pvc.Status.Phase != v1.ClaimPending {
+					// The PVC was bound to something, i.e. PV was created for wrong KMS key. That's bad!
+					return true, fmt.Errorf("PVC got unexpectedly %s (to PV %q)", pvc.Status.Phase, pvc.Spec.VolumeName)
+				}
+
 				return false, nil
 			})
+			if err == wait.ErrWaitTimeout {
+				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
+				err = nil
+			}
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -968,7 +907,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				By("creating a claim with class with allowedTopologies set")
 				suffix := "topology"
 				class := newStorageClass(test, ns, suffix)
-				zone := getRandomCloudZone(c)
+				zone := getRandomClusterZone(c)
 				addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
 				claim := newClaim(test, ns, suffix)
 				claim.Spec.StorageClassName = &class.Name
@@ -1244,10 +1183,11 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 	}
 }
 
-func getRandomCloudZone(c clientset.Interface) string {
+func getRandomClusterZone(c clientset.Interface) string {
 	zones, err := framework.GetClusterZones(c)
 	Expect(err).ToNot(HaveOccurred())
-	// return "" in case that no node has zone label
-	zone, _ := zones.PopAny()
-	return zone
+	Expect(len(zones)).ToNot(Equal(0))
+
+	zonesList := zones.UnsortedList()
+	return zonesList[rand.Intn(zones.Len())]
 }

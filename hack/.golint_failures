@@ -1,4 +1,3 @@
-cluster/images/etcd-version-monitor
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -46,6 +45,7 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/coordination
+pkg/apis/coordination/v1
 pkg/apis/coordination/v1beta1
 pkg/apis/core
 pkg/apis/core/helper
@@ -87,7 +87,6 @@ pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
 pkg/cloudprovider/providers/fake
-pkg/cloudprovider/providers/gce/cloud
 pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/cloudprovider/providers/vsphere/vclib
@@ -360,7 +359,6 @@ pkg/serviceaccount
 pkg/ssh
 pkg/util/bandwidth
 pkg/util/config
-pkg/util/configz
 pkg/util/ebtables
 pkg/util/env
 pkg/util/file
@@ -442,6 +440,7 @@ staging/src/k8s.io/api/batch/v1
 staging/src/k8s.io/api/batch/v1beta1
 staging/src/k8s.io/api/batch/v2alpha1
 staging/src/k8s.io/api/certificates/v1beta1
+staging/src/k8s.io/api/coordination/v1
 staging/src/k8s.io/api/coordination/v1beta1
 staging/src/k8s.io/api/core/v1
 staging/src/k8s.io/api/events/v1beta1
@@ -475,7 +474,6 @@ staging/src/k8s.io/apimachinery/pkg/api/meta
 staging/src/k8s.io/apimachinery/pkg/api/resource
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
-staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1
@@ -516,7 +514,6 @@ staging/src/k8s.io/apimachinery/pkg/util/runtime
 staging/src/k8s.io/apimachinery/pkg/util/sets/types
 staging/src/k8s.io/apimachinery/pkg/util/strategicpatch
 staging/src/k8s.io/apimachinery/pkg/util/uuid
-staging/src/k8s.io/apimachinery/pkg/util/validation
 staging/src/k8s.io/apimachinery/pkg/util/wait
 staging/src/k8s.io/apimachinery/pkg/util/yaml
 staging/src/k8s.io/apimachinery/pkg/watch
@@ -533,7 +530,6 @@ staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
-staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/apis/example2
@@ -571,7 +567,6 @@ staging/src/k8s.io/apiserver/pkg/server
 staging/src/k8s.io/apiserver/pkg/server/healthz
 staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
-staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
 staging/src/k8s.io/apiserver/pkg/storage/errors
@@ -663,6 +658,7 @@ staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
+staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -688,6 +684,7 @@ staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake
 staging/src/k8s.io/metrics/pkg/client/custom_metrics/scheme
 staging/src/k8s.io/metrics/pkg/client/external_metrics
 staging/src/k8s.io/metrics/pkg/client/external_metrics/fake
+staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
@@ -733,6 +730,7 @@ test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
+test/e2e/windows
 test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/builder

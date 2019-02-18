@@ -295,6 +295,10 @@ func (e *Runner) SetAdditionalFlags(fn func(*pflag.FlagSet)) {
 // command help, adding phase related flags and by adding phases subcommands
 // Please note that this command needs to be done once all the phases are added to the Runner.
 func (e *Runner) BindToCommand(cmd *cobra.Command) {
+	// keep track of the command triggering the runner
+	e.runCmd = cmd
+
+	// return early if no phases were added
 	if len(e.Phases) == 0 {
 		return
 	}
@@ -387,9 +391,6 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 
 	// adds phase related flags to the main command
 	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
-
-	// keep tracks of the command triggering the runner
-	e.runCmd = cmd
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags []string) {

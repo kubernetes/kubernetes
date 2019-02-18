@@ -486,6 +486,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
 	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
+	privileged := true
 
 	injectPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -511,11 +512,9 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 							MountPath: "/mnt",
 						},
 					},
-				},
-			},
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					Level: "s0:c0,c1",
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

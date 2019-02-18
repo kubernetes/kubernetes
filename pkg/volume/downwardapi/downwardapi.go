@@ -81,6 +81,10 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
+func (plugin *downwardAPIPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *downwardAPIPlugin) RequiresRemount() bool {
 	return true
 }

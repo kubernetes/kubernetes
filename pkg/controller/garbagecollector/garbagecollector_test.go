@@ -856,7 +856,16 @@ func TestGarbageCollectorSync(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go gc.Run(1, stopCh)
-	go gc.Sync(fakeDiscoveryClient, 10*time.Millisecond, stopCh)
+	// The pseudo-code of GarbageCollector.Sync():
+	// GarbageCollector.Sync(client, period, stopCh):
+	//    wait.Until() loops with `period` until the `stopCh` is closed :
+	//        wait.PollImmediateUntil() loops with 100ms (hardcode) util the `stopCh` is closed:
+	//            GetDeletableResources()
+	//            gc.resyncMonitors()
+	//            controller.WaitForCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
+	//
+	// Setting the period to 200ms allows the WaitForCacheSync() to check for cache sync ~2 times in every wait.PollImmediateUntil() loop.
+	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, stopCh)
 
 	// Wait until the sync discovers the initial resources
 	fmt.Printf("Test output")

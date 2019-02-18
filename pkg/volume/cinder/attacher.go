@@ -212,7 +212,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 }
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
-	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
+	// NOTE: devicePath is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err

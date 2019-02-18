@@ -211,10 +211,18 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1
+		gvr("coordination.k8s.io", "v1", "leases"): {
+			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1",
+			ExpectedGVK:      gvkP("coordination.k8s.io", "v1beta1", "Lease"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
 		gvr("coordination.k8s.io", "v1beta1", "leases"): {
-			Stub:             `{"metadata": {"name": "lease1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
-			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/lease1",
+			Stub:             `{"metadata": {"name": "leasev1beta1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1beta1",
 		},
 		// --
 

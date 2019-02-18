@@ -5,6 +5,7 @@ package user
 import (
 	"io"
 	"os"
+	"strconv"
 
 	"golang.org/x/sys/unix"
 )
@@ -113,4 +114,31 @@ func CurrentUser() (User, error) {
 // /etc/group file on the filesystem), then CurrentGroup returns an error.
 func CurrentGroup() (Group, error) {
 	return LookupGid(unix.Getgid())
+}
+
+func currentUserSubIDs(fileName string) ([]SubID, error) {
+	u, err := CurrentUser()
+	if err != nil {
+		return nil, err
+	}
+	filter := func(entry SubID) bool {
+		return entry.Name == u.Name || entry.Name == strconv.Itoa(u.Uid)
+	}
+	return ParseSubIDFileFilter(fileName, filter)
+}
+
+func CurrentUserSubUIDs() ([]SubID, error) {
+	return currentUserSubIDs("/etc/subuid")
+}
+
+func CurrentUserSubGIDs() ([]SubID, error) {
+	return currentUserSubIDs("/etc/subgid")
+}
+
+func CurrentProcessUIDMap() ([]IDMap, error) {
+	return ParseIDMapFile("/proc/self/uid_map")
+}
+
+func CurrentProcessGIDMap() ([]IDMap, error) {
+	return ParseIDMapFile("/proc/self/gid_map")
 }

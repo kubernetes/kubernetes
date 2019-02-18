@@ -1266,18 +1266,32 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
+	epIP1 := "10.180.1.1"
+	thisHostname := testHostname
+	otherHostname := "other-hostname"
+
 	makeEndpointsMap(fp,
 		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP:       epIP,
-					NodeName: nil,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
-				}},
-			}}
+			ept.Subsets = []v1.EndpointSubset{
+				{ // **local** endpoint address, should be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP,
+						NodeName: &thisHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}}},
+				{ // **remote** endpoint address, should not be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP1,
+						NodeName: &otherHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}},
+				}}
 		}),
 	)
 

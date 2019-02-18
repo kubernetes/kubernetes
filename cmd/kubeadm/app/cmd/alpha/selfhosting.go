@@ -18,11 +18,11 @@ package alpha
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"

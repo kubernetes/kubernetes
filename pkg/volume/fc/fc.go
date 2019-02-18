@@ -85,6 +85,10 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
+func (plugin *fcPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *fcPlugin) RequiresRemount() bool {
 	return false
 }

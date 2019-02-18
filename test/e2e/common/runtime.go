@@ -172,7 +172,7 @@ while true; do sleep 1; done
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
 					phase:   v1.PodFailed,
-					message: Equal("DONE\n"),
+					message: Equal("DONE"),
 				},
 
 				{
@@ -201,6 +201,7 @@ while true; do sleep 1; done
 					message: Equal("OK"),
 				},
 			} {
+				testCase := testCase
 				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
 					testCase.container.Name = "termination-message-container"
 					c := ConformanceContainer{

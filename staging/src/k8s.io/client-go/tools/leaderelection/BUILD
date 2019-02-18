@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "healthzadaptor.go",
         "leaderelection.go",
+        "metrics.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/leaderelection",
     importpath = "k8s.io/client-go/tools/leaderelection",
@@ -56,6 +57,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/tools/leaderelection/example:all-srcs",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:all-srcs",
     ],
     tags = ["automanaged"],

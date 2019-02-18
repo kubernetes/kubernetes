@@ -27,6 +27,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -183,7 +184,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 					PodSubnet: "5.6.7.8/24",
 				},
 				ImageRepository:   "someRepo",
-				KubernetesVersion: "v1.12.0",
+				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 			},
 		}
 

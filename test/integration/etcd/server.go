@@ -74,7 +74,7 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 	kubeAPIServerOptions.InsecureServing.BindPort = 0
 	kubeAPIServerOptions.SecureServing.Listener = listener
 	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-	kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
+	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 	kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
 	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
@@ -88,7 +88,7 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 	}
 
 	// get etcd client before starting API server
-	rawClient, kvClient, err := integration.GetEtcdClients(completedOptions.Etcd.StorageConfig)
+	rawClient, kvClient, err := integration.GetEtcdClients(completedOptions.Etcd.StorageConfig.Transport)
 	if err != nil {
 		t.Fatal(err)
 	}

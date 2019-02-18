@@ -351,29 +351,39 @@ type WaitFunc func(done <-chan struct{}) <-chan struct{}
 // WaitFor continually checks 'fn' as driven by 'wait'.
 //
 // WaitFor gets a channel from 'wait()'', and then invokes 'fn' once for every value
-// placed on the channel and once more when the channel is closed.
+// placed on the channel and once more when the channel is closed. If the channel is closed
+// and 'fn' returns false without error, WaitFor returns ErrWaitTimeout.
 //
-// If 'fn' returns an error the loop ends and that error is returned, and if
+// If 'fn' returns an error the loop ends and that error is returned. If
 // 'fn' returns true the loop ends and nil is returned.
 //
-// ErrWaitTimeout will be returned if the channel is closed without fn ever
+// ErrWaitTimeout will be returned if the 'done' channel is closed without fn ever
 // returning true.
+//
+// When the done channel is closed, because the golang `select` statement is
+// "uniform pseudo-random", the `fn` might still run one or multiple time,
+// though eventually `WaitFor` will return.
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
-	c := wait(done)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	c := wait(stopCh)
 	for {
-		_, open := <-c
-		ok, err := fn()
-		if err != nil {
-			return err
-		}
-		if ok {
-			return nil
-		}
-		if !open {
-			break
+		select {
+		case _, open := <-c:
+			ok, err := fn()
+			if err != nil {
+				return err
+			}
+			if ok {
+				return nil
+			}
+			if !open {
+				return ErrWaitTimeout
+			}
+		case <-done:
+			return ErrWaitTimeout
 		}
 	}
-	return ErrWaitTimeout
 }
 
 // poller returns a WaitFunc that will send to the channel every interval until

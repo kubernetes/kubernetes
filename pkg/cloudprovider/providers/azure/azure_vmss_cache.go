@@ -132,7 +132,7 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 		}
 
 		for _, resourceGroup := range resourceGroups.List() {
-			vmList, err := ss.Cloud.VirtualMachineClientListWithRetry(resourceGroup)
+			vmList, err := ss.Cloud.ListVirtualMachines(resourceGroup)
 			if err != nil {
 				return nil, err
 			}

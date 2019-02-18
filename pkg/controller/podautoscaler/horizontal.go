@@ -179,7 +179,9 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		return
 	}
 
-	// always add rate-limited so we don't fetch metrics more that once per resync interval
+	// Requests are always added to queue with resyncPeriod delay.  If there's already
+	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
+	// interval in queue so HPAs are processed every resync interval.
 	a.queue.AddRateLimited(key)
 }
 
@@ -207,14 +209,23 @@ func (a *HorizontalController) processNextWorkItem() bool {
 	}
 	defer a.queue.Done(key)
 
-	err := a.reconcileKey(key.(string))
-	if err == nil {
-		// don't "forget" here because we want to only process a given HPA once per resync interval
-		return true
+	deleted, err := a.reconcileKey(key.(string))
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	// Add request processing HPA to queue with resyncPeriod delay.
+	// Requests are always added to queue with resyncPeriod delay. If there's already request
+	// for the HPA in the queue then a new request is always dropped. Requests spend resyncPeriod
+	// in queue so HPAs are processed every resyncPeriod.
+	// Request is added here just in case last resync didn't insert request into the queue. This
+	// happens quite often because there is race condition between adding request after resyncPeriod
+	// and removing them from queue. Request can be added by resync before previous request is
+	// removed from queue. If we didn't add request here then in this case one request would be dropped
+	// and HPA would processed after 2 x resyncPeriod.
+	if !deleted {
+		a.queue.AddRateLimited(key)
 	}
 
-	a.queue.AddRateLimited(key)
-	utilruntime.HandleError(err)
 	return true
 }
 
@@ -298,20 +309,20 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	return replicas, metric, statuses, timestamp, nil
 }
 
-func (a *HorizontalController) reconcileKey(key string) error {
+func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error) {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		klog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
 		delete(a.recommendations, key)
-		return nil
+		return true, nil
 	}
 
-	return a.reconcileAutoscaler(hpa, key)
+	return false, a.reconcileAutoscaler(hpa, key)
 }
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.

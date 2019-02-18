@@ -245,12 +245,9 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-// IsNotMountPoint determines if a directory is a mountpoint.
-// It should return ErrNotExist when the directory does not exist.
-// This method uses the List() of all mountpoints
-// It is more extensive than IsLikelyNotMountPoint
-// and it detects bind mounts in linux
-func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+// isNotMountPoint implements Mounter.IsNotMountPoint and is shared by mounter
+// implementations.
+func isNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)

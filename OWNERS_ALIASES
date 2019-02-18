@@ -140,6 +140,7 @@ aliases:
     - ravisantoshgudimetla
     - misterikkit
     - Huang-Wei
+    - wgliang
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -170,14 +171,18 @@ aliases:
     - smarterclayton
     - soltysh
   sig-testing-reviewers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
   sig-testing-approvers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
   sig-node-reviewers:
     - Random-Liu
@@ -238,81 +243,6 @@ aliases:
     - DirectXMan12
     - MaciekPytel
     - mwielgus
-  milestone-maintainers:
-    - lavalamp
-    - deads2k
-    - michelleN
-    - mattfarina
-    - prydonius
-    - bgrant0607
-    - jdumars
-    - liggitt
-    - deads2k
-    - mwielgus
-    - directxman12
-    - justinsb
-    - kris-nova
-    - chrislovecnm
-    - mfburnett
-    - slack
-    - colemickens
-    - foxish
-    - AdoHe
-    - lukemarsden
-    - jbeda
-    - roberthbailey
-    - zehicle
-    - jdumars
-    - grodrigues3
-    - Phillels
-    - devin-donnelly
-    - jaredbhatti
-    - csbell
-    - quinton-hoole
-    - piosz
-    - fabxc
-    - thockin
-    - dcbw
-    - caseydavenport
-    - dchen1107
-    - derekwaynecarr
-    - zen
-    - marcoceppi
-    - dghubble
-    - idvoretskyi
-    - xsgordon
-    - apsinha
-    - idvoretskyi
-    - calebamiles
-    - calebamiles
-    - wojtek-t
-    - countspongebob
-    - jbeda
-    - davidopp
-    - timothysc
-    - pmorie
-    - arschles
-    - vaikas-google
-    - duglin
-    - saad-ali
-    - childsb
-    - spiffxp
-    - fejta
-    - timothysc
-    - danielromlein
-    - floreks
-    - michmike
-    - abgworrall
-    - krzyzacy
-    - steveperry-53
-    - radhikpac
-    - jpbetz
-    - cmluciano
-    - bsalamat
-    - m1093782566
-    - tallclair
-    - feiskyer
-    - mikedanese
   api-approvers:
     - erictune
     - lavalamp

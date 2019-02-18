@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -172,6 +171,33 @@ type ExtenderManagedResource struct {
 	IgnoredByScheduler bool
 }
 
+// ExtenderTLSConfig contains settings to enable TLS with extender
+type ExtenderTLSConfig struct {
+	// Server should be accessed without verifying the TLS certificate. For testing only.
+	Insecure bool
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// ceritificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string
+
+	// Server requires TLS client certificate authentication
+	CertFile string
+	// Server requires TLS client certificate authentication
+	KeyFile string
+	// Trusted root certificates for server
+	CAFile string
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -193,7 +219,7 @@ type ExtenderConfig struct {
 	// EnableHTTPS specifies whether https should be used to communicate with the extender
 	EnableHTTPS bool
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *restclient.TLSClientConfig
+	TLSConfig *ExtenderTLSConfig
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration

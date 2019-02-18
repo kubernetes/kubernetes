@@ -319,7 +319,7 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -376,7 +376,7 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}

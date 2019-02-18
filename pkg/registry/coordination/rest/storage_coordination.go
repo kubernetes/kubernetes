@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -37,10 +38,22 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.VersionEnabled(coordinationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
+	if apiResourceConfigSource.VersionEnabled(coordinationv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+	}
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// leases
+	leaseStorage := leasestorage.NewREST(restOptionsGetter)
+	storage["leases"] = leaseStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// leases
 	leaseStorage := leasestorage.NewREST(restOptionsGetter)

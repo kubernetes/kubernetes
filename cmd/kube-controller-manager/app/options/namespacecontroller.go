@@ -19,14 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // NamespaceControllerOptions holds the NamespaceController options.
 type NamespaceControllerOptions struct {
-	NamespaceSyncPeriod      metav1.Duration
-	ConcurrentNamespaceSyncs int32
+	*kubectrlmgrconfig.NamespaceControllerConfiguration
 }
 
 // AddFlags adds flags related to NamespaceController for controller manager to the specified FlagSet.

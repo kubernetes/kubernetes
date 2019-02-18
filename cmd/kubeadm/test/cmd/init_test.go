@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -102,7 +103,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:     "valid version is accepted",
-			args:     "--kubernetes-version=1.12.0",
+			args:     "--kubernetes-version=" + constants.CurrentKubernetesVersion.String(),
 			expected: true,
 		},
 	}

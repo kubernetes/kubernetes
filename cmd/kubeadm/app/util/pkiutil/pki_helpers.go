@@ -459,12 +459,12 @@ func EncodeCSRPEM(csr *x509.CertificateRequest) []byte {
 func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 	block, _ := pem.Decode(pemCSR)
 	if block == nil {
-		return nil, fmt.Errorf("data doesn't contain a valid certificate request")
+		return nil, errors.New("data doesn't contain a valid certificate request")
 	}
 
 	if block.Type != certutil.CertificateRequestBlockType {
 		var block *pem.Block
-		return nil, fmt.Errorf("expected block type %q, but PEM had type %v", certutil.CertificateRequestBlockType, block.Type)
+		return nil, errors.Errorf("expected block type %q, but PEM had type %v", certutil.CertificateRequestBlockType, block.Type)
 	}
 
 	return x509.ParseCertificateRequest(block.Bytes)
@@ -480,7 +480,7 @@ func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
 
 	csr, err := parseCSRPEM(pemBlock)
 	if err != nil {
-		return nil, fmt.Errorf("error reading certificate request file %s: %v", file, err)
+		return nil, errors.Wrapf(err, "error reading certificate request file %s", file)
 	}
 	return csr, nil
 }

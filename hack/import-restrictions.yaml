@@ -49,6 +49,13 @@
   - k8s.io/kube-openapi
   - k8s.io/klog
 
+- baseImportPath: "./vendor/k8s.io/component-base/"
+  allowedImports:
+  - k8s.io/apimachinery
+  - k8s.io/component-base
+  - k8s.io/klog
+  - k8s.io/utils
+
 - baseImportPath: "./vendor/k8s.io/client-go/"
   allowedImports:
   - k8s.io/api
@@ -84,6 +91,7 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/kube-openapi
   - k8s.io/utils
   - k8s.io/klog
@@ -102,6 +110,7 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/kube-aggregator
   - k8s.io/kube-openapi
   - k8s.io/klog
@@ -112,6 +121,7 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/sample-apiserver
   - k8s.io/klog
 
@@ -122,6 +132,7 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/component-base
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
@@ -141,23 +152,29 @@
 - baseImportPath: "./vendor/k8s.io/kube-controller-manager/"
   allowedImports:
   - k8s.io/apimachinery
-  - k8s.io/apiserver
+  - k8s.io/component-base
+  - k8s.io/klog
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-proxy/"
   allowedImports:
   - k8s.io/apimachinery
+  - k8s.io/component-base
+  - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-scheduler/"
   allowedImports:
   - k8s.io/apimachinery
-  - k8s.io/apiserver
+  - k8s.io/component-base
+  - k8s.io/klog
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kubelet/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
   allowedImports:
@@ -172,6 +189,12 @@
   - k8s.io/client-go
   - k8s.io/klog
 
+- baseImportPath: "./vendor/k8s.io/node-api/"
+  allowedImports:
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/node-api
+
 - baseImportPath: "./vendor/k8s.io/csi-api/"
   allowedImports:
   - k8s.io/api
@@ -180,3 +203,10 @@
   - k8s.io/client-go
   - k8s.io/csi-api
   - k8s.io/klog
+
+- baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/klog
+  - k8s.io/csi-translation-lib

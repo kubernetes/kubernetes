@@ -623,7 +623,7 @@ func TestReplicaCalcScaleUpCMObject(t *testing.T) {
 			expectedUtilization: 20000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Name:       "some-deployment",
 			},
 		},
@@ -643,7 +643,7 @@ func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
 			expectedUtilization: 50000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Name:       "some-deployment",
 			},
 		},
@@ -758,7 +758,7 @@ func TestReplicaCalcScaleDownCMObject(t *testing.T) {
 			expectedUtilization: 12000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Name:       "some-deployment",
 			},
 		},
@@ -916,7 +916,7 @@ func TestReplicaCalcToleranceCMObject(t *testing.T) {
 			expectedUtilization: 20666,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Name:       "some-deployment",
 			},
 		},

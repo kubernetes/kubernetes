@@ -17,8 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -33,8 +31,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
-	cloudprovider "k8s.io/cloud-provider"
+	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -43,16 +40,10 @@ import (
 	"k8s.io/klog"
 )
 
-var (
-	// ErrCloudInstance occurs when the cloud provider does not support
-	// the Instances API.
-	ErrCloudInstance = errors.New("cloud provider doesn't support instances")
-)
-
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
+func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
@@ -125,15 +116,6 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 	return updatedPod, nil
 }
 
-// ForcefullyDeleteNode deletes the node immediately. The pods on the
-// node are cleaned up by the podGC.
-func ForcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error {
-	if err := kubeClient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
-		return fmt.Errorf("unable to delete node %q: %v", nodeName, err)
-	}
-	return nil
-}
-
 // MarkAllPodsNotReady updates ready status of all pods running on
 // given node from master return true if success
 func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
@@ -169,36 +151,6 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 		return nil
 	}
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
-}
-
-// ExistsInCloudProvider returns true if the node exists in the
-// cloud provider.
-func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
-	instances, ok := cloud.Instances()
-	if !ok {
-		return false, fmt.Errorf("%v", ErrCloudInstance)
-	}
-	if _, err := instances.InstanceID(context.TODO(), nodeName); err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
-// ShutdownInCloudProvider returns true if the node is shutdowned in
-// cloud provider.
-func ShutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
-	instances, ok := cloud.Instances()
-	if !ok {
-		return false, fmt.Errorf("%v", ErrCloudInstance)
-	}
-	shutdown, err := instances.InstanceShutdownByProviderID(ctx, node.Spec.ProviderID)
-	if err == cloudprovider.NotImplemented {
-		return false, nil
-	}
-	return shutdown, err
 }
 
 // RecordNodeEvent records a event related to a node.

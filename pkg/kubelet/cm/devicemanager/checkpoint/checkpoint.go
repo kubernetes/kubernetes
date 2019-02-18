@@ -49,7 +49,7 @@ type Data struct {
 	Checksum checksum.Checksum
 }
 
-// NewDeviceManagerCheckpoint returns an instance of Checkpoint
+// New returns an instance of Checkpoint
 func New(devEntries []PodDevicesEntry,
 	devices map[string][]string) DeviceManagerCheckpoint {
 	return &Data{

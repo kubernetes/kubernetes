@@ -120,6 +120,10 @@ KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+    export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
@@ -139,13 +143,13 @@ isnum() {
 
 PARALLEL="${PARALLEL:-1}"
 while getopts "hp:i:" opt ; do
-  case $opt in
+  case ${opt} in
     h)
       kube::test::usage
       exit 0
       ;;
     p)
-      PARALLEL="$OPTARG"
+      PARALLEL="${OPTARG}"
       if ! isnum "${PARALLEL}" || [[ "${PARALLEL}" -le 0 ]]; then
         kube::log::usage "'$0': argument to -p must be numeric and greater than 0"
         kube::test::usage
@@ -162,7 +166,7 @@ while getopts "hp:i:" opt ; do
       exit 1
       ;;
     :)
-      kube::log::usage "Option -$OPTARG <value>"
+      kube::log::usage "Option -${OPTARG} <value>"
       kube::test::usage
       exit 1
       ;;
@@ -171,7 +175,6 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
@@ -220,15 +223,15 @@ verifyAndSuggestPackagePath() {
   local original_package_path="$3"
   local suggestion_package_path="$4"
 
-  if ! [ -d "$specified_package_path" ]; then
+  if ! [ -d "${specified_package_path}" ]; then
     # Because k8s sets a localized $GOPATH for testing, seeing the actual
     # directory can be confusing. Instead, just show $GOPATH if it exists in the
     # $specified_package_path.
-    local printable_package_path=$(echo "$specified_package_path" | sed "s|$GOPATH|\$GOPATH|")
-    kube::log::error "specified test path '$printable_package_path' does not exist"
+    local printable_package_path=$(echo "${specified_package_path}" | sed "s|${GOPATH}|\${GOPATH}|")
+    kube::log::error "specified test path '${printable_package_path}' does not exist"
 
-    if [ -d "$alternative_package_path" ]; then
-      kube::log::info "try changing \"$original_package_path\" to \"$suggestion_package_path\""
+    if [ -d "${alternative_package_path}" ]; then
+      kube::log::info "try changing \"${original_package_path}\" to \"${suggestion_package_path}\""
     fi
     exit 1
   fi
@@ -238,13 +241,13 @@ verifyPathsToPackagesUnderTest() {
   local packages_under_test=($@)
 
   for package_path in "${packages_under_test[@]}"; do
-    local local_package_path="$package_path"
-    local go_package_path="$GOPATH/src/$package_path"
+    local local_package_path="${package_path}"
+    local go_package_path="${GOPATH}/src/${package_path}"
 
     if [[ "${package_path:0:2}" == "./" ]] ; then
-      verifyAndSuggestPackagePath "$local_package_path" "$go_package_path" "$package_path" "${package_path:2}"
+      verifyAndSuggestPackagePath "${local_package_path}" "${go_package_path}" "${package_path}" "${package_path:2}"
     else
-      verifyAndSuggestPackagePath "$go_package_path" "$local_package_path" "$package_path" "./$package_path"
+      verifyAndSuggestPackagePath "${go_package_path}" "${local_package_path}" "${package_path}" "./${package_path}"
     fi
   done
 }
@@ -313,12 +316,12 @@ runTests() {
   # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
   #                            https://github.com/golang/go/issues/16540
   cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
-  for path in $(echo $cover_ignore_dirs | sed 's/|/ /g'); do
-      echo -e "skipped\tk8s.io/kubernetes/$path"
+  for path in $(echo ${cover_ignore_dirs} | sed 's/|/ /g'); do
+      echo -e "skipped\tk8s.io/kubernetes/${path}"
   done
 
   printf "%s\n" "${@}" \
-    | grep -Ev $cover_ignore_dirs \
+    | grep -Ev ${cover_ignore_dirs} \
     | xargs -I{} -n 1 -P ${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
       go test ${goflags[@]:+${goflags[@]}} \
@@ -346,7 +349,7 @@ runTests() {
     # Include all coverage reach data in the combined profile, but exclude the
     # 'mode' lines, as there should be only one.
     for x in `find "${cover_report_dir}" -name "${cover_profile}"`; do
-      cat $x | grep -h -v "^mode:" || true
+      cat ${x} | grep -h -v "^mode:" || true
     done
   } >"${COMBINED_COVER_PROFILE}"
 
@@ -371,8 +374,8 @@ checkFDs() {
   # several unittests panic when httptest cannot open more sockets
   # due to the low default files limit on OS X.  Warn about low limit.
   local fileslimit="$(ulimit -n)"
-  if [[ $fileslimit -lt 1000 ]]; then
-    echo "WARNING: ulimit -n (files) should be at least 1000, is $fileslimit, may cause test failure";
+  if [[ ${fileslimit} -lt 1000 ]]; then
+    echo "WARNING: ulimit -n (files) should be at least 1000, is ${fileslimit}, may cause test failure";
   fi
 }
 
@@ -384,7 +387,7 @@ IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 apiVersionsCount=${#apiVersions[@]}
 for (( i=0; i<${apiVersionsCount}; i++ )); do
   apiVersion=${apiVersions[i]}
-  echo "Running tests for APIVersion: $apiVersion"
+  echo "Running tests for APIVersion: ${apiVersion}"
   # KUBE_TEST_API sets the version of each group to be tested.
   KUBE_TEST_API="${apiVersion}" runTests "$@"
 done

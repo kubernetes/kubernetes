@@ -38,11 +38,18 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		if len(status.Status) == 0 {
 			status.Status = metav1.StatusFailure
 		}
-		if status.Code == 0 {
-			switch status.Status {
-			case metav1.StatusSuccess:
+		switch status.Status {
+		case metav1.StatusSuccess:
+			if status.Code == 0 {
 				status.Code = http.StatusOK
-			case metav1.StatusFailure:
+			}
+		case metav1.StatusFailure:
+			if status.Code == 0 {
+				status.Code = http.StatusInternalServerError
+			}
+		default:
+			runtime.HandleError(fmt.Errorf("apiserver received an error with wrong status field : %#+v", err))
+			if status.Code == 0 {
 				status.Code = http.StatusInternalServerError
 			}
 		}

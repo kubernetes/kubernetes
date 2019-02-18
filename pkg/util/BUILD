@@ -47,6 +47,7 @@ filegroup(
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pod:all-srcs",
         "//pkg/util/procfs:all-srcs",
+        "//pkg/util/prometheusclientgo:all-srcs",
         "//pkg/util/reflector/prometheus:all-srcs",
         "//pkg/util/removeall:all-srcs",
         "//pkg/util/resizefs:all-srcs",

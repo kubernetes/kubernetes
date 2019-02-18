@@ -7,10 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "bitbucket.org/ww/goautoneg",
-			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
-		},
-		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
 			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
 		},
@@ -91,16 +87,8 @@
 			"Rev": "449fdfce4d962303d702fec724ef0ad181c92528"
 		},
 		{
-			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
-			"Rev": "3dcc96556217539f50599357fb481ac0dc7439b9"
-		},
-		{
 			"ImportPath": "github.com/emicklei/go-restful",
 			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
-		},
-		{
-			"ImportPath": "github.com/emicklei/go-restful-swagger12",
-			"Rev": "dcef7f55730566d41eae5db10e7d6981829720f6"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
@@ -243,6 +231,10 @@
 			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
 		},
 		{
+			"ImportPath": "github.com/munnerz/goautoneg",
+			"Rev": "a547fc61f48d567d5b4ec6f8aee5573d8efce11d"
+		},
+		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
 		},
@@ -260,7 +252,11 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Rev": "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
+			"Rev": "abad2d1bd44235a26707c172eab6bca5bf2dbad3"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus/internal",
+			"Rev": "abad2d1bd44235a26707c172eab6bca5bf2dbad3"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
@@ -600,6 +596,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/api/certificates/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/api/coordination/v1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1155,10 +1155,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apiserver/pkg/server/routes/data/swagger",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apiserver/pkg/server/storage",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1216,10 +1212,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/util/flushwriter",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/apiserver/pkg/util/logs",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1364,6 +1356,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/informers/coordination",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/informers/coordination/v1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1543,6 +1539,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/kubernetes/typed/coordination/v1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/kubernetes/typed/coordination/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1652,6 +1652,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/listers/certificates/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/listers/coordination/v1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1783,6 +1787,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/tools/record/util",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/tools/reference",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1823,32 +1831,36 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/component-base/logs",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/klog",
 			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/aggregator",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "ced9eb3070a5f1c548ef46e8dfe2a97c208d9f03"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

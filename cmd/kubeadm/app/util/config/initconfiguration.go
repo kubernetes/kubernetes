@@ -40,6 +40,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -54,10 +55,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort); err != nil {
-		return err
-	}
-	return nil
+	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort)
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
@@ -97,6 +95,14 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
 	if masterTaint && cfg.Taints == nil {
 		cfg.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
+
+	if cfg.CRISocket == "" {
+		cfg.CRISocket, err = kubeadmruntime.DetectCRISocket()
+		if err != nil {
+			return err
+		}
+		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
 	}
 
 	return nil
@@ -217,8 +223,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 		// Try to get the registration for the ComponentConfig based on the kind
 		regKind := componentconfigs.RegistrationKind(gvk.Kind)
-		registration, found := componentconfigs.Known[regKind]
-		if found {
+		if registration, found := componentconfigs.Known[regKind]; found {
 			// Unmarshal the bytes from the YAML document into a runtime.Object containing the ComponentConfiguration struct
 			obj, err := registration.Unmarshal(fileContent)
 			if err != nil {
@@ -272,8 +277,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 	// Save the loaded ComponentConfig objects in the initcfg object
 	for kind, obj := range decodedComponentConfigObjects {
-		registration, found := componentconfigs.Known[kind]
-		if found {
+		if registration, found := componentconfigs.Known[kind]; found {
 			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
 				return nil, errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 			}

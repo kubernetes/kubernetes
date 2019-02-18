@@ -203,11 +203,12 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	var volumeName v1.UniqueVolumeName
 
-	// The unique volume name used depends on whether the volume is attachable
+	// The unique volume name used depends on whether the volume is attachable/device-mountable
 	// or not.
 	attachable := dsw.isAttachableVolume(volumeSpec)
-	if attachable {
-		// For attachable volumes, use the unique volume name as reported by
+	deviceMountable := dsw.isDeviceMountableVolume(volumeSpec)
+	if attachable || deviceMountable {
+		// For attachable/device-mountable volumes, use the unique volume name as reported by
 		// the plugin.
 		volumeName, err =
 			util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
@@ -219,12 +220,10 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				err)
 		}
 	} else {
-		// For non-attachable volumes, generate a unique name based on the pod
+		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
 		// namespace and name and the name of the volume within the pod.
-		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
+		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
-
-	deviceMountable := dsw.isDeviceMountableVolume(volumeSpec)
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		dsw.volumesToMount[volumeName] = volumeToMount{

@@ -17,6 +17,7 @@ limitations under the License.
 package test
 
 import (
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"os"
@@ -54,7 +55,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		t.Fatalf("Couldn't create cfgDir")
 	}
 
-	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
+	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(fmt.Sprintf(`
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: InitConfiguration
 		apiEndpoint:
@@ -66,8 +67,8 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.12.0
-		`)))
+		kubernetesVersion: %s
+		`, kubeadmconstants.MinimumControlPlaneVersion))))
 
 	f, err := os.Create(cfgPath)
 	if err != nil {

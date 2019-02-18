@@ -61,8 +61,9 @@ REQUIRED_BINS=(
   "github.com/cloudflare/cfssl/cmd/cfssl"
   "github.com/cloudflare/cfssl/cmd/cfssljson"
   "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
-  "github.com/kubernetes/repo-infra/kazel"
   "k8s.io/kube-openapi/cmd/openapi-gen"
+  "k8s.io/repo-infra/kazel"
+  "golang.org/x/lint/golint"
   "./..."
 )
 

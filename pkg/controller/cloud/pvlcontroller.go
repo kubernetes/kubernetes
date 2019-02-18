@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,19 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
 	cloudprovider "k8s.io/cloud-provider"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const initializerName = "pvlabel.kubernetes.io"
@@ -207,7 +202,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v
 func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolume, volLabels map[string]string) ([]byte, error) {
 	volName := vol.Name
 	newVolume := vol.DeepCopyObject().(*v1.PersistentVolume)
-	populateAffinity := utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && len(volLabels) != 0
+	populateAffinity := len(volLabels) != 0
 
 	if newVolume.Labels == nil {
 		newVolume.Labels = make(map[string]string)

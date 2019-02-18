@@ -29,6 +29,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -70,7 +71,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
-		criSocket:        kubeadmapiv1beta1.DefaultCRISocket,
+		// Don't set criSocket to a default value here, as this will override the setting in the stored config in RunApply below.
 	}
 
 	cmd := &cobra.Command{
@@ -114,7 +115,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			err = SetImplicitFlags(flags)
 			kubeadmutil.CheckErr(err)
 
-			err = RunApply(flags)
+			err = runApply(flags)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -127,12 +128,15 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
-	// TODO: Register this flag in a generic place
-	cmd.Flags().StringVar(&flags.criSocket, "cri-socket", flags.criSocket, "Specify the CRI socket to connect to.")
+
+	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
+	// node instead of the command line. This prevents errors by the users (such as attempts to use wrong CRI during upgrade).
+	cmdutil.AddCRISocketFlag(cmd.Flags(), &flags.criSocket)
+	cmd.Flags().MarkDeprecated(options.NodeCRISocket, "This flag is deprecated. Please, avoid using it.")
 	return cmd
 }
 
-// RunApply takes care of the actual upgrade functionality
+// runApply takes care of the actual upgrade functionality
 // It does the following things:
 // - Checks if the cluster is healthy
 // - Gets the configuration from the kubeadm-config ConfigMap in the cluster
@@ -144,7 +148,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
 //   - Applying new kube-dns and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
-func RunApply(flags *applyFlags) error {
+func runApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infof("[upgrade/apply] verifying health of cluster")

@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
+	v1 "k8s.io/api/core/v1"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
+	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -110,6 +111,8 @@ type Options struct {
 	master string
 	// healthzPort is the port to be used by the healthz server.
 	healthzPort int32
+	// metricsPort is the port to be used by the metrics server.
+	metricsPort int32
 
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
@@ -133,8 +136,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.Var(utilflag.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
-	fs.Var(utilflag.IPVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
+	fs.Var(utilflag.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
+	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
+	fs.Var(utilflag.IPVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&o.config.ResourceContainer, "resource-container", o.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
@@ -182,6 +186,7 @@ func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
+		metricsPort: ports.ProxyStatusPort,
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
@@ -193,6 +198,7 @@ func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzPortToConfig()
+		o.applyDeprecatedMetricsPortToConfig()
 	}
 
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
@@ -303,6 +309,20 @@ func (o *Options) applyDeprecatedHealthzPortToConfig() {
 	}
 
 	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
+}
+
+func (o *Options) applyDeprecatedMetricsPortToConfig() {
+	if o.metricsPort == 0 {
+		o.config.MetricsBindAddress = ""
+		return
+	}
+
+	index := strings.Index(o.config.MetricsBindAddress, ":")
+	if index != -1 {
+		o.config.MetricsBindAddress = o.config.MetricsBindAddress[0:index]
+	}
+
+	o.config.MetricsBindAddress = fmt.Sprintf("%s:%d", o.config.MetricsBindAddress, o.metricsPort)
 }
 
 // loadConfigFromFile loads the contents of file and decodes it as a
@@ -421,7 +441,7 @@ type ProxyServer struct {
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
 	var kubeConfig *rest.Config
 	var err error
 
@@ -530,17 +550,18 @@ func (s *ProxyServer) Run() error {
 		if max > 0 {
 			err := s.Conntracker.SetMax(max)
 			if err != nil {
-				if err != readOnlySysFSError {
+				if err != errReadOnlySysFS {
 					return err
 				}
-				// readOnlySysFSError is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
+				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
 				// the only remediation we know is to restart the docker daemon.
 				// Here we'll send an node event with specific reason and message, the
 				// administrator should decide whether and how to handle this issue,
-				// whether to drain the node and restart docker.
+				// whether to drain the node and restart docker.  Occurs in other container runtimes
+				// as well.
 				// TODO(random-liu): Remove this when the docker bug is fixed.
-				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: " +
-					"cannot modify conntrack limits, problems may arise later."
+				const message = "CRI error: /sys is read-only: " +
+					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 				s.Recorder.Eventf(s.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
@@ -560,7 +581,10 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(s.Client, s.ConfigSyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
+			options.LabelSelector = "!service.kubernetes.io/service-proxy-name"
+		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources

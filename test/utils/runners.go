@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -300,11 +300,11 @@ func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
 }
 
 func (config *DeploymentConfig) create() error {
-	deployment := &extensions.Deployment{
+	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -375,11 +375,11 @@ func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
 }
 
 func (config *ReplicaSetConfig) create() error {
-	rs := &extensions.ReplicaSet{
+	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -1327,11 +1327,11 @@ func (config *DaemonConfig) Run() error {
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",
 	}
-	daemon := &extensions.DaemonSet{
+	daemon := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: nameLabel,

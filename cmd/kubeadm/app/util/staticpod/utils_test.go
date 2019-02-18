@@ -166,27 +166,29 @@ func TestComponentProbe(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := ComponentProbe(rt.cfg, rt.component, rt.port, rt.path, rt.scheme)
-		if actual.Handler.HTTPGet.Host != rt.expected {
-			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
-				rt.name, rt.expected,
-				actual.Handler.HTTPGet.Host)
-		}
-		if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
-			t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
-				rt.name, rt.port,
-				actual.Handler.HTTPGet.Port)
-		}
-		if actual.Handler.HTTPGet.Path != rt.path {
-			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
-				rt.name, rt.path,
-				actual.Handler.HTTPGet.Path)
-		}
-		if actual.Handler.HTTPGet.Scheme != rt.scheme {
-			t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
-				rt.name, rt.scheme,
-				actual.Handler.HTTPGet.Scheme)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := ComponentProbe(rt.cfg, rt.component, rt.port, rt.path, rt.scheme)
+			if actual.Handler.HTTPGet.Host != rt.expected {
+				t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+					rt.name, rt.expected,
+					actual.Handler.HTTPGet.Host)
+			}
+			if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
+				t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
+					rt.name, rt.port,
+					actual.Handler.HTTPGet.Port)
+			}
+			if actual.Handler.HTTPGet.Path != rt.path {
+				t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+					rt.name, rt.path,
+					actual.Handler.HTTPGet.Path)
+			}
+			if actual.Handler.HTTPGet.Scheme != rt.scheme {
+				t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
+					rt.name, rt.scheme,
+					actual.Handler.HTTPGet.Scheme)
+			}
+		})
 	}
 }
 
@@ -330,16 +332,18 @@ func TestEtcdProbe(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make EtcdProbe accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *rt.cfg,
-		}
-		actual := EtcdProbe(initcfg, rt.component, rt.port, rt.certsDir, rt.cacert, rt.cert, rt.key)
-		if actual.Handler.Exec.Command[2] != rt.expected {
-			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
-				rt.name, rt.expected,
-				actual.Handler.Exec.Command[2])
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			// TODO: Make EtcdProbe accept a ClusterConfiguration object instead of InitConfiguration
+			initcfg := &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: *rt.cfg,
+			}
+			actual := EtcdProbe(initcfg, rt.component, rt.port, rt.certsDir, rt.cacert, rt.cert, rt.key)
+			if actual.Handler.Exec.Command[2] != rt.expected {
+				t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+					rt.name, rt.expected,
+					actual.Handler.Exec.Command[2])
+			}
+		})
 	}
 }
 
@@ -376,15 +380,17 @@ func TestComponentPod(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		c := v1.Container{Name: rt.name}
-		actual := ComponentPod(c, map[string]v1.Volume{})
-		if !reflect.DeepEqual(rt.expected, actual) {
-			t.Errorf(
-				"failed componentPod:\n\texpected: %v\n\t  actual: %v",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			c := v1.Container{Name: rt.name}
+			actual := ComponentPod(c, map[string]v1.Volume{})
+			if !reflect.DeepEqual(rt.expected, actual) {
+				t.Errorf(
+					"failed componentPod:\n\texpected: %v\n\t  actual: %v",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -413,14 +419,16 @@ func TestNewVolume(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := NewVolume(rt.name, rt.path, rt.pathType)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf(
-				"failed newVolume:\n\texpected: %v\n\t  actual: %v",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := NewVolume(rt.name, rt.path, rt.pathType)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				t.Errorf(
+					"failed newVolume:\n\texpected: %v\n\t  actual: %v",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -454,14 +462,16 @@ func TestNewVolumeMount(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := NewVolumeMount(rt.name, rt.path, rt.ro)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf(
-				"failed newVolumeMount:\n\texpected: %v\n\t  actual: %v",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := NewVolumeMount(rt.name, rt.path, rt.ro)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				t.Errorf(
+					"failed newVolumeMount:\n\texpected: %v\n\t  actual: %v",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 func TestVolumeMapToSlice(t *testing.T) {
@@ -508,11 +518,13 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 
 func TestGetExtraParameters(t *testing.T) {
 	var tests = []struct {
+		name      string
 		overrides map[string]string
 		defaults  map[string]string
 		expected  []string
 	}{
 		{
+			name: "with admission-control default NamespaceLifecycle",
 			overrides: map[string]string{
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
@@ -528,6 +540,7 @@ func TestGetExtraParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "without admission-control default",
 			overrides: map[string]string{
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
@@ -544,12 +557,14 @@ func TestGetExtraParameters(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := GetExtraParameters(rt.overrides, rt.defaults)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := GetExtraParameters(rt.overrides, rt.defaults)
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+			}
+		})
 	}
 }
 
@@ -599,27 +614,29 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		t.Run(rt.description, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		manifestPath := filepath.Join(tmpdir, "pod.yaml")
-		if rt.writeManifest {
-			err := ioutil.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
-			if err != nil {
-				t.Fatalf("Failed to write pod manifest\n%s\n\tfatal error: %v", rt.description, err)
+			manifestPath := filepath.Join(tmpdir, "pod.yaml")
+			if rt.writeManifest {
+				err := ioutil.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
+				if err != nil {
+					t.Fatalf("Failed to write pod manifest\n%s\n\tfatal error: %v", rt.description, err)
+				}
 			}
-		}
 
-		_, actualErr := ReadStaticPodFromDisk(manifestPath)
-		if (actualErr != nil) != rt.expectErr {
-			t.Errorf(
-				"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
-				rt.description,
-				rt.expectErr,
-				(actualErr != nil),
-				actualErr,
-			)
-		}
+			_, actualErr := ReadStaticPodFromDisk(manifestPath)
+			if (actualErr != nil) != rt.expectErr {
+				t.Errorf(
+					"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+					rt.description,
+					rt.expectErr,
+					(actualErr != nil),
+					actualErr,
+				)
+			}
+		})
 	}
 }
 
@@ -657,38 +674,40 @@ func TestManifestFilesAreEqual(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		t.Run(rt.description, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		// write 2 manifests
-		for i := 0; i < 2; i++ {
-			if rt.podYamls[i] != "" {
-				manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
-				err := ioutil.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
-				if err != nil {
-					t.Fatalf("Failed to write manifest file\n%s\n\tfatal error: %v", rt.description, err)
+			// write 2 manifests
+			for i := 0; i < 2; i++ {
+				if rt.podYamls[i] != "" {
+					manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
+					err := ioutil.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
+					if err != nil {
+						t.Fatalf("Failed to write manifest file\n%s\n\tfatal error: %v", rt.description, err)
+					}
 				}
 			}
-		}
 
-		// compare them
-		result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
-		if result != rt.expectedResult {
-			t.Errorf(
-				"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
-				rt.description,
-				rt.expectedResult,
-				result,
-			)
-		}
-		if (actualErr != nil) != rt.expectErr {
-			t.Errorf(
-				"ManifestFilesAreEqual failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
-				rt.description,
-				rt.expectErr,
-				(actualErr != nil),
-				actualErr,
-			)
-		}
+			// compare them
+			result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
+			if result != rt.expectedResult {
+				t.Errorf(
+					"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
+					rt.description,
+					rt.expectedResult,
+					result,
+				)
+			}
+			if (actualErr != nil) != rt.expectErr {
+				t.Errorf(
+					"ManifestFilesAreEqual failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+					rt.description,
+					rt.expectErr,
+					(actualErr != nil),
+					actualErr,
+				)
+			}
+		})
 	}
 }

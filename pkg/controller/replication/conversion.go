@@ -27,6 +27,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -237,6 +238,16 @@ func (c conversionClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.ReplicaSet, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("Patch() is not implemented for conversionClient")
+}
+
+func (c conversionClient) GetScale(name string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	// This is not used by RSC.
+	return nil, errors.New("GetScale() is not implemented for conversionClient")
+}
+
+func (c conversionClient) UpdateScale(name string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	// This is not used by RSC.
+	return nil, errors.New("UpdateScale() is not implemented for conversionClient")
 }
 
 func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error) {

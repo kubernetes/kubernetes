@@ -303,6 +303,7 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 	}
 
 	list := &unstructured.UnstructuredList{}
+	list.SetResourceVersion(entireList.GetResourceVersion())
 	for i := range entireList.Items {
 		item := &entireList.Items[i]
 		metadata, err := meta.Accessor(item)

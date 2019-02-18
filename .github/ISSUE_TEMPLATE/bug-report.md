@@ -1,6 +1,7 @@
 ---
 name: Bug Report
 about: Report a bug encountered while operating Kubernetes
+labels: kind/bug
 
 ---
 
@@ -22,6 +23,3 @@ about: Report a bug encountered while operating Kubernetes
 - Kernel (e.g. `uname -a`):
 - Install tools:
 - Others:
-
-<!-- DO NOT EDIT BELOW THIS LINE -->
-/kind bug

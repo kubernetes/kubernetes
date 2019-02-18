@@ -19,10 +19,14 @@ package cached
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"sync"
+	"syscall"
 
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
+	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
@@ -30,40 +34,87 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+type cacheEntry struct {
+	resourceList *metav1.APIResourceList
+	err          error
+}
+
 // memCacheClient can Invalidate() to stay up-to-date with discovery
 // information.
 //
-// TODO: Switch to a watch interface. Right now it will poll anytime
-// Invalidate() is called.
+// TODO: Switch to a watch interface. Right now it will poll after each
+// Invalidate() call.
 type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
 	lock                   sync.RWMutex
-	groupToServerResources map[string]*metav1.APIResourceList
+	groupToServerResources map[string]*cacheEntry
 	groupList              *metav1.APIGroupList
 	cacheValid             bool
 }
 
 // Error Constants
 var (
-	ErrCacheEmpty    = errors.New("the cache has not been filled yet")
 	ErrCacheNotFound = errors.New("not found")
 )
 
 var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 
+// isTransientConnectionError checks whether given error is "Connection refused" or
+// "Connection reset" error which usually means that apiserver is temporarily
+// unavailable.
+func isTransientConnectionError(err error) bool {
+	urlError, ok := err.(*url.Error)
+	if !ok {
+		return false
+	}
+	opError, ok := urlError.Err.(*net.OpError)
+	if !ok {
+		return false
+	}
+	errno, ok := opError.Err.(syscall.Errno)
+	if !ok {
+		return false
+	}
+	return errno == syscall.ECONNREFUSED || errno == syscall.ECONNRESET
+}
+
+func isTransientError(err error) bool {
+	if isTransientConnectionError(err) {
+		return true
+	}
+
+	if t, ok := err.(errorsutil.APIStatus); ok && t.Status().Code >= 500 {
+		return true
+	}
+
+	return errorsutil.IsTooManyRequests(err)
+}
+
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	if !d.cacheValid {
-		return nil, ErrCacheEmpty
+		if err := d.refreshLocked(); err != nil {
+			return nil, err
+		}
 	}
 	cachedVal, ok := d.groupToServerResources[groupVersion]
 	if !ok {
 		return nil, ErrCacheNotFound
 	}
-	return cachedVal, nil
+
+	if cachedVal.err != nil && isTransientError(cachedVal.err) {
+		r, err := d.serverResourcesForGroupVersion(groupVersion)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+		}
+		cachedVal = &cacheEntry{r, err}
+		d.groupToServerResources[groupVersion] = cachedVal
+	}
+
+	return cachedVal.resourceList, cachedVal.err
 }
 
 // ServerResources returns the supported resources for all groups and versions.
@@ -72,10 +123,12 @@ func (d *memCacheClient) ServerResources() ([]*metav1.APIResourceList, error) {
 }
 
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	if d.groupList == nil {
-		return nil, ErrCacheEmpty
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if !d.cacheValid {
+		if err := d.refreshLocked(); err != nil {
+			return nil, err
+		}
 	}
 	return d.groupList, nil
 }
@@ -103,49 +156,59 @@ func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
 func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	// Fresh is supposed to tell the caller whether or not to retry if the cache
-	// fails to find something. The idea here is that Invalidate will be called
-	// periodically and therefore we'll always be returning the latest data. (And
-	// in the future we can watch and stay even more up-to-date.) So we only
-	// return false if the cache has never been filled.
+	// Return whether the cache is populated at all. It is still possible that
+	// a single entry is missing due to transient errors and the attempt to read
+	// that entry will trigger retry.
 	return d.cacheValid
 }
 
-// Invalidate refreshes the cache, blocking calls until the cache has been
-// refreshed. It would be trivial to make a version that does this in the
-// background while continuing to respond to requests if needed.
+// Invalidate enforces that no cached data that is older than the current time
+// is used.
 func (d *memCacheClient) Invalidate() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+	d.cacheValid = false
+	d.groupToServerResources = nil
+	d.groupList = nil
+}
 
+// refreshLocked refreshes the state of cache. The caller must hold d.lock for
+// writing.
+func (d *memCacheClient) refreshLocked() error {
 	// TODO: Could this multiplicative set of calls be replaced by a single call
 	// to ServerResources? If it's possible for more than one resulting
 	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
-		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err))
-		return
+		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list: %v", err))
+		return err
 	}
 
-	rl := map[string]*metav1.APIResourceList{}
+	rl := map[string]*cacheEntry{}
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
-			r, err := d.delegate.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil || len(r.APIResources) == 0 {
+			r, err := d.serverResourcesForGroupVersion(v.GroupVersion)
+			rl[v.GroupVersion] = &cacheEntry{r, err}
+			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
-				if cur, ok := d.groupToServerResources[v.GroupVersion]; ok {
-					// retain the existing list, if we had it.
-					r = cur
-				} else {
-					continue
-				}
 			}
-			rl[v.GroupVersion] = r
 		}
 	}
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true
+	return nil
+}
+
+func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	r, err := d.delegate.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		return r, err
+	}
+	if len(r.APIResources) == 0 {
+		return r, fmt.Errorf("Got empty response for: %v", groupVersion)
+	}
+	return r, nil
 }
 
 // NewMemCacheClient creates a new CachedDiscoveryInterface which caches
@@ -156,6 +219,6 @@ func (d *memCacheClient) Invalidate() {
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
 	return &memCacheClient{
 		delegate:               delegate,
-		groupToServerResources: map[string]*metav1.APIResourceList{},
+		groupToServerResources: map[string]*cacheEntry{},
 	}
 }

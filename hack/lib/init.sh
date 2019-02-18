@@ -59,9 +59,9 @@ v1 \
 admissionregistration.k8s.io/v1alpha1 \
 admissionregistration.k8s.io/v1beta1 \
 admission.k8s.io/v1beta1 \
+apps/v1 \
 apps/v1beta1 \
 apps/v1beta2 \
-apps/v1 \
 auditregistration.k8s.io/v1alpha1 \
 authentication.k8s.io/v1 \
 authentication.k8s.io/v1beta1 \
@@ -75,6 +75,7 @@ batch/v1beta1 \
 batch/v2alpha1 \
 certificates.k8s.io/v1beta1 \
 coordination.k8s.io/v1beta1 \
+coordination.k8s.io/v1 \
 extensions/v1beta1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
@@ -131,15 +132,15 @@ KUBE_NONSERVER_GROUP_VERSIONS="
 function kube::readlinkdashf {
   # run in a subshell for simpler 'cd'
   (
-    if [[ -d "$1" ]]; then # This also catch symlinks to dirs.
-      cd "$1"
+    if [[ -d "${1}" ]]; then # This also catch symlinks to dirs.
+      cd "${1}"
       pwd -P
     else
-      cd "$(dirname "$1")"
+      cd "$(dirname "${1}")"
       local f
-      f=$(basename "$1")
-      if [[ -L "$f" ]]; then
-        readlink "$f"
+      f=$(basename "${1}")
+      if [[ -L "${f}" ]]; then
+        readlink "${f}"
       else
         echo "$(pwd -P)/${f}"
       fi
@@ -175,9 +176,9 @@ function kube::readlinkdashf {
 # testone $T/linkdir/linkfile
 # testone $T/linkdir/linkdir
 kube::realpath() {
-  if [[ ! -e "$1" ]]; then
-    echo "$1: No such file or directory" >&2
+  if [[ ! -e "${1}" ]]; then
+    echo "${1}: No such file or directory" >&2
     return 1
   fi
-  kube::readlinkdashf "$1"
+  kube::readlinkdashf "${1}"
 }

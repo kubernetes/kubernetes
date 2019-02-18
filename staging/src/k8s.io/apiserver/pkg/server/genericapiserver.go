@@ -25,7 +25,6 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/emicklei/go-restful-swagger12"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -121,7 +120,6 @@ type GenericAPIServer struct {
 	DiscoveryGroupManager discovery.GroupManager
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
-	swaggerConfig *swagger.Config
 	openAPIConfig *openapicommon.Config
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
@@ -236,9 +234,6 @@ type preparedGenericAPIServer struct {
 
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
-	if s.swaggerConfig != nil {
-		routes.Swagger{Config: s.swaggerConfig}.Install(s.Handler.GoRestfulContainer)
-	}
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
@@ -296,9 +291,11 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
-
+	var stoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
-		if err := s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh); err != nil {
+		var err error
+		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
+		if err != nil {
 			close(internalStopCh)
 			return err
 		}
@@ -310,6 +307,9 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	go func() {
 		<-stopCh
 		close(internalStopCh)
+		if stoppedCh != nil {
+			<-stoppedCh
+		}
 		s.HandlerChainWaitGroup.Wait()
 		close(auditStopCh)
 	}()

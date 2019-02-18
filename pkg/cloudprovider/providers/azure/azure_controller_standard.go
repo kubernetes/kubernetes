@@ -68,6 +68,7 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},
@@ -132,6 +133,7 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},

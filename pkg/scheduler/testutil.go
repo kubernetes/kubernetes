@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -37,12 +38,12 @@ type FakeConfigurator struct {
 }
 
 // GetPredicateMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
+func (fc *FakeConfigurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetPredicates is not implemented yet.
-func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
+func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

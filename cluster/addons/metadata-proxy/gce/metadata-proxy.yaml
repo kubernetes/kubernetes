@@ -8,7 +8,7 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: metadata-proxy-v0.1
@@ -19,6 +19,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.1
 spec:
+  selector:
+    matchLabels:
+      k8s-app: metadata-proxy
+      version: v0.1
   updateStrategy:
     type: RollingUpdate
   template:
@@ -44,7 +48,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: metadata-proxy
-        image: k8s.gcr.io/metadata-proxy:v0.1.10
+        image: k8s.gcr.io/metadata-proxy:v0.1.11
         securityContext:
           privileged: true
         # Request and limit resources to get guaranteed QoS.

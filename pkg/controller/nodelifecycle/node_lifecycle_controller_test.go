@@ -17,31 +17,26 @@ limitations under the License.
 package nodelifecycle
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	cloudprovider "k8s.io/cloud-provider"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
@@ -69,7 +64,7 @@ type nodeLifecycleController struct {
 	*Controller
 	leaseInformer     coordinformers.LeaseInformer
 	nodeInformer      coreinformers.NodeInformer
-	daemonSetInformer extensionsinformers.DaemonSetInformer
+	daemonSetInformer appsinformers.DaemonSetInformer
 }
 
 // doEviction does the fake eviction and returns the status of eviction operation.
@@ -128,7 +123,6 @@ func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeN
 }
 
 func newNodeLifecycleControllerFromClient(
-	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
@@ -145,14 +139,13 @@ func newNodeLifecycleControllerFromClient(
 
 	leaseInformer := factory.Coordination().V1beta1().Leases()
 	nodeInformer := factory.Core().V1().Nodes()
-	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
+	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
 	nc, err := NewNodeLifecycleController(
 		leaseInformer,
 		factory.Core().V1().Pods(),
 		nodeInformer,
 		daemonSetInformer,
-		cloud,
 		kubeClient,
 		nodeMonitorPeriod,
 		nodeStartupGracePeriod,
@@ -203,7 +196,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []extensions.DaemonSet
+		daemonSets          []apps.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
 		secondNodeNewStatus v1.NodeStatus
@@ -416,13 +409,13 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 					},
 				),
 			},
-			daemonSets: []extensions.DaemonSet{
+			daemonSets: []apps.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds0",
 						Namespace: "default",
 					},
-					Spec: extensions.DaemonSetSpec{
+					Spec: apps.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"daemon": "yes"},
 						},
@@ -641,7 +634,6 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -802,7 +794,6 @@ func TestPodStatusChange(t *testing.T) {
 
 	for _, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -1327,7 +1318,6 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -1392,185 +1382,6 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 	}
 }
 
-func TestCloudProviderNodeShutdown(t *testing.T) {
-
-	testCases := []struct {
-		testName string
-		node     *v1.Node
-		shutdown bool
-	}{
-		{
-			testName: "node shutdowned add taint",
-			shutdown: true,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		{
-			testName: "node started after shutdown remove taint",
-			shutdown: false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-					Taints: []v1.Taint{
-						{
-							Key:    schedulerapi.TaintNodeShutdown,
-							Effect: v1.TaintEffectNoSchedule,
-						},
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
-			fnh := &testutil.FakeNodeHandler{
-				Existing:  []*v1.Node{tc.node},
-				Clientset: fake.NewSimpleClientset(),
-			}
-			nodeController, _ := newNodeLifecycleControllerFromClient(
-				nil,
-				fnh,
-				10*time.Minute,
-				testRateLimiterQPS,
-				testRateLimiterQPS,
-				testLargeClusterThreshold,
-				testUnhealthyThreshold,
-				testNodeMonitorGracePeriod,
-				testNodeStartupGracePeriod,
-				testNodeMonitorPeriod,
-				false)
-			nodeController.cloud = &fakecloud.FakeCloud{}
-			nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
-			nodeController.recorder = testutil.NewFakeRecorder()
-			nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-				return tc.shutdown, nil
-			}
-
-			if err := nodeController.syncNodeStore(fnh); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if err := nodeController.monitorNodeHealth(); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			if len(fnh.UpdatedNodes) != 1 {
-				t.Errorf("Node was not updated")
-			}
-			if tc.shutdown {
-				if len(fnh.UpdatedNodes[0].Spec.Taints) != 1 {
-					t.Errorf("Node Taint was not added")
-				}
-				if fnh.UpdatedNodes[0].Spec.Taints[0].Key != "node.cloudprovider.kubernetes.io/shutdown" {
-					t.Errorf("Node Taint key is not correct")
-				}
-			} else {
-				if len(fnh.UpdatedNodes[0].Spec.Taints) != 0 {
-					t.Errorf("Node Taint was not removed after node is back in ready state")
-				}
-			}
-		})
-	}
-
-}
-
-// TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
-// pods and the node when kubelet has not reported, and the cloudprovider says
-// the node is gone.
-func TestCloudProviderNoRateLimit(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
-		Existing: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
-		DeleteWaitChan: make(chan struct{}),
-	}
-	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
-		fnh,
-		10*time.Minute,
-		testRateLimiterQPS,
-		testRateLimiterQPS,
-		testLargeClusterThreshold,
-		testUnhealthyThreshold,
-		testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod,
-		testNodeMonitorPeriod,
-		false)
-	nodeController.cloud = &fakecloud.FakeCloud{}
-	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
-	nodeController.recorder = testutil.NewFakeRecorder()
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
-		return false, nil
-	}
-	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-		return false, nil
-	}
-	// monitorNodeHealth should allow this node to be immediately deleted
-	if err := nodeController.syncNodeStore(fnh); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if err := nodeController.monitorNodeHealth(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	select {
-	case <-fnh.DeleteWaitChan:
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
-	}
-	if len(fnh.DeletedNodes) != 1 || fnh.DeletedNodes[0].Name != "node0" {
-		t.Errorf("Node was not deleted")
-	}
-	if nodeOnQueue := nodeController.zonePodEvictor[""].Remove("node0"); nodeOnQueue {
-		t.Errorf("Node was queued for eviction. Should have been immediately deleted.")
-	}
-}
-
 func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
@@ -1606,14 +1417,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-								LastTransitionTime: fakeNow,
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",
@@ -1687,13 +1490,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
-								{
-									Type:   v1.NodeOutOfDisk,
-									Status: v1.ConditionFalse,
-									// Node status hasn't been updated for 1hr.
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
 							},
 							Capacity: v1.ResourceList{
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -1715,13 +1511,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 					},
-					{
-						Type:   v1.NodeOutOfDisk,
-						Status: v1.ConditionFalse,
-						// Node status hasn't been updated for 1hr.
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-					},
 				},
 				Capacity: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -1738,14 +1527,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusUnknown",
-								Message:            "Kubelet stopped posting node status.",
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusUnknown",
 								Message:            "Kubelet stopped posting node status.",
@@ -1822,7 +1603,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 	}
 	for i, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			5*time.Minute,
 			testRateLimiterQPS,
@@ -1961,14 +1741,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  nodeCreationTime,
-								LastTransitionTime: fakeNow,
-							},
-							{
 								Type:               v1.NodeMemoryPressure,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
@@ -2063,14 +1835,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  nodeCreationTime,
-								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
-							},
-							{
 								Type:               v1.NodeMemoryPressure,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
@@ -2120,7 +1884,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 								{
-									Type:               v1.NodeOutOfDisk,
+									Type:               v1.NodeDiskPressure,
 									Status:             v1.ConditionFalse,
 									LastHeartbeatTime:  fakeNow,
 									LastTransitionTime: fakeNow,
@@ -2148,7 +1912,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						LastTransitionTime: fakeNow,
 					},
 					{
-						Type:               v1.NodeOutOfDisk,
+						Type:               v1.NodeDiskPressure,
 						Status:             v1.ConditionFalse,
 						LastHeartbeatTime:  fakeNow,
 						LastTransitionTime: fakeNow,
@@ -2175,7 +1939,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
+								Type:               v1.NodeDiskPressure,
 								Status:             v1.ConditionFalse,
 								LastHeartbeatTime:  fakeNow,
 								LastTransitionTime: fakeNow,
@@ -2210,7 +1974,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 								{
-									Type:               v1.NodeOutOfDisk,
+									Type:               v1.NodeDiskPressure,
 									Status:             v1.ConditionFalse,
 									LastHeartbeatTime:  fakeNow,
 									LastTransitionTime: fakeNow,
@@ -2238,7 +2002,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						LastTransitionTime: fakeNow,
 					},
 					{
-						Type:               v1.NodeOutOfDisk,
+						Type:               v1.NodeDiskPressure,
 						Status:             v1.ConditionFalse,
 						LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
 						LastTransitionTime: fakeNow,
@@ -2265,7 +2029,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
+								Type:               v1.NodeDiskPressure,
 								Status:             v1.ConditionFalse,
 								LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
 								LastTransitionTime: fakeNow,
@@ -2299,12 +2063,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 									LastHeartbeatTime:  fakeNow,
 									LastTransitionTime: fakeNow,
 								},
-								{
-									Type:               v1.NodeOutOfDisk,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  fakeNow,
-									LastTransitionTime: fakeNow,
-								},
 							},
 							Capacity: v1.ResourceList{
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -2327,12 +2085,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						LastHeartbeatTime:  fakeNow,
 						LastTransitionTime: fakeNow,
 					},
-					{
-						Type:               v1.NodeOutOfDisk,
-						Status:             v1.ConditionFalse,
-						LastHeartbeatTime:  fakeNow,
-						LastTransitionTime: fakeNow,
-					},
 				},
 				Capacity: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -2350,14 +2102,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusUnknown",
-								Message:            "Kubelet stopped posting node status.",
-								LastHeartbeatTime:  fakeNow,
-								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusUnknown",
 								Message:            "Kubelet stopped posting node status.",
@@ -2403,7 +2147,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 	for _, item := range testcases {
 		t.Run(item.description, func(t *testing.T) {
 			nodeController, _ := newNodeLifecycleControllerFromClient(
-				nil,
 				item.fakeNodeHandler,
 				5*time.Minute,
 				testRateLimiterQPS,
@@ -2567,7 +2310,6 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 
 	for i, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			5*time.Minute,
 			testRateLimiterQPS,
@@ -2697,7 +2439,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	}
 	originalTaint := UnreachableTaintTemplate
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -2838,7 +2579,6 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	updatedTaint := NotReadyTaintTemplate
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -2940,7 +2680,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -2954,10 +2693,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 
-	outOfDiskTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeOutOfDisk,
-		Effect: v1.TaintEffectNoSchedule,
-	}
 	networkUnavailableTaint := &v1.Taint{
 		Key:    schedulerapi.TaintNodeNetworkUnavailable,
 		Effect: v1.TaintEffectNoSchedule,
@@ -3007,7 +2742,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 			ExpectedTaints: []*v1.Taint{networkUnavailableTaint},
 		},
 		{
-			Name: "NetworkUnavailable and OutOfDisk are true",
+			Name: "NetworkUnavailable is true",
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
@@ -3028,48 +2763,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 						{
 							Type:               v1.NodeNetworkUnavailable,
 							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-						{
-							Type:               v1.NodeOutOfDisk,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-			ExpectedTaints: []*v1.Taint{networkUnavailableTaint, outOfDiskTaint},
-		},
-		{
-			Name: "NetworkUnavailable is true, OutOfDisk is unknown",
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-						{
-							Type:               v1.NodeNetworkUnavailable,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-						{
-							Type:               v1.NodeOutOfDisk,
-							Status:             v1.ConditionUnknown,
 							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
@@ -3180,7 +2873,6 @@ func TestNodeEventGeneration(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		5*time.Minute,
 		testRateLimiterQPS,
@@ -3191,26 +2883,20 @@ func TestNodeEventGeneration(t *testing.T) {
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
 		false)
-	nodeController.cloud = &fakecloud.FakeCloud{}
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
-		return false, nil
-	}
-	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-		return false, nil
-	}
 	nodeController.now = func() metav1.Time { return fakeNow }
 	fakeRecorder := testutil.NewFakeRecorder()
 	nodeController.recorder = fakeRecorder
+
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(fakeRecorder.Events) != 2 {
-		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 2, fakeRecorder.Events)
+	if len(fakeRecorder.Events) != 1 {
+		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 1, fakeRecorder.Events)
 	}
-	if fakeRecorder.Events[0].Reason != "RegisteredNode" || fakeRecorder.Events[1].Reason != "DeletingNode" {
+	if fakeRecorder.Events[0].Reason != "RegisteredNode" {
 		var reasons []string
 		for _, event := range fakeRecorder.Events {
 			reasons = append(reasons, event.Reason)
@@ -3249,7 +2935,6 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,

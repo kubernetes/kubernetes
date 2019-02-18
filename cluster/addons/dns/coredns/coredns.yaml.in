@@ -77,7 +77,7 @@ data:
         loadbalance
     }
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: coredns
@@ -110,6 +110,8 @@ spec:
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: coredns
         image: k8s.gcr.io/coredns:1.2.6

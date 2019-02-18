@@ -11,12 +11,12 @@ go_library(
     deps = [
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
-        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/plugins/v1alpha1:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
@@ -48,10 +48,9 @@ go_test(
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
-        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/plugins/v1alpha1:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -75,10 +74,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/scheduler/core/equivalence:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -419,3 +419,91 @@ func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
 		t.Fatalf("invalid configuration file (kms has no endpoint) got parsed:\n%s", incorrectConfigNoEndpointForKMS)
 	}
 }
+
+func TestKMSConfigTimeout(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		config  string
+		want    time.Duration
+		wantErr string
+	}{
+		{
+			desc: "duration explicitly provided",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: 15 * time.Second,
+		},
+		{
+			desc: "duration explicitly provided as 0 which is an invalid value, error should be returned",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   0s
+`,
+			wantErr: "timeout should be a positive value",
+		},
+		{
+			desc: "duration is not provided, default will be supplied",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+`,
+			want: kmsPluginConnectionTimeout,
+		},
+		{
+			desc: "duration is invalid (negative), error should be returned",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   -15s
+
+`,
+			wantErr: "timeout should be a positive value",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			// mocking envelopeServiceFactory to sense the value of the supplied timeout.
+			envelopeServiceFactory = func(endpoint string, callTimeout time.Duration) (envelope.Service, error) {
+				if callTimeout != tt.want {
+					t.Fatalf("got timeout: %v, want %v", callTimeout, tt.want)
+				}
+
+				return newMockEnvelopeService(endpoint, callTimeout)
+			}
+
+			// mocked envelopeServiceFactory is called during ParseEncryptionConfiguration.
+			if _, err := ParseEncryptionConfiguration(strings.NewReader(tt.config)); err != nil && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("unable to parse yaml\n%s\nerror: %v", tt.config, err)
+			}
+		})
+	}
+}

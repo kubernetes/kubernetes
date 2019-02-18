@@ -55,7 +55,7 @@ API_LOGFILE=${API_LOGFILE:-/tmp/openapi-api-server.log}
 
 kube::etcd::start
 
-echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
+echo "dummy_token,admin,admin" > ${TMP_DIR}/tokenauth.csv
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
@@ -67,7 +67,7 @@ kube::log::status "Starting kube-apiserver"
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --runtime-config="api/all=true" \
-  --token-auth-file=$TMP_DIR/tokenauth.csv \
+  --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
@@ -83,7 +83,7 @@ fi
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

@@ -93,7 +93,7 @@ type ApplyOptions struct {
 const (
 	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
 	maxPatchRetry = 5
-	// backOffPeriod is the period to back off when apply patch resutls in error.
+	// backOffPeriod is the period to back off when apply patch results in error.
 	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
@@ -576,12 +576,11 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
 			{"batch", "v1beta1", "CronJob", true},
-			{"extensions", "v1beta1", "DaemonSet", true},
-			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
-			{"extensions", "v1beta1", "ReplicaSet", true},
-			{"apps", "v1beta1", "StatefulSet", true},
-			{"apps", "v1beta1", "Deployment", true},
+			{"apps", "v1", "DaemonSet", true},
+			{"apps", "v1", "Deployment", true},
+			{"apps", "v1", "ReplicaSet", true},
+			{"apps", "v1", "StatefulSet", true},
 		}
 	}
 

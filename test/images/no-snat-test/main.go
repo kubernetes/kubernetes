@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 )
 
 // ip = target for /whoami query

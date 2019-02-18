@@ -57,6 +57,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFe
 })
 
 func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSockDir string) {
+	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	Context("DevicePlugin", func() {
 		By("Enabling support for Kubelet Plugins Watcher")
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {

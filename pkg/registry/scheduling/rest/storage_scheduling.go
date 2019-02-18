@@ -93,7 +93,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
-						return false, err
+						return false, nil
 					}
 				}
 			}

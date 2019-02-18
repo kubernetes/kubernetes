@@ -113,9 +113,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				"Time": recent(maxStatsAge),
 				// Pods are limited by Node Allocatable
 				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
-				"UsageBytes":      bounded(10*framework.Kb, 50*framework.Mb),
-				"WorkingSetBytes": bounded(10*framework.Kb, 50*framework.Mb),
-				"RSSBytes":        bounded(1*framework.Kb, 20*framework.Mb),
+				"UsageBytes":      bounded(10*framework.Kb, 400*framework.Mb),
+				"WorkingSetBytes": bounded(10*framework.Kb, 400*framework.Mb),
+				"RSSBytes":        bounded(1*framework.Kb, 160*framework.Mb),
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
 			})
@@ -180,10 +180,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(1*framework.Kb, 10*framework.Mb),
-							"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
-							"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
-							"RSSBytes":        bounded(1*framework.Kb, framework.Mb),
+							"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
+							"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
+							"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
+							"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
@@ -227,10 +227,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
-					"AvailableBytes":  bounded(1*framework.Kb, 10*framework.Mb),
-					"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
-					"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
-					"RSSBytes":        bounded(1*framework.Kb, framework.Mb),
+					"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
+					"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
+					"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
+					"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
 					"PageFaults":      bounded(0, 1000000),
 					"MajorPageFaults": bounded(0, 10),
 				}),
@@ -353,7 +353,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes
-								v1.ResourceMemory: resource.MustParse("10M"),
+								v1.ResourceMemory: resource.MustParse("80M"),
 							},
 						},
 						VolumeMounts: []v1.VolumeMount{

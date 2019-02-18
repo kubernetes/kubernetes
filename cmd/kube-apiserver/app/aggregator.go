@@ -73,10 +73,6 @@ func createAggregatorConfig(
 		aggregatorscheme.Scheme,
 		pluginInitializers...)
 
-	// the aggregator doesn't wire these up.  It just delegates them to the kubeapiserver
-	genericConfig.EnableSwaggerUI = false
-	genericConfig.SwaggerConfig = nil
-
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
@@ -269,6 +265,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1beta1"}:             {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	{Group: "coordination.k8s.io", Version: "v1"}:                {group: 16500, version: 15},
 	{Group: "coordination.k8s.io", Version: "v1beta1"}:           {group: 16500, version: 9},
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:     {group: 16400, version: 1},
 	// Append a new group to the end of the list if unsure.

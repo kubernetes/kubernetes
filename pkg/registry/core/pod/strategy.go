@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // podStrategy implements behavior for Pods
@@ -72,7 +73,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledAlphaFields(&pod.Spec)
+	podutil.DropDisabledPodFields(pod, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -81,8 +82,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	podutil.DropDisabledAlphaFields(&newPod.Spec)
-	podutil.DropDisabledAlphaFields(&oldPod.Spec)
+	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
 // Validate validates a new pod.
@@ -288,6 +288,10 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 				break
 			}
 		}
+	}
+
+	if err := proxyutil.IsProxyableIP(pod.Status.PodIP); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	loc := &url.URL{

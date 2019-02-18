@@ -35,7 +35,7 @@ go_library(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/util/pluginwatcher:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

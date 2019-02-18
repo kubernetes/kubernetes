@@ -26,7 +26,7 @@ subjects:
   name: event-exporter-sa
   namespace: kube-system
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: event-exporter-v0.2.3
@@ -38,6 +38,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: event-exporter
+      version: v0.2.3
   template:
     metadata:
       labels:

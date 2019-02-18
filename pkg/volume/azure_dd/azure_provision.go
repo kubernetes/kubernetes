@@ -311,51 +311,49 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
+	nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
 
-		if zoned {
-			// Set node affinity labels based on availability zone labels.
-			if len(labels) > 0 {
-				requirements := make([]v1.NodeSelectorRequirement, 0)
-				for k, v := range labels {
-					requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-				}
+	if zoned {
+		// Set node affinity labels based on availability zone labels.
+		if len(labels) > 0 {
+			requirements := make([]v1.NodeSelectorRequirement, 0)
+			for k, v := range labels {
+				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+			}
 
-				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-					MatchExpressions: requirements,
-				})
-			}
-		} else {
-			// Set node affinity labels based on fault domains.
-			// This is required because unzoned AzureDisk can't be attached to zoned nodes.
-			// There are at most 3 fault domains available in each region.
-			// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
-			for i := 0; i < 3; i++ {
-				requirements := []v1.NodeSelectorRequirement{
-					{
-						Key:      kubeletapis.LabelZoneRegion,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{diskController.GetLocation()},
-					},
-					{
-						Key:      kubeletapis.LabelZoneFailureDomain,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{strconv.Itoa(i)},
-					},
-				}
-				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-					MatchExpressions: requirements,
-				})
-			}
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			})
 		}
-
-		if len(nodeSelectorTerms) > 0 {
-			pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
-				Required: &v1.NodeSelector{
-					NodeSelectorTerms: nodeSelectorTerms,
+	} else {
+		// Set node affinity labels based on fault domains.
+		// This is required because unzoned AzureDisk can't be attached to zoned nodes.
+		// There are at most 3 fault domains available in each region.
+		// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
+		for i := 0; i < 3; i++ {
+			requirements := []v1.NodeSelectorRequirement{
+				{
+					Key:      kubeletapis.LabelZoneRegion,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{diskController.GetLocation()},
+				},
+				{
+					Key:      kubeletapis.LabelZoneFailureDomain,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{strconv.Itoa(i)},
 				},
 			}
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			})
+		}
+	}
+
+	if len(nodeSelectorTerms) > 0 {
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: nodeSelectorTerms,
+			},
 		}
 	}
 
