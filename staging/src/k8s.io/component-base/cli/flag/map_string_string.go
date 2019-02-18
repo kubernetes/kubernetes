@@ -40,11 +40,11 @@ func NewMapStringString(m *map[string]string) *MapStringString {
 }
 
 // NewMapStringString takes a pointer to a map[string]string and sets `NoSplit`
-// value to `true` and returns the MapStringString flag parsing shim for that map
+// value to `false` and returns the MapStringString flag parsing shim for that map
 func NewMapStringStringNoSplit(m *map[string]string) *MapStringString {
 	return &MapStringString{
 		Map:     m,
-		NoSplit: true,
+		NoSplit: false,
 	}
 }
 
