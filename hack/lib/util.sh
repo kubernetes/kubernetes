@@ -358,7 +358,7 @@ kube::util::godep_restored() {
   local root
   local old_rev=""
   while read -r path rev; do
-    rev=$(echo "${rev}" | sed "s/['\"]//g") # remove quotes which are around revs sometimes
+    rev="${rev//[\'\"]}" # remove quotes which are around revs sometimes
 
     if [[ "${rev}" == "${old_rev}" ]] && [[ "${path}" == "${root}"* ]]; then
       # avoid checking the same git/hg root again
