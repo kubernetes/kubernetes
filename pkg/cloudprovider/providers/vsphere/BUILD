@@ -33,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/node/helpers:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
+        "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/vapi/rest:go_default_library",
         "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",

@@ -86,7 +86,7 @@ func verifyDevicePath(path string) (string, error) {
 }
 
 // CreateVolume creates a vSphere volume.
-func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error) {
+func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner, selectedZone []string) (volSpec *VolumeSpec, err error) {
 	var fstype string
 	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
 	if err != nil {
@@ -106,6 +106,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 		Name:       name,
 	}
 
+	volumeOptions.Zone = selectedZone
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
 	for parameter, value := range v.options.Parameters {
