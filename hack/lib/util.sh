@@ -184,8 +184,10 @@ kube::util::find-binary-for-platform() {
   # The bazel go rules place some binaries in subtrees like
   # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
   # the platform name is matched in the path.
-  locations+=($(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true) )
+  while IFS=$'\n' read -r location; do
+    locations+=("$location");
+  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
+    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
@@ -264,18 +266,14 @@ kube::util::remove-gen-docs() {
 # * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
-  staging_apis=(
-  $(
-    cd "${KUBE_ROOT}/staging/src/k8s.io/api" &&
-    find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort
-  ))
-
   local group_version="$1"
 
-  if [[ " ${staging_apis[@]} " =~ " ${group_version/.*k8s.io/} " ]]; then
-    echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
-    return
-  fi
+  while IFS=$'\n' read -r api; do
+    if [[ "${api}" = "${group_version/.*k8s.io/}" ]]; then
+      echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+      return
+    fi
+  done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
