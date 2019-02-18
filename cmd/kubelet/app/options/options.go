@@ -20,6 +20,7 @@ package options
 import (
 	"fmt"
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -266,6 +267,19 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		// TODO(liggitt): in 1.15, return an error
 		klog.Warningf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v", unknownLabels.List())
 		klog.Warningf("in 1.15, --node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+	}
+	if len(f.BootstrapKubeconfig) == 0 && len(f.KubeConfig) > 0 {
+		if _, err := os.Stat(f.KubeConfig); err == nil {
+			// if the destination already exists, do nothing
+			return nil
+		} else if os.IsPermission(err) {
+			// if we can't access the file, skip it
+			klog.Warningf("kubeconfig %q permission denied %v", f.KubeConfig, err)
+			return nil
+		} else {
+			// return fail
+			return fmt.Errorf("stat kubeconfig %q err: %v", f.KubeConfig, err)
+		}
 	}
 
 	return nil
