@@ -156,7 +156,7 @@ func logDevicePluginMetrics() {
 	framework.ExpectNoError(err)
 	for msKey, samples := range ms {
 		switch msKey {
-		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationLatencyKey:
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationDurationKey:
 			for _, sample := range samples {
 				latency := sample.Value
 				resource := string(sample.Metric["resource_name"])

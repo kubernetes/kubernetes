@@ -50,7 +50,7 @@ func newInstrumentedImageManagerService(service internalapi.ImageManagerService)
 func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperations.WithLabelValues(operation).Inc()
 	metrics.DeprecatedRuntimeOperations.WithLabelValues(operation).Inc()
-	metrics.RuntimeOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
+	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 	metrics.DeprecatedRuntimeOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 

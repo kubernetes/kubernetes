@@ -697,7 +697,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
 		klog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
 		resp, err := eI.e.allocate(devs)
-		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
+		metrics.DevicePluginAllocationDuration.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
 		metrics.DeprecatedDevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices

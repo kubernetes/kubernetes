@@ -195,7 +195,7 @@ func (g *GenericPLEG) relist() {
 
 	timestamp := g.clock.Now()
 	defer func() {
-		metrics.PLEGRelistLatency.Observe(metrics.SinceInSeconds(timestamp))
+		metrics.PLEGRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
 		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 

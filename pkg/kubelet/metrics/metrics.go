@@ -34,11 +34,11 @@ const (
 	KubeletSubsystem                     = "kubelet"
 	NodeNameKey                          = "node_name"
 	NodeLabelKey                         = "node"
-	PodWorkerLatencyKey                  = "pod_worker_latency_seconds"
-	PodStartLatencyKey                   = "pod_start_latency_seconds"
-	CgroupManagerOperationsKey           = "cgroup_manager_latency_seconds"
-	PodWorkerStartLatencyKey             = "pod_worker_start_latency_seconds"
-	PLEGRelistLatencyKey                 = "pleg_relist_latency_seconds"
+	PodWorkerDurationKey                 = "pod_worker_duration_seconds"
+	PodStartDurationKey                  = "pod_start_duration_seconds"
+	CgroupManagerOperationsKey           = "cgroup_manager_duration_seconds"
+	PodWorkerStartDurationKey            = "pod_worker_start_duration_seconds"
+	PLEGRelistDurationKey                = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey                 = "pleg_discard_events"
 	PLEGRelistIntervalKey                = "pleg_relist_interval_seconds"
 	EvictionStatsAgeKey                  = "eviction_stats_age_seconds"
@@ -57,14 +57,14 @@ const (
 	VolumeStatsInodesUsedKey             = "volume_stats_inodes_used"
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey                  = "runtime_operations_total"
-	RuntimeOperationsLatencyKey           = "runtime_operations_latency_seconds"
+	RuntimeOperationsDurationKey          = "runtime_operations_duration_seconds"
 	RuntimeOperationsErrorsKey            = "runtime_operations_errors_total"
 	DeprecatedRuntimeOperationsKey        = "runtime_operations"
 	DeprecatedRuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
 	DeprecatedRuntimeOperationsErrorsKey  = "runtime_operations_errors"
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey           = "device_plugin_registration_total"
-	DevicePluginAllocationLatencyKey           = "device_plugin_alloc_latency_seconds"
+	DevicePluginAllocationDurationKey          = "device_plugin_alloc_duration_seconds"
 	DeprecatedDevicePluginRegistrationCountKey = "device_plugin_registration_count"
 	DeprecatedDevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
 
@@ -101,45 +101,45 @@ var (
 			Buckets:   prometheus.DefBuckets,
 		},
 	)
-	PodWorkerLatency = prometheus.NewHistogramVec(
+	PodWorkerDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      PodWorkerLatencyKey,
-			Help:      "Latency in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
+			Name:      PodWorkerDurationKey,
+			Help:      "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
 			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
-	PodStartLatency = prometheus.NewHistogram(
+	PodStartDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      PodStartLatencyKey,
-			Help:      "Latency in seconds for a single pod to go from pending to running.",
+			Name:      PodStartDurationKey,
+			Help:      "Duration in seconds for a single pod to go from pending to running.",
 			Buckets:   prometheus.DefBuckets,
 		},
 	)
-	CgroupManagerLatency = prometheus.NewHistogramVec(
+	CgroupManagerDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      CgroupManagerOperationsKey,
-			Help:      "Latency in seconds for cgroup manager operations. Broken down by method.",
+			Help:      "Duration in seconds for cgroup manager operations. Broken down by method.",
 			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
-	PodWorkerStartLatency = prometheus.NewHistogram(
+	PodWorkerStartDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      PodWorkerStartLatencyKey,
-			Help:      "Latency in seconds from seeing a pod to starting a worker.",
+			Name:      PodWorkerStartDurationKey,
+			Help:      "Duration in seconds from seeing a pod to starting a worker.",
 			Buckets:   prometheus.DefBuckets,
 		},
 	)
-	PLEGRelistLatency = prometheus.NewHistogram(
+	PLEGRelistDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      PLEGRelistLatencyKey,
-			Help:      "Latency in seconds for relisting pods in PLEG.",
+			Name:      PLEGRelistDurationKey,
+			Help:      "Duration in seconds for relisting pods in PLEG.",
 			Buckets:   prometheus.DefBuckets,
 		},
 	)
@@ -168,11 +168,11 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	RuntimeOperationsLatency = prometheus.NewHistogramVec(
+	RuntimeOperationsDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      RuntimeOperationsLatencyKey,
-			Help:      "Latency in seconds of runtime operations. Broken down by operation type.",
+			Name:      RuntimeOperationsDurationKey,
+			Help:      "Duration in seconds of runtime operations. Broken down by operation type.",
 			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
@@ -202,11 +202,11 @@ var (
 		},
 		[]string{"resource_name"},
 	)
-	DevicePluginAllocationLatency = prometheus.NewHistogramVec(
+	DevicePluginAllocationDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      DevicePluginAllocationLatencyKey,
-			Help:      "Latency in seconds to serve a device plugin Allocation request. Broken down by resource name.",
+			Name:      DevicePluginAllocationDurationKey,
+			Help:      "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
 			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"resource_name"},
@@ -363,21 +363,21 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheu
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(NodeName)
-		prometheus.MustRegister(PodWorkerLatency)
-		prometheus.MustRegister(PodStartLatency)
-		prometheus.MustRegister(CgroupManagerLatency)
-		prometheus.MustRegister(PodWorkerStartLatency)
+		prometheus.MustRegister(PodWorkerDuration)
+		prometheus.MustRegister(PodStartDuration)
+		prometheus.MustRegister(CgroupManagerDuration)
+		prometheus.MustRegister(PodWorkerStartDuration)
 		prometheus.MustRegister(ContainersPerPodCount)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
-		prometheus.MustRegister(PLEGRelistLatency)
+		prometheus.MustRegister(PLEGRelistDuration)
 		prometheus.MustRegister(PLEGDiscardEvents)
 		prometheus.MustRegister(PLEGRelistInterval)
 		prometheus.MustRegister(RuntimeOperations)
-		prometheus.MustRegister(RuntimeOperationsLatency)
+		prometheus.MustRegister(RuntimeOperationsDuration)
 		prometheus.MustRegister(RuntimeOperationsErrors)
 		prometheus.MustRegister(EvictionStatsAge)
 		prometheus.MustRegister(DevicePluginRegistrationCount)
-		prometheus.MustRegister(DevicePluginAllocationLatency)
+		prometheus.MustRegister(DevicePluginAllocationDuration)
 		prometheus.MustRegister(DeprecatedPodWorkerLatency)
 		prometheus.MustRegister(DeprecatedPodStartLatency)
 		prometheus.MustRegister(DeprecatedCgroupManagerLatency)
