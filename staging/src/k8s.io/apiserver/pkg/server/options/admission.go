@@ -61,6 +61,8 @@ type AdmissionOptions struct {
 	ConfigFile string
 	// Plugins contains all registered plugins.
 	Plugins *admission.Plugins
+	// Decorators is a list of admission decorator to wrap around the admission plugins
+	Decorators admission.Decorators
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
@@ -73,7 +75,8 @@ type AdmissionOptions struct {
 //  Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
-		Plugins: admission.NewPlugins(),
+		Plugins:    admission.NewPlugins(),
+		Decorators: admission.Decorators{admission.DecoratorFunc(admissionmetrics.WithControllerMetrics)},
 		// This list is mix of mutating admission plugins and validating
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
@@ -147,7 +150,7 @@ func (a *AdmissionOptions) ApplyTo(
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admission.DecoratorFunc(admissionmetrics.WithControllerMetrics))
+	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, a.Decorators)
 	if err != nil {
 		return err
 	}

@@ -138,6 +138,7 @@ func TestAddFlags(t *testing.T) {
 				EnablePlugins:          []string{"AlwaysDeny"},
 				ConfigFile:             "/admission-control-config",
 				Plugins:                s.Admission.GenericAdmission.Plugins,
+				Decorators:             s.Admission.GenericAdmission.Decorators,
 			},
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
