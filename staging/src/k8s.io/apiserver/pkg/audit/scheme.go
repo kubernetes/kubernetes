@@ -34,8 +34,8 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	utilruntime.Must(auditinternal.AddToScheme(Scheme))
 	utilruntime.Must(v1.AddToScheme(Scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(Scheme))
 	utilruntime.Must(v1beta1.AddToScheme(Scheme))
+	utilruntime.Must(auditinternal.AddToScheme(Scheme))
 }
