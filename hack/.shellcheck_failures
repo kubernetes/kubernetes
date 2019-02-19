@@ -24,11 +24,6 @@
 ./cluster/images/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
-./cluster/kube-down.sh
-./cluster/kube-up.sh
-./cluster/kube-util.sh
-./cluster/kubeadm.sh
-./cluster/kubectl.sh
 ./cluster/kubemark/gce/config-default.sh
 ./cluster/kubemark/iks/config-default.sh
 ./cluster/kubemark/util.sh
