@@ -215,7 +215,6 @@ pkg/kubelet/remote
 pkg/kubelet/secret
 pkg/kubelet/server
 pkg/kubelet/server/portforward
-pkg/kubelet/server/remotecommand
 pkg/kubelet/server/stats
 pkg/kubelet/server/streaming
 pkg/kubelet/stats
@@ -225,8 +224,6 @@ pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubelet/util
 pkg/kubelet/util/pluginwatcher
-pkg/kubelet/util/queue
-pkg/kubelet/util/sliceutils
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
