@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function kube::util::sourced_variable {
+  # Call this function to tell shellcheck that a variable is supposed to
+  # be used from other calling context. This helps quiet an "unused
+  # variable" warning from shellcheck and also document your code.
+  true
+}
+
 kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
@@ -200,6 +207,10 @@ kube::util::gen-docs() {
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
   genfeddocs=$(kube::util::find-binary "genfeddocs")
+
+  # TODO: If ${genfeddocs} is not used from anywhere (it isn't used at
+  # least from k/k tree), remove it completely.
+  kube::util::sourced_variable "${genfeddocs}"
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
   "${gendocs}" "${dest}/docs/user-guide/kubectl/"
@@ -777,6 +788,7 @@ function kube::util::ensure-gnu-sed {
     kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
     return 1
   fi
+  kube::util::sourced_variable "${SED}"
 }
 
 # kube::util::check-file-in-alphabetical-order <file>
@@ -814,6 +826,14 @@ if [[ -z "${color_start-}" ]]; then
   declare -r color_blue="${color_start}1;34m"
   declare -r color_cyan="${color_start}1;36m"
   declare -r color_norm="${color_start}0m"
+
+  kube::util::sourced_variable "${color_start}"
+  kube::util::sourced_variable "${color_red}"
+  kube::util::sourced_variable "${color_yellow}"
+  kube::util::sourced_variable "${color_green}"
+  kube::util::sourced_variable "${color_blue}"
+  kube::util::sourced_variable "${color_cyan}"
+  kube::util::sourced_variable "${color_norm}"
 fi
 
 # ex: ts=2 sw=2 et filetype=sh
