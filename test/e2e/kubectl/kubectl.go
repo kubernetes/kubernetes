@@ -514,8 +514,23 @@ var _ = SIGDescribe("Kubectl client", func() {
 			runOutput := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie()
-			Expect(runOutput).To(ContainSubstring("abcd1234"))
-			Expect(runOutput).To(ContainSubstring("stdin closed"))
+
+			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test", 1*time.Minute, g)
+			Expect(err).To(BeNil())
+			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
+			// to loop test.
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test")
+				}
+				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
+				Expect(runOutput).To(ContainSubstring("abcd1234"))
+				Expect(runOutput).To(ContainSubstring("stdin closed"))
+				return strings.Contains(logOutput, "abcd1234"), nil
+			})
+			Expect(err).To(BeNil())
+
 			Expect(c.BatchV1().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
@@ -531,11 +546,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinData("abcd1234\n").
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
-			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
-			if err != nil {
-				os.Exit(1)
-			}
+			g = func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+			runTestPod, _, err = polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
+			Expect(err).To(BeNil())
 			if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
@@ -550,9 +563,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 				Expect(logOutput).ToNot(ContainSubstring("stdin closed"))
 				return strings.Contains(logOutput, "abcd1234"), nil
 			})
-			if err != nil {
-				os.Exit(1)
-			}
 			Expect(err).To(BeNil())
 
 			Expect(c.BatchV1().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
