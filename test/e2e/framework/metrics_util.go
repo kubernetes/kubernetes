@@ -168,9 +168,9 @@ var InterestingKubeletMetrics = []string{
 	"kubelet_docker_errors",
 	"kubelet_docker_operations_latency_seconds",
 	"kubelet_generate_pod_status_latency_microseconds",
-	"kubelet_pod_start_latency_microseconds",
-	"kubelet_pod_worker_latency_microseconds",
-	"kubelet_pod_worker_start_latency_microseconds",
+	"kubelet_pod_start_duration_seconds",
+	"kubelet_pod_worker_duration_seconds",
+	"kubelet_pod_worker_start_duration_seconds",
 	"kubelet_sync_pods_latency_microseconds",
 }
 
