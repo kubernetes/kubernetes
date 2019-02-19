@@ -105,7 +105,7 @@ var registryCreateKeyFunc = func(baseKey registry.Key, path string, access uint3
 	return registry.CreateKey(baseKey, path, access)
 }
 
-// randomReader is only meant to ever be overriden for testing purposes,
+// randomReader is only meant to ever be overridden for testing purposes,
 // same idea as for `registryKey` above
 var randomReader = rand.Reader
 
