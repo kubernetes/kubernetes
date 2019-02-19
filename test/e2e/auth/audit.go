@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	"k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -734,7 +734,7 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 			return false, err
 		}
 		defer stream.Close()
-		missing, err := utils.CheckAuditLines(stream, expectedEvents, v1beta1.SchemeGroupVersion)
+		missing, err := utils.CheckAuditLines(stream, expectedEvents, v1.SchemeGroupVersion)
 		if err != nil {
 			framework.Logf("Failed to observe audit events: %v", err)
 		} else if len(missing) > 0 {

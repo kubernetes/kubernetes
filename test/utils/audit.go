@@ -49,13 +49,13 @@ type AuditEvent struct {
 }
 
 // CheckAuditLines searches the audit log for the expected audit lines.
-// if includeID is true the event ids will also be verified
 func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.GroupVersion) (missing []AuditEvent, err error) {
 	expectations := buildEventExpectations(expected)
 
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		line := scanner.Text()
+
 		e := &auditinternal.Event{}
 		decoder := audit.Codecs.UniversalDecoder(version)
 		if err := runtime.DecodeInto(decoder, []byte(line), e); err != nil {
@@ -81,7 +81,6 @@ func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.Gro
 }
 
 // CheckAuditList searches an audit event list for the expected audit events.
-// if includeID is true the event ids will also be verified
 func CheckAuditList(el auditinternal.EventList, expected []AuditEvent) (missing []AuditEvent, err error) {
 	expectations := buildEventExpectations(expected)
 
@@ -133,7 +132,6 @@ func buildEventExpectations(expected []AuditEvent) map[AuditEvent]bool {
 }
 
 // testEventFromInternal takes an internal audit event and returns a test event
-// if includeID is true the event id will be included
 func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
 	event := AuditEvent{
 		Level:      e.Level,
