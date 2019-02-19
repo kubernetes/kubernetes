@@ -738,6 +738,28 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	return result
 }
 
+func (j *ServiceTestJig) Scale(namespace string, replicas int) {
+	rc := j.Name
+	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
+	if err != nil {
+		Failf("Failed to get scale for RC %q: %v", rc, err)
+	}
+
+	scale.Spec.Replicas = int32(replicas)
+	_, err = j.Client.CoreV1().ReplicationControllers(namespace).UpdateScale(rc, scale)
+	if err != nil {
+		Failf("Failed to scale RC %q: %v", rc, err)
+	}
+	pods, err := j.waitForPodsCreated(namespace, replicas)
+	if err != nil {
+		Failf("Failed waiting for pods: %v", err)
+	}
+	if err := j.waitForPodsReady(namespace, pods); err != nil {
+		Failf("Failed waiting for pods to be running: %v", err)
+	}
+	return
+}
+
 func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
@@ -911,6 +933,20 @@ func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout tim
 	}
 }
 
+func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/", nil)
+		if result.Status == HTTPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("HTTP service %v:%v not rejected: %v", host, port, err)
+	}
+}
+
 func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
@@ -938,6 +974,19 @@ func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time
 	}
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status == UDPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
