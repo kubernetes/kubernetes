@@ -496,6 +496,9 @@ func (dc *DisruptionController) sync(key string) error {
 }
 
 func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
+	}
 	pods, err := dc.getPodsForPdb(pdb)
 	if err != nil {
 		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "NoPods", "Failed to get pods: %v", err)
