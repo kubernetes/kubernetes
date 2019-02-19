@@ -311,8 +311,7 @@ func (p *ExecOptions) Run() error {
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).
-			SubResource("exec").
-			Param("container", containerName)
+			SubResource("exec")
 		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
