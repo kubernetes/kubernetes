@@ -314,7 +314,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		}
 		le.observedRecord = leaderElectionRecord
 		le.observedTime = le.clock.Now()
-		klog.Info("Created a new lock, and acquired it succesfully at time: %v", le.observedTime)
+		klog.Info("Created a new lock, and acquired it successfully at time: %v", le.observedTime)
 		return true
 	}
 
