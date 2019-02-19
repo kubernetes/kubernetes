@@ -159,7 +159,7 @@ func extractVmssCacheKey(key string) (string, string, error) {
 	// key is composed of <resourceGroup>#<vmName>
 	keyItems := strings.Split(key, vmssCacheSeparator)
 	if len(keyItems) != 2 {
-		return "", "", fmt.Errorf("key %q is not in format '<resouceGroup>#<vmName>'", key)
+		return "", "", fmt.Errorf("key %q is not in format '<resourceGroup>#<vmName>'", key)
 	}
 
 	resourceGroup := keyItems[0]
