@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: "${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}"
+: "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
 

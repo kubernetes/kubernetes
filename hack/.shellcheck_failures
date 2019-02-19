@@ -45,13 +45,6 @@
 ./hack/build-cross.sh
 ./hack/build-go.sh
 ./hack/cherry_pick_pull.sh
-./hack/e2e-internal/e2e-cluster-size.sh
-./hack/e2e-internal/e2e-down.sh
-./hack/e2e-internal/e2e-grow-cluster.sh
-./hack/e2e-internal/e2e-shrink-cluster.sh
-./hack/e2e-internal/e2e-status.sh
-./hack/e2e-internal/e2e-up.sh
-./hack/e2e-node-test.sh
 ./hack/generate-bindata.sh
 ./hack/generate-docs.sh
 ./hack/get-build.sh
