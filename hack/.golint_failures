@@ -52,7 +52,6 @@ pkg/apis/events
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/extensions/validation
 pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
