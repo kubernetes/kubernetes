@@ -66,6 +66,7 @@ var (
 		/file/path for a local file`)
 )
 
+// CopyOptions have the data required to perform the copy operation
 type CopyOptions struct {
 	Container  string
 	Namespace  string
@@ -77,6 +78,7 @@ type CopyOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCopyOptions creates the options for copy
 func NewCopyOptions(ioStreams genericclioptions.IOStreams) *CopyOptions {
 	return &CopyOptions{
 		IOStreams: ioStreams,
@@ -140,6 +142,7 @@ func extractFileSpec(arg string) (fileSpec, error) {
 	return fileSpec{}, errFileSpecDoesntMatchFormat
 }
 
+// Complete completes all the required options
 func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -159,6 +162,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
+// Validate makes sure provided values for CopyOptions are valid
 func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
 	if len(args) != 2 {
 		return cmdutil.UsageErrorf(cmd, cpUsageStr)
@@ -166,6 +170,7 @@ func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Run performs the execution
 func (o *CopyOptions) Run(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("source and destination are required")
