@@ -18,7 +18,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.3
+    chart: galley-1.0.6
     release: istio
     heritage: Tiller
     istio: mixer
@@ -31,7 +31,7 @@ data:
       namespace: istio-system
       labels:
         app: istio-galley
-        chart: galley-1.0.3
+        chart: galley-1.0.6
         release: istio
         heritage: Tiller
     webhooks:
@@ -118,8 +118,6 @@ data:
             - servicecontrols
             - solarwindses
             - stackdrivers
-            - cloudwatches
-            - dogstatsds
             - statsds
             - stdios
             - apikeys
@@ -147,7 +145,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-statsd-prom-bridge
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     release: istio
     heritage: Tiller
     istio: mixer
@@ -165,7 +163,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -183,7 +181,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -203,7 +201,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -223,7 +221,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.3
+    chart: istio-1.0.6
     release: istio
     heritage: Tiller
 data:
@@ -316,7 +314,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.3
+    chart: istio-1.0.6
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -326,7 +324,7 @@ data:
     template: |-
       initContainers:
       - name: istio-init
-        image: "gcr.io/gke-release/istio/proxy_init:1.0.3-gke.3"
+        image: "gcr.io/gke-release/istio/proxy_init:1.0.6-gke.1"
         args:
         - "-p"
         - [[ .MeshConfig.ProxyListenPort ]]
@@ -351,7 +349,7 @@ data:
         restartPolicy: Always
       containers:
       - name: istio-proxy
-        image: [[ annotation .ObjectMeta `sidecar.istio.io/proxyImage`  "docker.io/istio/proxyv2:1.0.3"  ]]
+        image: [[ annotation .ObjectMeta `sidecar.istio.io/proxyImage`  "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"  ]]
 
         ports:
         - containerPort: 15090
@@ -376,7 +374,7 @@ data:
         - --parentShutdownDuration
         - [[ formatDuration .ProxyConfig.ParentShutdownDuration ]]
         - --discoveryAddress
-        - [[ .ProxyConfig.DiscoveryAddress ]]
+        - [[ annotation .ObjectMeta `sidecar.istio.io/discoveryAddress` .ProxyConfig.DiscoveryAddress ]]
         - --discoveryRefreshDelay
         - [[ formatDuration .ProxyConfig.DiscoveryRefreshDelay ]]
         - --zipkinAddress
@@ -487,7 +485,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.3
+    chart: galley-1.0.6
     heritage: Tiller
     release: istio
 
@@ -503,7 +501,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: egressgateway
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     heritage: Tiller
     release: istio
 ---
@@ -516,7 +514,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: ingressgateway
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     heritage: Tiller
     release: istio
 ---
@@ -532,7 +530,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     heritage: Tiller
     release: istio
 
@@ -547,7 +545,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.3
+    chart: pilot-1.0.6
     heritage: Tiller
     release: istio
 
@@ -575,7 +573,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 ---
@@ -591,7 +589,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -611,7 +609,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -636,7 +634,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -673,7 +671,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 
@@ -688,7 +686,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.3
+    chart: sidecarInjectorWebhook-1.0.6
     heritage: Tiller
     release: istio
 
@@ -1353,56 +1351,6 @@ spec:
 kind: CustomResourceDefinition
 apiVersion: apiextensions.k8s.io/v1beta1
 metadata:
-  name: cloudwatches.config.istio.io
-  annotations:
-    "helm.sh/hook": crd-install
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: mixer
-    package: cloudwatch
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: cloudwatch
-    plural: cloudwatches
-    singular: cloudwatch
-    categories:
-    - istio-io
-    - policy-istio-io
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: dogstatsds.config.istio.io
-  annotations:
-    "helm.sh/hook": crd-install
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: mixer
-    package: dogstatsd
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: dogstatsd
-    plural: dogstatsds
-    singular: dogstatsd
-    categories:
-    - istio-io
-    - policy-istio-io
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
   name: statsds.config.istio.io
   annotations:
     "helm.sh/hook": crd-install
@@ -1932,7 +1880,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.3
+    chart: galley-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -1961,7 +1909,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     heritage: Tiller
     release: istio
   name: istio-egressgateway-istio-system
@@ -1977,7 +1925,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     heritage: Tiller
     release: istio
   name: istio-ingressgateway-istio-system
@@ -1997,7 +1945,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -2030,7 +1978,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.3
+    chart: pilot-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -2072,7 +2020,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -2096,7 +2044,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.3
+    chart: sidecarInjectorWebhook-1.0.6
     heritage: Tiller
     release: istio
 rules:
@@ -2117,7 +2065,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.3
+    chart: galley-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -2175,7 +2123,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -2197,7 +2145,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.3
+    chart: pilot-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -2219,7 +2167,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -2241,7 +2189,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.3
+    chart: sidecarInjectorWebhook-1.0.6
     heritage: Tiller
     release: istio
 roleRef:
@@ -2287,7 +2235,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2315,7 +2263,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -2370,7 +2318,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     release: istio
     istio: mixer
 spec:
@@ -2394,7 +2342,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     release: istio
     istio: mixer
 spec:
@@ -2410,6 +2358,10 @@ spec:
   selector:
     istio: mixer
     istio-mixer-type: telemetry
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 60
 ---
 
 ---
@@ -2424,7 +2376,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
     app: istio-pilot
-    chart: pilot-1.0.3
+    chart: pilot-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -2494,7 +2446,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: galley
-    chart: galley-1.0.3
+    chart: galley-1.0.6
     release: istio
     heritage: Tiller
     istio: galley
@@ -2515,7 +2467,7 @@ spec:
       serviceAccountName: istio-galley-service-account
       containers:
         - name: validator
-          image: "gcr.io/gke-release/istio/galley:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/galley:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 443
@@ -2609,7 +2561,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2628,7 +2580,7 @@ spec:
       serviceAccountName: istio-egressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -2747,7 +2699,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.3
+    chart: gateways-1.0.6
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -2766,7 +2718,7 @@ spec:
       serviceAccountName: istio-ingressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -2895,7 +2847,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     release: istio
     istio: mixer
 spec:
@@ -2953,7 +2905,7 @@ spec:
                 - s390x
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.3-gke.3"
+        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.1"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -2964,6 +2916,7 @@ spec:
           - --configStoreURL=k8s://
           - --configDefaultNamespace=istio-system
           - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
+          - --numCheckCacheEntries=0
         env:
         - name: GODEBUG
           value: "gctrace=2"
@@ -2978,7 +2931,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.3"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3030,7 +2983,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.3
+    chart: mixer-1.0.6
     release: istio
     istio: mixer
 spec:
@@ -3055,7 +3008,7 @@ spec:
         emptyDir: {}
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.3-gke.3"
+        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.1"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3080,7 +3033,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.3"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3137,7 +3090,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.3
+    chart: pilot-1.0.6
     release: istio
     heritage: Tiller
     istio: pilot
@@ -3157,7 +3110,7 @@ spec:
       serviceAccountName: istio-pilot-service-account
       containers:
         - name: discovery
-          image: "gcr.io/gke-release/istio/pilot:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/pilot:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           args:
           - "discovery"
@@ -3190,6 +3143,8 @@ spec:
             value: "100"
           - name: PILOT_TRACE_SAMPLING
             value: "1"
+          - name: SIDECAR_TO_TELEMETRY_SESSION_AFFINITY
+            value: "true"
             
           volumeMounts:
           - name: config-volume
@@ -3198,7 +3153,7 @@ spec:
             mountPath: /etc/certs
             readOnly: true
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 15003
@@ -3288,7 +3243,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
     istio: citadel
@@ -3305,7 +3260,7 @@ spec:
       serviceAccountName: istio-citadel-service-account
       containers:
         - name: citadel
-          image: "gcr.io/gke-release/istio/citadel:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/citadel:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           args:
             - --append-dns-names=true
@@ -3360,7 +3315,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: sidecarInjectorWebhook
-    chart: sidecarInjectorWebhook-1.0.3
+    chart: sidecarInjectorWebhook-1.0.6
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -3377,7 +3332,7 @@ spec:
       serviceAccountName: istio-sidecar-injector-service-account
       containers:
         - name: sidecar-injector-webhook
-          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.3-gke.3"
+          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.6-gke.1"
           imagePullPolicy: IfNotPresent
           args:
             - --caCertFile=/etc/istio/certs/root-cert.pem
@@ -3819,362 +3774,6 @@ spec:
     destination.workload.namespace:
       valueType: STRING
 ---
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestcount
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: "1"
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.host | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    request_protocol: api.protocol | context.protocol | "unknown"
-    response_code: response.code | 200
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestduration
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: response.duration | "0ms"
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.host | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    request_protocol: api.protocol | context.protocol | "unknown"
-    response_code: response.code | 200
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestsize
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: request.size | 0
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.host | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    request_protocol: api.protocol | context.protocol | "unknown"
-    response_code: response.code | 200
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: responsesize
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: response.size | 0
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.host | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    request_protocol: api.protocol | context.protocol | "unknown"
-    response_code: response.code | 200
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: tcpbytesent
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: connection.sent.bytes | 0
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.name | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: tcpbytereceived
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: connection.received.bytes | 0
-  dimensions:
-    reporter: conditional((context.reporter.kind | "inbound") == "outbound", "source", "destination")
-    source_workload: source.workload.name | "unknown"
-    source_workload_namespace: source.workload.namespace | "unknown"
-    source_principal: source.principal | "unknown"
-    source_app: source.labels["app"] | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_workload: destination.workload.name | "unknown"
-    destination_workload_namespace: destination.workload.namespace | "unknown"
-    destination_principal: destination.principal | "unknown"
-    destination_app: destination.labels["app"] | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    destination_service: destination.service.name | "unknown"
-    destination_service_name: destination.service.name | "unknown"
-    destination_service_namespace: destination.service.namespace | "unknown"
-    connection_security_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: prometheus
-metadata:
-  name: handler
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  metrics:
-  - name: requests_total
-    instance_name: requestcount.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - request_protocol
-    - response_code
-    - connection_security_policy
-  - name: request_duration_seconds
-    instance_name: requestduration.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - request_protocol
-    - response_code
-    - connection_security_policy
-    buckets:
-      explicit_buckets:
-        bounds: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-  - name: request_bytes
-    instance_name: requestsize.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - request_protocol
-    - response_code
-    - connection_security_policy
-    buckets:
-      exponentialBuckets:
-        numFiniteBuckets: 8
-        scale: 1
-        growthFactor: 10
-  - name: response_bytes
-    instance_name: responsesize.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - request_protocol
-    - response_code
-    - connection_security_policy
-    buckets:
-      exponentialBuckets:
-        numFiniteBuckets: 8
-        scale: 1
-        growthFactor: 10
-  - name: tcp_sent_bytes_total
-    instance_name: tcpbytesent.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - connection_security_policy
-  - name: tcp_received_bytes_total
-    instance_name: tcpbytereceived.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - reporter
-    - source_app
-    - source_principal
-    - source_workload
-    - source_workload_namespace
-    - source_version
-    - destination_app
-    - destination_principal
-    - destination_workload
-    - destination_workload_namespace
-    - destination_version
-    - destination_service
-    - destination_service_name
-    - destination_service_namespace
-    - connection_security_policy
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: promhttp
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  match: context.protocol == "http" || context.protocol == "grpc"
-  actions:
-  - handler: handler.prometheus
-    instances:
-    - requestcount.metric
-    - requestduration.metric
-    - requestsize.metric
-    - responsesize.metric
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: promtcp
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  match: context.protocol == "tcp"
-  actions:
-  - handler: handler.prometheus
-    instances:
-    - tcpbytesent.metric
-    - tcpbytereceived.metric
----
 
 apiVersion: "config.istio.io/v1alpha2"
 kind: kubernetesenv
@@ -4317,7 +3916,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
-  push_interval: 10s
+  pushInterval: 10s
   metricInfo:
     server-request-count.metric.istio-system:
       # Due to a bug in gogoproto deserialization, Enums in maps must be
@@ -4621,9 +4220,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: metric
@@ -4690,9 +4289,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: metric
@@ -4759,9 +4358,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: metric
@@ -4828,9 +4427,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: metric
@@ -4889,9 +4488,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: metric
@@ -4950,9 +4549,9 @@ spec:
   monitoredResourceDimensions:
     project_id: '""'
     cluster_name: '""'
-    namespace_name: destination.workload.namespace | "unknown"
+    namespace_name: source.workload.namespace | "unknown"
     location: '""'
-    pod_name: destination.name | "unknown"
+    pod_name: source.name | "unknown"
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: rule
