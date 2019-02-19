@@ -201,8 +201,8 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	onlyCPUAndMemory := false
 	request.Request.ParseForm()
-	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
-		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
+	if onlyCpuAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
+		len(onlyCpuAndMemoryParam) == 1 && onlyCpuAndMemoryParam[0] == "true" {
 		onlyCPUAndMemory = true
 	}
 	var summary *statsapi.Summary
