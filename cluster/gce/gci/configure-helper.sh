@@ -63,6 +63,10 @@ function setup-os-params {
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
   # now, set a generic core_pattern that users can work with.
   echo "/core.%e.%p.%t" > /proc/sys/kernel/core_pattern
+
+  # The default values are too small so override them on GKE (see b/123885578).
+  echo "4194304" > /proc/sys/kernel/pid_max
+  echo "12288" > /proc/sys/fs/inotify/max_user_watches
 }
 
 # secure_random generates a secure random string of bytes. This function accepts
