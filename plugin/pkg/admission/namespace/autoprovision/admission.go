@@ -55,7 +55,7 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Provision{
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Provision{})
 
 // Admit makes an admission decision based on the request attributes
-func (p *Provision) Admit(a admission.Attributes) error {
+func (p *Provision) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Don't create a namespace if the request is for a dry-run.
 	if a.IsDryRun() {
 		return nil
