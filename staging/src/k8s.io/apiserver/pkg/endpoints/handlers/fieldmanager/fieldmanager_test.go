@@ -29,24 +29,24 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
 
-type mockObjectConvertor struct{}
+type fakeObjectConvertor struct{}
 
-func (c *mockObjectConvertor) Convert(in, out, context interface{}) error {
+func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
 	out = in
 	return nil
 }
 
-func (c *mockObjectConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
+func (c *fakeObjectConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
 	return in, nil
 }
 
-func (c *mockObjectConvertor) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
+func (c *fakeObjectConvertor) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
 	return "", "", errors.New("not implemented")
 }
 
-type mockObjectDefaulter struct{}
+type fakeObjectDefaulter struct{}
 
-func (d *mockObjectDefaulter) Default(in runtime.Object) {}
+func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 func NewTestFieldManager(t *testing.T) *fieldmanager.FieldManager {
 	gv := schema.GroupVersion{
@@ -55,25 +55,28 @@ func NewTestFieldManager(t *testing.T) *fieldmanager.FieldManager {
 	}
 
 	return fieldmanager.NewCRDFieldManager(
-		&mockObjectConvertor{},
-		&mockObjectDefaulter{},
+		&fakeObjectConvertor{},
+		&fakeObjectDefaulter{},
 		gv,
 		gv,
 	)
 }
 
 func TestFieldManagerCreation(t *testing.T) {
-	_ = NewTestFieldManager(t)
+	if NewTestFieldManager(t) == nil {
+		t.Fatal("failed to create FieldManager")
+	}
 }
 
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager(t)
+	ti, _ := time.Parse(time.RFC3339, "2016-05-19T09:59:00Z")
 
 	obj := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "a",
 			Namespace:         "a",
-			CreationTimestamp: metav1.Time{Time: time.Now().UTC()},
+			CreationTimestamp: metav1.Time{Time: ti},
 			SelfLink:          "a",
 		},
 	}
@@ -84,7 +87,7 @@ func TestApplyStripsFields(t *testing.T) {
 		"metadata": {
 			"name": "b",
 			"namespace": "b",
-			"creationTimestamp": "`+time.Now().UTC().Format(time.RFC3339)+`",
+			"creationTimestamp": "`+ti.Add(1*time.Minute).Format(time.RFC3339)+`",
 			"selfLink": "b",
 			"uid": "b",
 			"resourceVersion": "b"
@@ -137,4 +140,3 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 		t.Fatalf("labels shouldn't get stripped on apply: %v", m)
 	}
 }
-
