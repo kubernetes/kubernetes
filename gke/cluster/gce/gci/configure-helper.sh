@@ -67,6 +67,10 @@ function setup-os-params {
   # now, set a generic core_pattern that users can work with.
   echo "/core.%e.%p.%t" > /proc/sys/kernel/core_pattern
 
+  # The default values are too small so override them on GKE (see b/123885578).
+  echo "4194304" > /proc/sys/kernel/pid_max
+  echo "12288" > /proc/sys/fs/inotify/max_user_watches
+
   # Tuning node kernel parameteres and apply the node-pool level overrides on
   # GKE.
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
