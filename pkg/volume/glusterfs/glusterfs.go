@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -811,7 +812,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 
 	// GlusterFS/heketi creates volumes in units of GiB.
-	sz, err := volutil.RoundUpToGiBInt(capacity)
+	sz, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, 0, "", err
 	}
@@ -1240,11 +1241,11 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	}
 
 	// Find out delta size
-	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGiB := int(volutil.RoundUpSize(expansionSize, volutil.GIB))
+	expansionSize := resource.NewScaledQuantity((newSize.Value() - oldSize.Value()), 0)
+	expansionSizeGiB := int(volumehelpers.RoundUpToGiB(*expansionSize))
 
 	// Find out requested Size
-	requestGiB := volutil.RoundUpToGiB(newSize)
+	requestGiB := volumehelpers.RoundUpToGiB(newSize)
 
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)

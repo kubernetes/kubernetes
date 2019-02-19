@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -90,7 +91,7 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// PhotonController works with GiB, convert to GiB with rounding up
-	volSizeGB, err := volumeutil.RoundUpToGiBInt(capacity)
+	volSizeGB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return "", 0, "", err
 	}

@@ -190,7 +190,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	return
 }
 
-// parseResolveConf reads a resolv.conf file from the given reader, and parses
+// parseResolvConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
 func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
 	file, err := ioutil.ReadAll(reader)
@@ -280,7 +280,7 @@ func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 	return podDNSCluster, fmt.Errorf(fmt.Sprintf("invalid DNSPolicy=%v", dnsPolicy))
 }
 
-// Merge DNS options. If duplicated, entries given by PodDNSConfigOption will
+// mergeDNSOptions merges DNS options. If duplicated, entries given by PodDNSConfigOption will
 // overwrite the existing ones.
 func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.PodDNSConfigOption) []string {
 	optionsMap := make(map[string]string)

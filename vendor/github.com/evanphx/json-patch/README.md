@@ -34,13 +34,9 @@ go get -u github.com/evanphx/json-patch
   functionality can be disabled by setting `jsonpatch.SupportNegativeIndices =
   false`.
 
-* There is a global configuration variable `jsonpatch.ArraySizeLimit`, which
-  limits the length of any array the patched object can have. It defaults to 0,
-  which means there is no limit.
-
-* There is a global configuration variable `jsonpatch.ArraySizeAdditionLimit`,
-  which limits the increase of array length caused by each operation. It
-  defaults to 0, which means there is no limit.
+* There is a global configuration variable `jsonpatch.AccumulatedCopySizeLimit`,
+  which limits the total size increase in bytes caused by "copy" operations in a
+  patch. It defaults to 0, which means there is no limit.
 
 ## Create and apply a merge patch
 Given both an original JSON document and a modified JSON document, you can create

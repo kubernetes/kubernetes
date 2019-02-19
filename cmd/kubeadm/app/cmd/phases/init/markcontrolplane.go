@@ -56,7 +56,7 @@ func NewMarkControlPlanePhase() workflow.Phase {
 	}
 }
 
-// runMarkControlPlane executes markcontrolplane checks logic.
+// runMarkControlPlane executes mark-control-plane checks logic.
 func runMarkControlPlane(c workflow.RunData) error {
 	data, ok := c.(markControlPlaneData)
 	if !ok {

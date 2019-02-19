@@ -41,7 +41,23 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	utiltrace "k8s.io/utils/trace"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	initCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_init_events_total",
+			Help: "Counter of init events processed in watchcache broken by resource type",
+		},
+		[]string{"resource"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(initCounter)
+}
 
 // Config contains the configuration for a given Cache.
 type Config struct {
@@ -186,6 +202,9 @@ type Cacher struct {
 	stopped  bool
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
+
+	// Used to avoid unnecessary allocations in underlying watchers.
+	timer *time.Timer
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -227,6 +246,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
 		stopCh: stopCh,
+		timer:  time.NewTimer(time.Duration(0)),
 	}
 	watchCache.SetOnEvent(cacher.processEvent)
 	go cacher.dispatchEvents()
@@ -242,6 +262,14 @@ func NewCacherFromConfig(config Config) *Cacher {
 			}, time.Second, stopCh,
 		)
 	}()
+
+	// Ensure that timer is stopped.
+	if !cacher.timer.Stop() {
+		// Consume triggered (but not yet received) timer event
+		// so that future reuse does not get a spurious timeout.
+		<-cacher.timer.C
+	}
+
 	return cacher
 }
 
@@ -333,6 +361,13 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		// TODO: We should tune this value and ideally make it dependent on the
 		// number of objects of a given type and/or their churn.
 		chanSize = 1000
+	}
+
+	// With some events already sent, update resourceVersion so that
+	// events that were buffered and not yet processed won't be delivered
+	// to this watcher second time causing going back in time.
+	if len(initEvents) > 0 {
+		watchRV = initEvents[len(initEvents)-1].ResourceVersion
 	}
 
 	c.Lock()
@@ -621,13 +656,13 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	defer c.Unlock()
 	// Iterate over "allWatchers" no matter what the trigger function is.
 	for _, watcher := range c.watchers.allWatchers {
-		watcher.add(event, c.dispatchTimeoutBudget)
+		watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 	}
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
 			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
-				watcher.add(event, c.dispatchTimeoutBudget)
+				watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 			}
 		}
 	} else {
@@ -640,7 +675,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// Iterate over watchers interested in exact values for all values.
 		for _, watchers := range c.watchers.valueWatchers {
 			for _, watcher := range watchers {
-				watcher.add(event, c.dispatchTimeoutBudget)
+				watcher.add(event, c.timer, c.dispatchTimeoutBudget)
 			}
 		}
 	}
@@ -826,9 +861,7 @@ func (c *cacheWatcher) stop() {
 	}
 }
 
-var timerPool sync.Pool
-
-func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
+func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer, budget *timeBudget) {
 	// Try to send the event immediately, without blocking.
 	select {
 	case c.input <- event:
@@ -842,23 +875,16 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 	startTime := time.Now()
 	timeout := budget.takeAvailable()
 
-	t, ok := timerPool.Get().(*time.Timer)
-	if ok {
-		t.Reset(timeout)
-	} else {
-		t = time.NewTimer(timeout)
-	}
-	defer timerPool.Put(t)
+	timer.Reset(timeout)
 
 	select {
 	case c.input <- event:
-		stopped := t.Stop()
-		if !stopped {
+		if !timer.Stop() {
 			// Consume triggered (but not yet received) timer event
 			// so that future reuse does not get a spurious timeout.
-			<-t.C
+			<-timer.C
 		}
-	case <-t.C:
+	case <-timer.C:
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
@@ -940,6 +966,10 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 	startTime := time.Now()
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
+	}
+	if len(initEvents) > 0 {
+		objType := reflect.TypeOf(initEvents[0].Object).String()
+		initCounter.WithLabelValues(objType).Add(float64(len(initEvents)))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {

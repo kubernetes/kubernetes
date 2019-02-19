@@ -46,7 +46,7 @@ func (r *aggregatorEndpointRouting) ResolveEndpoint(namespace, name string) (*ur
 	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name)
 }
 
-// NewEndpointServiceResolver returns a ServiceResolver that directly calls the
+// NewClusterIPServiceResolver returns a ServiceResolver that directly calls the
 // service's cluster IP.
 func NewClusterIPServiceResolver(services listersv1.ServiceLister) ServiceResolver {
 	return &aggregatorClusterRouting{

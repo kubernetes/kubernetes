@@ -62,8 +62,10 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			client, err = getClientset(kubeConfigFile, false)
-			kubeadmutil.CheckErr(err)
+			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
+				client, err = getClientset(kubeConfigFile, false)
+				kubeadmutil.CheckErr(err)
+			}
 
 			if criSocketPath == "" {
 				criSocketPath, err = resetDetectCRISocket(client)
@@ -168,7 +170,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 
 	klog.V(1).Info("[reset] removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
-		klog.Errorf("[reset] failed to remove containers: %+v", err)
+		klog.Errorf("[reset] failed to remove containers: %v", err)
 	}
 
 	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
@@ -208,7 +210,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 	var dataDir string
 
 	if client != nil {
-		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
 		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
@@ -298,10 +300,12 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 }
 
 func resetDetectCRISocket(client clientset.Interface) (string, error) {
-	// first try to connect to the cluster for the CRI socket
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
-	if err == nil {
-		return cfg.NodeRegistration.CRISocket, nil
+	if client != nil {
+		// first try to connect to the cluster for the CRI socket
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+		if err == nil {
+			return cfg.NodeRegistration.CRISocket, nil
+		}
 	}
 
 	// if this fails, try to detect it

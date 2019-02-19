@@ -17,8 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
-	"os"
+	"fmt"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -29,12 +28,13 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestValidateSupportedVersion(t *testing.T) {
-	const KubeadmGroupName = "kubeadm.k8s.io"
+const KubeadmGroupName = "kubeadm.k8s.io"
 
+func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
-		gv          schema.GroupVersion
-		expectedErr bool
+		gv              schema.GroupVersion
+		allowDeprecated bool
+		expectedErr     bool
 	}{
 		{
 			gv: schema.GroupVersion{
@@ -55,6 +55,14 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Group:   KubeadmGroupName,
 				Version: "v1alpha3",
 			},
+			expectedErr: true,
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1alpha3",
+			},
+			allowDeprecated: true,
 		},
 		{
 			gv: schema.GroupVersion{
@@ -71,8 +79,8 @@ func TestValidateSupportedVersion(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		t.Run(rt.gv.String(), func(t *testing.T) {
-			err := ValidateSupportedVersion(rt.gv)
+		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gv, rt.allowDeprecated), func(t *testing.T) {
+			err := validateSupportedVersion(rt.gv, rt.allowDeprecated)
 			if rt.expectedErr && err == nil {
 				t.Error("unexpected success")
 			} else if !rt.expectedErr && err != nil {
@@ -352,20 +360,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "")
-			if err != nil {
-				t.Fatalf("could not create temporary test file: %v", err)
-			}
-			fileName := file.Name()
-			defer os.Remove(fileName)
-
-			_, err = file.WriteString(test.oldCfg)
-			file.Close()
-			if err != nil {
-				t.Fatalf("could not write contents of old config: %v", err)
-			}
-
-			b, err := MigrateOldConfigFromFile(fileName)
+			b, err := MigrateOldConfig([]byte(test.oldCfg))
 			if test.expectErr {
 				if err == nil {
 					t.Fatalf("unexpected success:\n%s", b)

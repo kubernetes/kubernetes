@@ -42,6 +42,8 @@ This is an example of how to build a kube-like controller with a single type.
 
 ```sh
 # assumes you have a working kubeconfig, not required if operating in-cluster
+$ go get k8s.io/sample-controller
+$ cd $GOPATH/src/k8s.io/sample-controller
 $ go build -o sample-controller .
 $ ./sample-controller -kubeconfig=$HOME/.kube/config
 

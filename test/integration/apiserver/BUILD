@@ -11,6 +11,8 @@ go_test(
     srcs = [
         "apiserver_test.go",
         "main_test.go",
+        "max_json_patch_operations_test.go",
+        "max_request_body_bytes_test.go",
         "patch_test.go",
         "print_test.go",
     ],
@@ -19,6 +21,7 @@ go_test(
         "integration",
     ],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master:go_default_library",
@@ -46,7 +49,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery/cached/disk:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",

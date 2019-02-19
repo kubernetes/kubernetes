@@ -22,13 +22,15 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorfs "github.com/google/cadvisor/fs"
+	"k8s.io/klog"
+
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -36,6 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+)
+
+var (
+	// defaultCachePeriod is the default cache period for each cpuUsage.
+	defaultCachePeriod = 10 * time.Minute
 )
 
 // criStatsProvider implements the containerStatsProvider interface by getting
@@ -54,6 +61,10 @@ type criStatsProvider struct {
 	imageService internalapi.ImageManagerService
 	// logMetrics provides the metrics for container logs
 	logMetricsService LogMetricsService
+
+	// cpuUsageCache caches the cpu usage for containers.
+	cpuUsageCache map[string]*runtimeapi.CpuUsage
+	mutex         sync.Mutex
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -71,6 +82,7 @@ func newCRIStatsProvider(
 		runtimeService:    runtimeService,
 		imageService:      imageService,
 		logMetricsService: logMetricsService,
+		cpuUsageCache:     make(map[string]*runtimeapi.CpuUsage),
 	}
 }
 
@@ -123,12 +135,6 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	}
 	caInfos := getCRICadvisorStats(allInfos)
 
-	// get network stats for containers.
-	containerNetworkStats, err := p.listContainerNetworkStats()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list container network stats: %v", err)
-	}
-
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
@@ -152,7 +158,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 		// Fill available stats for full set of required pod stats
 		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
-		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
+		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs)
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
@@ -165,6 +171,8 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		}
 		ps.Containers = append(ps.Containers, *cs)
 	}
+	// cleanup outdated caches.
+	p.cleanupOutdatedCaches()
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
@@ -247,6 +255,8 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		}
 		ps.Containers = append(ps.Containers, *cs)
 	}
+	// cleanup outdated caches.
+	p.cleanupOutdatedCaches()
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
@@ -358,21 +368,11 @@ func (p *criStatsProvider) addPodNetworkStats(
 	podSandboxID string,
 	caInfos map[string]cadvisorapiv2.ContainerInfo,
 	cs *statsapi.ContainerStats,
-	netStats *statsapi.NetworkStats,
 ) {
 	caPodSandbox, found := caInfos[podSandboxID]
 	// try get network stats from cadvisor first.
 	if found {
-		networkStats := cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
-		if networkStats != nil {
-			ps.Network = networkStats
-			return
-		}
-	}
-
-	// Not found from cadvisor, get from netStats.
-	if netStats != nil {
-		ps.Network = netStats
+		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
 		return
 	}
 
@@ -450,6 +450,11 @@ func (p *criStatsProvider) makeContainerStats(
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
 			result.CPU.UsageCoreNanoSeconds = &stats.Cpu.UsageCoreNanoSeconds.Value
 		}
+
+		usageNanoCores := p.getContainerUsageNanoCores(stats)
+		if usageNanoCores != nil {
+			result.CPU.UsageNanoCores = usageNanoCores
+		}
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -506,6 +511,11 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
 			result.CPU.UsageCoreNanoSeconds = &stats.Cpu.UsageCoreNanoSeconds.Value
 		}
+
+		usageNanoCores := p.getContainerUsageNanoCores(stats)
+		if usageNanoCores != nil {
+			result.CPU.UsageNanoCores = usageNanoCores
+		}
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -514,6 +524,44 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		}
 	}
 	return result
+}
+
+// getContainerUsageNanoCores gets usageNanoCores based on cached usageCoreNanoSeconds.
+func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
+	if stats == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
+		return nil
+	}
+
+	p.mutex.Lock()
+	defer func() {
+		// Update cache with new value.
+		p.cpuUsageCache[stats.Attributes.Id] = stats.Cpu
+		p.mutex.Unlock()
+	}()
+
+	cached, ok := p.cpuUsageCache[stats.Attributes.Id]
+	if !ok || cached.UsageCoreNanoSeconds == nil {
+		return nil
+	}
+
+	nanoSeconds := stats.Cpu.Timestamp - cached.Timestamp
+	usageNanoCores := (stats.Cpu.UsageCoreNanoSeconds.Value - cached.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
+	return &usageNanoCores
+}
+
+func (p *criStatsProvider) cleanupOutdatedCaches() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for k, v := range p.cpuUsageCache {
+		if v == nil {
+			delete(p.cpuUsageCache, k)
+		}
+
+		if time.Since(time.Unix(0, v.Timestamp)) > defaultCachePeriod {
+			delete(p.cpuUsageCache, k)
+		}
+	}
 }
 
 // removeTerminatedContainer returns the specified container but with

@@ -34,6 +34,8 @@ import (
 
 const (
 	testContainerRuntimeType = "fooRuntime"
+	// largeChannelCap is a large enough capacity to hold all events in a single test.
+	largeChannelCap = 100
 )
 
 type TestGenericPLEG struct {
@@ -43,6 +45,10 @@ type TestGenericPLEG struct {
 }
 
 func newTestGenericPLEG() *TestGenericPLEG {
+	return newTestGenericPLEGWithChannelSize(largeChannelCap)
+}
+
+func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
 	clock := clock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
@@ -50,7 +56,7 @@ func newTestGenericPLEG() *TestGenericPLEG {
 	pleg := &GenericPLEG{
 		relistPeriod: time.Hour,
 		runtime:      fakeRuntime,
-		eventChannel: make(chan *PodLifecycleEvent, 100),
+		eventChannel: make(chan *PodLifecycleEvent, eventChannelCap),
 		podRecords:   make(podRecords),
 		clock:        clock,
 	}
@@ -153,6 +159,65 @@ func TestRelisting(t *testing.T) {
 		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
 
+	actual = getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
+}
+
+// TestEventChannelFull test when channel is full, the events will be discard.
+func TestEventChannelFull(t *testing.T) {
+	testPleg := newTestGenericPLEGWithChannelSize(4)
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+	// The first relist should send a PodSync event to each pod.
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+		}},
+	}
+	pleg.relist()
+	// Report every running/exited container if we see them for the first time.
+	expected := []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerStarted, Data: "c2"},
+		{ID: "4567", Type: ContainerDied, Data: "c1"},
+		{ID: "1234", Type: ContainerDied, Data: "c1"},
+	}
+	actual := getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
+
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c2", kubecontainer.ContainerStateExited),
+				createTestContainer("c3", kubecontainer.ContainerStateRunning),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c4", kubecontainer.ContainerStateRunning),
+			},
+		}},
+	}
+	pleg.relist()
+	// event channel is full, discard events
+	expected = []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
+		{ID: "1234", Type: ContainerDied, Data: "c2"},
+		{ID: "1234", Type: ContainerStarted, Data: "c3"},
+		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
+	}
 	actual = getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
 }

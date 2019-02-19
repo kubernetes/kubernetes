@@ -59,7 +59,9 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new service.
 func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
-	return validation.ValidateService(service)
+	allErrs := validation.ValidateService(service)
+	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -71,7 +73,9 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
+	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
+	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
+	return allErrs
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {

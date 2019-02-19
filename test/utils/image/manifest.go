@@ -99,6 +99,7 @@ var (
 	BusyBox                  = Config{dockerLibraryRegistry, "busybox", "1.29"}
 	CheckMetadataConcealment = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	CudaVectorAdd            = Config{e2eRegistry, "cuda-vector-add", "1.0"}
+	CudaVectorAdd2           = Config{e2eRegistry, "cuda-vector-add", "2.0"}
 	Dnsutils                 = Config{e2eRegistry, "dnsutils", "1.1"}
 	EchoServer               = Config{e2eRegistry, "echoserver", "2.2"}
 	EntrypointTester         = Config{e2eRegistry, "entrypoint-tester", "1.0"}

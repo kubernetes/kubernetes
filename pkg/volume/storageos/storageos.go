@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -606,7 +607,7 @@ func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	}
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	var err error
-	c.sizeGB, err = util.RoundUpToGiBInt(capacity)
+	c.sizeGB, err = volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}

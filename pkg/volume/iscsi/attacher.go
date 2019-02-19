@@ -176,6 +176,10 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
+func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks keymutex.KeyMutex, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)

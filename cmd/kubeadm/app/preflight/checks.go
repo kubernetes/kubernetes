@@ -226,6 +226,14 @@ func (IsPrivilegedUserCheck) Name() string {
 	return "IsPrivilegedUser"
 }
 
+// IsDockerSystemdCheck verifies if Docker is setup to use systemd as the cgroup driver.
+type IsDockerSystemdCheck struct{}
+
+// Name returns name for IsDockerSystemdCheck
+func (IsDockerSystemdCheck) Name() string {
+	return "IsDockerSystemdCheck"
+}
+
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
 	Path  string
@@ -998,6 +1006,10 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		if containerRuntime.IsDocker() {
 			isDocker = true
 			checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+			// Linux only
+			// TODO: support other CRIs for this check eventually
+			// https://github.com/kubernetes/kubeadm/issues/874
+			checks = append(checks, IsDockerSystemdCheck{})
 		}
 	}
 

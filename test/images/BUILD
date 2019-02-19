@@ -32,6 +32,7 @@ filegroup(
         "//test/images/porter:all-srcs",
         "//test/images/resource-consumer:all-srcs",
         "//test/images/sample-apiserver:all-srcs",
+        "//test/images/sample-device-plugin:all-srcs",
         "//test/images/serve-hostname:all-srcs",
         "//test/images/test-webserver:all-srcs",
         "//test/images/webhook:all-srcs",

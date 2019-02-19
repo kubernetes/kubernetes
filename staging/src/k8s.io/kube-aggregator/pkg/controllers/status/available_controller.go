@@ -46,10 +46,12 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
+// ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string) (*url.URL, error)
 }
 
+// AvailableConditionController handles checking the availability of registered API services.
 type AvailableConditionController struct {
 	apiServiceClient apiregistrationclient.APIServicesGetter
 
@@ -72,6 +74,7 @@ type AvailableConditionController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewAvailableConditionController returns a new AvailableConditionController.
 func NewAvailableConditionController(
 	apiServiceInformer informers.APIServiceInformer,
 	serviceInformer v1informers.ServiceInformer,
@@ -309,6 +312,7 @@ func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, orig
 	return newAPIService, nil
 }
 
+// Run starts the AvailableConditionController loop which manages the availability condition of API services.
 func (c *AvailableConditionController) Run(threadiness int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()

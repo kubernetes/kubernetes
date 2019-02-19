@@ -64,6 +64,11 @@ func (rc *syncResize) Sync() {
 	// Resize PVCs that require resize
 	for _, pvcWithResizeRequest := range rc.resizeMap.GetPVCsWithResizeRequest() {
 		uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
+		if rc.opsExecutor.IsOperationPending(uniqueVolumeKey, "") {
+			klog.V(10).Infof("Operation for PVC %s is already pending", pvcWithResizeRequest.QualifiedName())
+			continue
+		}
+
 		updatedClaim, err := markPVCResizeInProgress(pvcWithResizeRequest, rc.kubeClient)
 		if err != nil {
 			klog.V(5).Infof("Error setting PVC %s in progress with error : %v", pvcWithResizeRequest.QualifiedName(), err)
@@ -73,10 +78,6 @@ func (rc *syncResize) Sync() {
 			pvcWithResizeRequest.PVC = updatedClaim
 		}
 
-		if rc.opsExecutor.IsOperationPending(uniqueVolumeKey, "") {
-			klog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.QualifiedName())
-			continue
-		}
 		growFuncError := rc.opsExecutor.ExpandVolume(pvcWithResizeRequest, rc.resizeMap)
 		if growFuncError != nil && !exponentialbackoff.IsExponentialBackoff(growFuncError) {
 			klog.Errorf("Error growing pvc %s with %v", pvcWithResizeRequest.QualifiedName(), growFuncError)

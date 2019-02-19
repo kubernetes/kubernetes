@@ -19,6 +19,7 @@ package testsuites
 import (
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -58,10 +59,11 @@ type InlineVolumeTestDriver interface {
 // PreprovisionedPVTestDriver represents an interface for a TestDriver that supports PreprovisionedPV
 type PreprovisionedPVTestDriver interface {
 	PreprovisionedVolumeTestDriver
-	// GetPersistentVolumeSource returns a PersistentVolumeSource for pre-provisioned Persistent Volume.
+	// GetPersistentVolumeSource returns a PersistentVolumeSource with volume node affinity for pre-provisioned Persistent Volume.
 	// It will set readOnly and fsType to the PersistentVolumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource
+	// Volume node affinity is optional, it will be nil for volumes which does not have volume node affinity.
+	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity)
 }
 
 // DynamicPVTestDriver represents an interface for a TestDriver that supports DynamicPV
@@ -78,6 +80,14 @@ type DynamicPVTestDriver interface {
 	GetClaimSize() string
 }
 
+// SnapshottableTestDriver represents an interface for a TestDriver that supports DynamicSnapshot
+type SnapshottableTestDriver interface {
+	TestDriver
+	// GetSnapshotClass returns a SnapshotClass to create snapshot.
+	// It will return nil, if the TestDriver doesn't support it.
+	GetSnapshotClass() *unstructured.Unstructured
+}
+
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
@@ -86,6 +96,14 @@ const (
 	CapBlock       Capability = "block"       // raw block mode
 	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
 	CapExec        Capability = "exec"        // exec a file in the volume
+	CapDataSource  Capability = "dataSource"  // support populate data from snapshot
+
+	// multiple pods on a node can use the same volume concurrently;
+	// for CSI, see:
+	// - https://github.com/container-storage-interface/spec/pull/150
+	// - https://github.com/container-storage-interface/spec/issues/178
+	// - NodeStageVolume in the spec
+	CapMultiPODs Capability = "multipods"
 )
 
 // DriverInfo represents a combination of parameters to be used in implementation of TestDriver

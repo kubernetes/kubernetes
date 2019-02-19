@@ -2,7 +2,7 @@
 
 This addon runs a node-local-dns pod on all cluster nodes. The pod runs CoreDNS as the dns cache. It runs with `hostNetwork:True` and creates a dedicated dummy interface with a link local ip(169.254.20.10/32 by default) to listen for DNS queries. The cache instances connect to clusterDNS in case of cache misses.
 
-Design details [here](https://github.com/kubernetes/community/blob/master/keps/sig-network/0030-nodelocal-dns-cache.md)
+Design details [here](https://git.k8s.io/enhancements/keps/sig-network/0030-nodelocal-dns-cache.md)
 
 ## nodelocaldns addon template
 

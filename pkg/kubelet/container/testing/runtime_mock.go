@@ -132,16 +132,6 @@ func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) err
 	return args.Error(0)
 }
 
-func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
-	args := r.Called(containerID)
-	return "", args.Error(0)
-}
-
-func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
-	args := r.Called(pod)
-	return ContainerID{}, args.Error(0)
-}
-
 func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)

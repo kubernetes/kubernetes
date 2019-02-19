@@ -28,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery/cached/disk:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",

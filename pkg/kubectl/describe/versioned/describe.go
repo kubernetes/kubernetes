@@ -2677,7 +2677,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings descr
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
@@ -2716,14 +2716,14 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
 	})
 }
 
-func combineResourceGroup(resource, group []string) string {
+func CombineResourceGroup(resource, group []string) string {
 	if len(resource) == 0 {
 		return ""
 	}

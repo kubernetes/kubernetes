@@ -86,7 +86,6 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -186,6 +185,9 @@ const (
 	// How long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
+
+	// How long for snapshot to create snapshotContent
+	SnapshotCreateTimeout = 5 * time.Minute
 
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
@@ -3380,8 +3382,8 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	return hosts
 }
 
-// NewHostExecPodSpec returns the pod spec of hostexec pod
-func NewHostExecPodSpec(ns, name string) *v1.Pod {
+// NewExecPodSpec returns the pod spec of hostexec pod
+func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3396,7 +3398,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-			HostNetwork:                   true,
+			HostNetwork:                   hostNetwork,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &immediate,
 		},
@@ -3439,7 +3441,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
 func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
+	hostExecPod := NewExecPodSpec(ns, name, true)
 	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
 	ExpectNoError(err)
 	err = WaitForPodRunningInNamespace(client, pod)
@@ -4224,16 +4226,10 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tls config: %v", err)
 	}
-	if tlsConfig != nil {
+	if url.Scheme == "https" {
 		url.Scheme = "wss"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":443"
-		}
 	} else {
 		url.Scheme = "ws"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":80"
-		}
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
@@ -5137,7 +5133,7 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}

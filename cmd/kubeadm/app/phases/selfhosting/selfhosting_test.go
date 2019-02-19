@@ -34,8 +34,6 @@ const (
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-apiserver
   namespace: kube-system
@@ -90,6 +88,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -179,6 +178,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -205,8 +205,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-controller-manager
   namespace: kube-system
@@ -252,6 +250,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -331,6 +330,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -361,8 +361,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-scheduler
   namespace: kube-system
@@ -392,6 +390,7 @@ spec:
       name: kubeconfig
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/scheduler.conf
@@ -446,6 +445,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master

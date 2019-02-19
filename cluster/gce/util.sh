@@ -2247,6 +2247,7 @@ function delete-all-firewall-rules() {
   fi
 }
 
+# Ignores firewall rule arguments that do not exist in NETWORK_PROJECT.
 function delete-firewall-rules() {
   for fw in $@; do
     if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
@@ -3139,6 +3140,7 @@ function kube-down() {
       "${CLUSTER_NAME}-default-internal-master" \
       "${CLUSTER_NAME}-default-internal-node" \
       "${NETWORK}-default-ssh" \
+      "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then

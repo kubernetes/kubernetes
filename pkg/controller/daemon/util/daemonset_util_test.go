@@ -27,7 +27,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -209,7 +208,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -246,7 +245,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -264,7 +263,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},

@@ -746,6 +746,10 @@ const (
 	// Status code 406
 	StatusReasonNotAcceptable StatusReason = "NotAcceptable"
 
+	// StatusReasonRequestEntityTooLarge means that the request entity is too large.
+	// Status code 413
+	StatusReasonRequestEntityTooLarge StatusReason = "RequestEntityTooLarge"
+
 	// StatusReasonUnsupportedMediaType means that the content type sent by the client is not acceptable
 	// to the server - for instance, attempting to send protobuf for a resource that supports only json and yaml.
 	// API calls that return UnsupportedMediaType can never succeed.
@@ -821,6 +825,9 @@ const (
 	// without the expected return type. The presence of this cause indicates the error may be
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
+	// FieldManagerConflict is used to report when another client claims to manage this field,
+	// It should only be returned for a request using server-side apply.
+	CauseTypeFieldManagerConflict CauseType = "FieldManagerConflict"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
