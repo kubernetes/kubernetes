@@ -70,13 +70,12 @@ func TestFieldManagerCreation(t *testing.T) {
 
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager(t)
-	ti, _ := time.Parse(time.RFC3339, "2016-05-19T09:59:00Z")
 
 	obj := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "a",
 			Namespace:         "a",
-			CreationTimestamp: metav1.Time{Time: ti},
+			CreationTimestamp: metav1.Time{Time: time.Time{}},
 			SelfLink:          "a",
 		},
 	}
@@ -87,7 +86,7 @@ func TestApplyStripsFields(t *testing.T) {
 		"metadata": {
 			"name": "b",
 			"namespace": "b",
-			"creationTimestamp": "`+ti.Add(1*time.Minute).Format(time.RFC3339)+`",
+			"creationTimestamp": "2016-05-19T09:59:00Z",
 			"selfLink": "b",
 			"uid": "b",
 			"resourceVersion": "b"
@@ -113,7 +112,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "a",
 			Namespace:         "a",
-			CreationTimestamp: metav1.Time{Time: time.Now().UTC()},
+			CreationTimestamp: metav1.Time{Time: time.Time{}},
 			SelfLink:          "a",
 		},
 	}
