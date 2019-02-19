@@ -148,20 +148,16 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
-		klog.Error(log("registrationHandler.RegisterPlugin failed at CSI.NodeGetInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
-			return unregErr
 		}
 		return err
 	}
 
 	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		klog.Error(log("registrationHandler.RegisterPlugin failed at AddNodeInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
-			return unregErr
 		}
 		return err
 	}
