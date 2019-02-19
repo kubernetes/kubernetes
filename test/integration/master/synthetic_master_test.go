@@ -45,11 +45,10 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetv1 "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -630,7 +629,7 @@ func TestAccept(t *testing.T) {
 	}
 }
 
-func countEndpoints(eps *api.Endpoints) int {
+func countEndpoints(eps *corev1.Endpoints) int {
 	count := 0
 	for i := range eps.Subsets {
 		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
@@ -686,14 +685,14 @@ func TestServiceAlloc(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
-	svc := func(i int) *api.Service {
-		return &api.Service{
+	svc := func(i int) *corev1.Service {
+		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("svc-%v", i),
 			},
-			Spec: api.ServiceSpec{
-				Type: api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{
 					{Port: 80},
 				},
 			},

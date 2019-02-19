@@ -105,7 +105,7 @@ func prometheusPodCustomMetricQuery(namespace, podNamePrefix string) string {
 
 func consumeCPUResources(f *framework.Framework, consumerName string, cpuUsage int) *common.ResourceConsumer {
 	return common.NewDynamicResourceConsumer(consumerName, f.Namespace.Name, common.KindDeployment, 1, cpuUsage,
-		memoryUsed, 0, int64(cpuUsage), memoryLimit, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+		memoryUsed, 0, int64(cpuUsage), memoryLimit, f.ClientSet, f.ScalesGetter)
 }
 
 func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
@@ -114,7 +114,7 @@ func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metr
 		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
-	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.ScalesGetter)
 }
 
 func exportCustomMetricFromService(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
@@ -123,7 +123,7 @@ func exportCustomMetricFromService(f *framework.Framework, consumerName string, 
 		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
-	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.ScalesGetter)
 }
 
 func validateMetricAvailableForAllNodes(c clientset.Interface, metric string, expectedNodesNames []string) error {

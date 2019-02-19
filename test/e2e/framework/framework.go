@@ -49,7 +49,6 @@ import (
 	csi "k8s.io/csi-api/pkg/client/clientset/versioned"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
@@ -81,9 +80,8 @@ type Framework struct {
 	CSIClientSet                     csi.Interface
 	NodeAPIClientSet                 nodeapiclient.Interface
 
-	InternalClientset *internalclientset.Clientset
-	AggregatorClient  *aggregatorclient.Clientset
-	DynamicClient     dynamic.Interface
+	AggregatorClient *aggregatorclient.Clientset
+	DynamicClient    dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -187,8 +185,6 @@ func (f *Framework) BeforeEach() {
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.APIExtensionsClientSet, err = apiextensionsclient.NewForConfig(config)
-		ExpectNoError(err)
-		f.InternalClientset, err = internalclientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		ExpectNoError(err)
@@ -609,7 +605,7 @@ type KubeUser struct {
 }
 
 type KubeCluster struct {
-	Name    string `yaml:"name"`
+	Name string `yaml:"name"`
 	Cluster struct {
 		CertificateAuthorityData string `yaml:"certificate-authority-data"`
 		Server                   string `yaml:"server"`
@@ -618,7 +614,7 @@ type KubeCluster struct {
 
 type KubeConfig struct {
 	Contexts []struct {
-		Name    string `yaml:"name"`
+		Name string `yaml:"name"`
 		Context struct {
 			Cluster string `yaml:"cluster"`
 			User    string
@@ -802,7 +798,7 @@ func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Names
 	unfilteredPods := pl.Items
 	filteredPods := []v1.Pod{}
 ReturnPodsSoFar:
-	// Next: Pod must match at least one of the states that the user specified
+// Next: Pod must match at least one of the states that the user specified
 	for _, pod := range unfilteredPods {
 		if !(passesPhasesFilter(pod, p.ValidPhases) && passesPodNameFilter(pod, p.PodName)) {
 			continue

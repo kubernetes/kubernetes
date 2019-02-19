@@ -27,6 +27,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/klog"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,12 +48,10 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
@@ -73,10 +74,10 @@ func clientForToken(user string) *http.Client {
 	}
 }
 
-func clientsetForToken(user string, config *restclient.Config) (clientset.Interface, externalclientset.Interface) {
+func clientsetForToken(user string, config *restclient.Config) externalclientset.Interface {
 	configCopy := *config
 	configCopy.BearerToken = user
-	return clientset.NewForConfigOrDie(&configCopy), externalclientset.NewForConfigOrDie(&configCopy)
+	return externalclientset.NewForConfigOrDie(&configCopy)
 }
 
 func crdClientsetForToken(user string, config *restclient.Config) apiextensionsclient.Interface {
@@ -115,16 +116,16 @@ func newRBACAuthorizer(config *master.Config) authorizer.Authorizer {
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
 type bootstrapRoles struct {
-	roles               []rbacapi.Role
-	roleBindings        []rbacapi.RoleBinding
-	clusterRoles        []rbacapi.ClusterRole
-	clusterRoleBindings []rbacapi.ClusterRoleBinding
+	roles               []rbacv1.Role
+	roleBindings        []rbacv1.RoleBinding
+	clusterRoles        []rbacv1.ClusterRole
+	clusterRoleBindings []rbacv1.ClusterRoleBinding
 }
 
 // bootstrap uses the provided client to create the bootstrap roles and role bindings.
 //
 // client should be authenticated as the RBAC super user.
-func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
+func (b bootstrapRoles) bootstrap(client externalclientset.Interface) error {
 	for _, r := range b.clusterRoles {
 		_, err := client.Rbac().ClusterRoles().Create(&r)
 		if err != nil {
@@ -306,23 +307,23 @@ func TestRBAC(t *testing.T) {
 	}{
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
-						Rules:      []rbacapi.PolicyRule{ruleReadPods},
+						Rules:      []rbacv1.PolicyRule{ruleReadPods},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
 					},
 				},
 			},
@@ -344,63 +345,63 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
-						Rules:      []rbacapi.PolicyRule{ruleWriteJobs},
+						Rules:      []rbacv1.PolicyRule{ruleWriteJobs},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbacapi.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbacapi.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "job-writer"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "job-writer"},
 							{Kind: "User", Name: "nonescalating-rolebinding-writer"},
 							{Kind: "User", Name: "any-rolebinding-writer"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "any-rolebinding-writer"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "any-rolebinding-writer"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
 					},
 				},
-				roleBindings: []rbacapi.RoleBinding{
+				roleBindings: []rbacv1.RoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "job-writer-namespace"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings", Namespace: "job-namespace"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "job-writer-namespace"},
 							{Kind: "User", Name: "any-rolebinding-writer-namespace"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole", Namespace: "job-namespace"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "any-rolebinding-writer-namespace"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "any-rolebinding-writer-namespace"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
 					},
 				},
 			},
@@ -451,25 +452,25 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbacapi.NewRule("update").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "limitrange-updater"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "update-limitranges"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "update-limitranges"},
 					},
 				},
 			},
@@ -485,25 +486,25 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "limitrange-patcher"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
 					},
 				},
 			},
@@ -543,7 +544,7 @@ func TestRBAC(t *testing.T) {
 		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 
 		// Bootstrap the API Server with the test case's initial roles.
-		superuserClient, _ := clientsetForToken(superUser, clientConfig)
+		superuserClient := clientsetForToken(superUser, clientConfig)
 		if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
 			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
 			continue
@@ -640,7 +641,7 @@ func TestBootstrapping(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset := externalclientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
 	watcher, err := clientset.Rbac().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {

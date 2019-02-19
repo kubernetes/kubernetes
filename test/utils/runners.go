@@ -27,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -42,11 +43,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	"k8s.io/klog"
 )
 
@@ -99,10 +95,8 @@ type RunObjectConfig interface {
 	GetNamespace() string
 	GetKind() schema.GroupKind
 	GetClient() clientset.Interface
-	GetInternalClient() internalclientset.Interface
 	GetScalesGetter() scaleclient.ScalesGetter
 	SetClient(clientset.Interface)
-	SetInternalClient(internalclientset.Interface)
 	SetScalesClient(scaleclient.ScalesGetter)
 	GetReplicas() int
 	GetLabelValue(string) (string, bool)
@@ -112,7 +106,6 @@ type RunObjectConfig interface {
 type RCConfig struct {
 	Affinity          *v1.Affinity
 	Client            clientset.Interface
-	InternalClient    internalclientset.Interface
 	ScalesGetter      scaleclient.ScalesGetter
 	Image             string
 	Command           []string
@@ -292,11 +285,11 @@ func (config *DeploymentConfig) Run() error {
 }
 
 func (config *DeploymentConfig) GetKind() schema.GroupKind {
-	return extensionsinternal.Kind("Deployment")
+	return schema.GroupKind{apps.GroupName, "Deployment"}
 }
 
 func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
-	return extensionsinternal.Resource("deployments")
+	return apps.Resource("deployments")
 }
 
 func (config *DeploymentConfig) create() error {
@@ -368,11 +361,11 @@ func (config *ReplicaSetConfig) Run() error {
 }
 
 func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
-	return extensionsinternal.Kind("ReplicaSet")
+	return schema.GroupKind{apps.GroupName, "ReplicaSet"}
 }
 
 func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
-	return extensionsinternal.Resource("replicasets")
+	return apps.Resource("replicasets")
 }
 
 func (config *ReplicaSetConfig) create() error {
@@ -440,11 +433,11 @@ func (config *JobConfig) Run() error {
 }
 
 func (config *JobConfig) GetKind() schema.GroupKind {
-	return batchinternal.Kind("Job")
+	return schema.GroupKind{batchv1.GroupName, "Job"}
 }
 
 func (config *JobConfig) GetGroupResource() schema.GroupResource {
-	return batchinternal.Resource("jobs")
+	return batchv1.Resource("jobs")
 }
 
 func (config *JobConfig) create() error {
@@ -516,19 +509,15 @@ func (config *RCConfig) GetNamespace() string {
 }
 
 func (config *RCConfig) GetKind() schema.GroupKind {
-	return api.Kind("ReplicationController")
+	return schema.GroupKind{v1.GroupName, "ReplicationController"}
 }
 
 func (config *RCConfig) GetGroupResource() schema.GroupResource {
-	return api.Resource("replicationcontrollers")
+	return v1.Resource("replicationcontrollers")
 }
 
 func (config *RCConfig) GetClient() clientset.Interface {
 	return config.Client
-}
-
-func (config *RCConfig) GetInternalClient() internalclientset.Interface {
-	return config.InternalClient
 }
 
 func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
@@ -537,10 +526,6 @@ func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
 
 func (config *RCConfig) SetClient(c clientset.Interface) {
 	config.Client = c
-}
-
-func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
-	config.InternalClient = c
 }
 
 func (config *RCConfig) SetScalesClient(getter scaleclient.ScalesGetter) {
@@ -1171,7 +1156,7 @@ func (config *SecretConfig) Run() error {
 }
 
 func (config *SecretConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, schema.GroupKind{v1.GroupName, "Secret"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
@@ -1229,7 +1214,7 @@ func (config *ConfigMapConfig) Run() error {
 }
 
 func (config *ConfigMapConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, schema.GroupKind{v1.GroupName, "ConfigMap"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting configmap: %v", err)
 	}
 	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)
