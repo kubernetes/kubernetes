@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -27,12 +28,13 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestValidateSupportedVersion(t *testing.T) {
-	const KubeadmGroupName = "kubeadm.k8s.io"
+const KubeadmGroupName = "kubeadm.k8s.io"
 
+func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
-		gv          schema.GroupVersion
-		expectedErr bool
+		gv              schema.GroupVersion
+		allowDeprecated bool
+		expectedErr     bool
 	}{
 		{
 			gv: schema.GroupVersion{
@@ -53,6 +55,14 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Group:   KubeadmGroupName,
 				Version: "v1alpha3",
 			},
+			expectedErr: true,
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1alpha3",
+			},
+			allowDeprecated: true,
 		},
 		{
 			gv: schema.GroupVersion{
@@ -69,8 +79,8 @@ func TestValidateSupportedVersion(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		t.Run(rt.gv.String(), func(t *testing.T) {
-			err := ValidateSupportedVersion(rt.gv)
+		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gv, rt.allowDeprecated), func(t *testing.T) {
+			err := validateSupportedVersion(rt.gv, rt.allowDeprecated)
 			if rt.expectedErr && err == nil {
 				t.Error("unexpected success")
 			} else if !rt.expectedErr && err != nil {
