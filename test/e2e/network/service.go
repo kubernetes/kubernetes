@@ -790,11 +790,47 @@ var _ = SIGDescribe("Services", func() {
 		jig.TestReachableUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
 
 		By("hitting the TCP service's LoadBalancer")
-		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB
+		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		if loadBalancerSupportsUDP {
 			By("hitting the UDP service's LoadBalancer")
-			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		}
+
+		By("Scaling the pods to 0")
+		jig.Scale(ns1, 0)
+		jig.Scale(ns2, 0)
+
+		By("looking for ICMP REJECT on the TCP service's NodePort")
+		jig.TestRejectedHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
+
+		By("looking for ICMP REJECT on the UDP service's NodePort")
+		jig.TestRejectedUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
+
+		By("looking for ICMP REJECT on the TCP service's LoadBalancer")
+		jig.TestRejectedHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		if loadBalancerSupportsUDP {
+			By("looking for ICMP REJECT on the UDP service's LoadBalancer")
+			jig.TestRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		}
+
+		By("Scaling the pods to 1")
+		jig.Scale(ns1, 1)
+		jig.Scale(ns2, 1)
+
+		By("hitting the TCP service's NodePort")
+		jig.TestReachableHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
+
+		By("hitting the UDP service's NodePort")
+		jig.TestReachableUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
+
+		By("hitting the TCP service's LoadBalancer")
+		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
 		}
 
 		// Change the services back to ClusterIP.
