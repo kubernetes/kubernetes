@@ -830,6 +830,29 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	return ret
 }
 
+func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bool, error) {
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s", ipPort)
+	if ip == "" {
+		Failf("Got empty IP for non-reachability check (%s)", url)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for non-reachability check (%s)", url)
+		return false, nil
+	}
+
+	Logf("Testing HTTP non-reachability of %v", url)
+
+	resp, err := httpGetNoConnectionPoolTimeout(url, timeout)
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", url)
+		return true, nil
+	}
+	resp.Body.Close()
+	return false, nil
+}
+
 // Does an HTTP GET, but does not reuse TCP connections
 // This masks problems where the iptables rule has changed, but we don't see it
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
