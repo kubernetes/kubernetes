@@ -51,7 +51,6 @@ go_library(
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -31,7 +31,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 func alwaysReady() bool { return true }
@@ -247,7 +247,7 @@ func TestReconcile(t *testing.T) {
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*v1.Node)
-				_, condition := utilnode.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+				_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
