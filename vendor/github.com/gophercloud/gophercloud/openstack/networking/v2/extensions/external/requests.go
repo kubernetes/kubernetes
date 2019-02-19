@@ -1,8 +1,36 @@
 package external
 
 import (
+	"net/url"
+	"strconv"
+
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 )
+
+// ListOptsExt adds the external network options to the base ListOpts.
+type ListOptsExt struct {
+	networks.ListOptsBuilder
+	External *bool `q:"router:external"`
+}
+
+// ToNetworkListQuery adds the router:external option to the base network
+// list options.
+func (opts ListOptsExt) ToNetworkListQuery() (string, error) {
+	q, err := gophercloud.BuildQueryString(opts.ListOptsBuilder)
+	if err != nil {
+		return "", err
+	}
+
+	params := q.Query()
+	if opts.External != nil {
+		v := strconv.FormatBool(*opts.External)
+		params.Add("router:external", v)
+	}
+
+	q = &url.URL{RawQuery: params.Encode()}
+	return q.String(), err
+}
 
 // CreateOptsExt is the structure used when creating new external network
 // resources. It embeds networks.CreateOpts and so inherits all of its required

@@ -333,7 +333,7 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // TODO: opts are currently ignored.
-func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {

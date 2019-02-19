@@ -220,7 +220,6 @@ func TestNewJoinData(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external join option and inject it to the join cmd
 			joinOptions := newJoinOptions()
-			joinOptions.args = &tc.args
 			cmd := NewCmdJoin(nil, joinOptions)
 
 			// sets cmd flags (that will be reflected on the join options)
@@ -229,7 +228,7 @@ func TestNewJoinData(t *testing.T) {
 			}
 
 			// test newJoinData method
-			data, err := newJoinData(cmd, joinOptions, nil)
+			data, err := newJoinData(cmd, tc.args, joinOptions, nil)
 			if err != nil && !tc.expectError {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
@@ -239,7 +238,7 @@ func TestNewJoinData(t *testing.T) {
 
 			// exec additional validation on the returned value
 			if tc.validate != nil {
-				tc.validate(t, &data)
+				tc.validate(t, data)
 			}
 		})
 	}

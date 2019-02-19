@@ -28,10 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 
 	"github.com/stretchr/testify/assert"
@@ -291,13 +288,12 @@ func TestGetPodDNSType(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc                    string
-		customPodDNSFeatureGate bool
-		hasClusterDNS           bool
-		hostNetwork             bool
-		dnsPolicy               v1.DNSPolicy
-		expectedDNSType         podDNSType
-		expectedError           bool
+		desc            string
+		hasClusterDNS   bool
+		hostNetwork     bool
+		dnsPolicy       v1.DNSPolicy
+		expectedDNSType podDNSType
+		expectedError   bool
 	}{
 		{
 			desc:            "valid DNSClusterFirst without hostnetwork",
@@ -337,15 +333,9 @@ func TestGetPodDNSType(t *testing.T) {
 			expectedDNSType: podDNSHost,
 		},
 		{
-			desc:                    "valid DNSNone with feature gate",
-			customPodDNSFeatureGate: true,
-			dnsPolicy:               v1.DNSNone,
-			expectedDNSType:         podDNSNone,
-		},
-		{
-			desc:          "DNSNone without feature gate, should return error",
-			dnsPolicy:     v1.DNSNone,
-			expectedError: true,
+			desc:            "valid DNSNone",
+			dnsPolicy:       v1.DNSNone,
+			expectedDNSType: podDNSNone,
 		},
 		{
 			desc:          "invalid DNS policy, should return error",
@@ -356,8 +346,6 @@ func TestGetPodDNSType(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomPodDNS, tc.customPodDNSFeatureGate)()
-
 			if tc.hasClusterDNS {
 				configurer.clusterDNS = testClusterDNS
 			} else {
@@ -516,32 +504,20 @@ func TestGetPodDNSCustom(t *testing.T) {
 	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{net.ParseIP(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
 
 	testCases := []struct {
-		desc                    string
-		customPodDNSFeatureGate bool
-		hostnetwork             bool
-		dnsPolicy               v1.DNSPolicy
-		dnsConfig               *v1.PodDNSConfig
-		expectedDNSConfig       *runtimeapi.DNSConfig
+		desc              string
+		hostnetwork       bool
+		dnsPolicy         v1.DNSPolicy
+		dnsConfig         *v1.PodDNSConfig
+		expectedDNSConfig *runtimeapi.DNSConfig
 	}{
 		{
-			desc:      "feature gate is disabled, DNSNone should fallback to DNSClusterFirst",
+			desc:              "DNSNone without DNSConfig should have empty DNS settings",
+			dnsPolicy:         v1.DNSNone,
+			expectedDNSConfig: &runtimeapi.DNSConfig{},
+		},
+		{
+			desc:      "DNSNone with DNSConfig should have a merged DNS settings",
 			dnsPolicy: v1.DNSNone,
-			expectedDNSConfig: &runtimeapi.DNSConfig{
-				Servers:  []string{testClusterNameserver},
-				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
-				Options:  []string{"ndots:5"},
-			},
-		},
-		{
-			desc:                    "feature gate is enabled, DNSNone without DNSConfig should have empty DNS settings",
-			customPodDNSFeatureGate: true,
-			dnsPolicy:               v1.DNSNone,
-			expectedDNSConfig:       &runtimeapi.DNSConfig{},
-		},
-		{
-			desc:                    "feature gate is enabled, DNSNone with DNSConfig should have a merged DNS settings",
-			customPodDNSFeatureGate: true,
-			dnsPolicy:               v1.DNSNone,
 			dnsConfig: &v1.PodDNSConfig{
 				Nameservers: []string{"203.0.113.1"},
 				Searches:    []string{"my.domain", "second.domain"},
@@ -557,9 +533,8 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc:                    "feature gate is enabled, DNSClusterFirst with DNSConfig should have a merged DNS settings",
-			customPodDNSFeatureGate: true,
-			dnsPolicy:               v1.DNSClusterFirst,
+			desc:      "DNSClusterFirst with DNSConfig should have a merged DNS settings",
+			dnsPolicy: v1.DNSClusterFirst,
 			dnsConfig: &v1.PodDNSConfig{
 				Nameservers: []string{"10.0.0.11"},
 				Searches:    []string{"my.domain"},
@@ -575,10 +550,9 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc:                    "feature gate is enabled, DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
-			customPodDNSFeatureGate: true,
-			hostnetwork:             true,
-			dnsPolicy:               v1.DNSClusterFirstWithHostNet,
+			desc:        "DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
+			hostnetwork: true,
+			dnsPolicy:   v1.DNSClusterFirstWithHostNet,
 			dnsConfig: &v1.PodDNSConfig{
 				Nameservers: []string{"10.0.0.11"},
 				Searches:    []string{"my.domain"},
@@ -594,9 +568,8 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc:                    "feature gate is enabled, DNSDefault with DNSConfig should have a merged DNS settings",
-			customPodDNSFeatureGate: true,
-			dnsPolicy:               v1.DNSDefault,
+			desc:      "DNSDefault with DNSConfig should have a merged DNS settings",
+			dnsPolicy: v1.DNSDefault,
 			dnsConfig: &v1.PodDNSConfig{
 				Nameservers: []string{"10.0.0.11"},
 				Searches:    []string{"my.domain"},
@@ -615,8 +588,6 @@ func TestGetPodDNSCustom(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomPodDNS, tc.customPodDNSFeatureGate)()
-
 			testPod.Spec.HostNetwork = tc.hostnetwork
 			testPod.Spec.DNSConfig = tc.dnsConfig
 			testPod.Spec.DNSPolicy = tc.dnsPolicy

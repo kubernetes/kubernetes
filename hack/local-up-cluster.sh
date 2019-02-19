@@ -78,6 +78,7 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
+STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-""}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable Pod priority and preemption
@@ -522,13 +523,6 @@ function start_apiserver {
       priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
     fi
 
-    if [[ ${ENABLE_ADMISSION_PLUGINS} == *"Initializers"* ]]; then
-        if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-        fi
-        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
-    fi
-
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -581,6 +575,7 @@ function start_apiserver {
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --storage-backend=${STORAGE_BACKEND} \
+      --storage-media-type=${STORAGE_MEDIA_TYPE} \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -965,9 +960,9 @@ create_csi_crd() {
     echo "create_csi_crd $1"
     YAML_FILE=${KUBE_ROOT}/cluster/addons/storage-crds/$1.yaml
 
-    if [ -e $YAML_FILE ]; then
+    if [ -e "${YAML_FILE}" ]; then
         echo "Create $1 crd"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $YAML_FILE
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${YAML_FILE}
     else
         echo "No $1 available."
     fi
@@ -1038,7 +1033,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
-  apt install -y sudo
+  apt-get update && apt-get install -y sudo
   apt-get remove -y systemd
 
   # configure shared mounts to prevent failure in DIND scenarios

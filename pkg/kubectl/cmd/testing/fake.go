@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
@@ -275,8 +276,13 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	return []*metav1.APIResourceList{}, nil
+}
+
+func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
 }
 
 // TestFactory extends cmdutil.Factory
@@ -453,7 +459,7 @@ func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, err
 	fakeClient := f.Client.(*fake.RESTClient)
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		return nil, err
 	}

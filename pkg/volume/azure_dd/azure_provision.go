@@ -28,9 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -135,7 +135,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestGiB, err := util.RoundUpToGiBInt(capacity)
+	requestGiB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			availabilityZone = v
 		case "zones":
 			zonesPresent = true
-			availabilityZones, err = util.ZonesToSet(v)
+			availabilityZones, err = volumehelpers.ZonesToSet(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", v, err)
 			}
@@ -225,7 +225,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 
 		if availabilityZone != "" || availabilityZones.Len() != 0 || activeZones.Len() != 0 || len(allowedTopologies) != 0 {
-			selectedAvailabilityZone, err = util.SelectZoneForVolume(zonePresent, zonesPresent, availabilityZone, availabilityZones, activeZones, selectedNode, allowedTopologies, p.options.PVC.Name)
+			selectedAvailabilityZone, err = volumehelpers.SelectZoneForVolume(zonePresent, zonesPresent, availabilityZone, availabilityZones, activeZones, selectedNode, allowedTopologies, p.options.PVC.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -333,12 +333,12 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		for i := 0; i < 3; i++ {
 			requirements := []v1.NodeSelectorRequirement{
 				{
-					Key:      kubeletapis.LabelZoneRegion,
+					Key:      v1.LabelZoneRegion,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{diskController.GetLocation()},
 				},
 				{
-					Key:      kubeletapis.LabelZoneFailureDomain,
+					Key:      v1.LabelZoneFailureDomain,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{strconv.Itoa(i)},
 				},

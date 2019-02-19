@@ -72,7 +72,7 @@ func TestCheckConfigurationIsHA(t *testing.T) {
 	}
 }
 
-func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.InitConfiguration) string, port int) {
+func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.APIEndpoint) string, port int) {
 	portStr := strconv.Itoa(port)
 	var tests = []struct {
 		name             string
@@ -102,12 +102,7 @@ func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.InitConfiguration) str
 	}
 
 	for _, test := range tests {
-		cfg := &kubeadmapi.InitConfiguration{
-			LocalAPIEndpoint: kubeadmapi.APIEndpoint{
-				AdvertiseAddress: test.advertiseAddress,
-			},
-		}
-		url := getURLFunc(cfg)
+		url := getURLFunc(&kubeadmapi.APIEndpoint{AdvertiseAddress: test.advertiseAddress})
 		if url != test.expectedURL {
 			t.Errorf("expected %s, got %s", test.expectedURL, url)
 		}

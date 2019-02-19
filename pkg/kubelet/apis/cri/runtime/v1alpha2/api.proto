@@ -313,7 +313,8 @@ message PodSandboxConfig {
     // operation. The runtime may also use this information to improve UX, such
     // as by constructing a readable name.
     PodSandboxMetadata metadata = 1;
-    // Hostname of the sandbox.
+    // Hostname of the sandbox. Hostname could only be empty when the pod
+    // network namespace is NODE.
     string hostname = 2;
     // Path to the directory on the host in which container log files are
     // stored.
@@ -365,7 +366,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/community/keps/sig-node/0014-runtime-class.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
     string runtime_handler = 2;
 }
 
@@ -439,6 +440,8 @@ message PodSandboxStatus {
     // MUST be identical to that of the corresponding PodSandboxConfig used to
     // instantiate the pod sandbox this status represents.
     map<string, string> annotations = 8;
+    // runtime configuration used for this PodSandbox.
+    string runtime_handler = 9;
 }
 
 message PodSandboxStatusResponse {
@@ -493,6 +496,8 @@ message PodSandbox {
     // MUST be identical to that of the corresponding PodSandboxConfig used to
     // instantiate this PodSandbox.
     map<string, string> annotations = 6;
+    // runtime configuration used for this PodSandbox.
+    string runtime_handler = 7;
 }
 
 message ListPodSandboxResponse {
@@ -1237,7 +1242,7 @@ message ContainerStats {
     CpuUsage cpu = 2;
     // Memory usage gathered from the container.
     MemoryUsage memory = 3;
-    // Usage of the writeable layer.
+    // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
 }
 

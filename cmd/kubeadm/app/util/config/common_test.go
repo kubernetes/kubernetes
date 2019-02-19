@@ -17,187 +17,64 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-var files = map[string][]byte{
-	"Master_v1alpha1": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha1
-kind: InitConfiguration
-`),
-	"Node_v1alpha1": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha1
-kind: NodeConfiguration
-`),
-	"Master_v1alpha2": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: MasterConfiguration
-`),
-	"Node_v1alpha2": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: NodeConfiguration
-`),
-	"Init_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: InitConfiguration
-`),
-	"Join_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: JoinConfiguration
-`),
-	"Init_v1beta1": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta1
-kind: InitConfiguration
-`),
-	"Join_v1beta1": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta1
-kind: JoinConfiguration
-`),
-	"NoKind": []byte(`
-apiVersion: baz.k8s.io/v1
-foo: foo
-bar: bar
-`),
-	"NoAPIVersion": []byte(`
-kind: Bar
-foo: foo
-bar: bar
-`),
-	"Foo": []byte(`
-apiVersion: foo.k8s.io/v1
-kind: Foo
-`),
-}
+func TestValidateSupportedVersion(t *testing.T) {
+	const KubeadmGroupName = "kubeadm.k8s.io"
 
-func TestDetectUnsupportedVersion(t *testing.T) {
-	var tests = []struct {
-		name         string
-		fileContents []byte
-		expectedErr  bool
+	tests := []struct {
+		gv          schema.GroupVersion
+		expectedErr bool
 	}{
 		{
-			name:         "Master_v1alpha1",
-			fileContents: files["Master_v1alpha1"],
-			expectedErr:  true,
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1alpha1",
+			},
+			expectedErr: true,
 		},
 		{
-			name:         "Node_v1alpha1",
-			fileContents: files["Node_v1alpha1"],
-			expectedErr:  true,
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1alpha2",
+			},
+			expectedErr: true,
 		},
 		{
-			name:         "Master_v1alpha2",
-			fileContents: files["Master_v1alpha2"],
-			expectedErr:  true,
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1alpha3",
+			},
 		},
 		{
-			name:         "Node_v1alpha2",
-			fileContents: files["Node_v1alpha2"],
-			expectedErr:  true,
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta1",
+			},
 		},
 		{
-			name:         "Init_v1alpha3",
-			fileContents: files["Init_v1alpha3"],
-		},
-		{
-			name:         "Join_v1alpha3",
-			fileContents: files["Join_v1alpha3"],
-		},
-		{
-			name:         "Init_v1beta1",
-			fileContents: files["Init_v1beta1"],
-		},
-		{
-			name:         "Join_v1beta1",
-			fileContents: files["Join_v1beta1"],
-		},
-		{
-			name:         "DuplicateInit v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Init_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateInit v1beta1",
-			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Init_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateInit v1beta1 and v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Init_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateJoin v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateJoin v1beta1",
-			fileContents: bytes.Join([][]byte{files["Join_v1beta1"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateJoin v1beta1 and v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Join_v1beta1"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "NoKind",
-			fileContents: files["NoKind"],
-			expectedErr:  true,
-		},
-		{
-			name:         "NoAPIVersion",
-			fileContents: files["NoAPIVersion"],
-			expectedErr:  true,
-		},
-		{
-			name:         "Ignore other Kind",
-			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-		},
-		{
-			name:         "Ignore other Kind",
-			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-		},
-		// CanMixInitJoin cases used to be MustNotMixInitJoin, however due to UX issues DetectUnsupportedVersion had to tolerate that.
-		// So the following tests actually verify, that Init and Join can be mixed together with no error.
-		{
-			name:         "CanMixInitJoin v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  false,
-		},
-		{
-			name:         "CanMixInitJoin v1alpha3 - v1beta1",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  false,
-		},
-		{
-			name:         "CanMixInitJoin v1beta1 - v1alpha3",
-			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  false,
-		},
-		{
-			name:         "CanMixInitJoin v1beta1",
-			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  false,
+			gv: schema.GroupVersion{
+				Group:   "foo.k8s.io",
+				Version: "v1",
+			},
 		},
 	}
 
 	for _, rt := range tests {
-		t.Run(rt.name, func(t2 *testing.T) {
-
-			err := DetectUnsupportedVersion(rt.fileContents)
-			if (err != nil) != rt.expectedErr {
-				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
+		t.Run(rt.gv.String(), func(t *testing.T) {
+			err := ValidateSupportedVersion(rt.gv)
+			if rt.expectedErr && err == nil {
+				t.Error("unexpected success")
+			} else if !rt.expectedErr && err != nil {
+				t.Errorf("unexpected failure: %v", err)
 			}
 		})
 	}
@@ -473,20 +350,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "")
-			if err != nil {
-				t.Fatalf("could not create temporary test file: %v", err)
-			}
-			fileName := file.Name()
-			defer os.Remove(fileName)
-
-			_, err = file.WriteString(test.oldCfg)
-			file.Close()
-			if err != nil {
-				t.Fatalf("could not write contents of old config: %v", err)
-			}
-
-			b, err := MigrateOldConfigFromFile(fileName)
+			b, err := MigrateOldConfig([]byte(test.oldCfg))
 			if test.expectErr {
 				if err == nil {
 					t.Fatalf("unexpected success:\n%s", b)

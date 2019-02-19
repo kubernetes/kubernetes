@@ -37,7 +37,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -377,9 +377,13 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
 		})
+		config.WrapTransport = transportConfig.WrapTransport
+		config.Dial = transportConfig.Dial
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.
 		config.TLSClientConfig = restclient.TLSClientConfig{}
+		config.AuthProvider = nil
+		config.ExecProvider = nil
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {

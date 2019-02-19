@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -400,7 +399,7 @@ type RESTStorageProvider interface {
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
-	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
+	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
@@ -423,13 +422,11 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
 	}
 
-	for i := range apiGroupsInfo {
-		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
-			klog.Fatalf("Error in registering group versions: %v", err)
-		}
+	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+		klog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
 
@@ -518,7 +515,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
-		admissionregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

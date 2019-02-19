@@ -151,14 +151,12 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 	o.serviceAccountName = args[len(args)-1]
 	resources := args[:len(args)-1]
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileNameOptions).
-		IncludeUninitialized(includeUninitialized).
 		Flatten()
 	if !o.local {
 		builder.ResourceTypeOrNameArgs(o.all, resources...).
@@ -193,8 +191,9 @@ func (o *SetServiceAccountOptions) Run() error {
 	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
+		name := info.ObjectName()
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 		if o.local || o.dryRun {

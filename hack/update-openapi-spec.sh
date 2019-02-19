@@ -25,6 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::require-jq
 kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
@@ -66,7 +67,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --runtime-config="api/all=true" \
+  --runtime-config="api/all=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/networkpolicies=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/replicationcontrollers=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --logtostderr \
   --v=2 \
@@ -83,7 +84,7 @@ fi
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S . > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

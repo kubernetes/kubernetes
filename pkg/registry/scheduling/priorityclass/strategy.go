@@ -36,7 +36,7 @@ type priorityClassStrategy struct {
 // Strategy is the default logic that applies when creating and updating PriorityClass objects.
 var Strategy = priorityClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all PriorityClasses are global.
+// NamespaceScoped returns false because all PriorityClasses are global.
 func (priorityClassStrategy) NamespaceScoped() bool {
 	return false
 }

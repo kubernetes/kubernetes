@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -67,6 +67,12 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
+			if criSocketPath == "" {
+				criSocketPath, err = resetDetectCRISocket(client)
+				kubeadmutil.CheckErr(err)
+				klog.V(1).Infof("[reset] detected and using CRI socket: %s", criSocketPath)
+			}
+
 			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out, client))
@@ -81,10 +87,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
-	cmd.PersistentFlags().StringVar(
-		&criSocketPath, "cri-socket", kubeadmapiv1beta1.DefaultCRISocket,
-		"The path to the CRI socket to use with crictl when cleaning up containers.",
-	)
+	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &criSocketPath)
 
 	cmd.PersistentFlags().BoolVarP(
 		&forceReset, "force", "f", false,
@@ -167,7 +170,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 
 	klog.V(1).Info("[reset] removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
-		klog.Errorf("[reset] failed to remove containers: %+v", err)
+		klog.Errorf("[reset] failed to remove containers: %v", err)
 	}
 
 	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
@@ -207,7 +210,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 	var dataDir string
 
 	if client != nil {
-		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
 		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
@@ -294,4 +297,17 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 			klog.Errorf("[reset] failed to remove file: %q [%v]\n", path, err)
 		}
 	}
+}
+
+func resetDetectCRISocket(client clientset.Interface) (string, error) {
+	if client != nil {
+		// first try to connect to the cluster for the CRI socket
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+		if err == nil {
+			return cfg.NodeRegistration.CRISocket, nil
+		}
+	}
+
+	// if this fails, try to detect it
+	return utilruntime.DetectCRISocket()
 }

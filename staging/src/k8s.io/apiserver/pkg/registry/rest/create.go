@@ -92,9 +92,12 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	objectMeta.SetInitializers(nil)
+
+	// Ensure managedFields is not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		objectMeta.SetManagedFields(nil)
 	}
 
 	// ClusterName is ignored and should not be saved

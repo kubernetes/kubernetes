@@ -35,7 +35,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller/endpoint:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",

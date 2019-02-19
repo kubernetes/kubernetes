@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -92,7 +92,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	// If Quobyte is already mounted we don't need to check if the binary is installed
 	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter(plugin.GetPluginName())); err == nil {
 		qm, _ := mounter.(*quobyteMounter)
-		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+		pluginDir := plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
 			klog.V(4).Infof("quobyte: can support")
 			return true
@@ -238,7 +238,7 @@ func (mounter *quobyteMounter) CanMount() error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
-	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+	pluginDir := mounter.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 	return mounter.SetUpAt(pluginDir, fsGroup)
 }
 
@@ -284,7 +284,7 @@ func (quobyteVolume *quobyte) GetPath() string {
 
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
-	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+	pluginDir := quobyteVolume.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
 }
 
@@ -330,6 +330,7 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 				group:   source.Group,
 				volume:  source.Volume,
 				plugin:  plugin,
+				tenant:  source.Tenant,
 			},
 			registry: source.Registry,
 			readOnly: readOnly,
@@ -428,6 +429,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 	pv.Spec.MountOptions = provisioner.options.MountOptions
+	pv.Spec.PersistentVolumeSource.Quobyte.Tenant = provisioner.tenant
 	return pv, nil
 }
 

@@ -22,14 +22,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
@@ -74,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/kustomize"
 )
 
 const (
@@ -294,7 +294,7 @@ var (
 
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
-	return NewDefaultKubectlCommandWithArgs(&defaultPluginHandler{}, os.Args, os.Stdin, os.Stdout, os.Stderr)
+	return NewDefaultKubectlCommandWithArgs(NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes), os.Args, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
@@ -311,7 +311,7 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			if err := handleEndpointExtensions(pluginHandler, cmdPathPieces); err != nil {
+			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
 				fmt.Fprintf(errout, "%v\n", err)
 				os.Exit(1)
 			}
@@ -325,35 +325,51 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 // and performing executable filename lookups to search
 // for valid plugin files, and execute found plugins.
 type PluginHandler interface {
-	// Lookup receives a potential filename and returns
-	// a full or relative path to an executable, if one
-	// exists at the given filename, or an error.
-	Lookup(filename string) (string, error)
+	// exists at the given filename, or a boolean false.
+	// Lookup will iterate over a list of given prefixes
+	// in order to recognize valid plugin filenames.
+	// The first filepath to match a prefix is returned.
+	Lookup(filename string) (string, bool)
 	// Execute receives an executable's filepath, a slice
 	// of arguments, and a slice of environment variables
 	// to relay to the executable.
 	Execute(executablePath string, cmdArgs, environment []string) error
 }
 
-type defaultPluginHandler struct{}
+// DefaultPluginHandler implements PluginHandler
+type DefaultPluginHandler struct {
+	ValidPrefixes []string
+}
+
+// NewDefaultPluginHandler instantiates the DefaultPluginHandler with a list of
+// given filename prefixes used to identify valid plugin filenames.
+func NewDefaultPluginHandler(validPrefixes []string) *DefaultPluginHandler {
+	return &DefaultPluginHandler{
+		ValidPrefixes: validPrefixes,
+	}
+}
 
 // Lookup implements PluginHandler
-func (h *defaultPluginHandler) Lookup(filename string) (string, error) {
-	// if on Windows, append the "exe" extension
-	// to the filename that we are looking up.
-	if runtime.GOOS == "windows" {
-		filename = filename + ".exe"
+func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
+	for _, prefix := range h.ValidPrefixes {
+		path, err := exec.LookPath(fmt.Sprintf("%s-%s", prefix, filename))
+		if err != nil || len(path) == 0 {
+			continue
+		}
+		return path, true
 	}
 
-	return exec.LookPath(filename)
+	return "", false
 }
 
 // Execute implements PluginHandler
-func (h *defaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
+func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
 	return syscall.Exec(executablePath, cmdArgs, environment)
 }
 
-func handleEndpointExtensions(pluginHandler PluginHandler, cmdArgs []string) error {
+// HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
+// a plugin executable on the PATH that satisfies the given arguments.
+func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 	remainingArgs := []string{} // all "non-flag" arguments
 
 	for idx := range cmdArgs {
@@ -367,8 +383,8 @@ func handleEndpointExtensions(pluginHandler PluginHandler, cmdArgs []string) err
 
 	// attempt to find binary, starting at longest possible name with given cmdArgs
 	for len(remainingArgs) > 0 {
-		path, err := pluginHandler.Lookup(fmt.Sprintf("kubectl-%s", strings.Join(remainingArgs, "-")))
-		if err != nil || len(path) == 0 {
+		path, found := pluginHandler.Lookup(strings.Join(remainingArgs, "-"))
+		if !found {
 			remainingArgs = remainingArgs[:len(remainingArgs)-1]
 			continue
 		}
@@ -415,11 +431,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	}
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
+	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
@@ -440,7 +456,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(utilflag.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
@@ -506,6 +522,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				replace.NewCmdReplace(f, ioStreams),
 				wait.NewCmdWait(f, ioStreams),
 				convert.NewCmdConvert(f, ioStreams),
+				kustomize.NewCmdKustomize(ioStreams),
 			},
 		},
 		{

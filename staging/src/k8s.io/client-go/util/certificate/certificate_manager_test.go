@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
@@ -433,7 +432,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		},
 	}
 
-	certificateWaitBackoff = wait.Backoff{Steps: 1}
+	defer func(t time.Duration) { certificateWaitTimeout = t }(certificateWaitTimeout)
+	certificateWaitTimeout = 1 * time.Millisecond
 	if success, err := m.rotateCerts(); success {
 		t.Errorf("Got success from 'rotateCerts', wanted failure.")
 	} else if err != nil {
@@ -879,15 +879,6 @@ func TestServerHealth(t *testing.T) {
 			clientErr:        errors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, false),
 			expectRotateFail: true,
 			expectHealthy:    true,
-		},
-		{
-			description: "Conflict error on watch",
-			certs:       currentCerts,
-
-			failureType:      watchError,
-			clientErr:        errors.NewGenericServerResponse(409, "POST", schema.GroupResource{}, "", "", 0, false),
-			expectRotateFail: true,
-			expectHealthy:    false,
 		},
 	}
 

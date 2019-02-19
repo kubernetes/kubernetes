@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -319,7 +320,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	volumeInfo := arr[len(arr)-1]
 
-	// Search symbolick link which matches volumeInfo under /dev/disk/by-path or /dev/disk/by-id
+	// Search symbolic link which matches volumeInfo under /dev/disk/by-path or /dev/disk/by-id
 	// then find destination device path from the link
 	searchPath := byID
 	if strings.Contains(volumeInfo, "-lun-") {
@@ -375,7 +376,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 }
 
 func checkPathExists(path string) (bool, error) {
-	if pathExists, pathErr := volumeutil.PathExists(path); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(path); pathErr != nil {
 		return pathExists, fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)

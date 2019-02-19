@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_PriorityClass = map[string]string{
 	"":              "PriorityClass defines mapping from a priority class name to the priority integer value. The value can be any valid integer.",
-	"metadata":      "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata":      "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"value":         "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
 	"globalDefault": "globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class. Only one PriorityClass can be marked as `globalDefault`. However, if more than one PriorityClasses exists with their `globalDefault` field set to true, the smallest value of such global default PriorityClasses will be used as the default priority.",
 	"description":   "description is an arbitrary string that usually provides guidelines on when this priority class should be used.",
@@ -41,7 +41,7 @@ func (PriorityClass) SwaggerDoc() map[string]string {
 
 var map_PriorityClassList = map[string]string{
 	"":         "PriorityClassList is a collection of priority classes.",
-	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of PriorityClasses",
 }
 

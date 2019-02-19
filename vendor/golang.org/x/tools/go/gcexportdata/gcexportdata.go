@@ -7,9 +7,6 @@
 // gc compiler.  This package supports go1.7 export data format and all
 // later versions.
 //
-// This package replaces the deprecated golang.org/x/tools/go/gcimporter15
-// package, which will be deleted in October 2017.
-//
 // Although it might seem convenient for this package to live alongside
 // go/types in the standard library, this would cause version skew
 // problems for developer tools that use it, since they must be able to
@@ -19,7 +16,7 @@
 // time before the Go 1.8 release and rebuild and redeploy their
 // developer tools, which will then be able to consume both Go 1.7 and
 // Go 1.8 export data files, so they will work before and after the
-// Go update. (See discussion at https://github.com/golang/go/issues/15651.)
+// Go update. (See discussion at https://golang.org/issue/15651.)
 //
 package gcexportdata
 
@@ -32,7 +29,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	gcimporter "golang.org/x/tools/go/gcimporter15"
+	"golang.org/x/tools/go/internal/gcimporter"
 )
 
 // Find returns the name of an object (.o) or archive (.a) file
@@ -44,7 +41,7 @@ import (
 //
 // Find also returns the package's resolved (canonical) import path,
 // reflecting the effects of srcDir and vendoring on importPath.
-func Find(importPath string, srcDir string) (filename, path string) {
+func Find(importPath, srcDir string) (filename, path string) {
 	return gcimporter.FindPkg(importPath, srcDir)
 }
 
@@ -88,6 +85,14 @@ func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, 
 		return gcimporter.ImportData(imports, path, path, bytes.NewReader(data))
 	}
 
+	// The indexed export format starts with an 'i'; the older
+	// binary export format starts with a 'c', 'd', or 'v'
+	// (from "version"). Select appropriate importer.
+	if len(data) > 0 && data[0] == 'i' {
+		_, pkg, err := gcimporter.IImportData(fset, imports, data[1:], path)
+		return pkg, err
+	}
+
 	_, pkg, err := gcimporter.BImportData(fset, imports, data, path)
 	return pkg, err
 }
@@ -95,6 +100,10 @@ func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, 
 // Write writes encoded type information for the specified package to out.
 // The FileSet provides file position information for named objects.
 func Write(out io.Writer, fset *token.FileSet, pkg *types.Package) error {
-	_, err := out.Write(gcimporter.BExportData(fset, pkg))
+	b, err := gcimporter.BExportData(fset, pkg)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(b)
 	return err
 }

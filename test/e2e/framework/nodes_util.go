@@ -394,3 +394,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 	}
 	wg.Wait()
 }
+
+func DeleteNodeOnCloudProvider(node *v1.Node) error {
+	return TestContext.CloudConfig.Provider.DeleteNode(node)
+}

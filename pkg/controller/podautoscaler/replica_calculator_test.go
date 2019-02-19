@@ -64,6 +64,7 @@ type metricType int
 
 const (
 	objectMetric metricType = iota
+	objectPerPodMetric
 	externalMetric
 	externalPerPodMetric
 	podMetric
@@ -384,6 +385,11 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
 		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector, nil)
+	case objectPerPodMetric:
+		if tc.metric.singleObject == nil {
+			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
+		}
+		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, nil)
 	case externalMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalMetric but metric.selector is nil.")
@@ -631,6 +637,26 @@ func TestReplicaCalcScaleUpCMObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpCMPerPodObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			metricType:              objectPerPodMetric,
+			name:                    "qps",
+			levels:                  []int64{20000},
+			perPodTargetUtilization: 5000,
+			expectedUtilization:     6667,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -742,6 +768,26 @@ func TestReplicaCalcScaleDownCM(t *testing.T) {
 			targetUtilization:   20000,
 			expectedUtilization: 12000,
 			metricType:          podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownPerPodCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                    "qps",
+			levels:                  []int64{6000},
+			perPodTargetUtilization: 2000,
+			expectedUtilization:     1200,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+			metricType: objectPerPodMetric,
 		},
 	}
 	tc.runTest(t)

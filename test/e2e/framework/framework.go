@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
+	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,6 +79,7 @@ type Framework struct {
 	KubemarkExternalClusterClientSet clientset.Interface
 	APIExtensionsClientSet           apiextensionsclient.Interface
 	CSIClientSet                     csi.Interface
+	NodeAPIClientSet                 nodeapiclient.Interface
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
@@ -196,6 +198,9 @@ func (f *Framework) BeforeEach() {
 		jsonConfig := config
 		jsonConfig.ContentType = "application/json"
 		f.CSIClientSet, err = csi.NewForConfig(jsonConfig)
+		Expect(err).NotTo(HaveOccurred())
+		// node.k8s.io is also based on CRD
+		f.NodeAPIClientSet, err = nodeapiclient.NewForConfig(jsonConfig)
 		Expect(err).NotTo(HaveOccurred())
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values

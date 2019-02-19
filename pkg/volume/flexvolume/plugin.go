@@ -23,15 +23,14 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
-
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -72,7 +71,7 @@ type pluginFactory struct{}
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
-	driverName := utilstrings.UnescapePluginName(name)
+	driverName := utilstrings.UnescapeQualifiedName(name)
 
 	flexPlugin := &flexVolumePlugin{
 		driverName:          driverName,
@@ -186,7 +185,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			pod.UID, utilstrings.EscapeQualifiedNameForDisk(sourceDriver), spec.Name()))
+			pod.UID, utilstrings.EscapeQualifiedName(sourceDriver), spec.Name()))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}
@@ -220,7 +219,7 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			podUID, utilstrings.EscapeQualifiedNameForDisk(plugin.driverName), volName))
+			podUID, utilstrings.EscapeQualifiedName(plugin.driverName), volName))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}
@@ -255,6 +254,10 @@ func (plugin *flexVolumeAttachablePlugin) NewDetacher() (volume.Detacher, error)
 
 func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return plugin.NewDetacher()
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.

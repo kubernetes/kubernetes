@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -50,7 +50,7 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	<-done
 	By("Verifying gpu job success")
 	t.verifyJobPodSuccess(f)
-	if upgrade == MasterUpgrade {
+	if upgrade == MasterUpgrade || upgrade == ClusterUpgrade {
 		// MasterUpgrade should be totally hitless.
 		job, err := framework.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
 		Expect(err).NotTo(HaveOccurred())

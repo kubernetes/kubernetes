@@ -38,13 +38,13 @@ func TestGetAPIServiceConditionByType(t *testing.T) {
 	}{
 		{
 			name:              "Should find a matching condition from apiService",
-			apiService:        makeNewApiService("v1", 100, conditionA, conditionB),
+			apiService:        makeNewAPIService("v1", 100, conditionA, conditionB),
 			conditionType:     a,
 			expectedCondition: &conditionA,
 		},
 		{
 			name:              "Should not find a matching condition",
-			apiService:        makeNewApiService("v1", 100, conditionA),
+			apiService:        makeNewAPIService("v1", 100, conditionA),
 			conditionType:     b,
 			expectedCondition: nil,
 		},
@@ -69,19 +69,19 @@ func TestIsAPIServiceConditionTrue(t *testing.T) {
 	}{
 		{
 			name:          "Should return false when condition of type is not present",
-			apiService:    makeNewApiService("v1", 100),
+			apiService:    makeNewAPIService("v1", 100),
 			conditionType: a,
 			expected:      false,
 		},
 		{
 			name:          "Should return false when condition of type is present but status is not ConditionTrue",
-			apiService:    makeNewApiService("v1", 100, conditionAFalse),
+			apiService:    makeNewAPIService("v1", 100, conditionAFalse),
 			conditionType: a,
 			expected:      false,
 		},
 		{
 			name:          "Should return false when condition of type is present but status is not ConditionTrue",
-			apiService:    makeNewApiService("v1", 100, conditionATrue),
+			apiService:    makeNewAPIService("v1", 100, conditionATrue),
 			conditionType: a,
 			expected:      true,
 		},
@@ -109,7 +109,7 @@ func TestSetAPIServiceCondition(t *testing.T) {
 	}{
 		{
 			name:              "Should set a new condition with type where previously there was no condition of that type",
-			apiService:        makeNewApiService("v1", 100),
+			apiService:        makeNewAPIService("v1", 100),
 			conditionType:     a,
 			initialCondition:  nil,
 			setCondition:      conditionA1,
@@ -117,7 +117,7 @@ func TestSetAPIServiceCondition(t *testing.T) {
 		},
 		{
 			name:              "Should override a condition of type, when a condition of that type existed previously",
-			apiService:        makeNewApiService("v1", 100, conditionA1),
+			apiService:        makeNewAPIService("v1", 100, conditionA1),
 			conditionType:     a,
 			initialCondition:  &conditionA1,
 			setCondition:      conditionA2,
@@ -175,7 +175,7 @@ func TestSortedAPIServicesByVersion(t *testing.T) {
 	for _, tc := range tests {
 		apiServices := make([]*APIService, 0)
 		for _, v := range tc.versions {
-			apiServices = append(apiServices, makeNewApiService(v, 100))
+			apiServices = append(apiServices, makeNewAPIService(v, 100))
 		}
 		sortedServices := SortedByGroupAndVersion(apiServices)
 		actual := make([]string, 0)
@@ -188,7 +188,7 @@ func TestSortedAPIServicesByVersion(t *testing.T) {
 	}
 }
 
-func makeNewApiService(version string, priority int32, conditions ...APIServiceCondition) *APIService {
+func makeNewAPIService(version string, priority int32, conditions ...APIServiceCondition) *APIService {
 	status := APIServiceStatus{Conditions: conditions}
 	return &APIService{Spec: APIServiceSpec{Version: version, VersionPriority: priority}, Status: status}
 }

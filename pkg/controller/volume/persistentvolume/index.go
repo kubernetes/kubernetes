@@ -185,7 +185,7 @@ func findMatchingVolume(
 			}
 		}
 
-		if isVolumeBoundToClaim(volume, claim) {
+		if IsVolumeBoundToClaim(volume, claim) {
 			// this claim and volume are pre-bound; return
 			// the volume if the size request is satisfied,
 			// otherwise continue searching for a match

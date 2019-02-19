@@ -35,11 +35,11 @@ source "${KUBE_ROOT}/test/cmd/certificate.sh"
 source "${KUBE_ROOT}/test/cmd/core.sh"
 source "${KUBE_ROOT}/test/cmd/crd.sh"
 source "${KUBE_ROOT}/test/cmd/create.sh"
+source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
-source "${KUBE_ROOT}/test/cmd/initializers.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/old-print.sh"
@@ -52,6 +52,7 @@ source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
 source "${KUBE_ROOT}/test/cmd/template-output.sh"
 source "${KUBE_ROOT}/test/cmd/version.sh"
+source "${KUBE_ROOT}/test/cmd/wait.sh"
 
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -492,6 +493,13 @@ runTests() {
     record_command run_create_secret_tests
   fi
 
+  ######################
+  # Delete             #
+  ######################
+  if kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_kubectl_delete_allnamespaces_tests
+  fi
+
   ##################
   # Global timeout #
   ##################
@@ -832,6 +840,12 @@ runTests() {
   # Impersonation #
   #################
   record_command run_impersonation_tests
+
+  ####################
+  # kubectl wait     #
+  ####################
+
+  record_command run_wait_tests
 
   kube::test::clear_all
 

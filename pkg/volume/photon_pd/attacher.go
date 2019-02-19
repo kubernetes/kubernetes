@@ -293,7 +293,7 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 		select {
 		case <-ticker.C:
 			klog.V(4).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
+			if pathExists, err := mount.PathExists(devicePath); err != nil {
 				return fmt.Errorf("Error checking if device path exists: %v", err)
 			} else if !pathExists {
 				return nil
@@ -305,5 +305,9 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 }
 
 func (detacher *photonPersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
+}
+
+func (plugin *photonPersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }

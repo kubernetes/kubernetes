@@ -79,8 +79,6 @@ type GetOptions struct {
 	IgnoreNotFound bool
 	Export         bool
 
-	IncludeUninitialized bool
-
 	genericclioptions.IOStreams
 }
 
@@ -119,6 +117,9 @@ var (
 
 		# Return only the phase value of the specified pod.
 		kubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}
+
+		# List resource information in custom columns.
+		kubectl get pod test-pod -o custom-columns=CONTAINER:.spec.containers[0].name,IMAGE:.spec.containers[0].image
 
 		# List all replication controllers and services together in ps output format.
 		kubectl get rc,services
@@ -177,6 +178,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	addOpenAPIPrintColumnFlags(cmd, o)
 	addServerPrintColumnFlags(cmd, o)
 	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
+	cmd.Flags().MarkDeprecated("export", "This flag is deprecated and will be removed in future.")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	return cmd
 }
@@ -224,8 +226,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.IsHumanReadablePrinter = true
 	}
 
-	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
-
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -256,9 +256,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	switch {
 	case o.Watch || o.WatchOnly:
-		// include uninitialized objects when watching on a single object
-		// unless explicitly set --include-uninitialized=false
-		o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestAPIResources(o.CmdParent))
@@ -428,7 +425,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FieldSelectorParam(o.FieldSelector).
 		ExportParam(o.Export).
 		RequestChunksOf(chunkSize).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -613,7 +609,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		FieldSelectorParam(o.FieldSelector).
 		ExportParam(o.Export).
 		RequestChunksOf(o.ChunkSize).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

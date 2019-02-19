@@ -39,11 +39,11 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -484,6 +484,10 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
+func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) bool {
+	return true
+}
+
 func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	return nil
 }
@@ -634,6 +638,10 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (Detacher, error) {
 	return f.Plugin.NewDetacher()
 }
 
+func (f *FakeAttachableVolumePlugin) CanAttach(spec *Spec) bool {
+	return true
+}
+
 var _ VolumePlugin = &FakeAttachableVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeAttachableVolumePlugin{}
 
@@ -765,7 +773,7 @@ func (fv *FakeVolume) GetPath() string {
 }
 
 func (fv *FakeVolume) getPath() string {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
+	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName), fv.VolName))
 }
 
 func (fv *FakeVolume) TearDown() error {
@@ -810,7 +818,7 @@ func (fv *FakeVolume) GetGlobalMapPath(spec *Spec) (string, error) {
 
 // Block volume support
 func (fv *FakeVolume) getGlobalMapPath() (string, error) {
-	return path.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedNameForDisk(fv.Plugin.PluginName)), "pluginDependentPath"), nil
+	return path.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "pluginDependentPath"), nil
 }
 
 // Block volume support
@@ -830,7 +838,7 @@ func (fv *FakeVolume) GetPodDeviceMapPath() (string, string) {
 
 // Block volume support
 func (fv *FakeVolume) getPodDeviceMapPath() (string, string) {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilstrings.EscapeQualifiedNameForDisk(fv.Plugin.PluginName))), fv.VolName
+	return path.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName))), fv.VolName
 }
 
 // Block volume support

@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
