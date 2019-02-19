@@ -194,4 +194,3 @@ func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
 		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
 	}
 }
->>>>>>> Retool HTTP and UDP e2e utils
