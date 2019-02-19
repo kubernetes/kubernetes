@@ -706,6 +706,4 @@ test/integration/master
 test/integration/replicaset
 test/integration/replicationcontroller
 test/integration/scheduler
-test/integration/scheduler_perf
-test/integration/volume
 test/utils
