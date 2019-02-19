@@ -681,6 +681,12 @@ items:
     verbs:
     - list
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
