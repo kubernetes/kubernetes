@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 )
 
 // This Pod's /checknosnat takes `target` and `ips` arguments, and queries {target}/checknosnat?ips={ips}

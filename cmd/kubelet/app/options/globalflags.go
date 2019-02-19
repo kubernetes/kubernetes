@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	// libs that provide registration functions
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	// ensure libs have a chance to globally register their flags

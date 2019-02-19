@@ -467,22 +467,6 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 	return fmt.Sprintf("phase: %s, bound to: %q, boundByController: %v", volume.Status.Phase, claimName, boundByController)
 }
 
-// isVolumeBoundToClaim returns true, if given volume is pre-bound or bound
-// to specific claim. Both claim.Name and claim.Namespace must be equal.
-// If claim.UID is present in volume.Spec.ClaimRef, it must be equal too.
-func isVolumeBoundToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) bool {
-	if volume.Spec.ClaimRef == nil {
-		return false
-	}
-	if claim.Name != volume.Spec.ClaimRef.Name || claim.Namespace != volume.Spec.ClaimRef.Namespace {
-		return false
-	}
-	if volume.Spec.ClaimRef.UID != "" && claim.UID != volume.Spec.ClaimRef.UID {
-		return false
-	}
-	return true
-}
-
 // storeObjectUpdate updates given cache with a new object version from Informer
 // callback (i.e. with events from etcd) or with an object modified by the
 // controller itself. Returns "true", if the cache was updated, false if the

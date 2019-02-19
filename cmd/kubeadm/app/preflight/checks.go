@@ -973,11 +973,11 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 }
 
 // RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
-func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
 	// Check ipvs required kernel module if we use ipvs kube-proxy mode
-	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks,
 			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)

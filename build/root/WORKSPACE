@@ -4,8 +4,8 @@ load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "7be7dc01f1e0afdba6c8eb2b43d2fa01c743be1b9273ab1eaf6c233df078d705",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"),
+    sha256 = "ade51a315fa17347e5c31201fdc55aa5ffb913377aa315dceb56ee9725e620ee",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.16.6/rules_go-0.16.6.tar.gz"),
 )
 
 http_archive(
@@ -49,7 +49,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_reposit
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.11.4",
+    go_version = "1.11.5",
 )
 
 docker_repositories()

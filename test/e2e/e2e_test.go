@@ -32,6 +32,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/apps"
 	_ "k8s.io/kubernetes/test/e2e/auth"
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
+	_ "k8s.io/kubernetes/test/e2e/cloud"
 	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"

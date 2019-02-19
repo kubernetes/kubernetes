@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
@@ -326,6 +327,12 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 					klog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
 				}
 
+			} else {
+				addErr := actualStateOfWorld.MarkVolumeAsUncertain(
+					v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+				if addErr != nil {
+					klog.Errorf("AttachVolume.MarkVolumeAsUncertain fail to add the volume %q to actual state with %s", volumeToAttach.VolumeName, addErr)
+				}
 			}
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
@@ -1436,4 +1443,33 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 		}
 	}
 	return deviceOpened, nil
+}
+
+// TODO(dyzz): need to also add logic to check CSINodeInfo for Kubelet migration status
+func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+	if csilib.IsPVMigratable(spec.PersistentVolume) || csilib.IsInlineMigratable(spec.Volume) {
+		migratable, err := vpm.IsPluginMigratableBySpec(spec)
+		if err == nil && migratable {
+			return true
+		}
+	}
+	return false
+}
+
+func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
+	if spec.PersistentVolume != nil {
+		// TranslateInTreePVToCSI will create a new PV
+		csiPV, err := csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
+		}
+		return &volume.Spec{
+			PersistentVolume: csiPV,
+			ReadOnly:         spec.ReadOnly,
+		}, nil
+	} else if spec.Volume != nil {
+		return &volume.Spec{}, fmt.Errorf("translation is not supported for in-line volumes yet")
+	} else {
+		return &volume.Spec{}, fmt.Errorf("not a valid volume spec")
+	}
 }

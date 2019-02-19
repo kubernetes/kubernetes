@@ -33,9 +33,9 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
-	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
+	utilio "k8s.io/utils/io"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -229,7 +229,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 }
 
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
+	return isNotMountPoint(mounter, dir)
 }
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
@@ -417,7 +417,7 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 }
 
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilfile.FileExists(pathname)
+	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
 func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
@@ -757,7 +757,7 @@ func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	notMount, err := mounter.IsNotMountPoint(bindPathTarget)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)

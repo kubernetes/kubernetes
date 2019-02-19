@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestSecretCredentialManager_GetCredential(t *testing.T) {
@@ -184,7 +183,8 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 		},
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	// TODO: replace 0 with NoResyncPeriodFunc() once it moved out pkg/controller/controller_utils.go in k/k.
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	secretInformer := informerFactory.Core().V1().Secrets()
 	secretCredentialManager := &SecretCredentialManager{
 		SecretName:      secretName,
@@ -204,7 +204,10 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 			t.Fatal("Failed to get all secrets from sharedInformer. error: ", err)
 		}
 		for _, secret := range secrets {
-			secretInformer.Informer().GetIndexer().Delete(secret)
+			err := secretInformer.Informer().GetIndexer().Delete(secret)
+			if err != nil {
+				t.Fatalf("Failed to delete secret from informer: %v", err)
+			}
 		}
 	}
 

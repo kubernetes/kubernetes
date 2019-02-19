@@ -46,7 +46,7 @@ import (
 func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	var lock sync.RWMutex
 	count := 0
-	filter := func(string, labels.Set, fields.Set, bool) bool { return true }
+	filter := func(string, labels.Set, fields.Set) bool { return true }
 	forget := func(bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -70,7 +70,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 }
 
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
-	filter := func(_ string, _ labels.Set, field fields.Set, _ bool) bool {
+	filter := func(_ string, _ labels.Set, field fields.Set) bool {
 		return field["spec.nodeName"] == "host"
 	}
 	forget := func(bool) {}
@@ -240,7 +240,7 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner) {
 		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   func(obj runtime.Object) (labels.Set, fields.Set, bool, error) { return nil, nil, true, nil },
+		GetAttrsFunc:   func(obj runtime.Object) (labels.Set, fields.Set, error) { return nil, nil, nil },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}

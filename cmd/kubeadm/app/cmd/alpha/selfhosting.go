@@ -125,7 +125,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			phases.SetKubernetesVersion(cfg)
+			phases.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -141,7 +141,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	// Add flags to the command
 	// flags bound to the configuration object
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, `The path where certificates are stored`)
-	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 
 	cmd.Flags().BoolVarP(
 		&certsInSecrets, "store-certs-in-secrets", "s",

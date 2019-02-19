@@ -58,8 +58,9 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
+	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set DefaultMode on files [NodeConformance]", func() {
+	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
@@ -73,8 +74,9 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
+	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set mode on item file [NodeConformance]", func() {
+	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)

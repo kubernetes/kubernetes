@@ -104,10 +104,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		oldMeta.SetInitializers(nil)
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	oldMeta.SetInitializers(nil)
+	objectMeta.SetInitializers(nil)
+
+	// Ensure managedFields state is removed unless ServerSideApply is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		oldMeta.SetManagedFields(nil)
+		objectMeta.SetManagedFields(nil)
 	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)

@@ -51,7 +51,7 @@ func TestSetKubernetesVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta1.InitConfiguration{ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{KubernetesVersion: test.input}}
+			cfg := &kubeadmapiv1beta1.ClusterConfiguration{KubernetesVersion: test.input}
 			SetKubernetesVersion(cfg)
 			if cfg.KubernetesVersion != test.output {
 				t.Fatalf("expected %q, got %q", test.output, cfg.KubernetesVersion)

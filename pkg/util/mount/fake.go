@@ -137,7 +137,7 @@ func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 }
 
 func (f *FakeMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(f, dir)
+	return isNotMountPoint(f, dir)
 }
 
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {

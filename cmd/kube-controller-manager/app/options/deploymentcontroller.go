@@ -19,14 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // DeploymentControllerOptions holds the DeploymentController options.
 type DeploymentControllerOptions struct {
-	ConcurrentDeploymentSyncs      int32
-	DeploymentControllerSyncPeriod metav1.Duration
+	*kubectrlmgrconfig.DeploymentControllerConfiguration
 }
 
 // AddFlags adds flags related to DeploymentController for controller manager to the specified FlagSet.

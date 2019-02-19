@@ -247,6 +247,33 @@ func TestVolumeCountConflicts(t *testing.T) {
 			},
 		},
 	}
+	twoVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp1"},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp2"},
+					},
+				},
+			},
+		},
+	}
+	oneVolCinderPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{VolumeID: "ovp"},
+					},
+				},
+			},
+		},
+	}
 
 	tests := []struct {
 		newPod       *v1.Pod
@@ -739,6 +766,23 @@ func TestVolumeCountConflicts(t *testing.T) {
 			fits:         true,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
+		// filterName:CinderVolumeFilterType
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's Cinder volumes",
+		},
+		{
+			newPod:       oneVolCinderPod,
+			existingPods: []*v1.Pod{twoVolCinderPod},
+			filterName:   CinderVolumeFilterType,
+			maxVols:      2,
+			fits:         false,
+			test:         "not fit when node capacity < new pod's Cinder volumes",
+		},
 	}
 
 	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
@@ -916,6 +960,8 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case AzureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}

@@ -89,4 +89,5 @@ spec:
       # END_PROMETHEUS_TO_SD
       nodeSelector:
         beta.kubernetes.io/metadata-proxy-ready: "true"
+        beta.kubernetes.io/os: linux
       terminationGracePeriodSeconds: 30

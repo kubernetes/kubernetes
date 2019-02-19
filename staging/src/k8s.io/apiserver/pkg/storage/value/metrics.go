@@ -33,8 +33,20 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
+			Name:      "transformation_latencies_seconds",
+			Help:      "Latencies in seconds of value transformation operations.",
+			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
+			// external KMS is involved latencies may climb into milliseconds.
+			Buckets: prometheus.ExponentialBuckets(5e-6, 2, 14),
+		},
+		[]string{"transformation_type"},
+	)
+	deprecatedTransformerLatencies = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      "transformation_latencies_microseconds",
-			Help:      "Latencies in microseconds of value transformation operations.",
+			Help:      "(Deprecated) Latencies in microseconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
 			Buckets: prometheus.ExponentialBuckets(5, 2, 14),
@@ -64,8 +76,17 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
+			Name:      "data_key_generation_latencies_seconds",
+			Help:      "Latencies in seconds of data encryption key(DEK) generation operations.",
+			Buckets:   prometheus.ExponentialBuckets(5e-6, 2, 14),
+		},
+	)
+	deprecatedDataKeyGenerationLatencies = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      "data_key_generation_latencies_microseconds",
-			Help:      "Latencies in microseconds of data encryption key(DEK) generation operations.",
+			Help:      "(Deprecated) Latencies in microseconds of data encryption key(DEK) generation operations.",
 			Buckets:   prometheus.ExponentialBuckets(5, 2, 14),
 		},
 	)
@@ -84,9 +105,11 @@ var registerMetrics sync.Once
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(transformerLatencies)
+		prometheus.MustRegister(deprecatedTransformerLatencies)
 		prometheus.MustRegister(transformerFailuresTotal)
 		prometheus.MustRegister(envelopeTransformationCacheMissTotal)
 		prometheus.MustRegister(dataKeyGenerationLatencies)
+		prometheus.MustRegister(deprecatedDataKeyGenerationLatencies)
 		prometheus.MustRegister(dataKeyGenerationFailuresTotal)
 	})
 }
@@ -98,8 +121,8 @@ func RecordTransformation(transformationType string, start time.Time, err error)
 		return
 	}
 
-	since := sinceInMicroseconds(start)
-	transformerLatencies.WithLabelValues(transformationType).Observe(float64(since))
+	transformerLatencies.WithLabelValues(transformationType).Observe(sinceInSeconds(start))
+	deprecatedTransformerLatencies.WithLabelValues(transformationType).Observe(sinceInMicroseconds(start))
 }
 
 // RecordCacheMiss records a miss on Key Encryption Key(KEK) - call to KMS was required to decrypt KEK.
@@ -114,11 +137,16 @@ func RecordDataKeyGeneration(start time.Time, err error) {
 		return
 	}
 
-	since := sinceInMicroseconds(start)
-	dataKeyGenerationLatencies.Observe(float64(since))
+	dataKeyGenerationLatencies.Observe(sinceInSeconds(start))
+	deprecatedDataKeyGenerationLatencies.Observe(sinceInMicroseconds(start))
 }
 
-func sinceInMicroseconds(start time.Time) int64 {
-	elapsedNanoseconds := time.Since(start).Nanoseconds()
-	return elapsedNanoseconds / int64(time.Microsecond)
+// sinceInMicroseconds gets the time since the specified start in microseconds.
+func sinceInMicroseconds(start time.Time) float64 {
+	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+// sinceInSeconds gets the time since the specified start in seconds.
+func sinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }

@@ -20,6 +20,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudfeatures "k8s.io/cloud-provider/features"
 )
 
 const (
@@ -121,6 +122,7 @@ const (
 	// owner: @bsalamat
 	// alpha: v1.8
 	// beta: v1.11
+	// GA: v1.14
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
@@ -161,6 +163,7 @@ const (
 
 	// owner: @derekwaynecarr
 	// beta: v1.10
+	// GA: v1.14
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
@@ -206,7 +209,7 @@ const (
 	CSINodeInfo utilfeature.Feature = "CSINodeInfo"
 
 	// owner @MrHohn
-	// beta: v1.10
+	// GA: v1.14
 	//
 	// Support configurable pod DNS parameters.
 	CustomPodDNS utilfeature.Feature = "CustomPodDNS"
@@ -280,12 +283,6 @@ const (
 	//
 	// Enable container log rotation for cri container runtime
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
-
-	// owner: @verult
-	// GA: v1.13
-	//
-	// Enables the regional PD feature on GCE.
-	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
 
 	// owner: @krmayankk
 	// alpha: v1.10
@@ -390,6 +387,24 @@ const (
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the in-tree storage to CSI Plugin migration feature.
+	CSIMigration utilfeature.Feature = "CSIMigration"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
+	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
+
+	// owner: @leakingtapan
+	// alpha: v1.14
+	//
+	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
+	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
 )
 
 func init() {
@@ -410,11 +425,11 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
-	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	HugePages:                                   {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
-	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.GA},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.14
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
@@ -429,7 +444,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
 	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
+	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	BlockVolume:                                 {Default: true, PreRelease: utilfeature.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
@@ -441,7 +456,10 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
+	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA},
+	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
@@ -461,12 +479,13 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
 	genericfeatures.DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

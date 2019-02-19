@@ -27,20 +27,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -100,31 +96,9 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		return false, nil
-	}
-	oldMeta, err := meta.Accessor(old)
-	if err != nil {
-		return false, err
-	}
-	oldInitializers := oldMeta.GetInitializers()
-	if oldInitializers != nil && len(oldInitializers.Pending) != 0 {
-		return true, nil
-	}
-	return false, nil
-}
-
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePod(obj.(*api.Pod))
-	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
-	if err != nil {
-		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
-	}
-	if uninitializedUpdate {
-		return errorList
-	}
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
@@ -193,25 +167,16 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	var errorList field.ErrorList
-	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
-	if err != nil {
-		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
-	}
-	if uninitializedUpdate {
-		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
-	}
-	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a pod")
+		return nil, nil, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.

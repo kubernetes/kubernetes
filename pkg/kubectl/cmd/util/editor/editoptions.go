@@ -177,10 +177,8 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
 		ContinueOnError().
 		Flatten().
 		Do()
@@ -195,7 +193,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 		return f.NewBuilder().
 			Unstructured().
 			Stream(bytes.NewReader(data), "edited-file").
-			IncludeUninitialized(includeUninitialized).
 			ContinueOnError().
 			Flatten().
 			Do()

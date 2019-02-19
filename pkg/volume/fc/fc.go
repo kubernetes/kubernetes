@@ -29,10 +29,10 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -83,6 +83,10 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
+}
+
+func (plugin *fcPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *fcPlugin) RequiresRemount() bool {
@@ -356,7 +360,7 @@ type fcDisk struct {
 
 func (fc *fcDisk) GetPath() string {
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(fcPluginName), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName), fc.volName)
 }
 
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -369,7 +373,7 @@ func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 }
 
 func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
-	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(fcPluginName)), fc.volName
+	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName)), fc.volName
 }
 
 type fcDiskMounter struct {
@@ -427,7 +431,7 @@ func (c *fcDiskUnmounter) TearDown() error {
 }
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 // Block Volumes Support

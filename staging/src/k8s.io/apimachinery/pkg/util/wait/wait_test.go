@@ -17,6 +17,7 @@ limitations under the License.
 package wait
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -48,6 +49,26 @@ func TestUntil(t *testing.T) {
 	<-called
 }
 
+func TestUntilWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	UntilWithContext(ctx, func(context.Context) {
+		t.Fatal("should not have been invoked")
+	}, 0)
+
+	ctx, cancel = context.WithCancel(context.TODO())
+	called := make(chan struct{})
+	go func() {
+		UntilWithContext(ctx, func(context.Context) {
+			called <- struct{}{}
+		}, 0)
+		close(called)
+	}()
+	<-called
+	cancel()
+	<-called
+}
+
 func TestNonSlidingUntil(t *testing.T) {
 	ch := make(chan struct{})
 	close(ch)
@@ -65,6 +86,26 @@ func TestNonSlidingUntil(t *testing.T) {
 	}()
 	<-called
 	close(ch)
+	<-called
+}
+
+func TestNonSlidingUntilWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	NonSlidingUntilWithContext(ctx, func(context.Context) {
+		t.Fatal("should not have been invoked")
+	}, 0)
+
+	ctx, cancel = context.WithCancel(context.TODO())
+	called := make(chan struct{})
+	go func() {
+		NonSlidingUntilWithContext(ctx, func(context.Context) {
+			called <- struct{}{}
+		}, 0)
+		close(called)
+	}()
+	<-called
+	cancel()
 	<-called
 }
 
@@ -98,6 +139,26 @@ func TestJitterUntil(t *testing.T) {
 	}()
 	<-called
 	close(ch)
+	<-called
+}
+
+func TestJitterUntilWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+	JitterUntilWithContext(ctx, func(context.Context) {
+		t.Fatal("should not have been invoked")
+	}, 0, 1.0, true)
+
+	ctx, cancel = context.WithCancel(context.TODO())
+	called := make(chan struct{})
+	go func() {
+		JitterUntilWithContext(ctx, func(context.Context) {
+			called <- struct{}{}
+		}, 0, 1.0, true)
+		close(called)
+	}()
+	<-called
+	cancel()
 	<-called
 }
 

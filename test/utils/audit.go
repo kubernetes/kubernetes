@@ -25,11 +25,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 )
 
+// AuditEvent is a simplified representation of an audit event for testing purposes
 type AuditEvent struct {
+	ID                 types.UID
 	Level              auditinternal.Level
 	Stage              auditinternal.Stage
 	RequestURI         string
@@ -45,17 +48,21 @@ type AuditEvent struct {
 	AuthorizeDecision  string
 }
 
-// Search the audit log for the expected audit lines.
+// CheckAuditLines searches the audit log for the expected audit lines.
+// if includeID is true the event ids will also be verified
 func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.GroupVersion) (missing []AuditEvent, err error) {
-	expectations := map[AuditEvent]bool{}
-	for _, event := range expected {
-		expectations[event] = false
-	}
+	expectations := buildEventExpectations(expected)
 
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		line := scanner.Text()
-		event, err := parseAuditLine(line, version)
+		e := &auditinternal.Event{}
+		decoder := audit.Codecs.UniversalDecoder(version)
+		if err := runtime.DecodeInto(decoder, []byte(line), e); err != nil {
+			return expected, fmt.Errorf("failed decoding buf: %s, apiVersion: %s", line, version)
+		}
+
+		event, err := testEventFromInternal(e)
 		if err != nil {
 			return expected, err
 		}
@@ -69,22 +76,65 @@ func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.Gro
 		return expected, err
 	}
 
-	missing = make([]AuditEvent, 0)
-	for event, found := range expectations {
-		if !found {
-			missing = append(missing, event)
-		}
-	}
+	missing = findMissing(expectations)
 	return missing, nil
 }
 
-func parseAuditLine(line string, version schema.GroupVersion) (AuditEvent, error) {
-	e := &auditinternal.Event{}
-	decoder := audit.Codecs.UniversalDecoder(version)
-	if err := runtime.DecodeInto(decoder, []byte(line), e); err != nil {
-		return AuditEvent{}, fmt.Errorf("failed decoding buf: %s, apiVersion: %s", line, version)
+// CheckAuditList searches an audit event list for the expected audit events.
+// if includeID is true the event ids will also be verified
+func CheckAuditList(el auditinternal.EventList, expected []AuditEvent) (missing []AuditEvent, err error) {
+	expectations := buildEventExpectations(expected)
+
+	for _, e := range el.Items {
+		event, err := testEventFromInternal(&e)
+		if err != nil {
+			return expected, err
+		}
+
+		// If the event was expected, mark it as found.
+		if _, found := expectations[event]; found {
+			expectations[event] = true
+		}
 	}
 
+	missing = findMissing(expectations)
+	return missing, nil
+}
+
+// CheckForDuplicates checks a list for duplicate events
+func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, error) {
+	// eventMap holds a map of audit events with just a nil value
+	eventMap := map[AuditEvent]*bool{}
+	duplicates := auditinternal.EventList{}
+	var err error
+	for _, e := range el.Items {
+		event, err := testEventFromInternal(&e)
+		if err != nil {
+			return duplicates, err
+		}
+		event.ID = e.AuditID
+		if _, ok := eventMap[event]; ok {
+			duplicates.Items = append(duplicates.Items, e)
+			err = fmt.Errorf("failed duplicate check")
+			continue
+		}
+		eventMap[event] = nil
+	}
+	return duplicates, err
+}
+
+// buildEventExpectations creates a bool map out of a list of audit events
+func buildEventExpectations(expected []AuditEvent) map[AuditEvent]bool {
+	expectations := map[AuditEvent]bool{}
+	for _, event := range expected {
+		expectations[event] = false
+	}
+	return expectations
+}
+
+// testEventFromInternal takes an internal audit event and returns a test event
+// if includeID is true the event id will be included
+func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
 	event := AuditEvent{
 		Level:      e.Level,
 		Stage:      e.Stage,
@@ -112,4 +162,15 @@ func parseAuditLine(line string, version schema.GroupVersion) (AuditEvent, error
 	}
 	event.AuthorizeDecision = e.Annotations["authorization.k8s.io/decision"]
 	return event, nil
+}
+
+// findMissing checks for false values in the expectations map and returns them as a list
+func findMissing(expectations map[AuditEvent]bool) []AuditEvent {
+	var missing []AuditEvent
+	for event, found := range expectations {
+		if !found {
+			missing = append(missing, event)
+		}
+	}
+	return missing
 }

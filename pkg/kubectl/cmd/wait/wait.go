@@ -90,6 +90,8 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
+			WithFieldSelector("").
+			WithAll(false).
 			WithAllNamespaces(false).
 			WithAll(false).
 			WithLatest(),
@@ -105,11 +107,12 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "wait resource.group/name [--for=delete|--for condition=available]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
+		Short:   "Experimental: Wait for a specific condition on one or many resources.",
+		Long:    waitLong,
+		Example: waitExample,
+
 		DisableFlagsInUseLine: true,
-		Short:                 "Experimental: Wait for a specific condition on one or many resources.",
-		Long:                  waitLong,
-		Example:               waitExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)

@@ -48,7 +48,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -91,12 +90,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/flock"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/nsenter"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	"k8s.io/utils/exec"
+	"k8s.io/utils/nsenter"
 )
 
 const (
@@ -369,7 +369,10 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		}
 		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
 		// an exec interface which can use nsenter for flex plugin calls
-		pluginRunner = nsenter.NewNsenterExecutor(nsenter.DefaultHostRootFsPath, exec.New())
+		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var dockerClientConfig *dockershim.ClientConfig
@@ -542,12 +545,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	switch {
 	case standaloneMode:
 		kubeDeps.KubeClient = nil
-		kubeDeps.DynamicKubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
 		klog.Warningf("standalone mode, no API client")
 
-	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil, kubeDeps.DynamicKubeClient == nil:
+	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
 		clientConfig, closeAllConns, err := buildKubeletClientConfig(s, nodeName)
 		if err != nil {
 			return err
@@ -557,11 +559,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet client: %v", err)
-		}
-
-		kubeDeps.DynamicKubeClient, err = dynamic.NewForConfig(clientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet dynamic client: %v", err)
 		}
 
 		// make a separate client for events
@@ -590,11 +587,16 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 
 		// CRDs are JSON only, and client renegotiation for streaming is not correct as per #67803
-		csiClientConfig := restclient.CopyConfig(clientConfig)
-		csiClientConfig.ContentType = "application/json"
-		kubeDeps.CSIClient, err = csiclientset.NewForConfig(csiClientConfig)
+		crdClientConfig := restclient.CopyConfig(clientConfig)
+		crdClientConfig.ContentType = "application/json"
+		kubeDeps.CSIClient, err = csiclientset.NewForConfig(crdClientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet storage client: %v", err)
+		}
+
+		kubeDeps.NodeAPIClient, err = nodeapiclientset.NewForConfig(crdClientConfig)
+		if err != nil {
+			return fmt.Errorf("failed to initialize kubelet node-api client: %v", err)
 		}
 	}
 

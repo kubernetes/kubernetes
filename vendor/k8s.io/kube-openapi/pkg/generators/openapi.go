@@ -336,6 +336,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		}
 		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
 		g.generateDescription(t.CommentLines)
+		g.Do("Type: []string{\"object\"},\n", nil)
 		g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
 		required, err := g.generateMembers(t, []string{})
 		if err != nil {

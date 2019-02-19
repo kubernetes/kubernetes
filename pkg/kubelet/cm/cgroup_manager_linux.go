@@ -327,9 +327,7 @@ func getSupportedSubsystems() map[subsystem]bool {
 		&cgroupfs.CpuGroup{}:    true,
 	}
 	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-		supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
-	}
+	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) {
 		supportedSubsystems[&cgroupfs.PidsGroup{}] = true
 	}
@@ -385,27 +383,25 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 		}
 	}
 	// if huge pages are enabled, we set them in libcontainer
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-		// for each page size enumerated, set that value
-		pageSizes := sets.NewString()
-		for pageSize, limit := range resourceConfig.HugePageLimit {
-			sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, hugePageSizeList)
-			resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
-				Pagesize: sizeString,
-				Limit:    uint64(limit),
-			})
-			pageSizes.Insert(sizeString)
+	// for each page size enumerated, set that value
+	pageSizes := sets.NewString()
+	for pageSize, limit := range resourceConfig.HugePageLimit {
+		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, hugePageSizeList)
+		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
+			Pagesize: sizeString,
+			Limit:    uint64(limit),
+		})
+		pageSizes.Insert(sizeString)
+	}
+	// for each page size omitted, limit to 0
+	for _, pageSize := range cgroupfs.HugePageSizes {
+		if pageSizes.Has(pageSize) {
+			continue
 		}
-		// for each page size omitted, limit to 0
-		for _, pageSize := range cgroupfs.HugePageSizes {
-			if pageSizes.Has(pageSize) {
-				continue
-			}
-			resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
-				Pagesize: pageSize,
-				Limit:    uint64(0),
-			})
-		}
+		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
+			Pagesize: pageSize,
+			Limit:    uint64(0),
+		})
 	}
 	return resources
 }
@@ -435,7 +431,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PodPidsLimit
 	}
 
@@ -465,7 +461,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PodPidsLimit
 	}
 

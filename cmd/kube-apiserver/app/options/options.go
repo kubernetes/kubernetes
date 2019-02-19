@@ -212,11 +212,6 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
 
-	// TODO: delete this flag in 1.13
-	repair := false
-	fs.BoolVar(&repair, "repair-malformed-updates", false, "deprecated")
-	fs.MarkDeprecated("repair-malformed-updates", "This flag will be removed in a future version")
-
 	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
 		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
 		"when it must call out during a request. This includes proxying requests to a user "+

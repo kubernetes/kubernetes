@@ -129,6 +129,47 @@ type Config struct {
 	// Version string
 }
 
+var _ fmt.Stringer = new(Config)
+var _ fmt.GoStringer = new(Config)
+
+type sanitizedConfig *Config
+
+type sanitizedAuthConfigPersister struct{ AuthProviderConfigPersister }
+
+func (sanitizedAuthConfigPersister) GoString() string {
+	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
+}
+func (sanitizedAuthConfigPersister) String() string {
+	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
+}
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of Config
+// to prevent accidental leaking via logs.
+func (c *Config) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of Config to
+// prevent accidental leaking via logs.
+func (c *Config) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	cc := sanitizedConfig(CopyConfig(c))
+	// Explicitly mark non-empty credential fields as redacted.
+	if cc.Password != "" {
+		cc.Password = "--- REDACTED ---"
+	}
+	if cc.BearerToken != "" {
+		cc.BearerToken = "--- REDACTED ---"
+	}
+	if cc.AuthConfigPersister != nil {
+		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
+	}
+
+	return fmt.Sprintf("%#v", cc)
+}
+
 // ImpersonationConfig has all the available impersonation options
 type ImpersonationConfig struct {
 	// UserName is the username to impersonate on each request.
@@ -166,6 +207,40 @@ type TLSClientConfig struct {
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
+}
+
+var _ fmt.Stringer = TLSClientConfig{}
+var _ fmt.GoStringer = TLSClientConfig{}
+
+type sanitizedTLSClientConfig TLSClientConfig
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of
+// TLSClientConfig to prevent accidental leaking via logs.
+func (c TLSClientConfig) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of
+// TLSClientConfig to prevent accidental leaking via logs.
+func (c TLSClientConfig) String() string {
+	cc := sanitizedTLSClientConfig{
+		Insecure:   c.Insecure,
+		ServerName: c.ServerName,
+		CertFile:   c.CertFile,
+		KeyFile:    c.KeyFile,
+		CAFile:     c.CAFile,
+		CertData:   c.CertData,
+		KeyData:    c.KeyData,
+		CAData:     c.CAData,
+	}
+	// Explicitly mark non-empty credential fields as redacted.
+	if len(cc.CertData) != 0 {
+		cc.CertData = []byte("--- TRUNCATED ---")
+	}
+	if len(cc.KeyData) != 0 {
+		cc.KeyData = []byte("--- REDACTED ---")
+	}
+	return fmt.Sprintf("%#v", cc)
 }
 
 type ContentConfig struct {

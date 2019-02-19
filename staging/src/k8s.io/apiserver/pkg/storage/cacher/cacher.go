@@ -39,8 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // Config contains the configuration for a given Cache.
@@ -62,8 +62,8 @@ type Config struct {
 	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
-	// GetAttrsFunc is used to get object labels, fields, and the uninitialized bool
-	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error)
+	// GetAttrsFunc is used to get object labels, fields
+	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, err error)
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -131,7 +131,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -458,7 +458,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
+		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -532,7 +532,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
+		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -693,11 +693,11 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 }
 
 func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesObjectAttributes(label, field, uninitialized)
+		return p.MatchesObjectAttributes(label, field)
 	}
 	return filterFunc
 }
@@ -871,10 +871,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.ObjUninitialized)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObjUninitialized)
+		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.

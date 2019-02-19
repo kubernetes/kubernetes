@@ -1237,7 +1237,7 @@ message ContainerStats {
     CpuUsage cpu = 2;
     // Memory usage gathered from the container.
     MemoryUsage memory = 3;
-    // Usage of the writeable layer.
+    // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
 }
 

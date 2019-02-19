@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
@@ -134,6 +134,20 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			}
 		}
 
+		if scope.FieldManager != nil {
+			liveObj, err := scope.Creater.New(scope.Kind)
+			if err != nil {
+				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
+				return
+			}
+
+			obj, err = scope.FieldManager.Update(liveObj, obj, prefixFromUserAgent(req.UserAgent()))
+			if err != nil {
+				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
+				return
+			}
+		}
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Create(
@@ -150,13 +164,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 		trace.Step("Object stored in database")
 
-		// If the object is partially initialized, always indicate it via StatusAccepted
 		code := http.StatusCreated
-		if accessor, err := meta.Accessor(result); err == nil {
-			if accessor.GetInitializers() != nil {
-				code = http.StatusAccepted
-			}
-		}
 		status, ok := result.(*metav1.Status)
 		if ok && err == nil && status.Code == 0 {
 			status.Code = int32(code)
@@ -183,4 +191,8 @@ type namedCreaterAdapter struct {
 
 func (c *namedCreaterAdapter) Create(ctx context.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj, createValidatingAdmission, options)
+}
+
+func prefixFromUserAgent(u string) string {
+	return strings.Split(u, "/")[0]
 }

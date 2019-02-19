@@ -114,14 +114,29 @@ func setupScheduler(
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       100,
+		StopCh:                         stopCh,
 	})
-
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 
-	schedulerConfig.StopEverything = stopCh
+	// TODO: Replace NewFromConfig and AddAllEventHandlers with scheduler.New() in
+	// all test/integration tests.
+	sched := scheduler.NewFromConfig(schedulerConfig)
+	scheduler.AddAllEventHandlers(sched,
+		v1.DefaultSchedulerName,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+	)
 
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
@@ -131,8 +146,6 @@ func setupScheduler(
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
 		Interface: cs.CoreV1().Events(""),
 	})
-
-	sched := scheduler.NewFromConfig(schedulerConfig)
 
 	algorithmprovider.ApplyFeatureGates()
 
@@ -513,11 +526,11 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
 			// Start Scheduler
 			setupScheduler(t, clientset, informers, stopCh)
+
+			informers.Start(stopCh)
+			go dc.Run(5, stopCh)
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -924,11 +937,11 @@ func TestTaintedNode(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
 			// Start Scheduler
 			setupScheduler(t, clientset, informers, stopCh)
+			informers.Start(stopCh)
+
+			go dc.Run(5, stopCh)
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy

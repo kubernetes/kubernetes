@@ -73,12 +73,11 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	labelSelector        *string
-	fieldSelector        *string
-	selectAll            bool
-	includeUninitialized bool
-	limitChunks          int64
-	requestTransforms    []RequestTransform
+	labelSelector     *string
+	fieldSelector     *string
+	selectAll         bool
+	limitChunks       int64
+	requestTransforms []RequestTransform
 
 	resources []string
 
@@ -441,12 +440,6 @@ func (b *Builder) ExportParam(export bool) *Builder {
 	return b
 }
 
-// IncludeUninitialized accepts the include-uninitialized boolean for these resources
-func (b *Builder) IncludeUninitialized(includeUninitialized bool) *Builder {
-	b.includeUninitialized = includeUninitialized
-	return b
-}
-
 // NamespaceParam accepts the namespace that these resources should be
 // considered under from - used by DefaultNamespace() and RequireNamespace()
 func (b *Builder) NamespaceParam(namespace string) *Builder {
@@ -715,12 +708,12 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
 		// announce that a resource type could not be found.
-		// if the error is a URL error, then we had trouble doing discovery, so we should return the original
-		// error since it may help a user diagnose what is actually wrong
-		if _, ok := err.(*url.Error); ok {
-			return nil, err
+		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
+		// so we should return the original error since it may help a user diagnose what is actually wrong
+		if meta.IsNoMatchError(err) {
+			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
 		}
-		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+		return nil, err
 	}
 
 	return mapping, nil
@@ -844,7 +837,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

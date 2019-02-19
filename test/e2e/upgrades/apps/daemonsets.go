@@ -51,6 +51,9 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 			Name:      daemonSetName,
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labelSet,
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labelSet,

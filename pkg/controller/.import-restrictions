@@ -80,14 +80,12 @@
         "k8s.io/apiserver/pkg/storage",
         "k8s.io/api/batch/v2alpha1",
         "k8s.io/apiserver/pkg/registry/rest",
-        "k8s.io/apimachinery/pkg/util/initialization",
         "k8s.io/api/scheduling/v1alpha1",
         "k8s.io/api/admissionregistration/v1beta1",
         "k8s.io/api/authorization/v1",
         "k8s.io/api/settings/v1alpha1",
         "k8s.io/api/admission/v1beta1",
         "k8s.io/api/networking/v1",
-        "k8s.io/api/admissionregistration/v1alpha1",
         "k8s.io/component-base/config",
         "k8s.io/component-base/config/v1alpha1"
       ]
@@ -150,6 +148,7 @@
         "k8s.io/client-go/listers/policy/v1beta1",
         "k8s.io/client-go/listers/rbac/v1",
         "k8s.io/client-go/listers/storage/v1",
+        "k8s.io/client-go/pkg/version",
         "k8s.io/client-go/rest",
         "k8s.io/client-go/scale",
         "k8s.io/client-go/scale/fake",
@@ -162,7 +161,6 @@
         "k8s.io/client-go/tools/watch",
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
-        "k8s.io/client-go/util/integer",
         "k8s.io/client-go/util/retry",
         "k8s.io/client-go/util/testing",
         "k8s.io/client-go/util/workqueue"
@@ -289,7 +287,6 @@
         "k8s.io/kubernetes/pkg/util/node",
         "k8s.io/kubernetes/pkg/util/reflector/prometheus",
         "k8s.io/kubernetes/pkg/util/slice",
-        "k8s.io/kubernetes/pkg/util/strings",
         "k8s.io/kubernetes/pkg/util/system",
         "k8s.io/kubernetes/pkg/util/taints",
         "k8s.io/kubernetes/pkg/util/workqueue/prometheus",
@@ -310,19 +307,14 @@
         "k8s.io/kubernetes/pkg/scheduler/api",
         "k8s.io/kubernetes/pkg/scheduler/util",
         "k8s.io/kubernetes/pkg/security/apparmor",
-        "k8s.io/kubernetes/pkg/util/file",
-        "k8s.io/kubernetes/pkg/util/net/sets",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
-        "k8s.io/kubernetes/pkg/kubeapiserver/admission/util",
         "k8s.io/kubernetes/pkg/scheduler/volumebinder",
         "k8s.io/kubernetes/pkg/scheduler/internal/cache",
-        "k8s.io/kubernetes/pkg/util/nsenter",
         "k8s.io/kubernetes/pkg/util/resizefs",
         "k8s.io/kubernetes/pkg/util/version",
         "k8s.io/kubernetes/pkg/apis/apps",
-        "k8s.io/kubernetes/pkg/version",
-        "k8s.io/kubernetes/pkg/util/io"
+        "k8s.io/kubernetes/pkg/version"
       ]
     },
     {
@@ -343,8 +335,14 @@
         "k8s.io/metrics/pkg/client/custom_metrics/fake",
         "k8s.io/metrics/pkg/client/external_metrics",
         "k8s.io/metrics/pkg/client/external_metrics/fake",
+        "k8s.io/utils/nsenter",
+        "k8s.io/utils/integer",
+        "k8s.io/utils/io",
+        "k8s.io/utils/path",
         "k8s.io/utils/pointer",
-        "k8s.io/utils/exec"
+        "k8s.io/utils/exec",
+        "k8s.io/utils/strings",
+        "k8s.io/utils/net"
       ]
     },
     {

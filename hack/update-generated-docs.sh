@@ -47,6 +47,3 @@ kube::util::remove-gen-docs
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
-
-# Replace with placeholder docs
-kube::util::set-placeholder-gen-docs

@@ -101,6 +101,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.triggerTimeTracker = NewTriggerTimeTracker()
+
 	return e
 }
 
@@ -138,6 +140,10 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
+	// annotation.
+	triggerTimeTracker *TriggerTimeTracker
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -399,6 +405,7 @@ func (e *EndpointController) syncService(key string) error {
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
+		e.triggerTimeTracker.DeleteEndpoints(namespace, name)
 		return nil
 	}
 
@@ -426,6 +433,12 @@ func (e *EndpointController) syncService(key string) error {
 			utilruntime.HandleError(fmt.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
 		}
 	}
+
+	// We call ComputeEndpointsLastChangeTriggerTime here to make sure that the state of the trigger
+	// time tracker gets updated even if the sync turns out to be no-op and we don't update the
+	// endpoints object.
+	endpointsLastChangeTriggerTime := e.triggerTimeTracker.
+		ComputeEndpointsLastChangeTriggerTime(namespace, name, service, pods)
 
 	subsets := []v1.EndpointSubset{}
 	var totalReadyEps int
@@ -504,6 +517,11 @@ func (e *EndpointController) syncService(key string) error {
 	newEndpoints.Labels = service.Labels
 	if newEndpoints.Annotations == nil {
 		newEndpoints.Annotations = make(map[string]string)
+	}
+
+	if !endpointsLastChangeTriggerTime.IsZero() {
+		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
+			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
 	}
 
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)

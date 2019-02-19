@@ -84,6 +84,8 @@ const (
 	MaxGCEPDVolumeCountPred = "MaxGCEPDVolumeCount"
 	// MaxAzureDiskVolumeCountPred defines the name of predicate MaxAzureDiskVolumeCount.
 	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
+	// MaxCinderVolumeCountPred defines the name of predicate MaxCinderDiskVolumeCount.
+	MaxCinderVolumeCountPred = "MaxCinderVolumeCount"
 	// MaxCSIVolumeCountPred defines the predicate that decides how many CSI volumes should be attached
 	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
 	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
@@ -112,6 +114,8 @@ const (
 	GCEPDVolumeFilterType = "GCE"
 	// AzureDiskVolumeFilterType defines the filter name for AzureDiskVolumeFilter.
 	AzureDiskVolumeFilterType = "AzureDisk"
+	// CinderVolumeFilterType defines the filter name for CinderVolumeFilter.
+	CinderVolumeFilterType = "Cinder"
 )
 
 // IMPORTANT NOTE for predicate developers:
@@ -133,7 +137,7 @@ var (
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
-		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
+		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
 
@@ -332,6 +336,9 @@ func NewMaxPDVolumeCountPredicate(
 	case AzureDiskVolumeFilterType:
 		filter = AzureDiskVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		filter = CinderVolumeFilter
+		volumeLimitKey = v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		klog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
 			GCEPDVolumeFilterType, AzureDiskVolumeFilterType)
@@ -370,6 +377,8 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 			return DefaultMaxGCEPDVolumes
 		case AzureDiskVolumeFilterType:
 			return DefaultMaxAzureDiskVolumes
+		case CinderVolumeFilterType:
+			return volumeutil.DefaultMaxCinderVolumes
 		default:
 			return -1
 		}
@@ -553,6 +562,24 @@ var AzureDiskVolumeFilter = VolumeFilter{
 	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
 		if pv.Spec.AzureDisk != nil {
 			return pv.Spec.AzureDisk.DiskName, true
+		}
+		return "", false
+	},
+}
+
+// CinderVolumeFilter is a VolumeFilter for filtering Cinder Volumes
+// It will be deprecated once Openstack cloudprovider has been removed from in-tree.
+var CinderVolumeFilter = VolumeFilter{
+	FilterVolume: func(vol *v1.Volume) (string, bool) {
+		if vol.Cinder != nil {
+			return vol.Cinder.VolumeID, true
+		}
+		return "", false
+	},
+
+	FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+		if pv.Spec.Cinder != nil {
+			return pv.Spec.Cinder.VolumeID, true
 		}
 		return "", false
 	},
@@ -923,7 +950,7 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 	return true, nil, nil
 }
 
-// ServiceAffinity defines a struct used for create service affinity predicates.
+// ServiceAffinity defines a struct used for creating service affinity predicates.
 type ServiceAffinity struct {
 	podLister     algorithm.PodLister
 	serviceLister algorithm.ServiceLister
@@ -985,7 +1012,7 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 //
 // 	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
 //	These backfilled labels in the selector "L" are defined like so:
-// 		- L is a label that the ServiceAffinity object needs as a matching constraints.
+// 		- L is a label that the ServiceAffinity object needs as a matching constraint.
 // 		- L is not defined in the pod itself already.
 // 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 //
@@ -1615,7 +1642,21 @@ func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
 	return c.predicate
 }
 
+func podHasPVCs(pod *v1.Pod) bool {
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	// If pod does not request any PVC, we don't need to do anything.
+	if !podHasPVCs(pod) {
+		return true, nil, nil
+	}
+
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")

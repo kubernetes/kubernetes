@@ -84,6 +84,13 @@ func init() {
 			return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
 		},
 	)
+	factory.RegisterFitPredicateFactory(
+		predicates.MaxCinderVolumeCountPred,
+		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.PVInfo, args.PVCInfo)
+		},
+	)
+
 	// Fit is determined by inter-pod affinity.
 	factory.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,

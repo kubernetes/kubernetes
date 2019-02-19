@@ -152,8 +152,7 @@ skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/
                 "pkg/kubectl/generated/bindata.go"]
 
 # list all the files contain 'DO NOT EDIT', but are not generated
-skipped_ungenerated_files = ['hack/build-ui.sh', 'hack/lib/swagger.sh',
-                             'hack/boilerplate/boilerplate.py']
+skipped_ungenerated_files = ['hack/lib/swagger.sh', 'hack/boilerplate/boilerplate.py']
 
 def normalize_files(files):
     newfiles = []

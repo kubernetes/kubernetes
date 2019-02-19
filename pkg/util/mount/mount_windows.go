@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -132,7 +132,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 
 // IsNotMountPoint determines if a directory is a mountpoint.
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
+	return isNotMountPoint(mounter, dir)
 }
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
@@ -235,7 +235,7 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 
 // ExistsPath checks whether the path exists
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilfile.FileExists(pathname)
+	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
 // EvalHostSymlinks returns the path name after evaluating symlinks

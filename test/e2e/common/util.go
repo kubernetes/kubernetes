@@ -17,7 +17,9 @@ limitations under the License.
 package common
 
 import (
+	"bytes"
 	"fmt"
+	"text/template"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -62,6 +64,51 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.Net),
 )
+
+type testImagesStruct struct {
+	BusyBoxImage      string
+	GBFrontendImage   string
+	GBRedisSlaveImage string
+	KittenImage       string
+	LivenessImage     string
+	MounttestImage    string
+	NautilusImage     string
+	NginxImage        string
+	NginxNewImage     string
+	PauseImage        string
+	RedisImage        string
+}
+
+var testImages testImagesStruct
+
+func init() {
+	testImages = testImagesStruct{
+		imageutils.GetE2EImage(imageutils.BusyBox),
+		imageutils.GetE2EImage(imageutils.GBFrontend),
+		imageutils.GetE2EImage(imageutils.GBRedisSlave),
+		imageutils.GetE2EImage(imageutils.Kitten),
+		imageutils.GetE2EImage(imageutils.Liveness),
+		imageutils.GetE2EImage(imageutils.Mounttest),
+		imageutils.GetE2EImage(imageutils.Nautilus),
+		imageutils.GetE2EImage(imageutils.Nginx),
+		imageutils.GetE2EImage(imageutils.NginxNew),
+		imageutils.GetE2EImage(imageutils.Pause),
+		imageutils.GetE2EImage(imageutils.Redis),
+	}
+}
+
+func SubstituteImageName(content string) string {
+	contentWithImageName := new(bytes.Buffer)
+	tmpl, err := template.New("imagemanifest").Parse(content)
+	if err != nil {
+		framework.Failf("Failed Parse the template: %v", err)
+	}
+	err = tmpl.Execute(contentWithImageName, testImages)
+	if err != nil {
+		framework.Failf("Failed executing template: %v", err)
+	}
+	return contentWithImageName.String()
+}
 
 func svcByName(name string, port int) *v1.Service {
 	return &v1.Service{

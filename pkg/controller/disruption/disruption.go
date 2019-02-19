@@ -720,9 +720,9 @@ func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy
 	newPdb, err := pdbClient.Get(pdb.Name, metav1.GetOptions{})
 	if err == nil {
 		return newPdb
-	} else {
-		return pdb
 	}
+	return pdb
+
 }
 
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {

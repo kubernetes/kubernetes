@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,11 +38,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 var (
@@ -149,10 +149,10 @@ func TestJSONPatch(t *testing.T) {
 		},
 	} {
 		p := &patcher{
-			patchType: types.JSONPatchType,
-			patchJS:   []byte(test.patch),
+			patchType:  types.JSONPatchType,
+			patchBytes: []byte(test.patch),
 		}
-		jp := jsonPatcher{p}
+		jp := jsonPatcher{patcher: p}
 		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
 		pod := &examplev1.Pod{}
 		pod.Name = "podA"
@@ -454,12 +454,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
-			patchJS:     patch,
+			patchBytes:  patch,
 
 			trace: utiltrace.New("Patch" + name),
 		}
 
-		resultObj, err := p.patchResource(ctx)
+		resultObj, _, err := p.patchResource(ctx, RequestScope{})
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -938,4 +938,12 @@ func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, 
 	if len(nodeName) != 0 {
 		tcPod.Spec.NodeName = nodeName
 	}
+}
+
+func (f mutateObjectUpdateFunc) Handles(operation admission.Operation) bool {
+	return true
+}
+
+func (f mutateObjectUpdateFunc) Admit(a admission.Attributes) (err error) {
+	return f(a.GetObject(), a.GetOldObject())
 }

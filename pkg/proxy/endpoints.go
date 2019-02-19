@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/utils/net"
 )
 
 // BaseEndpointInfo contains base information that defines an endpoint.

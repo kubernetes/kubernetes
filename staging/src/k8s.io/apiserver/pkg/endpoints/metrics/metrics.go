@@ -49,8 +49,15 @@ var (
 	// the upstream library supports it.
 	requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "apiserver_request_count",
+			Name: "apiserver_request_total",
 			Help: "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
+	)
+	deprecatedRequestCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_request_count",
+			Help: "(Deprecated) Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
@@ -63,17 +70,29 @@ var (
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
+			Name: "apiserver_request_latency_seconds",
+			Help: "Response latency distribution in seconds for each verb, group, version, resource, subresource, scope and component.",
+			// This metric is used for verifying api call latencies SLO,
+			// as well as tracking regressions in this aspects.
+			// Thus we customize buckets significantly, to empower both usecases.
+			Buckets: []float64{0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
+				1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60},
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
+	)
+	deprecatedRequestLatencies = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "(Deprecated) Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	requestLatenciesSummary = prometheus.NewSummaryVec(
+	deprecatedRequestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "(Deprecated) Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on our SLI definition (medium term).
 			MaxAge: 5 * time.Hour,
@@ -92,8 +111,15 @@ var (
 	// DroppedRequests is a number of requests dropped with 'Try again later' response"
 	DroppedRequests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "apiserver_dropped_requests",
+			Name: "apiserver_dropped_requests_total",
 			Help: "Number of requests dropped with 'Try again later' response",
+		},
+		[]string{"requestKind"},
+	)
+	DeprecatedDroppedRequests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_dropped_requests",
+			Help: "(Deprecated) Number of requests dropped with 'Try again later' response",
 		},
 		[]string{"requestKind"},
 	)
@@ -118,11 +144,14 @@ var (
 
 	metrics = []resettableCollector{
 		requestCounter,
+		deprecatedRequestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
-		requestLatenciesSummary,
+		deprecatedRequestLatencies,
+		deprecatedRequestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
+		DeprecatedDroppedRequests,
 		RegisteredWatchers,
 		currentInflightRequests,
 	}
@@ -198,9 +227,12 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
+	elapsedSeconds := elapsed.Seconds()
 	requestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
-	requestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
+	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	deprecatedRequestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
+	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))

@@ -51,7 +51,6 @@ type specAggregator struct {
 	openAPISpecs map[string]*openAPISpecInfo
 
 	// provided for dynamic OpenAPI spec
-	openAPIService          *handler.OpenAPIService
 	openAPIVersionedService *handler.OpenAPIService
 }
 
@@ -110,14 +109,6 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	// NOTE: [DEPRECATION] We will announce deprecation for format-separated endpoints for OpenAPI spec,
-	// and switch to a single /openapi/v2 endpoint in Kubernetes 1.10. The design doc and deprecation process
-	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
-	s.openAPIService, err = handler.RegisterOpenAPIService(
-		specToServe, "/swagger.json", pathHandler)
-	if err != nil {
-		return nil, err
-	}
 	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(
 		specToServe, "/openapi/v2", pathHandler)
 	if err != nil {
@@ -148,6 +139,12 @@ func (a byPriority) Len() int      { return len(a.specs) }
 func (a byPriority) Swap(i, j int) { a.specs[i], a.specs[j] = a.specs[j], a.specs[i] }
 func (a byPriority) Less(i, j int) bool {
 	// All local specs will come first
+	if a.specs[i].apiService.Spec.Service == nil && a.specs[j].apiService.Spec.Service != nil {
+		return true
+	}
+	if a.specs[i].apiService.Spec.Service != nil && a.specs[j].apiService.Spec.Service == nil {
+		return false
+	}
 	// WARNING: This will result in not following priorities for local APIServices.
 	if a.specs[i].apiService.Spec.Service == nil {
 		// Sort local specs with their name. This is the order in the delegation chain (aggregator first).
@@ -216,21 +213,10 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 
 // updateOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.
 func (s *specAggregator) updateOpenAPISpec() error {
-	if s.openAPIService == nil || s.openAPIVersionedService == nil {
-		// openAPIVersionedService and deprecated openAPIService should be initialized together
-		if !(s.openAPIService == nil && s.openAPIVersionedService == nil) {
-			return fmt.Errorf("unexpected openapi service initialization error")
-		}
+	if s.openAPIVersionedService == nil {
 		return nil
 	}
 	specToServe, err := s.buildOpenAPISpec()
-	if err != nil {
-		return err
-	}
-	// openAPIService.UpdateSpec and openAPIVersionedService.UpdateSpec read the same swagger spec
-	// serially and update their local caches separately. Both endpoints will have same spec in
-	// their caches if the caller is holding proper locks.
-	err = s.openAPIService.UpdateSpec(specToServe)
 	if err != nil {
 		return err
 	}

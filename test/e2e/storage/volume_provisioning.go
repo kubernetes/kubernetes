@@ -844,7 +844,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}
 			}()
 
-			// Watch events until the message about invalid key appears
+			// Watch events until the message about invalid key appears.
+			// Event delivery is not reliable and it's used only as a quick way how to check if volume with wrong KMS
+			// key was not provisioned. If the event is not delivered, we check that the volume is not Bound for whole
+			// ClaimProvisionTimeout in the very same loop.
 			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -853,8 +856,22 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						return true, nil
 					}
 				}
+
+				pvc, err := c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+				if err != nil {
+					return true, err
+				}
+				if pvc.Status.Phase != v1.ClaimPending {
+					// The PVC was bound to something, i.e. PV was created for wrong KMS key. That's bad!
+					return true, fmt.Errorf("PVC got unexpectedly %s (to PV %q)", pvc.Status.Phase, pvc.Spec.VolumeName)
+				}
+
 				return false, nil
 			})
+			if err == wait.ErrWaitTimeout {
+				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
+				err = nil
+			}
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

@@ -56,7 +56,7 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		var notMnt bool
 		var err error
 		if extensiveMountPointCheck {
-			notMnt, err = IsNotMountPoint(mounter, mountPath)
+			notMnt, err = mounter.IsNotMountPoint(mountPath)
 		} else {
 			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
 		}

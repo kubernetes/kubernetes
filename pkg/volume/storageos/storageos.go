@@ -24,17 +24,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -64,9 +63,9 @@ const (
 
 func getPath(uid types.UID, volNamespace string, volName string, pvName string, host volume.VolumeHost) string {
 	if len(volNamespace) != 0 && len(volName) != 0 && strings.Count(volName, ".") == 0 {
-		return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName+"."+volNamespace+"."+volName)
+		return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName+"."+volNamespace+"."+volName)
 	}
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName)
 }
 
 func (plugin *storageosPlugin) Init(host volume.VolumeHost) error {
@@ -89,6 +88,10 @@ func (plugin *storageosPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.StorageOS != nil) ||
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
+}
+
+func (plugin *storageosPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *storageosPlugin) RequiresRemount() bool {
@@ -428,7 +431,7 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, pvName, volNamespace, volName string) string {
-	return path.Join(host.GetPluginDir(kstrings.EscapeQualifiedNameForDisk(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
+	return path.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
 }
 
 // Given the pod id and PV name, finds the volume's namespace and name from the
@@ -440,7 +443,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 		return volNamespace, volName, nil
 	}
 
-	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName))
+	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
 		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
@@ -529,7 +532,7 @@ func (b *storageosUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDownAt(dir string) error {
-	if err := util.UnmountPath(dir, b.mounter); err != nil {
+	if err := mount.CleanupMountPoint(dir, b.mounter, false); err != nil {
 		klog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}
 	if err := b.manager.UnmountVolume(b); err != nil {

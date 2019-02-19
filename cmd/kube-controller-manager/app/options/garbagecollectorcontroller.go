@@ -24,9 +24,7 @@ import (
 
 // GarbageCollectorControllerOptions holds the GarbageCollectorController options.
 type GarbageCollectorControllerOptions struct {
-	ConcurrentGCSyncs      int32
-	GCIgnoredResources     []kubectrlmgrconfig.GroupResource
-	EnableGarbageCollector bool
+	*kubectrlmgrconfig.GarbageCollectorControllerConfiguration
 }
 
 // AddFlags adds flags related to GarbageCollectorController for controller manager to the specified FlagSet.

@@ -96,7 +96,7 @@ func (tc *patchTestCase) runner(t *testing.T) {
 	client := NewSimpleDynamicClient(runtime.NewScheme(), tc.object)
 	resourceInterface := client.Resource(schema.GroupVersionResource{Group: testGroup, Version: testVersion, Resource: testResource}).Namespace(testNamespace)
 
-	got, recErr := resourceInterface.Patch(testName, tc.patchType, tc.patchBytes, metav1.UpdateOptions{})
+	got, recErr := resourceInterface.Patch(testName, tc.patchType, tc.patchBytes, metav1.PatchOptions{})
 
 	if err := tc.verifyErr(recErr); err != nil {
 		t.Error(err)

@@ -199,11 +199,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
 					"/healthz", "/version", "/version/",
-					// remove once swagger 1.2 support is removed
-					"/swaggerapi", "/swaggerapi/*",
-					// do not expand this pattern for openapi discovery docs
-					// move to a single openapi endpoint that takes accept/accept-encoding headers
-					"/swagger.json", "/swagger-2.0.0.pb-v1",
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",

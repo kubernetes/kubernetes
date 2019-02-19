@@ -21,13 +21,19 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# required version for this script, if not installed on the host we will
+# use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
+SHELLCHECK_VERSION="0.6.0"
 # upstream shellcheck latest stable image as of January 10th, 2019
 SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.6.0@sha256:7d4d712a2686da99d37580b4e2f45eb658b74e4b01caf67c1099adc294b96b52"
+
+# fixed name for the shellcheck docker container so we can reliably clean it up
 SHELLCHECK_CONTAINER="k8s-shellcheck"
 
 # disabled lints
 disabled=(
-  # this lint dissalows non-constant source, which we use extensively
+  # this lint disallows non-constant source, which we use extensively without
+  # any known bugs
   1090
   # this lint prefers command -v to which, they are not the same
   2230
@@ -41,6 +47,22 @@ join_by() {
 SHELLCHECK_DISABLED="$(join_by , "${disabled[@]}")"
 readonly SHELLCHECK_DISABLED
 
+# creates the shellcheck container for later use
+create_container () {
+  # TODO(bentheelder): this is a performance hack, we create the container with
+  # a sleep MAX_INT32 so that it is effectively paused.
+  # We then repeatedly exec to it to run each shellcheck, and later rm it when
+  # we're done.
+  # This is incredibly much faster than creating a container for each shellcheck
+  # call ...
+  docker run --name "${SHELLCHECK_CONTAINER}" -d --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" --entrypoint="sleep" "${SHELLCHECK_IMAGE}" 2147483647
+}
+# removes the shellcheck container
+remove_container () {
+  docker rm -f "${SHELLCHECK_CONTAINER}" &> /dev/null || true
+}
+
+# ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
 # find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
@@ -88,32 +110,33 @@ array_contains () {
   return $in
 }
 
-# creates the shellcheck container for later user
-create_container () {
-  # TODO(bentheelder): this is a performance hack, we create the container with
-  # a sleep MAX_INT32 so that it is effectively paused.
-  # We then repeatedly exec to it to run each shellcheck, and later rm it when
-  # we're done.
-  # This is incredibly much faster than creating a container for each shellcheck
-  # call ...
-  docker run --name "${SHELLCHECK_CONTAINER}" -d --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" --entrypoint="sleep" "${SHELLCHECK_IMAGE}" 2147483647
-}
-# removes the shellcheck container
-remove_container () {
-  docker rm -f "${SHELLCHECK_CONTAINER}" &> /dev/null || true
-}
+# detect if the host machine has the required shellcheck version installed
+# if so, we will use that instead.
+HAVE_SHELLCHECK=false
+if which shellcheck &>/dev/null; then
+  detected_version="$(shellcheck --version | grep 'version: .*')"
+  if [[ "${detected_version}" = "version: ${SHELLCHECK_VERSION}" ]]; then
+    HAVE_SHELLCHECK=true
+  fi
+fi
 
-# remove any previous container, ensure we will attempt to cleanup on exit,
-# and create the container
-remove_container
-trap remove_container EXIT
-if ! output="$(create_container 2>&1)"; then
-    {
-      echo "Failed to create shellcheck container with output: "
-      echo ""
-      echo "${output}"
-    } >&2
-    exit 1
+# tell the user which we've selected and possibly set up the container
+if ${HAVE_SHELLCHECK}; then
+  echo "Using host shellcheck ${SHELLCHECK_VERSION} binary."
+else
+  echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
+  # remove any previous container, ensure we will attempt to cleanup on exit,
+  # and create the container
+  remove_container
+  kube::util::trap_add 'remove_container' EXIT
+  if ! output="$(create_container 2>&1)"; then
+      {
+        echo "Failed to create shellcheck container with output: "
+        echo ""
+        echo "${output}"
+      } >&2
+      exit 1
+  fi
 fi
 
 # lint each script, tracking failures
@@ -121,7 +144,12 @@ errors=()
 not_failing=()
 for f in "${all_shell_scripts[@]}"; do
   set +o errexit
-  failedLint=$(docker exec -t "${SHELLCHECK_CONTAINER}" shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  if ${HAVE_SHELLCHECK}; then
+    failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  else
+    failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
+                 shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  fi  
   set -o errexit
   array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
@@ -134,7 +162,7 @@ done
 
 # Check to be sure all the packages that should pass lint are.
 if [ ${#errors[@]} -eq 0 ]; then
-  echo 'Congratulations!  All shell files have been linted.'
+  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
 else
   {
     echo "Errors from shellcheck:"

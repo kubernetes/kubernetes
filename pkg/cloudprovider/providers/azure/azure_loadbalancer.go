@@ -27,8 +27,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -888,8 +888,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 			return expectedProbes, expectedRules, err
 		}
 
-		if serviceapi.NeedsHealthCheck(service) {
-			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
+		if servicehelpers.NeedsHealthCheck(service) {
+			podPresencePath, podPresencePort := servicehelpers.GetServiceHealthCheckPathPort(service)
 
 			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
@@ -983,7 +983,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		destinationIPAddress = "*"
 	}
 
-	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(service)
 	if err != nil {
 		return nil, err
 	}
@@ -992,7 +992,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	var sourceAddressPrefixes []string
-	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
+	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
 			sourceAddressPrefixes = []string{"Internet"}
 		}

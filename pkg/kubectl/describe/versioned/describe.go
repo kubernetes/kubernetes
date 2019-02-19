@@ -822,8 +822,16 @@ func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWr
 }
 
 func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
+	var sizeLimit string
+	if emptyDir.SizeLimit != nil && emptyDir.SizeLimit.Cmp(resource.Quantity{}) > 0 {
+		sizeLimit = fmt.Sprintf("%v", emptyDir.SizeLimit)
+	} else {
+		sizeLimit = "<unset>"
+	}
 	w.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
-		"    Medium:\t%v\n", emptyDir.Medium)
+		"    Medium:\t%v\n"+
+		"    SizeLimit:\t%v\n",
+		emptyDir.Medium, sizeLimit)
 }
 
 func printGCEPersistentDiskVolumeSource(gce *corev1.GCEPersistentDiskVolumeSource, w PrefixWriter) {
@@ -2308,7 +2316,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 			}
 			w.Write(LEVEL_1, "%s\t\n", host)
 			for _, path := range rules.HTTP.Paths {
-				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ns, &path.Backend))
+				w.Write(LEVEL_2, "\t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ing.Namespace, &path.Backend))
 			}
 		}
 		if count == 0 {
@@ -3111,11 +3119,20 @@ func describeHorizontalPodAutoscaler(hpa *autoscalingv2beta2.HorizontalPodAutosc
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
 			case autoscalingv2beta2.ObjectMetricSourceType:
-				current := "<unknown>"
-				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
-					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
+				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, "(target average value):\t%s / %s\n", current, metric.Object.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+					}
+					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
 			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {

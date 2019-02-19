@@ -59,7 +59,15 @@ var (
 	reconcileLong = templates.LongDesc(`
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects.
 
-		This is preferred to 'apply' for RBAC resources so that proper rule coverage checks are done.`)
+		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
+		
+		Existing roles are updated to include the permissions in the input objects,
+		and remove extra permissions if --remove-extra-permissions is specified.
+
+		Existing bindings are updated to include the subjects in the input objects,
+		and remove extra subjects if --remove-extra-subjects is specified.
+
+		This is preferred to 'apply' for RBAC resources so that semantically-aware merging of rules and subjects is done.`)
 
 	reconcileExample = templates.Examples(`
 		# Reconcile rbac resources from a file

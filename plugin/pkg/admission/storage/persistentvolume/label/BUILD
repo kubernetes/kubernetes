@@ -15,13 +15,12 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/cloudprovider/providers/aws:go_default_library",
-        "//pkg/cloudprovider/providers/azure:go_default_library",
-        "//pkg/cloudprovider/providers/gce:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -34,13 +33,13 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/volume/util:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
     ],
 )
 

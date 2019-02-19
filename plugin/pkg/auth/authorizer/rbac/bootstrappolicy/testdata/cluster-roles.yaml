@@ -550,10 +550,6 @@ items:
     - /healthz
     - /openapi
     - /openapi/*
-    - /swagger-2.0.0.pb-v1
-    - /swagger.json
-    - /swaggerapi
-    - /swaggerapi/*
     - /version
     - /version/
     verbs:

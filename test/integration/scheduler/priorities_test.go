@@ -180,12 +180,6 @@ func TestImageLocality(t *testing.T) {
 	context := initTest(t, "image-locality")
 	defer cleanupTest(t, context)
 
-	// Add a few nodes.
-	_, err := createNodes(context.clientSet, "testnode", nil, 10)
-	if err != nil {
-		t.Fatalf("cannot create nodes: %v", err)
-	}
-
 	// We use a fake large image as the test image used by the pod, which has relatively large image size.
 	image := v1.ContainerImage{
 		Names: []string{
@@ -194,10 +188,16 @@ func TestImageLocality(t *testing.T) {
 		SizeBytes: 3000 * 1024 * 1024,
 	}
 
-	// Create a node with the large image
+	// Create a node with the large image.
 	nodeWithLargeImage, err := createNodeWithImages(context.clientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
 	if err != nil {
 		t.Fatalf("cannot create node with a large image: %v", err)
+	}
+
+	// Add a few nodes.
+	_, err = createNodes(context.clientSet, "testnode", nil, 10)
+	if err != nil {
+		t.Fatalf("cannot create nodes: %v", err)
 	}
 
 	// Create a pod with containers each having the specified image.

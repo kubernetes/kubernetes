@@ -208,8 +208,8 @@ type subPathTestInput struct {
 
 func testSubPath(input *subPathTestInput) {
 	It("should support non-existent path", func() {
-		// Write the file in the subPath from container 0
-		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.Containers[0])
+		// Write the file in the subPath from init container 1
+		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.InitContainers[1])
 
 		// Read it from outside the subPath from container 1
 		testReadFile(input.f, input.filePathInVolume, input.pod, 1)
@@ -219,8 +219,8 @@ func testSubPath(input *subPathTestInput) {
 		// Create the directory
 		setInitCommand(input.pod, fmt.Sprintf("mkdir -p %s", input.subPathDir))
 
-		// Write the file in the subPath from container 0
-		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.Containers[0])
+		// Write the file in the subPath from init container 1
+		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.InitContainers[1])
 
 		// Read it from outside the subPath from container 1
 		testReadFile(input.f, input.filePathInVolume, input.pod, 1)
@@ -291,6 +291,7 @@ func testSubPath(input *subPathTestInput) {
 			SubPath:   "subpath2",
 		})
 
+		// Write the files from container 0 and instantly read them back
 		addMultipleWrites(&input.pod.Spec.Containers[0], filepath1, filepath2)
 		testMultipleReads(input.f, input.pod, 0, filepath1, filepath2)
 	})
@@ -325,8 +326,8 @@ func testSubPath(input *subPathTestInput) {
 		// Create the directory
 		setInitCommand(input.pod, fmt.Sprintf("mkdir -p %s", input.subPathDir))
 
-		// Write the file in the volume from container 1
-		setWriteCommand(input.filePathInVolume, &input.pod.Spec.Containers[1])
+		// Write the file in the volume from init container 2
+		setWriteCommand(input.filePathInVolume, &input.pod.Spec.InitContainers[2])
 
 		// Read it from inside the subPath from container 0
 		input.pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
@@ -337,8 +338,8 @@ func testSubPath(input *subPathTestInput) {
 		// Create the file
 		setInitCommand(input.pod, fmt.Sprintf("touch %s", input.subPathDir))
 
-		// Write the file in the volume from container 1
-		setWriteCommand(input.subPathDir, &input.pod.Spec.Containers[1])
+		// Write the file in the volume from init container 2
+		setWriteCommand(input.subPathDir, &input.pod.Spec.InitContainers[2])
 
 		// Read it from inside the subPath from container 0
 		input.pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
@@ -350,8 +351,19 @@ func testSubPath(input *subPathTestInput) {
 			framework.Skipf("Volume type %v doesn't support readOnly source", input.volType)
 		}
 
-		// Initialize content in the volume while it's writable
-		initVolumeContent(input.f, input.pod, input.filePathInVolume, input.filePathInSubpath)
+		pod := input.pod.DeepCopy()
+
+		// Create the directory
+		setInitCommand(input.pod, fmt.Sprintf("mkdir -p %s", input.subPathDir))
+
+		// Write the file in the subPath from init container 1
+		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.InitContainers[1])
+
+		// Read it from inside the subPath from container 0
+		testReadFile(input.f, input.filePathInSubpath, input.pod, 0)
+
+		// Reset the pod
+		input.pod = pod
 
 		// Set volume source to read only
 		input.pod.Spec.Volumes[0].VolumeSource = *input.roVol
@@ -384,6 +396,7 @@ func testSubPath(input *subPathTestInput) {
 		input.pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
 
 		By(fmt.Sprintf("Creating pod %s", input.pod.Name))
+		removeUnusedContainers(input.pod)
 		pod, err := input.f.ClientSet.CoreV1().Pods(input.f.Namespace.Name).Create(input.pod)
 		Expect(err).ToNot(HaveOccurred(), "while creating pod")
 		defer func() {
@@ -416,6 +429,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	setReadCommand(filepath, &pod.Spec.Containers[0])
 
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
@@ -453,6 +467,41 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 				{
 					Name:  fmt.Sprintf("init-volume-%s", suffix),
 					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: volumePath,
+						},
+						{
+							Name:      probeVolumeName,
+							MountPath: probeVolumePath,
+						},
+					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privilegedSecurityContext,
+					},
+				},
+				{
+					Name:  fmt.Sprintf("test-init-subpath-%s", suffix),
+					Image: mountImage,
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: volumePath,
+							SubPath:   subpath,
+						},
+						{
+							Name:      probeVolumeName,
+							MountPath: probeVolumePath,
+						},
+					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privilegedSecurityContext,
+					},
+				},
+				{
+					Name:  fmt.Sprintf("test-init-volume-%s", suffix),
+					Image: mountImage,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -528,6 +577,33 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 	}
 }
 
+func containerIsUnused(container *v1.Container) bool {
+	// mountImage with nil Args does nothing. Leave everything else
+	return container.Image == mountImage && container.Args == nil
+}
+
+// removeUnusedContainers removes containers from a SubpathTestPod that aren't
+// needed for a test. e.g. to test for subpath mount failure, only one
+// container needs to run and get its status checked.
+func removeUnusedContainers(pod *v1.Pod) {
+	initContainers := []v1.Container{}
+	containers := []v1.Container{}
+	if pod.Spec.InitContainers[0].Command != nil {
+		initContainers = append(initContainers, pod.Spec.InitContainers[0])
+	}
+	for _, ic := range pod.Spec.InitContainers[1:] {
+		if !containerIsUnused(&ic) {
+			initContainers = append(initContainers, ic)
+		}
+	}
+	containers = append(containers, pod.Spec.Containers[0])
+	if !containerIsUnused(&pod.Spec.Containers[1]) {
+		containers = append(containers, pod.Spec.Containers[1])
+	}
+	pod.Spec.InitContainers = initContainers
+	pod.Spec.Containers = containers
+}
+
 // volumeFormatPod returns a Pod that does nothing but will cause the plugin to format a filesystem
 // on first use
 func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.Pod {
@@ -562,6 +638,8 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 
 func clearSubpathPodCommands(pod *v1.Pod) {
 	pod.Spec.InitContainers[0].Command = nil
+	pod.Spec.InitContainers[1].Args = nil
+	pod.Spec.InitContainers[2].Args = nil
 	pod.Spec.Containers[0].Args = nil
 	pod.Spec.Containers[1].Args = nil
 }
@@ -591,6 +669,7 @@ func addMultipleWrites(container *v1.Container, file1 string, file2 string) {
 
 func testMultipleReads(f *framework.Framework, pod *v1.Pod, containerIndex int, file1 string, file2 string) {
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	f.TestContainerOutput("multi_subpath", pod, containerIndex, []string{
 		"content of file \"" + file1 + "\": mount-tester new file",
 		"content of file \"" + file2 + "\": mount-tester new file",
@@ -608,6 +687,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 	setReadCommand(file, &pod.Spec.Containers[containerIndex])
 
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	f.TestContainerOutput("subpath", pod, containerIndex, []string{
 		"content of file \"" + file + "\": mount-tester new file",
 	})
@@ -623,6 +703,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTermi
 
 func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg string, allowContainerTerminationError bool) {
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 	defer func() {
@@ -704,6 +785,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 
 	// Start pod
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 	defer func() {
@@ -791,6 +873,7 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod.Spec.TerminationGracePeriodSeconds = &gracePeriod
 
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 
@@ -813,23 +896,6 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
 	Expect(err).ToNot(HaveOccurred(), "while deleting volume init pod")
-}
-
-func initVolumeContent(f *framework.Framework, pod *v1.Pod, volumeFilepath, subpathFilepath string) {
-	setWriteCommand(volumeFilepath, &pod.Spec.Containers[1])
-	setReadCommand(subpathFilepath, &pod.Spec.Containers[0])
-
-	By(fmt.Sprintf("Creating pod to write volume content %s", pod.Name))
-	f.TestContainerOutput("subpath", pod, 0, []string{
-		"content of file \"" + subpathFilepath + "\": mount-tester new file",
-	})
-
-	By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
-
-	// This pod spec is going to be reused; reset all the commands
-	clearSubpathPodCommands(pod)
 }
 
 func podContainerExec(pod *v1.Pod, containerIndex int, bashExec string) (string, error) {
