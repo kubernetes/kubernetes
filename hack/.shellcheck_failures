@@ -118,7 +118,6 @@
 ./hack/update-workspace-mirror.sh
 ./hack/verify-all.sh
 ./hack/verify-api-groups.sh
-./hack/verify-bazel.sh
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
 ./hack/verify-codegen.sh
@@ -132,13 +131,9 @@
 ./hack/verify-generated-protobuf.sh
 ./hack/verify-generated-runtime.sh
 ./hack/verify-generated-swagger-docs.sh
-./hack/verify-godep-licenses.sh
-./hack/verify-godeps.sh
-./hack/verify-gofmt.sh
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
-./hack/verify-imports.sh
 ./hack/verify-linkcheck.sh
 ./hack/verify-no-vendor-cycles.sh
 ./hack/verify-openapi-spec.sh
