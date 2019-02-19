@@ -165,7 +165,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.3
+    chart: security-1.0.6
     release: istio
     heritage: Tiller
 spec:
@@ -2328,16 +2328,13 @@ spec:
   ports:
     -
       name: http2
-      nodePort: 31380
       port: 80
       targetPort: 80
     -
       name: https
-      nodePort: 31390
       port: 443
     -
       name: tcp
-      nodePort: 31400
       port: 31400
     -
       name: tcp-pilot-grpc-tls
@@ -4083,6 +4080,7 @@ spec:
     namespace_id: destination.workload.namespace | "unknown"
     pod_id: destination.name | "unknown"
     project_id: '""'
+    zone: '""'
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: prometheus

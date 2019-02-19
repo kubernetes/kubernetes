@@ -2289,16 +2289,13 @@ spec:
   ports:
     -
       name: http2
-      nodePort: 31380
       port: 80
       targetPort: 80
     -
       name: https
-      nodePort: 31390
       port: 443
     -
       name: tcp
-      nodePort: 31400
       port: 31400
     -
       name: tcp-pilot-grpc-tls
@@ -4437,7 +4434,7 @@ spec:
       - total_received_bytes
       - total_sent_bytes
   trace:
-    sample_probability: 0.1
+    sampleProbability: 1
 ---
 #################################################
 ############## Metric Config ####################
@@ -4968,6 +4965,7 @@ spec:
     namespace_id: destination.workload.namespace | "unknown"
     pod_id: destination.name | "unknown"
     project_id: '""'
+    zone: '""'
 ---
 apiVersion: "config.istio.io/v1alpha2"
 kind: tracespan
@@ -5016,7 +5014,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: EnsureExists
 spec:
-  match: context.protocol == "http" || context.protocol == "grpc"
+  match: (context.protocol == "http" || context.protocol == "grpc") && request.headers["x-b3-sampled"] == "1" && destination.workload.name != "istio-telemetry" && destination.workload.name != "istio-pilot"
   actions:
   - handler: handler.stackdriver.istio-system
     instances:
