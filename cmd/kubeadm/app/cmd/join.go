@@ -173,7 +173,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 				}
 
 				ctx := map[string]string{
-					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
+					"KubeConfigPath": data.KubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
 				joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
@@ -378,6 +378,11 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 // Cfg returns the JoinConfiguration.
 func (j *joinData) Cfg() *kubeadmapi.JoinConfiguration {
 	return j.cfg
+}
+
+// KubeConfigPath returns the default kubeconfig path.
+func (j *joinData) KubeConfigPath() string {
+	return kubeadmconstants.GetAdminKubeConfigPath()
 }
 
 // TLSBootstrapCfg returns the cluster-info (kubeconfig).
