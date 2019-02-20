@@ -67,7 +67,7 @@ we close the body of the original repsonse, and return a new 403 response with a
 
 Example use cases:
 
-1. https://github.com/elazarl/goproxy/tree/master/examples/goproxy-avgsize
+1. https://github.com/elazarl/goproxy/tree/master/examples/goproxy-stats
 
 To measure the average size of an Html served in your site. One can ask
 all the QA team to access the website by a proxy, and the proxy will
