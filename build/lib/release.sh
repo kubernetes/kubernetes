@@ -141,7 +141,7 @@ function kube::release::package_client_tarballs() {
 
       # This fancy expression will expand to prepend a path
       # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_CLIENT_BINARIES array.
+      # client_bins array.
       cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/client/bin/"
 
@@ -174,7 +174,7 @@ function kube::release::package_node_tarballs() {
     fi
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_NODE_BINARIES array.
+    # node_bins array.
     cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -186,6 +186,9 @@ function kube::release::package_node_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -253,6 +256,9 @@ function kube::release::package_server_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
@@ -481,6 +487,9 @@ function kube::release::package_test_platform_tarballs() {
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
     mkdir -p "${release_stage}/test/bin"
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_TEST_SERVER_BINARIES array.
     cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/test/bin/"
   done
@@ -495,6 +504,9 @@ function kube::release::package_test_platform_tarballs() {
       if [[ "${platform%/*}" == "windows" ]]; then
         test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
       fi
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
       cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/test/bin/"
 
@@ -538,11 +550,17 @@ function kube::release::package_test_tarballs() {
         test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
       fi
       mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
       cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/platforms/${platform}"
     done
     for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
       mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # KUBE_TEST_SERVER_BINARIES array.
       cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/platforms/${platform}"
     done
