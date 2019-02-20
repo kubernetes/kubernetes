@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -198,6 +198,7 @@ func newProxyServer(
 			recorder,
 			healthzServer,
 			config.IPVS.Scheduler,
+			config.IPVS.IgnoreLoadBalancerIPs,
 			config.NodePortAddresses,
 		)
 		if err != nil {

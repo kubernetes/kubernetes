@@ -206,6 +206,8 @@ type Proxier struct {
 	healthChecker  healthcheck.Server
 	healthzServer  healthcheck.HealthzUpdater
 	ipvsScheduler  string
+	// set to true to ignore ingress IPs of LoadBalancer typed services.
+	ignoreLoadBalancerIPs bool
 	// Added as a member to the struct to allow injection for testing.
 	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
@@ -309,6 +311,7 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
+	ignoreLoadBalancerIPs bool,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
@@ -381,6 +384,7 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
+		ignoreLoadBalancerIPs: ignoreLoadBalancerIPs,
 		ipGetter:              &realIPGetter{nl: NewNetLinkHandle()},
 		iptablesData:          bytes.NewBuffer(nil),
 		natChains:             bytes.NewBuffer(nil),
@@ -890,104 +894,106 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-			if ingress.IP != "" {
-				// ipset call
-				entry = &utilipset.Entry{
-					IP:       ingress.IP,
-					Port:     svcInfo.Port,
-					Protocol: protocol,
-					SetType:  utilipset.HashIPPort,
-				}
-				// add service load balancer ingressIP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
-				// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
-				// If we are proxying globally, we need to masquerade in case we cross nodes.
-				// If we are proxying only locally, we can retain the source IP.
-				if valid := proxier.ipsetList[kubeLoadBalancerSet].validateEntry(entry); !valid {
-					glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSet].Name))
-					continue
-				}
-				proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
-				// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
-				if svcInfo.OnlyNodeLocalEndpoints {
-					if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
-						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerLocalSet].Name))
+		if !proxier.ignoreLoadBalancerIPs {
+			for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
+				if ingress.IP != "" {
+					// ipset call
+					entry = &utilipset.Entry{
+						IP:       ingress.IP,
+						Port:     svcInfo.Port,
+						Protocol: protocol,
+						SetType:  utilipset.HashIPPort,
+					}
+					// add service load balancer ingressIP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
+					// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
+					// If we are proxying globally, we need to masquerade in case we cross nodes.
+					// If we are proxying only locally, we can retain the source IP.
+					if valid := proxier.ipsetList[kubeLoadBalancerSet].validateEntry(entry); !valid {
+						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSet].Name))
 						continue
 					}
-					proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
-				}
-				if len(svcInfo.LoadBalancerSourceRanges) != 0 {
-					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
-					// This currently works for loadbalancers that preserves source ips.
-					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-					if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
-						glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadbalancerFWSet].Name))
-						continue
-					}
-					proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
-					allowFromNode := false
-					for _, src := range svcInfo.LoadBalancerSourceRanges {
-						// ipset call
-						entry = &utilipset.Entry{
-							IP:       ingress.IP,
-							Port:     svcInfo.Port,
-							Protocol: protocol,
-							Net:      src,
-							SetType:  utilipset.HashIPPortNet,
-						}
-						// enumerate all white list source cidr
-						if valid := proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].validateEntry(entry); !valid {
-							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name))
+					proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
+					// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
+					if svcInfo.OnlyNodeLocalEndpoints {
+						if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
+							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerLocalSet].Name))
 							continue
 						}
-						proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
-
-						// ignore error because it has been validated
-						_, cidr, _ := net.ParseCIDR(src)
-						if cidr.Contains(proxier.nodeIP) {
-							allowFromNode = true
-						}
+						proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
 					}
-					// generally, ip route rule was added to intercept request to loadbalancer vip from the
-					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
-					// Need to add the following rule to allow request on host.
-					if allowFromNode {
-						entry = &utilipset.Entry{
-							IP:       ingress.IP,
-							Port:     svcInfo.Port,
-							Protocol: protocol,
-							IP2:      ingress.IP,
-							SetType:  utilipset.HashIPPortIP,
-						}
-						// enumerate all white list source ip
-						if valid := proxier.ipsetList[kubeLoadBalancerSourceIPSet].validateEntry(entry); !valid {
-							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name))
+					if len(svcInfo.LoadBalancerSourceRanges) != 0 {
+						// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
+						// This currently works for loadbalancers that preserves source ips.
+						// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+						if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
+							glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadbalancerFWSet].Name))
 							continue
 						}
-						proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
-					}
-				}
+						proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
+						allowFromNode := false
+						for _, src := range svcInfo.LoadBalancerSourceRanges {
+							// ipset call
+							entry = &utilipset.Entry{
+								IP:       ingress.IP,
+								Port:     svcInfo.Port,
+								Protocol: protocol,
+								Net:      src,
+								SetType:  utilipset.HashIPPortNet,
+							}
+							// enumerate all white list source cidr
+							if valid := proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].validateEntry(entry); !valid {
+								glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name))
+								continue
+							}
+							proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
 
-				// ipvs call
-				serv := &utilipvs.VirtualServer{
-					Address:   net.ParseIP(ingress.IP),
-					Port:      uint16(svcInfo.Port),
-					Protocol:  string(svcInfo.Protocol),
-					Scheduler: proxier.ipvsScheduler,
-				}
-				if svcInfo.SessionAffinityType == api.ServiceAffinityClientIP {
-					serv.Flags |= utilipvs.FlagPersistent
-					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
-				}
-				if err := proxier.syncService(svcNameString, serv, true); err == nil {
-					// check if service need skip endpoints that not in same host as kube-proxy
-					onlyLocal := svcInfo.SessionAffinityType == api.ServiceAffinityClientIP && svcInfo.OnlyNodeLocalEndpoints
-					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, onlyLocal, serv); err != nil {
-						glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
+							// ignore error because it has been validated
+							_, cidr, _ := net.ParseCIDR(src)
+							if cidr.Contains(proxier.nodeIP) {
+								allowFromNode = true
+							}
+						}
+						// generally, ip route rule was added to intercept request to loadbalancer vip from the
+						// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
+						// Need to add the following rule to allow request on host.
+						if allowFromNode {
+							entry = &utilipset.Entry{
+								IP:       ingress.IP,
+								Port:     svcInfo.Port,
+								Protocol: protocol,
+								IP2:      ingress.IP,
+								SetType:  utilipset.HashIPPortIP,
+							}
+							// enumerate all white list source ip
+							if valid := proxier.ipsetList[kubeLoadBalancerSourceIPSet].validateEntry(entry); !valid {
+								glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name))
+								continue
+							}
+							proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
+						}
 					}
-				} else {
-					glog.Errorf("Failed to sync service: %v, err: %v", serv, err)
+
+					// ipvs call
+					serv := &utilipvs.VirtualServer{
+						Address:   net.ParseIP(ingress.IP),
+						Port:      uint16(svcInfo.Port),
+						Protocol:  string(svcInfo.Protocol),
+						Scheduler: proxier.ipvsScheduler,
+					}
+					if svcInfo.SessionAffinityType == api.ServiceAffinityClientIP {
+						serv.Flags |= utilipvs.FlagPersistent
+						serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
+					}
+					if err := proxier.syncService(svcNameString, serv, true); err == nil {
+						// check if service need skip endpoints that not in same host as kube-proxy
+						onlyLocal := svcInfo.SessionAffinityType == api.ServiceAffinityClientIP && svcInfo.OnlyNodeLocalEndpoints
+						activeIPVSServices[serv.String()] = true
+						if err := proxier.syncEndpoint(svcName, onlyLocal, serv); err != nil {
+							glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
+						}
+					} else {
+						glog.Errorf("Failed to sync service: %v, err: %v", serv, err)
+					}
 				}
 			}
 		}

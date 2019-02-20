@@ -66,6 +66,9 @@ type KubeProxyIPVSConfiguration struct {
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
 	ExcludeCIDRs []string `json:"excludeCIDRs"`
+	// ignoreLoadBalancerIPs set to true to ignore ingress IPs of LoadBalancer typed services.
+	// (leave them handled by cloud provider.)
+	IgnoreLoadBalancerIPs bool `json:"ignoreLoadBalancerIPs"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
