@@ -2038,6 +2038,11 @@ func RandomSuffix() string {
 	return strconv.Itoa(r.Int() % 10000)
 }
 
+// ExpectError expects an error happens, otherwise an exception raises
+func ExpectError(err error, explain ...interface{}) {
+	gomega.Expect(err).To(gomega.HaveOccurred(), explain...)
+}
+
 // ExpectNoError checks if "err" is set, and if so, fails assertion while logging the error.
 func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)
