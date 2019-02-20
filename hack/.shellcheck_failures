@@ -124,9 +124,7 @@
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
-./test/cmd/authorization.sh
 ./test/cmd/batch.sh
-./test/cmd/certificate.sh
 ./test/cmd/core.sh
 ./test/cmd/crd.sh
 ./test/cmd/create.sh
@@ -135,16 +133,7 @@
 ./test/cmd/generic-resources.sh
 ./test/cmd/get.sh
 ./test/cmd/legacy-script.sh
-./test/cmd/node-management.sh
-./test/cmd/old-print.sh
-./test/cmd/proxy.sh
-./test/cmd/rbac.sh
-./test/cmd/request-timeout.sh
-./test/cmd/run.sh
 ./test/cmd/save-config.sh
-./test/cmd/storage.sh
-./test/cmd/template-output.sh
-./test/cmd/version.sh
 ./test/e2e_node/conformance/run_test.sh
 ./test/e2e_node/environment/setup_host.sh
 ./test/e2e_node/gubernator.sh
