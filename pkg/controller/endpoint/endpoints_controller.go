@@ -522,6 +522,8 @@ func (e *EndpointController) syncService(key string) error {
 	if !endpointsLastChangeTriggerTime.IsZero() {
 		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
 			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
+	} else { // No new trigger time, clear the annotation.
+		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
 	}
 
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
