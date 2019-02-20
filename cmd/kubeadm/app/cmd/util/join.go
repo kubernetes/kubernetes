@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ import (
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.MasterHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
+	`kubeadm join {{.MasterHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}{{if .UploadCerts}} --certificate-key {{.CertificateKey}}{{end}}`,
 ))
 
 // GetJoinCommand returns the kubeadm join command for a given token and
 // and Kubernetes cluster (the current cluster in the kubeconfig file)
-func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (string, error) {
+func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCerts bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
@@ -74,6 +74,8 @@ func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (s
 		"Token":          token,
 		"CAPubKeyPins":   publicKeyPins,
 		"MasterHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
+		"UploadCerts":    uploadCerts,
+		"CertificateKey": key,
 	}
 
 	if skipTokenPrint {
