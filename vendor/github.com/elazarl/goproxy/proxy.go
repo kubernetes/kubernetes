@@ -78,7 +78,7 @@ func removeProxyHeaders(ctx *ProxyCtx, r *http.Request) {
 	// and would wrap the response body with the relevant reader.
 	r.Header.Del("Accept-Encoding")
 	// curl can add that, see
-	// https://jdebp.eu./FGA/web-proxy-connection-header.html
+	// https://jdebp.eu/FGA/web-proxy-connection-header.html
 	r.Header.Del("Proxy-Connection")
 	r.Header.Del("Proxy-Authenticate")
 	r.Header.Del("Proxy-Authorization")
