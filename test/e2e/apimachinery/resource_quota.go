@@ -23,7 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -852,7 +852,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -891,7 +891,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -936,7 +936,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -982,10 +982,10 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func() {
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
-		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass6"}, Value: int32(1000)})
+		_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass6"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -1037,7 +1037,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -1071,7 +1071,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}
@@ -1110,7 +1110,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 	It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
 
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		hard := v1.ResourceList{}

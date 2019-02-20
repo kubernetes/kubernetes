@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/api/scheduling/v1beta1"
+	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -302,11 +302,11 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(BeTrue())
 		})
 		AfterEach(func() {
-			err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 		specs := []podEvictSpec{
@@ -359,11 +359,11 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(BeTrue())
 		})
 		AfterEach(func() {
-			err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 		specs := []podEvictSpec{
@@ -412,11 +412,11 @@ var _ = framework.KubeDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Dis
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		BeforeEach(func() {
-			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(BeTrue())
 		})
 		AfterEach(func() {
-			err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(highPriorityClassName, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 		})
 		specs := []podEvictSpec{
