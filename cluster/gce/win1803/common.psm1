@@ -18,6 +18,9 @@
   and scripts for configuring Windows nodes.
 #>
 
+# Disable progress bar to increase download speed.
+$ProgressPreference = 'SilentlyContinue'
+
 # REDO_STEPS affects the behavior of a node that is rebooted after initial
 # bringup. When true, on a reboot the scripts will redo steps that were
 # determined to have already been completed once (e.g. to overwrite
@@ -82,6 +85,63 @@ function Get-InstanceMetadataValue {
     else {
       Log-Output "Failed to retrieve value for $Key."
       return $null
+    }
+  }
+}
+
+function Validate-SHA1 {
+  param(
+    [parameter(Mandatory=$true)] [string]$Hash,
+    [parameter(Mandatory=$true)] [string]$Path
+  )
+  $actual = Get-FileHash -Path $Path -Algorithm SHA1
+  # Note: Powershell string comparisons are case-insensitive by default, and this
+  # is important here because Linux shell scripts produce lowercase hashes but
+  # Powershell Get-FileHash produces uppercase hashes. This must be case-insensitive
+  # to work.
+  if ($actual.Hash -ne $Hash) {
+    Log-Output "$Path corrupted, sha1 $actual doesn't match expected $Hash"
+    Throw ("$Path corrupted, sha1 $actual doesn't match expected $Hash")
+  }
+}
+
+# Attempts to download the file from URLs, trying each URL until it succeeds.
+# It will loop through the URLs list forever until it has a success.
+# If successful, it will write the file to OutFile. You can optionally provide a SHA1 Hash
+# argument, in which case it will attempt to validate the downloaded file against the hash.
+function MustDownload-File {
+  param (
+    [parameter(Mandatory=$false)] [string]$Hash,
+    [parameter(Mandatory=$true)] [string]$OutFile,
+    [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs
+  )
+
+  While($true) {
+    ForEach($url in $URLs) {
+      # Attempt to download the file
+      Try {
+        # TODO(mtaufen): When we finally get a Windows version that has Powershell 6
+        # installed we can set `-MaximumRetryCount 6 -RetryIntervalSec 10` to make this even more robust.
+        Invoke-WebRequest $url -OutFile $OutFile -TimeoutSec 300
+      } Catch {
+        $message = $_.Exception.ToString()
+        Log-Output "Failed to download file from $url. Will retry. Error: $message"
+        continue
+      }
+      # Attempt to validate the hash
+      if ($Hash -ne $null) {
+        Try {
+            Validate-SHA1 -Hash $Hash -Path $OutFile
+        } Catch {
+            $message = $_.Exception.ToString()
+            Log-Output "Hash validation of $url failed. Will retry. Error: $message"
+            continue
+        }
+        Log-Output "Downloaded $url (SHA1 = $Hash)"
+        return
+      }
+      Log-Output "Downloaded $url"
+      return
     }
   }
 }
