@@ -88,6 +88,18 @@ const (
 	//
 	// Server-side apply. Merging happens on the server.
 	ServerSideApply utilfeature.Feature = "ServerSideApply"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to run in Overlay mode for Windows
+	WinOverlay utilfeature.Feature = "WinOverlay"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to create DSR loadbalancers for Windows
+	WinDSR utilfeature.Feature = "WinDSR"
 )
 
 func init() {
@@ -106,4 +118,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
 	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
+	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
+	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
 }
