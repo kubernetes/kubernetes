@@ -17,23 +17,13 @@ limitations under the License.
 package storage
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
-	"time"
-
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -169,160 +159,6 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
 		}
 		test.TestDynamicProvisioning()
-	}
-}
-
-func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
-	timeout := 2 * time.Minute
-
-	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
-		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
-}
-
-func destroyCSIDriver(csics csiclient.Interface, driverName string) {
-	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
-	if err == nil {
-		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
-		// Uncomment the following line to get full dump of CSIDriver object
-		// framework.Logf("%s", framework.PrettyPrint(driverGet))
-		csics.CsiV1alpha1().CSIDrivers().Delete(driverName, nil)
-	}
-}
-
-func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
-	// re-get the claim to the latest state with bound volume
-	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PVC")
-		return ""
-	}
-	pvName := claim.Spec.VolumeName
-	pv, err := cs.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PV")
-		return ""
-	}
-	if pv.Spec.CSI == nil {
-		Expect(pv.Spec.CSI).NotTo(BeNil())
-		return ""
-	}
-	return pv.Spec.CSI.VolumeHandle
-}
-
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node testsuites.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class := newStorageClass(t, ns, "")
-	class, err := cs.StorageV1().StorageClasses().Create(class)
-	framework.ExpectNoError(err, "Failed to create class : %v", err)
-	claim := newClaim(t, ns, "")
-	claim.Spec.StorageClassName = &class.Name
-	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(claim)
-	framework.ExpectNoError(err, "Failed to create claim: %v", err)
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-volume-tester-",
-		},
-		Spec: v1.PodSpec{
-			NodeName:     node.Name,
-			NodeSelector: node.Selector,
-			Affinity:     node.Affinity,
-			Containers: []v1.Container{
-				{
-					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.Pause),
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "my-volume",
-							MountPath: "/mnt/test",
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name: "my-volume",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: claim.Name,
-							ReadOnly:  false,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	pod, err = cs.CoreV1().Pods(ns).Create(pod)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	return class, claim, pod
-}
-
-// checkPodInfo tests that NodePublish was called with expected volume_context
-func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo bool) error {
-	expectedAttributes := map[string]string{
-		"csi.storage.k8s.io/pod.name":            pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       namespace,
-		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
-		"csi.storage.k8s.io/serviceAccount.name": "default",
-	}
-	// Load logs of driver pod
-	log, err := framework.GetPodLogs(cs, namespace, driverPodName, driverContainerName)
-	if err != nil {
-		return fmt.Errorf("could not load CSI driver logs: %s", err)
-	}
-	framework.Logf("CSI driver logs:\n%s", log)
-	// Find NodePublish in the logs
-	foundAttributes := sets.NewString()
-	logLines := strings.Split(log, "\n")
-	for _, line := range logLines {
-		if !strings.HasPrefix(line, "gRPCCall:") {
-			continue
-		}
-		line = strings.TrimPrefix(line, "gRPCCall:")
-		// Dummy structure that parses just volume_attributes out of logged CSI call
-		type MockCSICall struct {
-			Method  string
-			Request struct {
-				VolumeContext map[string]string `json:"volume_context"`
-			}
-		}
-		var call MockCSICall
-		err := json.Unmarshal([]byte(line), &call)
-		if err != nil {
-			framework.Logf("Could not parse CSI driver log line %q: %s", line, err)
-			continue
-		}
-		if call.Method != "/csi.v1.Node/NodePublishVolume" {
-			continue
-		}
-		// Check that NodePublish had expected attributes
-		for k, v := range expectedAttributes {
-			vv, found := call.Request.VolumeContext[k]
-			if found && v == vv {
-				foundAttributes.Insert(k)
-				framework.Logf("Found volume attribute %s: %s", k, v)
-			}
-		}
-		// Process just the first NodePublish, the rest of the log is useless.
-		break
-	}
-	if expectPodInfo {
-		if foundAttributes.Len() != len(expectedAttributes) {
-			return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
-		}
-		return nil
-	} else {
-		if foundAttributes.Len() != 0 {
-			return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
-		}
-		return nil
 	}
 }
 

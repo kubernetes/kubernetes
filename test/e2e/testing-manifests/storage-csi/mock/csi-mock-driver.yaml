@@ -44,6 +44,8 @@ spec:
                   apiVersion: v1
                   fieldPath: spec.nodeName
           imagePullPolicy: Always
+          securityContext:
+            privileged: true
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
