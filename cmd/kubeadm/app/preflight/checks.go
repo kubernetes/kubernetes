@@ -1038,7 +1038,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		HostnameCheck{nodeName: cfg.GetNodeName()},
 		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: 10250})
+		PortOpenCheck{port: ports.KubeletPort})
 	return checks
 }
 
