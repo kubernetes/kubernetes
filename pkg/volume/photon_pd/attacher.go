@@ -70,7 +70,9 @@ func (plugin *photonPersistentDiskPlugin) NewDeviceMounter() (volume.DeviceMount
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
+	nodeName := types.NodeName(node.Name) // FIXME(justinsb): pass node through
+
 	hostName := string(nodeName)
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {

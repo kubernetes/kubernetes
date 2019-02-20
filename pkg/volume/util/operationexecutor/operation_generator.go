@@ -336,7 +336,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	attachVolumeFunc := func() (error, error) {
 		// Execute attach
 		devicePath, attachErr := volumeAttacher.Attach(
-			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+			volumeToAttach.VolumeSpec, volumeToAttach.Node)
 
 		if attachErr != nil {
 			if derr, ok := attachErr.(*volerr.DanglingAttachError); ok {
@@ -352,7 +352,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 			} else {
 				addErr := actualStateOfWorld.MarkVolumeAsUncertain(
-					v1.UniqueVolumeName(""), originalSpec, volumeToAttach.NodeName)
+					v1.UniqueVolumeName(""), originalSpec, types.NodeName(volumeToAttach.Node.Name))
 				if addErr != nil {
 					klog.Errorf("AttachVolume.MarkVolumeAsUncertain fail to add the volume %q to actual state with %s", volumeToAttach.VolumeName, addErr)
 				}
@@ -370,7 +370,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			v1.UniqueVolumeName(""), originalSpec, volumeToAttach.NodeName, devicePath)
+			v1.UniqueVolumeName(""), originalSpec, types.NodeName(volumeToAttach.Node.Name), devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)

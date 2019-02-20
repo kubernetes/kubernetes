@@ -127,7 +127,9 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 	return err
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
+	nodeName := types.NodeName(node.Name) // FIXME(justinsb): pass node through
+
 	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err

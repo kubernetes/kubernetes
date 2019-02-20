@@ -91,7 +91,7 @@ var _ volume.DeviceMounter = &rbdAttacher{}
 // access external `rbd` utility. And there is no need since AttachDetach
 // controller will not try to attach RWO volumes which are already attached to
 // other nodes.
-func (attacher *rbdAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *rbdAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
 	return "", nil
 }
 

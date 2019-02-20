@@ -57,7 +57,9 @@ var _ volume.Attacher = &csiAttacher{}
 
 var _ volume.DeviceMounter = &csiAttacher{}
 
-func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (c *csiAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
+	nodeName := types.NodeName(node.Name) // FIXME(justinsb): pass node through
+
 	if spec == nil {
 		klog.Error(log("attacher.Attach missing volume.Spec"))
 		return "", errors.New("missing spec")
@@ -69,16 +71,15 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", err
 	}
 
-	node := string(nodeName)
 	pvName := spec.PersistentVolume.GetName()
-	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, node)
+	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, string(nodeName))
 
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
 			Name: attachID,
 		},
 		Spec: storage.VolumeAttachmentSpec{
-			NodeName: node,
+			NodeName: string(nodeName),
 			Attacher: csiSource.Driver,
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,

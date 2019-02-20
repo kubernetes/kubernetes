@@ -59,7 +59,9 @@ var _ volume.DeviceUnmounter = &azureDiskDetacher{}
 var getLunMutex = keymutex.NewHashed(0)
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
-func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (a *azureDiskAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
+	nodeName := types.NodeName(node.Name) // FIXME(justinsb): pass node through
+
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		klog.Warningf("failed to get azure disk spec (%v)", err)

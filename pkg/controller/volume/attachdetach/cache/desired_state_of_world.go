@@ -48,7 +48,7 @@ type DesiredStateOfWorld interface {
 	// If the node already exists this is a no-op.
 	// keepTerminatedPodVolumes is a property of the node that determines
 	// if volumes should be mounted and attached for terminated pods.
-	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool)
+	AddNode(node *v1.Node, keepTerminatedPodVolumes bool)
 
 	// AddPod adds the given pod to the list of pods that reference the
 	// specified volume and is scheduled to the specified node.
@@ -153,6 +153,7 @@ type desiredStateOfWorld struct {
 type nodeManaged struct {
 	// nodeName contains the name of this node.
 	nodeName k8stypes.NodeName
+	nodeObj  *v1.Node
 
 	// volumesToAttach is a map containing the set of volumes that should be
 	// attached to this node. The key in the map is the name of the volume and
@@ -195,16 +196,24 @@ type pod struct {
 	podObj *v1.Pod
 }
 
-func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
+func (dsw *desiredStateOfWorld) AddNode(node *v1.Node, keepTerminatedPodVolumes bool) {
 	dsw.Lock()
 	defer dsw.Unlock()
+
+	nodeName := k8stypes.NodeName(node.Name)
 
 	if _, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
 		dsw.nodesManaged[nodeName] = nodeManaged{
 			nodeName:                 nodeName,
+			nodeObj:                  node,
 			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
 			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		}
+	} else {
+		// TODO: I _think_ this is safe because we always copy-on-read?
+		copy := dsw.nodesManaged[nodeName]
+		copy.nodeObj = node
+		dsw.nodesManaged[nodeName] = copy
 	}
 }
 
@@ -373,7 +382,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 	defer dsw.RUnlock()
 
 	volumesToAttach := make([]VolumeToAttach, 0 /* len */, len(dsw.nodesManaged) /* cap */)
-	for nodeName, nodeObj := range dsw.nodesManaged {
+	for _, nodeObj := range dsw.nodesManaged {
 		for volumeName, volumeObj := range nodeObj.volumesToAttach {
 			volumesToAttach = append(volumesToAttach,
 				VolumeToAttach{
@@ -381,7 +390,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 						MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
 						VolumeName:               volumeName,
 						VolumeSpec:               volumeObj.spec,
-						NodeName:                 nodeName,
+						Node:                     nodeObj.nodeObj,
 						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
 					}})
 		}

@@ -267,7 +267,7 @@ type VolumeToAttach struct {
 
 	// NodeName is the identifier for the node that the volume should be
 	// attached to.
-	NodeName types.NodeName
+	Node *v1.Node
 
 	// scheduledPods is a map containing the set of pods that reference this
 	// volume and are scheduled to the underlying node. The key in the map is
@@ -278,7 +278,7 @@ type VolumeToAttach struct {
 
 // GenerateMsgDetailed returns detailed msgs for volumes to attach
 func (volume *VolumeToAttach) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.NodeName)
+	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.Node.Name)
 	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
 		volumeSpecName = volume.VolumeSpec.Name()
@@ -288,7 +288,7 @@ func (volume *VolumeToAttach) GenerateMsgDetailed(prefixMsg, suffixMsg string) (
 
 // GenerateMsg returns simple and detailed msgs for volumes to attach
 func (volume *VolumeToAttach) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.NodeName)
+	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.Node.Name)
 	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
 		volumeSpecName = volume.VolumeSpec.Name()

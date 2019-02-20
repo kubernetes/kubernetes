@@ -362,7 +362,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				continue
 			}
 			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-			adc.addNodeToDswp(node, types.NodeName(node.Name))
+			adc.addNodeToDswp(node)
 		}
 	}
 	return nil
@@ -529,7 +529,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	}
 
 	nodeName := types.NodeName(node.Name)
-	adc.addNodeToDswp(node, nodeName)
+	adc.addNodeToDswp(node)
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
@@ -739,7 +739,7 @@ func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
 }
 
-func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
+func (adc *attachDetachController) addNodeToDswp(node *v1.Node) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
 		keepTerminatedPodVolumes := false
 
@@ -749,7 +749,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+		adc.desiredStateOfWorld.AddNode(node, keepTerminatedPodVolumes)
 	}
 }
 

@@ -62,7 +62,7 @@ func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, er
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
-func (attacher *fcAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *fcAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
 	return "", nil
 }
 

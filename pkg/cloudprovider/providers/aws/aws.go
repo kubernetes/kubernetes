@@ -434,7 +434,7 @@ type Volumes interface {
 	// Attach the disk to the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error)
+	AttachDisk(diskName KubernetesVolumeID, node *v1.Node) (string, error)
 	// Detach the disk from the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
@@ -2093,11 +2093,13 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
+func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, node *v1.Node) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
+
+	nodeName := types.NodeName(node.Name)
 
 	awsInstance, info, err := c.getFullInstance(nodeName)
 	if err != nil {

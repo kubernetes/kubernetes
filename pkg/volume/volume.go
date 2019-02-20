@@ -209,7 +209,7 @@ type Attacher interface {
 	// Attaches the volume specified by the given spec to the node with the given Name.
 	// On success, returns the device path where the device was attached on the
 	// node.
-	Attach(spec *Spec, nodeName types.NodeName) (string, error)
+	Attach(spec *Spec, node *v1.Node) (string, error)
 
 	// VolumesAreAttached checks whether the list of volumes still attached to the specified
 	// node. It returns a map which maps from the volume spec to the checking result.

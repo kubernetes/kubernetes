@@ -63,7 +63,7 @@ func (plugin *iscsiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string,
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
-func (attacher *iscsiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *iscsiAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
 	return "", nil
 }
 

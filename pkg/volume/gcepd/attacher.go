@@ -75,7 +75,9 @@ func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string
 // Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, node *v1.Node) (string, error) {
+	nodeName := types.NodeName(node.Name) // FIXME(justinsb): pass node through
+
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
