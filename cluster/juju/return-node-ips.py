@@ -24,6 +24,6 @@ if len(sys.argv) > 1:
     nodes = json.loads(sys.argv[1])
     # There can be multiple nodes to print the Stdout.
     for num in nodes:
-        print num['Stdout'].rstrip()
+        print(num['Stdout'].rstrip())
 else:
     exit(1)
