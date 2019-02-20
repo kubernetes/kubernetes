@@ -43,7 +43,7 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
 	}
 	if obj.MetricsBindAddress == "" {
-		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)
+		obj.MetricsBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyStatusPort)
 	} else if !strings.Contains(obj.MetricsBindAddress, ":") {
 		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
 	}
