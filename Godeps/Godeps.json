@@ -3158,23 +3158,23 @@
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/netutil",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/serror",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/types",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
