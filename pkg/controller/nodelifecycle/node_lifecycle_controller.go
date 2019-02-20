@@ -146,7 +146,7 @@ type Controller struct {
 	kubeClient        clientset.Interface
 
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
-	// to aviod the problem with time skew across the cluster.
+	// to avoid the problem with time skew across the cluster.
 	now func() metav1.Time
 
 	enterPartialDisruptionFunc func(nodeNum int) float32
