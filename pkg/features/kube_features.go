@@ -195,12 +195,14 @@ const (
 
 	// owner: @saad-ali
 	// alpha: v1.12
-	// Enable all logic related to the CSIDriver API object in csi.storage.k8s.io
+	// beta:  v1.14
+	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry utilfeature.Feature = "CSIDriverRegistry"
 
 	// owner: @verult
 	// alpha: v1.12
-	// Enable all logic related to the CSINodeInfo API object in csi.storage.k8s.io
+	// beta:  v1.14
+	// Enable all logic related to the CSINode API object in storage.k8s.io
 	CSINodeInfo utilfeature.Feature = "CSINodeInfo"
 
 	// owner @MrHohn
@@ -448,8 +450,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
-	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
-	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	CSIDriverRegistry:                           {Default: true, PreRelease: utilfeature.Beta},
+	CSINodeInfo:                                 {Default: true, PreRelease: utilfeature.Beta},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	BlockVolume:                                 {Default: true, PreRelease: utilfeature.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},

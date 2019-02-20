@@ -57,7 +57,6 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -400,7 +399,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		DockerClientConfig:  dockerClientConfig,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
-		CSIClient:           nil,
 		EventClient:         nil,
 		Mounter:             mounter,
 		Subpather:           subpather,
@@ -598,10 +596,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// CRDs are JSON only, and client renegotiation for streaming is not correct as per #67803
 		crdClientConfig := restclient.CopyConfig(clientConfig)
 		crdClientConfig.ContentType = "application/json"
-		kubeDeps.CSIClient, err = csiclientset.NewForConfig(crdClientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet storage client: %v", err)
-		}
 
 		kubeDeps.NodeAPIClient, err = nodeapiclientset.NewForConfig(crdClientConfig)
 		if err != nil {

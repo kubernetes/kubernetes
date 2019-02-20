@@ -37,7 +37,6 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
-	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -236,12 +235,12 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCSIClient := fakecsi.NewSimpleClientset(
+			fakeClient := fakeclient.NewSimpleClientset(
 				getCSIDriver("not-attachable", nil, &bFalse),
 				getCSIDriver("attachable", nil, &bTrue),
 				getCSIDriver("nil", nil, nil),
 			)
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeCSIClient)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -274,10 +273,10 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				t.Errorf("Attach() failed: %s", err)
 			}
 			if test.expectVolumeAttachment && attachID == "" {
-				t.Errorf("Epected attachID, got nothing")
+				t.Errorf("Expected attachID, got nothing")
 			}
 			if !test.expectVolumeAttachment && attachID != "" {
-				t.Errorf("Epected empty attachID, got %q", attachID)
+				t.Errorf("Expected empty attachID, got %q", attachID)
 			}
 		})
 	}
@@ -318,12 +317,12 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCSIClient := fakecsi.NewSimpleClientset(
+			fakeClient := fakeclient.NewSimpleClientset(
 				getCSIDriver("not-attachable", nil, &bFalse),
 				getCSIDriver("attachable", nil, &bTrue),
 				getCSIDriver("nil", nil, nil),
 			)
-			plug, tmpDir := newTestPlugin(t, nil, fakeCSIClient)
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -519,7 +518,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttached(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	attacher, err := plug.NewAttacher()
@@ -981,23 +980,20 @@ func TestAttacherUnmountDevice(t *testing.T) {
 }
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*csiPlugin, *watch.RaceFreeFakeWatcher, string, *fakeclient.Clientset) {
+func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlugin, *watch.RaceFreeFakeWatcher, string, *fakeclient.Clientset) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
 	}
 
-	fakeClient := fakeclient.NewSimpleClientset()
-	fakeWatcher := watch.NewRaceFreeFake()
-	fakeClient.Fake.PrependWatchReactor("*", core.DefaultWatchReactor(fakeWatcher, nil))
-	fakeClient.Fake.WatchReactionChain = fakeClient.Fake.WatchReactionChain[:1]
-	if csiClient == nil {
-		csiClient = fakecsi.NewSimpleClientset()
+	if fakeClient == nil {
+		fakeClient = fakeclient.NewSimpleClientset()
 	}
+	fakeWatcher := watch.NewRaceFreeFake()
+	fakeClient.Fake.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatcher, nil))
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
-		csiClient,
 		nil,
 		"node",
 	)

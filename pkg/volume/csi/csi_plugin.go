@@ -36,10 +36,10 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	csiapiinformer "k8s.io/client-go/informers"
+	csiinformer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
-	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
-	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
+	csilister "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -205,16 +205,15 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiClient := host.GetCSIClient()
+		csiClient := host.GetKubeClient()
 		if csiClient == nil {
-			klog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
-		} else {
-			// Start informer for CSIDrivers.
-			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-			p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
-			p.csiDriverLister = p.csiDriverInformer.Lister()
-			go factory.Start(wait.NeverStop)
+			return errors.New("unable to get Kubernetes client")
 		}
+		// Start informer for CSIDrivers.
+		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
+		p.csiDriverInformer = factory.Storage().V1beta1().CSIDrivers()
+		p.csiDriverLister = p.csiDriverInformer.Lister()
+		go factory.Start(wait.NeverStop)
 	}
 
 	// Initializing the label management channels
