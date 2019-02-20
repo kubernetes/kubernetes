@@ -85,6 +85,169 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	return &cfg, nil
 }
 
+type DatastoreFinder struct {
+	defaultDatastore string
+	dc *vclib.Datacenter
+	nodeManager *NodeManager
+	volumeOptions *vclib.VolumeOptions
+}
+
+func NewDatastoreFinder(defaultDatastore string, dc *vclib.Datacenter, nm *NodeManager, volumeOptions *vclib.VolumeOptions) (*DatastoreFinder, error) {
+	return &DatastoreFinder{
+		defaultDatastore: defaultDatastore,
+		dc: dc,
+		nodeManager: nm,
+		volumeOptions: volumeOptions,
+	}, nil
+}
+
+func (df *DatastoreFinder) containsOrErr(sharedDsList []*vclib.DatastoreInfo, datastore string, err error) (string, error) {
+	// Check if the given datastore belongs to the list of shared datastores computed.
+	for _, ds := range sharedDsList {
+		if datastore == ds.Info.Name {
+			return datastore, nil
+		}
+	}
+	klog.Error(err)
+	return "", err
+}
+
+func (df *DatastoreFinder) verifySharedDatastore(ctx context.Context, datastore string) (string, error) {
+	// Verify given datastore is in list of getSharedDatastoresInK8SCluster
+	sharedDsList, err := getSharedDatastoresInK8SCluster(ctx, df.dc, df.nodeManager)
+	if err != nil {
+		klog.Errorf("Failed to get shared datastore: %+v", err)
+		return "", err
+	}
+	err = fmt.Errorf("The specified datastore %s is not a shared datastore across node VMs", datastore)
+	return df.containsOrErr(sharedDsList, datastore, err)
+}
+
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | Zone  | Storage profile | Datastore | Action to take                                        |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 0     | 0               | 0         | Use workspace default datastore and verify            |
+// |       |                 |           | it is in list of getSharedDatastoresInK8SCluster      |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 0     | 0               | 1         | Use given datastore and verify it is in               |
+// |       |                 |           | list of getSharedDatastoresInK8SCluster               |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 0     | 1               | 0         | Use getPbmCompatibleDatastore                         |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 0     | 1               | 1         | Use given datastore and verify it is in               |
+// |       |                 |           | list of getSharedDatastoresInK8SCluster               |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 1     | 0               | 0         | getDatastoresForZone & getMostFreeDatastoreName       |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 1     | 0               | 1         | getDatastoresForZone and verify given                 |
+// |       |                 |           | datastore is in that list                             |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 1     | 1               | 0         | getDatastoresForZone & getPbmCompatibleZonedDatastore |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+// | 1     | 1               | 1         | getDatastoresForZone and verify given                 |
+// |       |                 |           | datastore is in that list                             |
+// +-------+-----------------+-----------+-------------------------------------------------------+
+
+// GetDatastoreForVolume returns the datastore on which the volume should be created.
+// The datstore is found based on the given inputs as per above table.
+func (df *DatastoreFinder) GetDatastoreForVolume(ctx context.Context) (string, error) {
+	const (
+		DatastorePresent = 1
+		ProfilePresent = 2
+		ZonePresent = 4
+	)
+	dispatch := map[uint8]func (context.Context) (string, error) {
+		// when nothing is given
+		0: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 0: No inputs to select datastore")
+			return df.verifySharedDatastore(ctx, df.defaultDatastore)
+		},
+		// when only datastore is given
+		1: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 1: Datastore %s is given", df.volumeOptions.Datastore)
+			return df.verifySharedDatastore(ctx, df.volumeOptions.Datastore)
+		},
+		// when only storage profile is given
+		2: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 2: Storage policy %s is given", df.volumeOptions.StoragePolicyName)
+			return getPbmCompatibleDatastore(ctx, df.dc, df.volumeOptions.StoragePolicyName, df.nodeManager)
+		},
+		// when both datastore and storage profile is given
+		3: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 3: Datastore %s and storage policy %s are given", df.volumeOptions.Datastore, df.volumeOptions.StoragePolicyName)
+			// Just verify whether given datastore is shared. Storage profile compatiblility is checked later in vmdm.
+			return df.verifySharedDatastore(ctx, df.volumeOptions.Datastore)
+		},
+		// when only zone is given
+		4: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 4: Zone %s is given", df.volumeOptions.Zone)
+			// If zone is specified, first get the datastores in the zone.
+			dsList, err := getDatastoresForZone(ctx, df.dc, df.nodeManager, df.volumeOptions.Zone)
+			if err != nil {
+				return "", err
+			}
+			return getMostFreeDatastoreName(ctx, nil, dsList)
+		},
+		// when a datastore and zone is given
+		5: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 5: Datastore %s and Zone %s are given", df.volumeOptions.Datastore, df.volumeOptions.Zone)
+			dsList, err := getDatastoresForZone(ctx, df.dc, df.nodeManager, df.volumeOptions.Zone)
+			if err != nil {
+				return "", err
+			}
+			err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", df.volumeOptions.Datastore, df.volumeOptions.Zone)
+			return df.containsOrErr(dsList, df.volumeOptions.Datastore, err)
+		},
+		// when storage profile and zone are given
+		6: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 6: Storage profile %s and Zone %s are given", df.volumeOptions.StoragePolicyName, df.volumeOptions.Zone)
+			// If zone is specified, first get the datastores in the zone.
+			dsList, err := getDatastoresForZone(ctx, df.dc, df.nodeManager, df.volumeOptions.Zone)
+			if err != nil {
+				return "", err
+			}
+			// If unable to get any datastore, fail the operation.
+			if len(dsList) == 0 {
+				err := fmt.Errorf("Failed to find a shared datastore in zone %s", df.volumeOptions.Zone)
+				klog.Error(err)
+				return "", err
+			}
+
+			klog.V(4).Infof("Specified zone : %s. Picking a datastore as per the storage policy %s among the zoned datastores : %s", df.volumeOptions.Zone,
+				df.volumeOptions.StoragePolicyName, dsList)
+			// Among the compatible datastores, select the one based on the maximum free space.
+			return getPbmCompatibleZonedDatastore(ctx, df.dc, df.volumeOptions.StoragePolicyName, df.volumeOptions.Zone, dsList)
+		},
+		// when a datastore, storage profile and zone are given
+		7: func(ctx context.Context) (string, error) {
+			klog.V(4).Infof("Case 7: Datastore %s, Storage profile %s and Zone %s are given",
+				df.volumeOptions.Datastore, df.volumeOptions.StoragePolicyName, df.volumeOptions.Zone)
+			// Storage profile compatibility is checked later in vmdm. So verify given datastore is in zone here.
+			dsList, err := getDatastoresForZone(ctx, df.dc, df.nodeManager, df.volumeOptions.Zone)
+			if err != nil {
+				return "", err
+			}
+			err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", df.volumeOptions.Datastore, df.volumeOptions.Zone)
+			return df.containsOrErr(dsList, df.volumeOptions.Datastore, err)
+		},
+	}
+
+	var inputState uint8 = 0
+
+	// if datastore is given set 0th bit
+	if df.volumeOptions.Datastore != "" {
+		inputState |=  DatastorePresent
+	}
+	if df.volumeOptions.StoragePolicyName != "" {
+		inputState |= ProfilePresent
+	}
+	if len(df.volumeOptions.Zone) != 0 {
+		inputState |= ZonePresent
+	}
+	return dispatch[inputState](ctx)
+
+}
+
 // Returns the accessible datastores for the given node VM.
 func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
 	accessibleDatastores, err := nodeVmDetail.vm.GetAllAccessibleDatastores(ctx)
@@ -316,7 +479,7 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 	return sharedDatastores, nil
 }
 
-func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, zonedDatastores []*vclib.DatastoreInfo) (string, error) {
+func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, zoneNames []string, zonedDatastores []*vclib.DatastoreInfo) (string, error) {
 	pbmClient, err := vclib.NewPbmClient(ctx, dc.Client())
 	if err != nil {
 		return "", err
@@ -330,7 +493,7 @@ func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, s
 	if err != nil {
 		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
 			zonedDatastores, storagePolicyID, err)
-		return "", err
+		return "", fmt.Errorf("No compatible datastores found in zone %s that satisfy given storage policy %s", zoneNames, storagePolicyName)
 	}
 	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
 	datastore, err := getMostFreeDatastoreName(ctx, dc.Client(), compatibleDatastores)
