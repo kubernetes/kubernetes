@@ -24,10 +24,8 @@
 ./cluster/images/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
-./cluster/kube-down.sh
 ./cluster/kube-up.sh
 ./cluster/kube-util.sh
-./cluster/kubeadm.sh
 ./cluster/kubectl.sh
 ./cluster/kubemark/gce/config-default.sh
 ./cluster/kubemark/iks/config-default.sh
@@ -47,7 +45,6 @@
 ./hack/cherry_pick_pull.sh
 ./hack/generate-bindata.sh
 ./hack/generate-docs.sh
-./hack/get-build.sh
 ./hack/ginkgo-e2e.sh
 ./hack/godep-restore.sh
 ./hack/godep-save.sh
