@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net"
 	"reflect"
 	"strings"
@@ -49,20 +48,35 @@ func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	}
 }
 
-// ValidateSupportedVersion checks if a supplied GroupVersion is not on the list of unsupported GVs. If it is, an error is returned.
-func ValidateSupportedVersion(gv schema.GroupVersion) error {
+// validateSupportedVersion checks if the supplied GroupVersion is not on the lists of old unsupported or deprecated GVs.
+// If it is, an error is returned.
+func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) error {
 	// The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
-	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1 or v1alpha2
+	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Errors if the user tries to use v1alpha1
+	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
+	// v1.14: v1alpha3 convert only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
-	if useKubeadmVersion := oldKnownAPIVersions[gv.String()]; useKubeadmVersion != "" {
+
+	// Deprecated API versions are supported by us, but can only be used for migration.
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1alpha3": {}, // Can be migrated with kubeadm 1.13+
+	}
+
+	gvString := gv.String()
+
+	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
 		return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
 	}
+
+	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
+		return errors.Errorf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
+	}
+
 	return nil
 }
 
@@ -138,23 +152,24 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	return ip, nil
 }
 
-// MigrateOldConfigFromFile migrates an old configuration from a file into a new one (returned as a byte slice). Only kubeadm kinds are migrated. Others are silently ignored.
-func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
+// MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
+// Only kubeadm kinds are migrated. Others are silently ignored.
+func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	newConfig := [][]byte{}
 
-	cfgBytes, err := ioutil.ReadFile(cfgPath)
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	gvks, err := kubeadmutil.GroupVersionKindsFromBytes(cfgBytes)
-	if err != nil {
-		return []byte{}, err
+	gvks := []schema.GroupVersionKind{}
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
 	}
 
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		o, err := LoadInitConfigurationFromFile(cfgPath)
+		o, err := documentMapToInitConfiguration(gvkmap, true)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -167,7 +182,7 @@ func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
 
 	// Migrate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		o, err := LoadJoinConfigurationFromFile(cfgPath)
+		o, err := documentMapToJoinConfiguration(gvkmap, true)
 		if err != nil {
 			return []byte{}, err
 		}

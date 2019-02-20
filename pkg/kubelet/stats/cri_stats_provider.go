@@ -26,10 +26,11 @@ import (
 	"time"
 
 	cadvisorfs "github.com/google/cadvisor/fs"
+	"k8s.io/klog"
+
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -134,12 +135,6 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	}
 	caInfos := getCRICadvisorStats(allInfos)
 
-	// get network stats for containers.
-	containerNetworkStats, err := p.listContainerNetworkStats()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list container network stats: %v", err)
-	}
-
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
@@ -163,7 +158,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 		// Fill available stats for full set of required pod stats
 		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
-		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
+		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs)
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
@@ -373,21 +368,11 @@ func (p *criStatsProvider) addPodNetworkStats(
 	podSandboxID string,
 	caInfos map[string]cadvisorapiv2.ContainerInfo,
 	cs *statsapi.ContainerStats,
-	netStats *statsapi.NetworkStats,
 ) {
 	caPodSandbox, found := caInfos[podSandboxID]
 	// try get network stats from cadvisor first.
 	if found {
-		networkStats := cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
-		if networkStats != nil {
-			ps.Network = networkStats
-			return
-		}
-	}
-
-	// Not found from cadvisor, get from netStats.
-	if netStats != nil {
-		ps.Network = netStats
+		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
 		return
 	}
 

@@ -22,8 +22,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vmware/govmomi/object"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
@@ -34,6 +36,7 @@ type NodeInfo struct {
 	vm         *vclib.VirtualMachine
 	vcServer   string
 	vmUUID     string
+	zone       *cloudprovider.Zone
 }
 
 type NodeManager struct {
@@ -58,6 +61,7 @@ type NodeDetails struct {
 	NodeName string
 	vm       *vclib.VirtualMachine
 	VMUUID   string
+	Zone     *cloudprovider.Zone
 }
 
 // TODO: Make it configurable in vsphere.conf
@@ -190,7 +194,11 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					klog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						node.Name, vm, res.vc, res.datacenter.Name())
 
-					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID}
+					// Get the node zone information
+					nodeFd := node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+					nodeRegion := node.ObjectMeta.Labels[v1.LabelZoneRegion]
+					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
+					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
 					for range queueChannel {
 					}
@@ -309,7 +317,7 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 			return nil, err
 		}
 		klog.V(4).Infof("Updated NodeInfo %v for node %q.", nodeInfo, nodeName)
-		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm, nodeInfo.vmUUID})
+		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm, nodeInfo.vmUUID, nodeInfo.zone})
 	}
 	return nodeDetails, nil
 }
@@ -355,6 +363,7 @@ func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeI
 		dataCenter: vm.Datacenter,
 		vcServer:   nodeInfo.vcServer,
 		vmUUID:     nodeInfo.vmUUID,
+		zone:       nodeInfo.zone,
 	}, nil
 }
 
@@ -441,4 +450,29 @@ func (nm *NodeManager) UpdateCredentialManager(credentialManager *SecretCredenti
 	nm.credentialManagerLock.Lock()
 	defer nm.credentialManagerLock.Unlock()
 	nm.credentialManager = credentialManager
+}
+
+func (nm *NodeManager) GetHostsInZone(ctx context.Context, zoneFailureDomain string) ([]*object.HostSystem, error) {
+	klog.V(9).Infof("GetHostsInZone called with registeredNodes: %v", nm.registeredNodes)
+	nodeDetails, err := nm.GetNodeDetails()
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("Node Details: %v", nodeDetails)
+	// Return those hosts that are in the given zone.
+	hosts := make([]*object.HostSystem, 0)
+	for _, n := range nodeDetails {
+		// Match the provided zone failure domain with the node.
+		klog.V(9).Infof("Matching provided zone %s with node %s zone %s", zoneFailureDomain, n.NodeName, n.Zone.FailureDomain)
+		if zoneFailureDomain == n.Zone.FailureDomain {
+			host, err := n.vm.HostSystem(ctx)
+			if err != nil {
+				klog.Errorf("Failed to get host system for VM %s. err: %+v", n.vm, err)
+				continue
+			}
+			hosts = append(hosts, host)
+		}
+	}
+	klog.V(4).Infof("GetHostsInZone %v returning: %v", zoneFailureDomain, hosts)
+	return hosts, nil
 }

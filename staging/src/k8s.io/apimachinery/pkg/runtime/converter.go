@@ -746,7 +746,7 @@ func isZero(v reflect.Value) bool {
 func structToUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-		dv.Set(reflect.MakeMap(mapStringInterfaceType))
+		dv.Set(reflect.MakeMapWithSize(mapStringInterfaceType, st.NumField()))
 		dv = dv.Elem()
 		dt = dv.Type()
 	}

@@ -4,7 +4,6 @@ cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/apis/kubeadm/v1beta1
-cmd/kubeadm/app/util/config
 cmd/kubeadm/app/util/system
 pkg/apis/abac/latest
 pkg/apis/admission
@@ -53,7 +52,6 @@ pkg/apis/events
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/extensions/validation
 pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
@@ -216,7 +214,6 @@ pkg/kubelet/remote
 pkg/kubelet/secret
 pkg/kubelet/server
 pkg/kubelet/server/portforward
-pkg/kubelet/server/remotecommand
 pkg/kubelet/server/stats
 pkg/kubelet/server/streaming
 pkg/kubelet/stats
@@ -225,10 +222,7 @@ pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubelet/util
-pkg/kubelet/util/cache
 pkg/kubelet/util/pluginwatcher
-pkg/kubelet/util/queue
-pkg/kubelet/util/sliceutils
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
@@ -335,7 +329,6 @@ pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
-pkg/routes
 pkg/scheduler/apis/config/v1alpha1
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
@@ -568,7 +561,6 @@ staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
 staging/src/k8s.io/apiserver/pkg/storage/value
 staging/src/k8s.io/apiserver/pkg/util/feature
-staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
@@ -643,6 +635,7 @@ staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
+staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
@@ -681,7 +674,6 @@ test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress
-test/e2e/framework/metrics
 test/e2e/framework/providers/aws
 test/e2e/framework/providers/azure
 test/e2e/framework/providers/gce

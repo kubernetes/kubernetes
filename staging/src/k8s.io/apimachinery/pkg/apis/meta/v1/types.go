@@ -825,6 +825,9 @@ const (
 	// without the expected return type. The presence of this cause indicates the error may be
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
+	// FieldManagerConflict is used to report when another client claims to manage this field,
+	// It should only be returned for a request using server-side apply.
+	CauseTypeFieldManagerConflict CauseType = "FieldManagerConflict"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

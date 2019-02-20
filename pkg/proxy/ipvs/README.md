@@ -336,7 +336,7 @@ export KUBE_PROXY_MODE=ipvs
 
 If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` and also add `SupportIPVSProxyMode: true` below the `kubeProxy` field as part of the kubeadm configuration.
 
-```json
+```yaml
 ...
 kubeProxy:
   config:

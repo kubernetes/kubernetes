@@ -101,7 +101,13 @@
         "github.com/google/gofuzz",
         "github.com/prometheus/client_golang/prometheus",
         "github.com/robfig/cron",
-        "github.com/spf13/pflag"
+        "github.com/spf13/pflag",
+        "github.com/stretchr/testify/assert",
+        "github.com/stretchr/testify/require",
+        "github.com/google/gofuzz",
+        "github.com/golang/protobuf/ptypes/wrappers",
+        "github.com/golang/protobuf/proto",
+        "github.com/container-storage-interface/spec/lib/go/csi"
       ]
     },
     {
@@ -257,6 +263,8 @@
       "AllowedPrefixes": [
         "k8s.io/csi-api/pkg/apis/csi/v1alpha1",
         "k8s.io/csi-api/pkg/client/clientset/versioned",
+        "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1",
+        "k8s.io/csi-api/pkg/client/informers/externalversions",
         "k8s.io/heapster/metrics/api/v1/types",
         "k8s.io/kube-controller-manager/config/v1alpha1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
@@ -288,7 +296,9 @@
         "google.golang.org/api/compute/v0.alpha",
         "google.golang.org/api/container/v1",
         "google.golang.org/api/compute/v0.beta",
-        "google.golang.org/api/tpu/v1"
+        "google.golang.org/api/tpu/v1",
+        "golang.org/x/net/context",
+        "google.golang.org/grpc"
       ]
     }
   ]

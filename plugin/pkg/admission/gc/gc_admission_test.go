@@ -100,7 +100,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
+	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{})
 	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
@@ -308,7 +308,7 @@ func TestGCAdmission(t *testing.T) {
 			user := &user.DefaultInfo{Name: tc.username}
 			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-			err = gcAdmit.Validate(attributes)
+			err = gcAdmit.Validate(attributes, nil)
 			if !tc.checkError(err) {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -611,7 +611,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-		err := gcAdmit.Validate(attributes)
+		err := gcAdmit.Validate(attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

@@ -257,7 +257,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	Describe("DynamicProvisioner [Slow]", func() {
 		It("should provision storage with different parameters", func() {
-			cloudZone := getRandomClusterZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
 			// that can be used to persist data among pods.
@@ -269,7 +268,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					Provisioner:    "kubernetes.io/gce-pd",
 					Parameters: map[string]string{
 						"type": "pd-ssd",
-						"zone": cloudZone,
+						"zone": getRandomClusterZone(c),
 					},
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
@@ -301,7 +300,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"type": "gp2",
-						"zone": cloudZone,
+						"zone": getRandomClusterZone(c),
 					},
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",

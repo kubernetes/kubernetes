@@ -1004,9 +1004,9 @@ func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*csiPlugin,
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName(csiPluginName)
+	plug, err := plugMgr.FindPluginByName(CSIPluginName)
 	if err != nil {
-		t.Fatalf("can't find plugin %v", csiPluginName)
+		t.Fatalf("can't find plugin %v", CSIPluginName)
 	}
 
 	csiPlug, ok := plug.(*csiPlugin)

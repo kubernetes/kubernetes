@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	smdschema "sigs.k8s.io/structured-merge-diff/schema"
 	"sigs.k8s.io/structured-merge-diff/typed"
 )
 
@@ -49,7 +48,6 @@ func newGVKParser(models proto.Models) (*gvkParser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert models to schema: %v", err)
 	}
-	typeSchema = makeRawExtensionUntyped(typeSchema)
 	parser := gvkParser{
 		gvks: map[schema.GroupVersionKind]string{},
 	}
@@ -119,21 +117,4 @@ func parseGroupVersionKind(s proto.Schema) []schema.GroupVersionKind {
 	}
 
 	return gvkListResult
-}
-
-// makeRawExtensionUntyped explicitly sets RawExtension's type in the schema to Untyped atomic
-// TODO: remove this once kube-openapi is updated to include
-// https://github.com/kubernetes/kube-openapi/pull/133
-func makeRawExtensionUntyped(s *smdschema.Schema) *smdschema.Schema {
-	s2 := &smdschema.Schema{}
-	for _, t := range s.Types {
-		t2 := t
-		if t2.Name == "io.k8s.apimachinery.pkg.runtime.RawExtension" {
-			t2.Atom = smdschema.Atom{
-				Untyped: &smdschema.Untyped{},
-			}
-		}
-		s2.Types = append(s2.Types, t2)
-	}
-	return s2
 }

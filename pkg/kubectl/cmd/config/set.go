@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -37,7 +37,7 @@ type setOptions struct {
 	configAccess  clientcmd.ConfigAccess
 	propertyName  string
 	propertyValue string
-	setRawBytes   flag.Tristate
+	setRawBytes   cliflag.Tristate
 }
 
 var (

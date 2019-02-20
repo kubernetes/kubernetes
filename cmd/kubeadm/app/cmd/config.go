@@ -246,7 +246,10 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(errors.New("The --old-config flag is mandatory"))
 			}
 
-			outputBytes, err := configutil.MigrateOldConfigFromFile(oldCfgPath)
+			oldCfgBytes, err := ioutil.ReadFile(oldCfgPath)
+			kubeadmutil.CheckErr(err)
+
+			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes)
 			kubeadmutil.CheckErr(err)
 
 			if newCfgPath == "" {

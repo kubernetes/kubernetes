@@ -55,13 +55,12 @@ type applyFlags struct {
 	etcdUpgrade        bool
 	criSocket          string
 	newK8sVersionStr   string
-	newK8sVersion      *version.Version
 	imagePullTimeout   time.Duration
 }
 
-// SessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
-func (f *applyFlags) SessionIsInteractive() bool {
-	return !f.nonInteractiveMode
+// sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
+func (f *applyFlags) sessionIsInteractive() bool {
+	return !(f.nonInteractiveMode || f.dryRun || f.force)
 }
 
 // NewCmdApply returns the cobra command for `kubeadm upgrade apply`
@@ -140,7 +139,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Gets the configuration from the kubeadm-config ConfigMap in the cluster
 // - Enforces all version skew policies
 // - Asks the user if they really want to upgrade
-// - Makes sure the control plane images are available locally on the master(s)
+// - Makes sure the control plane images are available locally on the control-plane(s)
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
@@ -151,53 +150,54 @@ func runApply(flags *applyFlags) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infof("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
-	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
 	if len(flags.criSocket) != 0 {
 		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
-		upgradeVars.cfg.NodeRegistration.CRISocket = flags.criSocket
+		cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
 	// Validate requested and validate actual version
 	klog.V(1).Infof("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
+	if err := configutil.NormalizeKubernetesVersion(&cfg.ClusterConfiguration); err != nil {
 		return err
 	}
 
 	// Use normalized version string in all following code.
-	flags.newK8sVersionStr = upgradeVars.cfg.KubernetesVersion
-	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
+	flags.newK8sVersionStr = cfg.KubernetesVersion
+	newK8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
-		return errors.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
+		return errors.Errorf("unable to parse normalized version %q as a semantic version", cfg.KubernetesVersion)
 	}
-	flags.newK8sVersion = k8sVer
 
-	if err := features.ValidateVersion(features.InitFeatureGates, upgradeVars.cfg.FeatureGates, upgradeVars.cfg.KubernetesVersion); err != nil {
+	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return err
 	}
 
 	// Enforce the version skew policies
 	klog.V(1).Infof("[upgrade/version] enforcing version skew policies")
-	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
+	if err := EnforceVersionPolicies(newK8sVersion, flags, versionGetter); err != nil {
 		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
 
-	// If the current session is interactive, ask the user whether they really want to upgrade
-	if flags.SessionIsInteractive() {
+	// If the current session is interactive, ask the user whether they really want to upgrade.
+	if flags.sessionIsInteractive() {
 		if err := InteractivelyConfirmUpgrade("Are you sure you want to proceed with the upgrade?"); err != nil {
 			return err
 		}
 	}
 
+	waiter := getWaiter(flags.dryRun, client)
+
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
 	klog.V(1).Infof("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
+	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
 	componentsToPrepull := constants.MasterComponents
-	if upgradeVars.cfg.Etcd.External == nil && flags.etcdUpgrade {
+	if cfg.Etcd.External == nil && flags.etcdUpgrade {
 		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
 	}
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
@@ -206,13 +206,13 @@ func runApply(flags *applyFlags) error {
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infof("[upgrade/apply] performing upgrade")
-	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.cfg, flags.newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
@@ -231,11 +231,6 @@ func runApply(flags *applyFlags) error {
 
 // SetImplicitFlags handles dynamically defaulting flags based on each other's value
 func SetImplicitFlags(flags *applyFlags) error {
-	// If we are in dry-run or force mode; we should automatically execute this command non-interactively
-	if flags.dryRun || flags.force {
-		flags.nonInteractiveMode = true
-	}
-
 	if len(flags.newK8sVersionStr) == 0 {
 		return errors.New("version string can't be empty")
 	}
@@ -245,10 +240,10 @@ func SetImplicitFlags(flags *applyFlags) error {
 
 // EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
-func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGetter) error {
+func EnforceVersionPolicies(newK8sVersion *version.Version, flags *applyFlags, versionGetter upgrade.VersionGetter) error {
 	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
 
-	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.allowExperimentalUpgrades, flags.allowRCUpgrades)
+	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, newK8sVersion, flags.allowExperimentalUpgrades, flags.allowRCUpgrades)
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {

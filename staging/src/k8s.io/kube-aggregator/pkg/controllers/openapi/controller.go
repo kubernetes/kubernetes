@@ -127,7 +127,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 		return syncRequeueRateLimited, err
 	case httpStatus == http.StatusNotModified:
 	case httpStatus == http.StatusNotFound || returnSpec == nil:
-		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exists")
+		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exist")
 	case httpStatus == http.StatusOK:
 		if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(key, returnSpec, newEtag); err != nil {
 			return syncRequeueRateLimited, err

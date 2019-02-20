@@ -46,7 +46,8 @@ import (
 )
 
 const (
-	csiPluginName = "kubernetes.io/csi"
+	// CSIPluginName is the name of the in-tree CSI Plugin
+	CSIPluginName = "kubernetes.io/csi"
 
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
@@ -147,20 +148,16 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
-		klog.Error(log("registrationHandler.RegisterPlugin failed at CSI.NodeGetInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
-			return unregErr
 		}
 		return err
 	}
 
 	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		klog.Error(log("registrationHandler.RegisterPlugin failed at AddNodeInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
-			return unregErr
 		}
 		return err
 	}
@@ -230,7 +227,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (p *csiPlugin) GetPluginName() string {
-	return csiPluginName
+	return CSIPluginName
 }
 
 // GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle

@@ -83,13 +83,13 @@ To see the different types of tests the Kubernetes end-to-end charm has access
 to, we encourage you to see the upstream documentation on the different types
 of tests, and to strongly understand what subsets of the tests you are running.
 
-[Kinds of tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md#kinds-of-tests)
+[Kinds of tests](https://git.k8s.io/community/contributors/devel/sig-testing/e2e-tests.md#kinds-of-tests)
 
 ### More information on end-to-end testing
 
 Along with the above descriptions, end-to-end testing is a much larger subject
 than this readme can encapsulate. There is far more information in the
-[end-to-end testing guide](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
+[end-to-end testing guide](https://git.k8s.io/community/contributors/devel/sig-testing/e2e-tests.md).
 
 ### Evaluating end-to-end results
 

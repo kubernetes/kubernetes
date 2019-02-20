@@ -15,4 +15,4 @@ $ make push
 ## Version history:
 
 1.0: build cuda-vector-add from CUDA 8.0.
-2.0: build amd64 cuda-vector-add from CUDA 10.0 and ppc64le from CUDA 9.2.
+2.0: build cuda-vector-add from CUDA 10.0

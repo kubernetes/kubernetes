@@ -199,16 +199,12 @@
 ./test/images/volume/rbd/create_block.sh
 ./test/images/volume/rbd/mon.sh
 ./test/images/volume/rbd/osd.sh
-./test/integration/ipamperf/test-performance.sh
-./test/integration/scheduler_perf/test-performance.sh
 ./test/kubemark/common/util.sh
-./test/kubemark/configure-kubectl.sh
 ./test/kubemark/gce/util.sh
 ./test/kubemark/iks/shutdown.sh
 ./test/kubemark/iks/startup.sh
 ./test/kubemark/iks/util.sh
 ./test/kubemark/master-log-dump.sh
-./test/kubemark/pre-existing/util.sh
 ./test/kubemark/resources/start-kubemark-master.sh
 ./test/kubemark/run-e2e-tests.sh
 ./test/kubemark/start-kubemark.sh

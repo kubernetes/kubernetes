@@ -38,6 +38,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"k8s.io/klog"
@@ -170,6 +171,7 @@ type Cloud struct {
 	VirtualMachinesClient   VirtualMachinesClient
 	StorageAccountClient    StorageAccountClient
 	DisksClient             DisksClient
+	SnapshotsClient         *compute.SnapshotsClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
 	metadata                *InstanceMetadataService
@@ -344,6 +346,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		resourceRequestBackoff: resourceRequestBackoff,
 
 		DisksClient:                     newAzDisksClient(azClientConfig),
+		SnapshotsClient:                 newSnapshotsClient(azClientConfig),
 		RoutesClient:                    newAzRoutesClient(azClientConfig),
 		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
 		InterfacesClient:                newAzInterfacesClient(azClientConfig),

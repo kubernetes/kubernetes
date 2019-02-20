@@ -199,28 +199,29 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err    error
 			driver testsuites.TestDriver
 		)
 
 		tests := []struct {
 			name             string
 			driverAttachable bool
-			driverExists     bool
+			deployDriverCRD  bool
 		}{
 			{
 				name:             "should not require VolumeAttach for drivers without attachment",
 				driverAttachable: false,
-				driverExists:     true,
+				deployDriverCRD:  true,
 			},
 			{
 				name:             "should require VolumeAttach for drivers with attachment",
 				driverAttachable: true,
-				driverExists:     true,
+				deployDriverCRD:  true,
 			},
 			{
 				name:             "should preserve attachment policy when no CSIDriver present",
 				driverAttachable: true,
-				driverExists:     false,
+				deployDriverCRD:  false,
 			},
 		}
 
@@ -233,12 +234,14 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Prefix:    "csi-attach",
 				}
 
-				driver = drivers.InitMockCSIDriver(config, test.driverExists, test.driverAttachable, nil)
+				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, test.driverAttachable, nil)
 				driver.CreateDriver()
+				defer driver.CleanupDriver()
 
-				if test.driverExists {
+				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driver)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
 					defer destroyCSIDriver(csics, driver)
-					defer driver.CleanupDriver()
 				}
 
 				By("Creating pod")
@@ -273,7 +276,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					return
 				}
 
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				By("Checking if VolumeAttachment was created for the pod")
@@ -299,6 +302,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	Context("CSI workload information using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err            error
 			driver         testsuites.TestDriver
 			podInfoV1      = "v1"
 			podInfoUnknown = "unknown"
@@ -308,37 +312,37 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		tests := []struct {
 			name                  string
 			podInfoOnMountVersion *string
-			driverExists          bool
+			deployDriverCRD       bool
 			expectPodInfo         bool
 		}{
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=nil",
 				podInfoOnMountVersion: nil,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should be passed when podInfoOnMountVersion=v1",
 				podInfoOnMountVersion: &podInfoV1,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         true,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<empty string>",
 				podInfoOnMountVersion: &podInfoEmpty,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<unknown string>",
 				podInfoOnMountVersion: &podInfoUnknown,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
-				name:          "should not be passed when CSIDriver does not exist",
-				driverExists:  false,
-				expectPodInfo: false,
+				name:            "should not be passed when CSIDriver does not exist",
+				deployDriverCRD: false,
+				expectPodInfo:   false,
 			},
 		}
 		for _, t := range tests {
@@ -350,12 +354,14 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Prefix:    "csi-workload",
 				}
 
-				driver = drivers.InitMockCSIDriver(config, test.driverExists, true, test.podInfoOnMountVersion)
+				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, true, test.podInfoOnMountVersion)
 				driver.CreateDriver()
+				defer driver.CleanupDriver()
 
-				if test.driverExists {
+				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driver)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
 					defer destroyCSIDriver(csics, driver)
-					defer driver.CleanupDriver()
 				}
 
 				By("Creating pod")
@@ -393,7 +399,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				if pod == nil {
 					return
 				}
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 				By("Checking CSI driver logs")
 				// The driver is deployed as a statefulset with stable pod names
@@ -459,6 +465,20 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	}
 }
 
+func waitForCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) error {
+	timeout := 2 * time.Minute
+	driverName := testsuites.GetUniqueDriverName(driver)
+
+	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
+		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
+}
+
 func destroyCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) {
 	driverName := testsuites.GetUniqueDriverName(driver)
 	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
@@ -495,7 +515,7 @@ func deleteVolume(cs clientset.Interface, claim *v1.PersistentVolumeClaim) {
 	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	if err == nil {
 		cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, 2*time.Second, 2*time.Minute)
+		framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute)
 	}
 }
 

@@ -144,7 +144,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 
 	// Write env file with flags for the kubelet to use. We only want to
 	// register the joining node with the specified taints if the node
-	// is not a master. The markmaster phase will register the taints otherwise.
+	// is not a control-plane. The mark-control-plane phase will register the taints otherwise.
 	registerTaintsUsingFlags := cfg.ControlPlane == nil
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(&initCfg.ClusterConfiguration, &initCfg.NodeRegistration, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
