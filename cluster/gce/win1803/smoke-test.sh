@@ -22,8 +22,7 @@
 #      pods, Windows pods, K8s services, and the Internet.
 #   4) Verifying that basic DNS resolution works in Windows pods.
 #
-# This script assumes that it is run from the root of the kubernetes repository
-# and that kubectl is present at client/bin/kubectl.
+# This script assumes that it is run from the root of the kubernetes repository.
 #
 # TODOs:
 #   - Implement the node-to-pod checks.
@@ -41,7 +40,7 @@
 # Override this to use a different kubectl binary.
 kubectl=kubectl
 linux_deployment_timeout=60
-windows_deployment_timeout=240
+windows_deployment_timeout=120
 output_file=/tmp/k8s-smoke-test.out
 
 function check_windows_nodes_are_ready {
@@ -59,6 +58,15 @@ function check_windows_nodes_are_ready {
   echo "Verified that all Windows nodes have status Ready"
 }
 
+function untaint_windows_nodes {
+  # Untaint the windows nodes to allow test workloads without tolerations to be
+  # scheduled onto them.
+  WINDOWS_NODES=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows -o name)
+  for node in $WINDOWS_NODES; do
+    ${kubectl} taint node "$node" node.kubernetes.io/os:NoSchedule-
+  done
+}
+
 function check_no_system_pods_on_windows_nodes {
   windows_system_pods=$(${kubectl} get pods --namespace kube-system \
     -o wide | grep -E "Pending|windows" | wc -w)
@@ -73,6 +81,7 @@ function check_no_system_pods_on_windows_nodes {
 
 linux_webserver_deployment=linux-nginx
 linux_webserver_pod_label=nginx
+linux_webserver_replicas=1
 
 function deploy_linux_webserver_pod {
   echo "Writing example deployment to $linux_webserver_deployment.yaml"
@@ -84,7 +93,7 @@ metadata:
   labels:
     app: $linux_webserver_pod_label
 spec:
-  replicas: 1
+  replicas: $linux_webserver_replicas
   selector:
     matchLabels:
       app: $linux_webserver_pod_label
@@ -107,11 +116,11 @@ EOF
 
   timeout=$linux_deployment_timeout
   while [[ $timeout -gt 0 ]]; do
-    echo "Waiting for Linux $linux_webserver_pod_label pods to become Ready"
+    echo "Waiting for $linux_webserver_replicas Linux $linux_webserver_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$linux_webserver_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
-      | grep "False" | wc -w)
-    if [[ $statuses -eq 0 ]]; then
+      | grep "True" | wc -w)
+    if [[ $statuses -eq $linux_webserver_replicas ]]; then
       break
     else
       sleep 10
@@ -148,6 +157,7 @@ function undeploy_linux_webserver_pod {
 
 linux_command_deployment=linux-ubuntu
 linux_command_pod_label=ubuntu
+linux_command_replicas=1
 
 function deploy_linux_command_pod {
   echo "Writing example deployment to $linux_command_deployment.yaml"
@@ -159,7 +169,7 @@ metadata:
   labels:
     app: $linux_command_pod_label
 spec:
-  replicas: 1
+  replicas: $linux_command_replicas
   selector:
     matchLabels:
       app: $linux_command_pod_label
@@ -183,11 +193,11 @@ EOF
 
   timeout=$linux_deployment_timeout
   while [[ $timeout -gt 0 ]]; do
-    echo "Waiting for Linux $linux_command_pod_label pods to become Ready"
+    echo "Waiting for $linux_command_replicas Linux $linux_command_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$linux_command_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
-      | grep "False" | wc -w)
-    if [[ $statuses -eq 0 ]]; then
+      | grep "True" | wc -w)
+    if [[ $statuses -eq $linux_command_replicas ]]; then
       break
     else
       sleep 10
@@ -237,6 +247,7 @@ function undeploy_linux_command_pod {
 
 windows_webserver_deployment=windows-nettest
 windows_webserver_pod_label=nettest
+windows_webserver_replicas=1
 
 function deploy_windows_webserver_pod {
   echo "Writing example deployment to $windows_webserver_deployment.yaml"
@@ -252,7 +263,7 @@ metadata:
   labels:
     app: $windows_webserver_pod_label
 spec:
-  replicas: 1
+  replicas: $windows_webserver_replicas
   selector:
     matchLabels:
       app: $windows_webserver_pod_label
@@ -280,11 +291,11 @@ EOF
 
   timeout=$windows_deployment_timeout
   while [[ $timeout -gt 0 ]]; do
-    echo "Waiting for Windows $windows_webserver_pod_label pods to become Ready"
+    echo "Waiting for $windows_webserver_replicas Windows $windows_webserver_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$windows_webserver_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
-      | grep "False" | wc -w)
-    if [[ $statuses -eq 0 ]]; then
+      | grep "True" | wc -w)
+    if [[ $statuses -eq $windows_webserver_replicas ]]; then
       break
     else
       sleep 10
@@ -319,6 +330,7 @@ function undeploy_windows_webserver_pod {
 
 windows_command_deployment=windows-powershell
 windows_command_pod_label=powershell
+windows_command_replicas=1
 
 function deploy_windows_command_pod {
   echo "Writing example deployment to $windows_command_deployment.yaml"
@@ -330,7 +342,7 @@ metadata:
   labels:
     app: $windows_command_pod_label
 spec:
-  replicas: 1
+  replicas: $windows_command_replicas
   selector:
     matchLabels:
       app: $windows_command_pod_label
@@ -358,11 +370,11 @@ EOF
 
   timeout=$windows_deployment_timeout
   while [[ $timeout -gt 0 ]]; do
-    echo "Waiting for Windows $windows_command_pod_label pods to become Ready"
+    echo "Waiting for $windows_command_replicas Windows $windows_command_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$windows_command_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
-      | grep "False" | wc -w)
-    if [[ $statuses -eq 0 ]]; then
+      | grep "True" | wc -w)
+    if [[ $statuses -eq $windows_command_replicas ]]; then
       break
     else
       sleep 10
@@ -640,6 +652,7 @@ function cleanup_deployments {
 }
 
 check_windows_nodes_are_ready
+untaint_windows_nodes
 check_no_system_pods_on_windows_nodes
 
 deploy_linux_webserver_pod
