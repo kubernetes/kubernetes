@@ -400,7 +400,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
-		ctx.InformerFactory,
+		ctx.GenericInformerFactory,
 		ctx.InformersStarted,
 	)
 	if err != nil {

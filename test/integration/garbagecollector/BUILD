@@ -12,6 +12,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
@@ -28,6 +29,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
+        "//staging/src/k8s.io/client-go/dynamic/dynamicinformer:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
