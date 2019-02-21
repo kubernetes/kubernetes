@@ -89,14 +89,6 @@
 ./hack/verify-cli-conventions.sh
 ./hack/verify-codegen.sh
 ./hack/verify-description.sh
-./hack/verify-generated-device-plugin.sh
-./hack/verify-generated-docs.sh
-./hack/verify-generated-files.sh
-./hack/verify-generated-kms.sh
-./hack/verify-generated-kubelet-plugin-registration.sh
-./hack/verify-generated-pod-resources.sh
-./hack/verify-generated-protobuf.sh
-./hack/verify-generated-runtime.sh
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
