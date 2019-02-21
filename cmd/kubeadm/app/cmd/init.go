@@ -69,26 +69,6 @@ var (
 		  {{.joinCommand}}
 
 		`)))
-
-	kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-		Unfortunately, an error has occurred:
-			{{ .Error }}
-
-		This error is likely caused by:
-			- The kubelet is not running
-			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-
-		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
-			- 'systemctl status kubelet'
-			- 'journalctl -xeu kubelet'
-
-		Additionally, a control plane component may have crashed or exited when started by the container runtime.
-		To troubleshoot, list all containers using your preferred container runtimes CLI, e.g. docker.
-		Here is one example how you may list all Kubernetes containers running in docker:
-			- 'docker ps -a | grep kube | grep -v pause'
-			Once you have found the failing container, you can inspect its logs with:
-			- 'docker logs CONTAINERID'
-		`)))
 )
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
@@ -107,7 +87,7 @@ type initOptions struct {
 	uploadCerts           bool
 }
 
-// initData defines all the runtime information used when running the kubeadm init worklow;
+// initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
 	cfg                   *kubeadmapi.InitConfiguration
@@ -269,7 +249,7 @@ func AddInitOtherFlags(
 
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
-	// initialize the public kubeadm config API by appling defaults
+	// initialize the public kubeadm config API by applying defaults
 	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 
@@ -469,7 +449,7 @@ func (d *initData) OutputWriter() io.Writer {
 func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
 		if d.dryRun {
-			// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
+			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
 			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, d.cfg.Networking.ServiceSubnet)
 			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
 		} else {
