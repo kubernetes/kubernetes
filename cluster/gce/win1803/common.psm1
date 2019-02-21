@@ -129,7 +129,7 @@ function MustDownload-File {
         continue
       }
       # Attempt to validate the hash
-      if ($Hash -ne $null) {
+      if ($Hash) {
         Try {
             Validate-SHA1 -Hash $Hash -Path $OutFile
         } Catch {
