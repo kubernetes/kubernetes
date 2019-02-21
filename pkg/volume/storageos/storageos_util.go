@@ -69,6 +69,7 @@ type apiImplementer interface {
 	VolumeMount(opts storageostypes.VolumeMountOptions) error
 	VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error
 	VolumeDelete(opt storageostypes.DeleteOptions) error
+	VolumeUpdate(opt storageostypes.VolumeUpdateOptions) (*storageostypes.Volume, error)
 	Node(ref string) (*storageostypes.Node, error)
 }
 
@@ -303,6 +304,17 @@ func (u *storageosUtil) DeviceDir(b *storageosMounter) string {
 		return defaultDeviceDir
 	}
 	return ctrl.DeviceDir
+}
+
+// ExpandVolume expands a volume to a new size(in GiB).
+func (u *storageosUtil) ExpandVolume(volumeName, volumeNamespace string, size int) error {
+	opts := storageostypes.VolumeUpdateOptions{
+		Name:      volumeName,
+		Namespace: volumeNamespace,
+		Size:      size,
+	}
+	_, err := u.api.VolumeUpdate(opts)
+	return err
 }
 
 // pathMode returns the FileMode for a path.

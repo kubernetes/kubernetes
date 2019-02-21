@@ -83,10 +83,16 @@ type fakePDManager struct {
 	unmountCalled      bool
 	createCalled       bool
 	deleteCalled       bool
+	expandCalled       bool
 }
 
 func (fake *fakePDManager) NewAPI(apiCfg *storageosAPIConfig) error {
 	fake.api = fakeAPI{}
+	return nil
+}
+
+func (fake *fakePDManager) ExpandVolume(volumeName, volumeNamespace string, size int) error {
+	fake.expandCalled = true
 	return nil
 }
 

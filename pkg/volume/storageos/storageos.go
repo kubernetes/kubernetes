@@ -50,6 +50,7 @@ var _ volume.VolumePlugin = &storageosPlugin{}
 var _ volume.PersistentVolumePlugin = &storageosPlugin{}
 var _ volume.DeletableVolumePlugin = &storageosPlugin{}
 var _ volume.ProvisionableVolumePlugin = &storageosPlugin{}
+var _ volume.ExpandableVolumePlugin = &storageosPlugin{}
 
 const (
 	storageosPluginName = "kubernetes.io/storageos"
@@ -176,20 +177,9 @@ func (plugin *storageosPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.StorageOS is nil")
 	}
 
-	class, err := util.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
+	adminSecretName, adminSecretNamespace, err := getSecretReferenceForPV(plugin.host.GetKubeClient(), spec.PersistentVolume)
 	if err != nil {
 		return nil, err
-	}
-
-	var adminSecretName, adminSecretNamespace string
-
-	for k, v := range class.Parameters {
-		switch strings.ToLower(k) {
-		case "adminsecretname":
-			adminSecretName = v
-		case "adminsecretnamespace":
-			adminSecretNamespace = v
-		}
 	}
 
 	apiCfg, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
@@ -259,6 +249,51 @@ func (plugin *storageosPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *storageosPlugin) RequiresFSResize() bool {
+	return false
+}
+
+func (plugin *storageosPlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	// Obtain the Volume Source from spec.
+	src, _, err := getPersistentVolumeSource(spec)
+	if err != nil {
+		return oldSize, err
+	}
+
+	// Get Secret reference.
+	adminSecretName, adminSecretNamespace, err := getSecretReferenceForPV(plugin.host.GetKubeClient(), spec.PersistentVolume)
+	if err != nil {
+		return oldSize, err
+	}
+
+	// Obtain API Config from the secret.
+	apiCfg, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
+	if err != nil {
+		return oldSize, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
+	}
+
+	// Configure StorageOS manager with the obtained API Config.
+	manager := &storageosUtil{}
+	if err := manager.NewAPI(apiCfg); err != nil {
+		return oldSize, fmt.Errorf("failed to get new API: %v", err)
+	}
+
+	requestGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
+
+	if err := manager.ExpandVolume(src.VolumeName, src.VolumeNamespace, requestGiB); err != nil {
+		return oldSize, err
+	}
+
+	return newSizeQuant, nil
+}
+
 func getVolumeSource(spec *volume.Spec) (*v1.StorageOSVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.StorageOS != nil {
 		return spec.Volume.StorageOS, spec.Volume.StorageOS.ReadOnly, nil
@@ -291,6 +326,8 @@ type storageosManager interface {
 	UnmountVolume(unounter *storageosUnmounter) error
 	// Deletes the storageos volume.  All data will be lost.
 	DeleteVolume(deleter *storageosDeleter) error
+	// Expands the storageos volume to a new size.
+	ExpandVolume(volumeName, volumeNamespace string, size int) error
 	// Gets the node's device path.
 	DeviceDir(mounter *storageosMounter) string
 }
@@ -770,4 +807,29 @@ func parseAPIConfig(params map[string]string) (*storageosAPIConfig, error) {
 	}
 
 	return c, nil
+}
+
+// getSecretReferenceForPV returns Name and Namespace reference of a Secret from
+// Persistent Volume Parameters.
+func getSecretReferenceForPV(kubeClient clientset.Interface, pv *v1.PersistentVolume) (string, string, error) {
+	class, err := util.GetClassForVolume(kubeClient, pv)
+	if err != nil {
+		return "", "", err
+	}
+
+	var adminSecretName, adminSecretNamespace string
+
+	for k, v := range class.Parameters {
+		switch strings.ToLower(k) {
+		case "adminsecretname":
+			adminSecretName = v
+		case "adminsecretnamespace":
+			adminSecretNamespace = v
+		}
+	}
+
+	if adminSecretName == "" && adminSecretNamespace == "" {
+		return "", "", fmt.Errorf("secret reference not found in Persisent Volume parameters")
+	}
+	return adminSecretName, adminSecretNamespace, nil
 }
