@@ -46,8 +46,10 @@ func (r *ASCIIRenderer) NormalText(out *bytes.Buffer, text []byte) {
 	lines := strings.Split(raw, linebreak)
 	for _, line := range lines {
 		trimmed := strings.Trim(line, " \n\t")
+		if len(trimmed) > 0 && trimmed[0] != '_' {
+			out.WriteString(" ")
+		}
 		out.WriteString(trimmed)
-		out.WriteString(" ")
 	}
 }
 
