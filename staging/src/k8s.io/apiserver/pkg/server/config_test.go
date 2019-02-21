@@ -57,7 +57,7 @@ func TestNewWithDelegate(t *testing.T) {
 	})
 
 	delegatePostStartHookChan := make(chan struct{})
-	delegateServer.AddPostStartHook("delegate-post-start-hook", func(context PostStartHookContext) error {
+	delegateServer.AddPostStartHookOrDie("delegate-post-start-hook", func(context PostStartHookContext) error {
 		defer close(delegatePostStartHookChan)
 		return nil
 	})
@@ -85,7 +85,7 @@ func TestNewWithDelegate(t *testing.T) {
 	})
 
 	wrappingPostStartHookChan := make(chan struct{})
-	wrappingServer.AddPostStartHook("wrapping-post-start-hook", func(context PostStartHookContext) error {
+	wrappingServer.AddPostStartHookOrDie("wrapping-post-start-hook", func(context PostStartHookContext) error {
 		defer close(wrappingPostStartHookChan)
 		return nil
 	})

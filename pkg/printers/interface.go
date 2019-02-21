@@ -46,7 +46,6 @@ type PrintOptions struct {
 	WithNamespace      bool
 	WithKind           bool
 	Wide               bool
-	ShowAll            bool
 	ShowLabels         bool
 	AbsoluteTimestamps bool
 	Kind               schema.GroupKind

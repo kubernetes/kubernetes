@@ -8,7 +8,8 @@ import (
 var (
 	// LoginAPIPrefix is a partial path to the HTTP endpoint.
 	LoginAPIPrefix = "auth/login"
-	ErrLoginFailed = errors.New("Failed to get token from API endpoint")
+	// ErrLoginFailed is the error returned on an unsuccessful login.
+	ErrLoginFailed = errors.New("failed to get token from API endpoint")
 )
 
 // Login attemps to get a token from the API

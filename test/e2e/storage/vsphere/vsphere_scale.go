@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			case storageclass4:
 				scParams[Datastore] = datastoreName
 			}
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams, nil))
 			Expect(sc).NotTo(BeNil(), "Storage class is empty")
 			Expect(err).NotTo(HaveOccurred(), "Failed to create storage class")
 			defer client.StorageV1().StorageClasses().Delete(scname, nil)

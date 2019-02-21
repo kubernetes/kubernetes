@@ -788,3 +788,40 @@ func TestFormatAndMount(t *testing.T) {
 		}
 	}
 }
+
+func TestNewSMBMapping(t *testing.T) {
+	tests := []struct {
+		username    string
+		password    string
+		remotepath  string
+		expectError bool
+	}{
+		{
+			"",
+			"password",
+			`\\remotepath`,
+			true,
+		},
+		{
+			"username",
+			"",
+			`\\remotepath`,
+			true,
+		},
+		{
+			"username",
+			"password",
+			"",
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		_, err := newSMBMapping(test.username, test.password, test.remotepath)
+		if test.expectError {
+			assert.NotNil(t, err, "Expect error during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
+		} else {
+			assert.Nil(t, err, "Expect error is nil during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
+		}
+	}
+}

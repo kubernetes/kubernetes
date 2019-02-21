@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -1069,7 +1069,7 @@ func contains(fields []string, field string) bool {
 }
 
 func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
-	ingress := extensions.Ingress{
+	ingress := networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
@@ -1077,13 +1077,13 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 				"app_name": "kubectl_test_ingress",
 			},
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: networking.IngressSpec{
+			Backend: &networking.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
 			},
 		},
-		Status: extensions.IngressStatus{
+		Status: networking.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{

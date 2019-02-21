@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volerr "k8s.io/cloud-provider/volume/errors"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
@@ -505,12 +505,12 @@ func newDiskMetricContextRegional(request, region string) *metricContext {
 // GetLabelsForVolume retrieved the label info for the provided volume
 func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.GCEPersistentDisk.PDName == volume.ProvisionedVolumeName {
+	if pv.Spec.GCEPersistentDisk.PDName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone := pv.Labels[kubeletapis.LabelZoneFailureDomain]
+	zone := pv.Labels[v1.LabelZoneFailureDomain]
 
 	labels, err := g.GetAutoLabelsForPD(pv.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
@@ -731,7 +731,7 @@ func getDiskType(diskType string) (string, error) {
 func (g *Cloud) DeleteDisk(diskToDelete string) error {
 	err := g.doDeleteDisk(diskToDelete)
 	if isGCEError(err, "resourceInUseByAnotherResource") {
-		return volume.NewDeletedVolumeInUseError(err.Error())
+		return volerr.NewDeletedVolumeInUseError(err.Error())
 	}
 
 	if err == cloudprovider.DiskNotFound {
@@ -748,7 +748,7 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	}
 
 	// GCE resizes in chunks of GiBs
-	requestGIB := volumeutil.RoundUpToGiB(newSize)
+	requestGIB := volumehelpers.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return
@@ -812,7 +812,7 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 		// However it is more consistent to ensure the disk exists,
 		// and in future we may gather addition information (e.g. disk type, IOPS etc)
 		if utilfeature.DefaultFeatureGate.Enabled(cloudfeatures.GCERegionalPersistentDisk) {
-			zoneSet, err := volumeutil.LabelZonesToSet(zone)
+			zoneSet, err := volumehelpers.LabelZonesToSet(zone)
 			if err != nil {
 				klog.Warningf("Failed to parse zone field: %q. Will use raw field.", zone)
 			}
@@ -845,16 +845,16 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD did not have zone/region information: %v", disk)
 		}
-		labels[kubeletapis.LabelZoneFailureDomain] = zoneInfo.zone
-		labels[kubeletapis.LabelZoneRegion] = disk.Region
+		labels[v1.LabelZoneFailureDomain] = zoneInfo.zone
+		labels[v1.LabelZoneRegion] = disk.Region
 	case multiZone:
 		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
 		}
-		labels[kubeletapis.LabelZoneFailureDomain] =
-			volumeutil.ZonesSetToLabelValue(zoneInfo.replicaZones)
-		labels[kubeletapis.LabelZoneRegion] = disk.Region
+		labels[v1.LabelZoneFailureDomain] =
+			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
+		labels[v1.LabelZoneRegion] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check
 		return nil, fmt.Errorf("PD did not have ZoneInfo: %v", disk)

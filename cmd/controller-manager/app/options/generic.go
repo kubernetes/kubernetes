@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -48,7 +48,7 @@ func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.Gene
 }
 
 // AddFlags adds flags related to generic for controller manager to the specified FlagSet.
-func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverflag.NamedFlagSets, allControllers, disabledByDefaultControllers []string) {
+func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.NamedFlagSets, allControllers, disabledByDefaultControllers []string) {
 	if o == nil {
 		return
 	}

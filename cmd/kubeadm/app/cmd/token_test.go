@@ -176,7 +176,7 @@ func TestRunCreateToken(t *testing.T) {
 			cfg := &kubeadmapiv1beta1.InitConfiguration{
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 					// KubernetesVersion is not used, but we set this explicitly to avoid
-					// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+					// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
 					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 				},
 				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{

@@ -81,7 +81,7 @@ type podTolerationsPlugin struct {
 // instead if specified. Tolerations to a namespace are assigned via
 // scheduler.alpha.kubernetes.io/defaultTolerations and scheduler.alpha.kubernetes.io/tolerationsWhitelist
 // annotations keys.
-func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -134,9 +134,9 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 	pod.Spec.Tolerations = finalTolerations
 
-	return p.Validate(a)
+	return p.Validate(a, o)
 }
-func (p *podTolerationsPlugin) Validate(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}

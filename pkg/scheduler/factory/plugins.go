@@ -412,23 +412,23 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	predicates := map[string]predicates.FitPredicate{}
+	fitPredicates := map[string]predicates.FitPredicate{}
 	for _, name := range names.List() {
 		factory, ok := fitPredicateMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid predicate name %q specified - no corresponding function found", name)
+			return nil, fmt.Errorf("invalid predicate name %q specified - no corresponding function found", name)
 		}
-		predicates[name] = factory(args)
+		fitPredicates[name] = factory(args)
 	}
 
 	// Always include mandatory fit predicates.
 	for name := range mandatoryFitPredicates {
 		if factory, found := fitPredicateMap[name]; found {
-			predicates[name] = factory(args)
+			fitPredicates[name] = factory(args)
 		}
 	}
 
-	return predicates, nil
+	return fitPredicates, nil
 }
 
 func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMetadataProducer, error) {
@@ -455,11 +455,11 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]pr
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	configs := []priorities.PriorityConfig{}
+	var configs []priorities.PriorityConfig
 	for _, name := range names.List() {
 		factory, ok := priorityFunctionMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
+			return nil, fmt.Errorf("invalid priority name %s specified - no corresponding function found", name)
 		}
 		if factory.Function != nil {
 			configs = append(configs, priorities.PriorityConfig{
@@ -489,7 +489,7 @@ func validateSelectedConfigs(configs []priorities.PriorityConfig) error {
 	for _, config := range configs {
 		// Checks totalPriority against MaxTotalPriority to avoid overflow
 		if config.Weight*schedulerapi.MaxPriority > schedulerapi.MaxTotalPriority-totalPriority {
-			return fmt.Errorf("Total priority of priority functions has overflown")
+			return fmt.Errorf("total priority of priority functions has overflown")
 		}
 		totalPriority += config.Weight * schedulerapi.MaxPriority
 	}
@@ -542,7 +542,7 @@ func ListRegisteredFitPredicates() []string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	names := []string{}
+	var names []string
 	for name := range fitPredicateMap {
 		names = append(names, name)
 	}
@@ -554,7 +554,7 @@ func ListRegisteredPriorityFunctions() []string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	names := []string{}
+	var names []string
 	for name := range priorityFunctionMap {
 		names = append(names, name)
 	}

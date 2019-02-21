@@ -188,6 +188,10 @@ if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
 
+if [[ -n "${FULL_LOG:-}" ]] ; then
+  go_test_grep_pattern=".*"
+fi
+
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
@@ -222,6 +226,10 @@ verifyAndSuggestPackagePath() {
   local alternative_package_path="$2"
   local original_package_path="$3"
   local suggestion_package_path="$4"
+
+  if [[ "${specified_package_path}" =~ '/...'$ ]]; then
+    specified_package_path=${specified_package_path::-4}
+  fi
 
   if ! [ -d "${specified_package_path}" ]; then
     # Because k8s sets a localized $GOPATH for testing, seeing the actual

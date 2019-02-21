@@ -56,10 +56,12 @@ func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 	if err := m.Writer.Write("DESCRIPTION:"); err != nil {
 		return err
 	}
+	empty := true
 	for i, desc := range append(m.Descriptions, schema.GetDescription()) {
 		if desc == "" {
 			continue
 		}
+		empty = false
 		if i != 0 {
 			if err := m.Writer.Write(""); err != nil {
 				return err
@@ -68,6 +70,9 @@ func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 		if err := m.Writer.Indent(descriptionIndentLevel).WriteWrapped(desc); err != nil {
 			return err
 		}
+	}
+	if empty {
+		return m.Writer.Indent(descriptionIndentLevel).WriteWrapped("<empty>")
 	}
 	return nil
 }
@@ -132,6 +137,15 @@ func (m *modelPrinter) VisitPrimitive(p *proto.Primitive) {
 		return
 	}
 	m.Error = m.PrintDescription(p)
+}
+
+func (m *modelPrinter) VisitArbitrary(a *proto.Arbitrary) {
+	if err := m.PrintKindAndVersion(); err != nil {
+		m.Error = err
+		return
+	}
+
+	m.Error = m.PrintDescription(a)
 }
 
 // VisitReference recurses inside the subtype, while collecting the description.

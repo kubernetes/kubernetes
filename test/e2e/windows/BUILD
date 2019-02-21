@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "density.go",
         "framework.go",
+        "networking.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/windows",
     visibility = ["//visibility:public"],
@@ -15,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",

@@ -337,6 +337,18 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
+		// Support create on update, if forced to.
+		if forceAllowCreate {
+			obj, err := objInfo.UpdatedObject(ctx, nil)
+			if err != nil {
+				return nil, false, err
+			}
+			createdObj, err := rs.Create(ctx, obj, createValidation, &metav1.CreateOptions{DryRun: options.DryRun})
+			if err != nil {
+				return nil, false, err
+			}
+			return createdObj, true, nil
+		}
 		return nil, false, err
 	}
 	oldService := oldObj.(*api.Service)

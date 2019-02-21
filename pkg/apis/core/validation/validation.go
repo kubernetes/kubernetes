@@ -1969,8 +1969,6 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
@@ -2082,13 +2080,6 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	}
 
 	return allErrs
-}
-
-func fsResourceIsEphemeralStorage(resource string) bool {
-	if resource == "limits.ephemeral-storage" || resource == "requests.ephemeral-storage" {
-		return true
-	}
-	return false
 }
 
 func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
@@ -2271,6 +2262,14 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
+
+		if len(mnt.SubPathExpr) > 0 {
+			if len(mnt.SubPath) > 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "subPathExpr and subPath are mutually exclusive"))
+			}
+
+			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPathExpr, fldPath.Child("subPathExpr"))...)
 		}
 
 		if mnt.MountPropagation != nil {
@@ -3724,9 +3723,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
-			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
@@ -3825,8 +3822,6 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
@@ -4020,7 +4015,7 @@ func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path)
 		vol := &volumes[i]
 		idxPath := fldPath.Index(i)
 		if vol.GCEPersistentDisk != nil {
-			if vol.GCEPersistentDisk.ReadOnly == false {
+			if !vol.GCEPersistentDisk.ReadOnly {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
 			}
 		}
@@ -4364,15 +4359,6 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		}
 	}
 	return allErrs
-}
-
-// isLocalStorageResource checks whether the resource is local ephemeral storage
-func isLocalStorageResource(name string) bool {
-	if name == string(core.ResourceEphemeralStorage) || name == string(core.ResourceRequestsEphemeralStorage) ||
-		name == string(core.ResourceLimitsEphemeralStorage) {
-		return true
-	}
-	return false
 }
 
 // Validate resource names that can go in a resource quota
@@ -4981,10 +4967,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
-		allErrs = append(allErrs, err)
-	}
-
+	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
 	return allErrs
 }
 
@@ -5129,8 +5112,6 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}

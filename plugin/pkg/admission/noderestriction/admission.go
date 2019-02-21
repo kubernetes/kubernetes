@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -101,7 +102,7 @@ var (
 	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
 )
 
-func (c *nodePlugin) Admit(a admission.Attributes) error {
+func (c *nodePlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	nodeName, isNode := c.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
 	// Our job is just to restrict nodes
@@ -434,7 +435,7 @@ func (c *nodePlugin) getForbiddenCreateLabels(modifiedLabels sets.String) sets.S
 	for label := range modifiedLabels {
 		namespace := getLabelNamespace(label)
 		// forbid kubelets from setting node-restriction labels
-		if namespace == kubeletapis.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+kubeletapis.LabelNamespaceNodeRestriction) {
+		if namespace == v1.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+v1.LabelNamespaceNodeRestriction) {
 			forbiddenLabels.Insert(label)
 		}
 	}
@@ -451,7 +452,7 @@ func (c *nodePlugin) getForbiddenUpdateLabels(modifiedLabels sets.String) sets.S
 	for label := range modifiedLabels {
 		namespace := getLabelNamespace(label)
 		// forbid kubelets from setting node-restriction labels
-		if namespace == kubeletapis.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+kubeletapis.LabelNamespaceNodeRestriction) {
+		if namespace == v1.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+v1.LabelNamespaceNodeRestriction) {
 			forbiddenLabels.Insert(label)
 		}
 		// forbid kubelets from setting unknown kubernetes.io and k8s.io labels on update

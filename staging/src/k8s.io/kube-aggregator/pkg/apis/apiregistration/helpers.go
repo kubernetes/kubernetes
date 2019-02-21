@@ -25,6 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 )
 
+// SortedByGroupAndVersion sorts APIServices into their different groups, and then sorts them based on their versions.
+// For example, the first element of the first array contains the APIService with the highest version number, in the
+// group with the highest priority; while the last element of the last array contains the APIService with the lowest
+// version number, in the group with the lowest priority.
 func SortedByGroupAndVersion(servers []*APIService) [][]*APIService {
 	serversByGroupPriorityMinimum := ByGroupPriorityMinimum(servers)
 	sort.Sort(serversByGroupPriorityMinimum)

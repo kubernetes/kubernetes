@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -118,7 +116,7 @@ func GetClusterName(instancePrefix string) string {
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
 func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	clusterName := GetClusterName(instancePrefix)
 
 	fws := []*compute.Firewall{}

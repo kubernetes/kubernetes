@@ -94,7 +94,7 @@ func readConfig(config io.Reader) *pluginConfig {
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
-func (p *podNodeSelector) Admit(a admission.Attributes) error {
+func (p *podNodeSelector) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -117,11 +117,11 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	// second selector wins
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return p.Validate(a)
+	return p.Validate(a, o)
 }
 
 // Validate ensures that the pod node selector is allowed
-func (p *podNodeSelector) Validate(a admission.Attributes) error {
+func (p *podNodeSelector) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}

@@ -3141,7 +3141,7 @@ message PodSpec {
   // If specified, all readiness gates will be evaluated for pod readiness.
   // A pod is ready when all its containers are ready AND
   // all conditions specified in the readiness gates have status equal to "True"
-  // More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+  // More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md
   // +optional
   repeated PodReadinessGate readinessGates = 28;
 
@@ -3149,7 +3149,7 @@ message PodSpec {
   // to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
   // If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
   // empty definition that uses the default runtime handler.
-  // More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
+  // More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
   // This is an alpha feature and may change in the future.
   // +optional
   optional string runtimeClassName = 29;
@@ -4292,7 +4292,7 @@ message ServiceSpec {
   // "LoadBalancer" builds on NodePort and creates an
   // external load-balancer (if supported in the current cloud) which routes
   // to the clusterIP.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services---service-types
+  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   // +optional
   optional string type = 4;
 
@@ -4604,6 +4604,14 @@ message VolumeMount {
   // This field is beta in 1.10.
   // +optional
   optional string mountPropagation = 5;
+
+  // Expanded path within the volume from which the container's volume should be mounted.
+  // Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+  // Defaults to "" (volume's root).
+  // SubPathExpr and SubPath are mutually exclusive.
+  // This field is alpha in 1.14.
+  // +optional
+  optional string subPathExpr = 6;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

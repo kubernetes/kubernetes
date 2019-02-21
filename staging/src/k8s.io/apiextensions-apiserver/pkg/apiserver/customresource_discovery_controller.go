@@ -136,7 +136,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Categories:   crd.Status.AcceptedNames.Categories,
 		})
 
-		subresources, err := getSubresourcesForVersion(crd, version.Version)
+		subresources, err := apiextensions.GetSubresourcesForVersion(crd, version.Version)
 		if err != nil {
 			return err
 		}

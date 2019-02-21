@@ -161,33 +161,14 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 	return nil
 }
 
-// ConfigFileAndDefaultsToInternalConfig takes a path to a config file and a versioned configuration that can serve as the default config
-// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
-// Then the external, versioned configuration is defaulted and converted to the internal type.
-// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
-// Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+// DefaultedInitConfiguration takes a versioned init config (often populated by flags), defaults it and converts it into internal InitConfiguration
+func DefaultedInitConfiguration(defaultversionedcfg *kubeadmapiv1beta1.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
 	internalcfg := &kubeadmapi.InitConfiguration{}
 
-	if cfgPath != "" {
-		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags
-		klog.V(1).Infoln("loading configuration from the given file")
-
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
-		}
-		internalcfg, err = BytesToInternalConfig(b)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
-		// static default values to cfg only for values not provided with flags
-		kubeadmscheme.Scheme.Default(defaultversionedcfg)
-		kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
-	}
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
+	// static default values to cfg only for values not provided with flags
+	kubeadmscheme.Scheme.Default(defaultversionedcfg)
+	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
@@ -200,22 +181,55 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	return internalcfg, nil
 }
 
-// BytesToInternalConfig converts a byte slice to an internal, defaulted and validated configuration object.
-// The byte slice may contain one or many different YAML documents. These YAML documents are parsed one-by-one
-// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct
-func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
-	var initcfg *kubeadmapi.InitConfiguration
-	var clustercfg *kubeadmapi.ClusterConfiguration
-	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
+// LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
+func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
+	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
+	b, err := ioutil.ReadFile(cfgPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
+	}
+
+	return BytesToInitConfiguration(b)
+}
+
+// LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// Then the external, versioned configuration is defaulted and converted to the internal type.
+// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Lastly, the internal config is validated and returned.
+func LoadOrDefaultInitConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+	if cfgPath != "" {
+		// Loads configuration from config file, if provided
+		// Nb. --config overrides command line flags
+		return LoadInitConfigurationFromFile(cfgPath)
+	}
+
+	return DefaultedInitConfiguration(defaultversionedcfg)
+}
+
+// BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
+// The map may contain many different YAML documents. These YAML documents are parsed one-by-one
+// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
+// The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 	if err != nil {
 		return nil, err
 	}
 
+	return documentMapToInitConfiguration(gvkmap, false)
+}
+
+// documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
+func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, allowDeprecated bool) (*kubeadmapi.InitConfiguration, error) {
+	var initcfg *kubeadmapi.InitConfiguration
+	var clustercfg *kubeadmapi.ClusterConfiguration
+	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
+
 	for gvk, fileContent := range gvkmap {
-		// first, check if this GVK is supported one
-		if err := ValidateSupportedVersion(gvk.GroupVersion()); err != nil {
+		// first, check if this GVK is supported and possibly not deprecated
+		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated); err != nil {
 			return nil, err
 		}
 
@@ -287,6 +301,17 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
 		}
 	}
+
+	// Applies dynamic defaults to settings not provided with flags
+	if err := SetInitDynamicDefaults(initcfg); err != nil {
+		return nil, err
+	}
+
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err := validation.ValidateInitConfiguration(initcfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+
 	return initcfg, nil
 }
 

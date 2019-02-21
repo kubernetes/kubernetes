@@ -25,18 +25,18 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // APIEnablementOptions contains the options for which resources to turn on and off.
 // Given small aggregated API servers, this option isn't required for "normal" API servers
 type APIEnablementOptions struct {
-	RuntimeConfig utilflag.ConfigurationMap
+	RuntimeConfig cliflag.ConfigurationMap
 }
 
 func NewAPIEnablementOptions() *APIEnablementOptions {
 	return &APIEnablementOptions{
-		RuntimeConfig: make(utilflag.ConfigurationMap),
+		RuntimeConfig: make(cliflag.ConfigurationMap),
 	}
 }
 
@@ -84,6 +84,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 
 // ApplyTo override MergedResourceConfig with defaults and registry
 func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *serverstore.ResourceConfig, registry resourceconfig.GroupVersionRegistry) error {
+
 	if s == nil {
 		return nil
 	}

@@ -56,6 +56,7 @@ fi
 # won't pick them up.
 REQUIRED_BINS=(
   "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/bazelbuild/buildtools/buildozer"
   "github.com/cespare/prettybench"
   "github.com/client9/misspell/cmd/misspell"
   "github.com/cloudflare/cfssl/cmd/cfssl"
@@ -101,6 +102,8 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - dep-approvers
 __EOF__

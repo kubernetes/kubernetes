@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,29 +51,37 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
 
 	It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should create a ResourceQuota and capture the life of a service.", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -83,7 +92,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Ensuring resource quota status captures service creation")
 		usedResources = v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourceServices] = resource.MustParse("1")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -116,16 +125,20 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		defaultSecrets := fmt.Sprintf("%d", found)
 		hardSecrets := fmt.Sprintf("%d", found+1)
 
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
 		resourceQuota.Spec.Hard[v1.ResourceSecrets] = resource.MustParse(hardSecrets)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourceSecrets] = resource.MustParse(defaultSecrets)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -154,15 +167,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a pod.", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -181,7 +198,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		podToUpdate := pod
 
 		By("Ensuring ResourceQuota status captures the pod usage")
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourcePods] = resource.MustParse("1")
 		usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
 		usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
@@ -229,7 +246,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourcePods] = resource.MustParse("0")
 		usedResources[v1.ResourceCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceMemory] = resource.MustParse("0")
@@ -256,15 +273,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		defaultConfigMaps := fmt.Sprintf("%d", found)
 		hardConfigMaps := fmt.Sprintf("%d", found+1)
 
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourceConfigMaps] = resource.MustParse(defaultConfigMaps)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -276,7 +297,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Ensuring resource quota status captures configMap creation")
 		usedResources = v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		// we expect there to be two configmaps because each namespace will receive
 		// a ca.crt configmap by default.
 		// ref:https://github.com/kubernetes/kubernetes/pull/68812
@@ -295,15 +316,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a replication controller.", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourceReplicationControllers] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -330,15 +355,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a replica set.", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourceName("count/replicasets.apps")] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -365,15 +394,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
@@ -403,15 +436,19 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]", func() {
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
 		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
 		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
@@ -1403,6 +1440,23 @@ func createResourceQuota(c clientset.Interface, namespace string, resourceQuota 
 // deleteResourceQuota with the specified name
 func deleteResourceQuota(c clientset.Interface, namespace, name string) error {
 	return c.CoreV1().ResourceQuotas(namespace).Delete(name, nil)
+}
+
+// countResourceQuota counts the number of ResourceQuota in the specified namespace
+func countResourceQuota(c clientset.Interface, namespace string) (int, error) {
+	found, unchanged := 0, 0
+	return found, wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		resourceQuotas, err := c.CoreV1().ResourceQuotas(namespace).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		if len(resourceQuotas.Items) == found {
+			// loop until the number of resource quotas has stabilized for 5 seconds
+			unchanged++
+			return unchanged > 4, nil
+		}
+		unchanged = 0
+		found = len(resourceQuotas.Items)
+		return false, nil
+	})
 }
 
 // wait for resource quota status to show the expected used resources value

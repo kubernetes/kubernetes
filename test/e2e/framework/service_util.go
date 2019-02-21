@@ -45,7 +45,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -349,7 +348,7 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 
 func PickNodeIP(c clientset.Interface) string {
 	publicIps, err := GetNodePublicIps(c)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))
 	}

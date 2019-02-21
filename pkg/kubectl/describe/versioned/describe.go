@@ -40,6 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -173,6 +174,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: extensionsv1beta1.GroupName, Kind: "DaemonSet"}:                   &DaemonSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
@@ -642,6 +644,9 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings descri
 			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
+			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
+				ref.UID = types.UID(pod.Annotations[corev1.MirrorPodAnnotationKey])
+			}
 			events, _ = d.Core().Events(namespace).Search(scheme.Scheme, ref)
 		}
 	}
@@ -2677,7 +2682,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings descr
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
@@ -2716,14 +2721,14 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
 	})
 }
 
-func combineResourceGroup(resource, group []string) string {
+func CombineResourceGroup(resource, group []string) string {
 	if len(resource) == 0 {
 		return ""
 	}

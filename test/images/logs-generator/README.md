@@ -3,7 +3,7 @@
 ## Overview
 
 Logs generator is a tool to create predictable load on the logs delivery system.
-Is generates random lines with predictable format and predictable average length.
+It generates random lines with predictable format and predictable average length.
 Each line can be later uniquely identified to ensure logs delivery.
 
 ## Usage

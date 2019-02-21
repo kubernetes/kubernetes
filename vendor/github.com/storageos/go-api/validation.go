@@ -22,7 +22,9 @@ var (
 	// collection of restricted characters.
 	NamePattern = regexp.MustCompile(`^` + NameFormat + `$`)
 
-	ErrNoRef       = errors.New("no ref provided or incorrect format")
+	// ErrNoRef is given when the reference given is invalid.
+	ErrNoRef = errors.New("no ref provided or incorrect format")
+	// ErrNoNamespace is given when the namespace given is invalid.
 	ErrNoNamespace = errors.New("no namespace provided or incorrect format")
 )
 

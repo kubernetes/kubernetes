@@ -2,14 +2,9 @@ cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
-cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/apis/kubeadm/v1beta1
-cmd/kubeadm/app/util/config
 cmd/kubeadm/app/util/system
-cmd/kubelet/app
-cmd/kubelet/app/options
-cmd/kubemark
 pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admission/v1beta1
@@ -57,7 +52,6 @@ pkg/apis/events
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/extensions/validation
 pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
@@ -220,7 +214,6 @@ pkg/kubelet/remote
 pkg/kubelet/secret
 pkg/kubelet/server
 pkg/kubelet/server/portforward
-pkg/kubelet/server/remotecommand
 pkg/kubelet/server/stats
 pkg/kubelet/server/streaming
 pkg/kubelet/stats
@@ -229,10 +222,7 @@ pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubelet/util
-pkg/kubelet/util/cache
 pkg/kubelet/util/pluginwatcher
-pkg/kubelet/util/queue
-pkg/kubelet/util/sliceutils
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
@@ -313,8 +303,6 @@ pkg/registry/core/service/storage
 pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
-pkg/registry/extensions/ingress
-pkg/registry/extensions/ingress/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
@@ -339,7 +327,6 @@ pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
-pkg/routes
 pkg/scheduler/apis/config/v1alpha1
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
@@ -542,7 +529,6 @@ staging/src/k8s.io/apiserver/pkg/endpoints
 staging/src/k8s.io/apiserver/pkg/endpoints/discovery
 staging/src/k8s.io/apiserver/pkg/endpoints/filters
 staging/src/k8s.io/apiserver/pkg/endpoints/handlers
-staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation
 staging/src/k8s.io/apiserver/pkg/endpoints/metrics
 staging/src/k8s.io/apiserver/pkg/endpoints/openapi/testing
 staging/src/k8s.io/apiserver/pkg/endpoints/request
@@ -572,7 +558,6 @@ staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
 staging/src/k8s.io/apiserver/pkg/storage/value
 staging/src/k8s.io/apiserver/pkg/util/feature
-staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
@@ -647,17 +632,9 @@ staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
+staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation
-staging/src/k8s.io/kube-aggregator/pkg/apiserver
-staging/src/k8s.io/kube-aggregator/pkg/cmd/server
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
-staging/src/k8s.io/kube-aggregator/pkg/controllers/status
-staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice
-staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubelet/config/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
@@ -694,12 +671,8 @@ test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress
-test/e2e/framework/metrics
-test/e2e/framework/providers/aws
-test/e2e/framework/providers/azure
 test/e2e/framework/providers/gce
 test/e2e/framework/providers/kubemark
-test/e2e/framework/timer
 test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring

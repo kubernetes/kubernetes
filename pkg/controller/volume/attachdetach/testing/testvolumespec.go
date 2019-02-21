@@ -310,6 +310,10 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
+func (plugin *TestPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 func (plugin *TestPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return plugin.NewDetacher()
 }

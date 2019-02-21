@@ -60,12 +60,12 @@ message AllowedHostPath {
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The desired behavior of this daemon set.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional DaemonSetSpec spec = 2;
 
@@ -73,7 +73,7 @@ message DaemonSet {
   // out of date by some window of time.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional DaemonSetStatus status = 3;
 }
@@ -102,7 +102,7 @@ message DaemonSetCondition {
 // DaemonSetList is a collection of daemon sets.
 message DaemonSetList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -471,19 +471,20 @@ message IPBlock {
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
+// DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
 message Ingress {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is the desired state of the Ingress.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional IngressSpec spec = 2;
 
   // Status is the current state of the Ingress.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional IngressStatus status = 3;
 }
@@ -500,7 +501,7 @@ message IngressBackend {
 // IngressList is a collection of Ingress.
 message IngressList {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -597,7 +598,7 @@ message IngressTLS {
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -652,7 +653,7 @@ message NetworkPolicyIngressRule {
 // Network Policy List is a list of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -732,7 +733,7 @@ message NetworkPolicySpec {
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
-  // Valid options are Ingress, Egress, or Ingress,Egress.
+  // Valid options are "Ingress", "Egress", or "Ingress,Egress".
   // If this field is not specified, it will default based on the existence of Ingress or Egress rules;
   // policies that contain an Egress section are assumed to affect Egress, and all policies
   // (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -750,7 +751,7 @@ message NetworkPolicySpec {
 // Deprecated: use PodSecurityPolicy from policy API Group instead.
 message PodSecurityPolicy {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -763,7 +764,7 @@ message PodSecurityPolicy {
 // Deprecated: use PodSecurityPolicyList from policy API Group instead.
 message PodSecurityPolicyList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -898,12 +899,12 @@ message PodSecurityPolicySpec {
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
-  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ReplicaSetSpec spec = 2;
 
@@ -911,7 +912,7 @@ message ReplicaSet {
   // This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ReplicaSetStatus status = 3;
 }
@@ -940,7 +941,7 @@ message ReplicaSetCondition {
 // ReplicaSetList is a collection of ReplicaSets.
 message ReplicaSetList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1063,7 +1064,7 @@ message RollingUpdateDeployment {
   // the rolling update starts, such that the total number of old and new pods do not exceed
   // 130% of desired pods. Once old pods have been killed,
   // new RC can be scaled up further, ensuring that total number of pods running
-  // at any time during the update is atmost 130% of desired pods.
+  // at any time during the update is at most 130% of desired pods.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
@@ -1106,15 +1107,15 @@ message SELinuxStrategyOptions {
 
 // represents a scaling request for a resource.
 message Scale {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }

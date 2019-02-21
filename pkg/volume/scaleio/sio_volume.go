@@ -28,6 +28,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -265,19 +266,20 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 
 	// setup volume attrributes
 	genName := v.generateName("k8svol", 11)
-	var oneGig int64 = 1024 * 1024 * 1024
-	eightGig := 8 * oneGig
+	eightGig := int64(8 * volumehelpers.GiB)
 
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+
 	volSizeBytes := capacity.Value()
-	volSizeGB := int64(util.RoundUpSize(volSizeBytes, oneGig))
+	volSizeGB := int64(volumehelpers.RoundUpToGiB(capacity))
 
 	if volSizeBytes == 0 {
 		return nil, fmt.Errorf("invalid volume size of 0 specified")
 	}
 
 	if volSizeBytes < eightGig {
-		volSizeGB = int64(util.RoundUpSize(eightGig, oneGig))
+		eightGiBCapacity := resource.NewQuantity(eightGig, resource.BinarySI)
+		volSizeGB = int64(volumehelpers.RoundUpToGiB(*eightGiBCapacity))
 		klog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
 
 	}

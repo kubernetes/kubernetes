@@ -146,19 +146,19 @@ func TestCmdInitConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "can't load v1alpha1 config",
+			name:     "can't load old v1alpha1 config",
 			args:     "--config=testdata/init/v1alpha1.yaml",
 			expected: false,
 		},
 		{
-			name:     "can't load v1alpha2 config",
+			name:     "can't load old v1alpha2 config",
 			args:     "--config=testdata/init/v1alpha2.yaml",
 			expected: false,
 		},
 		{
-			name:     "can load v1alpha3 config",
+			name:     "can't load deprecated v1alpha3 config",
 			args:     "--config=testdata/init/v1alpha3.yaml",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "can load v1beta1 config",

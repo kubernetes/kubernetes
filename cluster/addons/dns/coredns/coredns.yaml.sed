@@ -106,6 +106,7 @@ spec:
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       tolerations:
         - key: "CriticalAddonsOnly"
@@ -146,6 +147,11 @@ spec:
           timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

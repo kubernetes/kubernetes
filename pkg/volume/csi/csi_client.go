@@ -147,19 +147,12 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	requiresV0Client := true
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		var existingDriver csiDriver
-		driverExists := false
-		func() {
-			csiDrivers.RLock()
-			defer csiDrivers.RUnlock()
-			existingDriver, driverExists = csiDrivers.driversMap[string(driverName)]
-		}()
-
+		existingDriver, driverExists := csiDrivers.Get(string(driverName))
 		if !driverExists {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}
 
-		addr = existingDriver.driverEndpoint
+		addr = existingDriver.endpoint
 		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
 	}
 

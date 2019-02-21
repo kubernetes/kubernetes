@@ -198,11 +198,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdHandler,
 	)
 
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)

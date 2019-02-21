@@ -38,6 +38,7 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	volerr "k8s.io/cloud-provider/volume/errors"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
@@ -1177,7 +1178,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 	if err != nil {
 		// Delete failed, update the volume and emit an event.
 		klog.V(3).Infof("deletion of volume %q failed: %v", volume.Name, err)
-		if vol.IsDeletedVolumeInUse(err) {
+		if volerr.IsDeletedVolumeInUse(err) {
 			// The plugin needs more time, don't mark the volume as Failed
 			// and send Normal event only
 			ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeDelete, err.Error())

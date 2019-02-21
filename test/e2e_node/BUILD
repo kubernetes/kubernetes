@@ -165,6 +165,7 @@ go_test(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//cmd/kubeadm/app/util/system:go_default_library",
+            "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",

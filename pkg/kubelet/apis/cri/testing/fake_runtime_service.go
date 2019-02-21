@@ -104,6 +104,12 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 	return nil
 }
 
+func (r *FakeRuntimeService) GetCalls() []string {
+	r.Lock()
+	defer r.Unlock()
+	return append([]string{}, r.Called...)
+}
+
 func (r *FakeRuntimeService) InjectError(f string, err error) {
 	r.Lock()
 	defer r.Unlock()

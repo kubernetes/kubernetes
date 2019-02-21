@@ -649,3 +649,10 @@ func newMatchEverythingRules() []registrationv1beta1.RuleWithOperations {
 		},
 	}}
 }
+
+// NewObjectInterfacesForTest returns an ObjectInterfaces appropriate for test cases in this file.
+func NewObjectInterfacesForTest() admission.ObjectInterfaces {
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+	return &admission.SchemeBasedObjectInterfaces{scheme}
+}

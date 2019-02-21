@@ -15,6 +15,7 @@ go_library(
 go_binary(
     name = "go-junit-report",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

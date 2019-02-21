@@ -52,7 +52,6 @@ func createAPIExtensionsConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		apiextensionsapiserver.Scheme,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err

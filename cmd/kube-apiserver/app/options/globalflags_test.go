@@ -25,12 +25,12 @@ import (
 
 	"github.com/spf13/pflag"
 
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/globalflag"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli/globalflag"
 )
 
 func TestAddCustomGlobalFlags(t *testing.T) {
-	namedFlagSets := &apiserverflag.NamedFlagSets{}
+	namedFlagSets := &cliflag.NamedFlagSets{}
 
 	// Note that we will register all flags (including klog flags) into the same
 	// flag set. This allows us to test against all global flags from
@@ -46,7 +46,7 @@ func TestAddCustomGlobalFlags(t *testing.T) {
 
 	// Get all flags from flags.CommandLine, except flag `test.*`.
 	wantedFlag := []string{"help"}
-	pflag.CommandLine.SetNormalizeFunc(apiserverflag.WordSepNormalizeFunc)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		if !strings.Contains(flag.Name, "test.") {

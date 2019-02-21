@@ -12,7 +12,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "d4020504c68b6bfa818032bedfb48e33e9638506"
+			"Rev": "5858425f75500d40c52783dce87d085a483ce135"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
@@ -283,6 +283,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/api/networking/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/api/policy/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -483,6 +487,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/discovery/cached/disk",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/kubernetes/scheme",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -577,26 +585,6 @@
 		{
 			"ImportPath": "k8s.io/utils/integer",
 			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

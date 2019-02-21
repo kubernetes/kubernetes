@@ -193,6 +193,7 @@ package_group(
         "//pkg/kubectl/cmd/expose",
         "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/help",
+        "//pkg/kubectl/cmd/kustomize",
         "//pkg/kubectl/cmd/label",
         "//pkg/kubectl/cmd/logs",
         "//pkg/kubectl/cmd/options",

@@ -247,7 +247,8 @@ func (o *SetImageOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
+			name := info.ObjectName()
+			allErrs = append(allErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 

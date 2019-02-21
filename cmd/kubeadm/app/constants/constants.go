@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -191,6 +191,13 @@ const (
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
 
+	// DefaultCertTokenDuration specifies the default amount of time that the token used by upload certs will be valid
+	// Default behaviour is 2 hours
+	DefaultCertTokenDuration = 2 * time.Hour
+
+	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
+	CertificateKeySize = 32
+
 	// LabelNodeRoleMaster specifies that a node is a master
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
@@ -352,6 +359,9 @@ const (
 
 	// MasterNumCPU is the number of CPUs required on master
 	MasterNumCPU = 2
+
+	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
+	KubeadmCertsSecret = "kubeadm-certs"
 )
 
 var (
@@ -393,6 +403,10 @@ var (
 		13: "3.2.24",
 		14: "3.3.10",
 	}
+
+	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
+	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
+	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
 )
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release

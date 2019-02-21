@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -70,6 +71,8 @@ type RequestScope struct {
 
 	// HubGroupVersion indicates what version objects read from etcd or incoming requests should be converted to for in-memory handling.
 	HubGroupVersion schema.GroupVersion
+
+	MaxRequestBodyBytes int64
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
@@ -100,6 +103,13 @@ func (scope *RequestScope) AllowsStreamSchema(s string) bool {
 	return s == "watch"
 }
 
+var _ admission.ObjectInterfaces = &RequestScope{}
+
+func (r *RequestScope) GetObjectCreater() runtime.ObjectCreater     { return r.Creater }
+func (r *RequestScope) GetObjectTyper() runtime.ObjectTyper         { return r.Typer }
+func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.Defaulter }
+func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
+
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
 func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -128,14 +138,14 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -333,9 +343,23 @@ func summarizeData(data []byte, maxLength int) string {
 	}
 }
 
-func readBody(req *http.Request) ([]byte, error) {
+func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	defer req.Body.Close()
-	return ioutil.ReadAll(req.Body)
+	if limit <= 0 {
+		return ioutil.ReadAll(req.Body)
+	}
+	lr := &io.LimitedReader{
+		R: req.Body,
+		N: limit + 1,
+	}
+	data, err := ioutil.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if lr.N <= 0 {
+		return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
+	}
+	return data, nil
 }
 
 func parseTimeout(str string) time.Duration {
