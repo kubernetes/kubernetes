@@ -114,7 +114,6 @@ func (e *endpointImpl) run() {
 		for _, d := range devs {
 			newDevs = append(newDevs, *d)
 		}
-
 		e.callback(e.resourceName, newDevs)
 	}
 }

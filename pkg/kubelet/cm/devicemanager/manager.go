@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -79,6 +80,9 @@ type ManagerImpl struct {
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
 
+	// allDevices is a map by resource name of all the devices currently registered to the device manager
+	allDevices map[string][]pluginapi.Device
+
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
 
@@ -91,6 +95,9 @@ type ManagerImpl struct {
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
 	checkpointManager checkpointmanager.CheckpointManager
+
+	//Store of Topology Affinties that the Device Manager can query
+	topologyAffinityStore topologymanager.Store
 }
 
 type endpointInfo struct {
@@ -104,11 +111,11 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl() (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket)
+func NewManagerImpl(topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	return newManagerImpl(pluginapi.KubeletSocket, topologyAffinityStore)
 }
 
-func newManagerImpl(socketPath string) (*ManagerImpl, error) {
+func newManagerImpl(socketPath string, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	klog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
@@ -119,12 +126,14 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	manager := &ManagerImpl{
 		endpoints: make(map[string]endpointInfo),
 
-		socketname:       file,
-		socketdir:        dir,
-		healthyDevices:   make(map[string]sets.String),
-		unhealthyDevices: make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		socketname:            file,
+		socketdir:             dir,
+		allDevices:            make(map[string][]pluginapi.Device),
+		healthyDevices:        make(map[string]sets.String),
+		unhealthyDevices:      make(map[string]sets.String),
+		allocatedDevices:      make(map[string]sets.String),
+		podDevices:            make(podDevices),
+		topologyAffinityStore: topologyAffinityStore,
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -145,6 +154,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
+	m.allDevices[resourceName] = devices
 	for _, dev := range devices {
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
@@ -589,6 +599,7 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
 func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
+	allDevices := m.allDevices
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -633,7 +644,41 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
+
+	//Get Topology Mask for pod/container here, check available against devices to get devices that have the same socket and update available to these
+	podTopologyAffinity := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, podTopologyAffinity)
+
+	sockets := make(map[int]bool)
+	for _, bitMasks := range podTopologyAffinity.SocketAffinity {
+		for counter, bit := range bitMasks {
+			if bit == int64(1) {
+				sockets[counter] = true
+			}
+		}
+	}
+
 	allocated := available.UnsortedList()[:needed]
+	availableTopologyAligned := available
+	klog.Infof("allDevice: %v", allDevices)
+	for availID := range available {
+		for _, device := range allDevices[resource] {
+			klog.Infof("AvailID: %v DeviceID: %v", availID, device)
+			if availID == device.ID {
+				if !sockets[int(device.Topology.Socket)] {
+					delete(availableTopologyAligned, availID)
+				}
+				break
+			}
+		}
+	}
+
+	if int(availableTopologyAligned.Len()) < needed {
+		klog.Infof("requested number of devices unavailable in an Topology Aligned Manner for %s. Choosing arbitrary free devices.", resource)
+	} else {
+		klog.Infof("Chosing Topology Aligned Devices for %s.", resource)
+		allocated = availableTopologyAligned.UnsortedList()[:needed]
+	}
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are
 	// not holding lock during the rpc call.
