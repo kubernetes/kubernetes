@@ -341,6 +341,17 @@ func NewTooManyRequestsError(message string) *StatusError {
 	}}
 }
 
+// NewRequestEntityTooLargeError returns an error indicating that the request
+// entity was too large.
+func NewRequestEntityTooLargeError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusRequestEntityTooLarge,
+		Reason:  metav1.StatusReasonRequestEntityTooLarge,
+		Message: fmt.Sprintf("Request entity too large: %s", message),
+	}}
+}
+
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
 func NewGenericServerResponse(code int, verb string, qualifiedResource schema.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
 	reason := metav1.StatusReasonUnknown
@@ -523,6 +534,19 @@ func IsTooManyRequests(err error) bool {
 	switch t := err.(type) {
 	case APIStatus:
 		return t.Status().Code == http.StatusTooManyRequests
+	}
+	return false
+}
+
+// IsRequestEntityTooLargeError determines if err is an error which indicates
+// the request entity is too large.
+func IsRequestEntityTooLargeError(err error) bool {
+	if ReasonForError(err) == metav1.StatusReasonRequestEntityTooLarge {
+		return true
+	}
+	switch t := err.(type) {
+	case APIStatus:
+		return t.Status().Code == http.StatusRequestEntityTooLarge
 	}
 	return false
 }
