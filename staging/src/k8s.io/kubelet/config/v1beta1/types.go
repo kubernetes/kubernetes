@@ -54,6 +54,15 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+	// StrictTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with NUMA alignment of CPU and device resources.
+	StrictTopologyManagerPolicy = "strict"
+	// PreferredTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	PreferredTopologyManagerPolicy = "preferred"
+	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
+	// of NUMA alignment of a pod's CPU and device resources.
+	NoneTopologyManagerPolicy = "none"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -409,6 +418,13 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
+	// TopologyManagerPolicy is the name of the policy to use.
+	// Policies other than "none" require the TopologyManager feature gate to be enabled.
+	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
+	// reboot. It is safest to keep this value the same as the local config.
+	// Default: "none"
+	// +optional
+	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
 	// qosReserved is a set of resource name to percentage pairs that specify
 	// the minimum percentage of a resource reserved for exclusive use by the
 	// guaranteed QoS tier.

@@ -66,6 +66,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
+			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
 			obj.QOSReserved = map[string]string{
 				"memory": "50%",
 			}
