@@ -58,11 +58,6 @@ var (
 		`)
 )
 
-type uploadConfigData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	Client() (clientset.Interface, error)
-}
-
 // NewUploadConfigPhase returns the phase to uploadConfig
 func NewUploadConfigPhase() workflow.Phase {
 	return workflow.Phase{
@@ -138,7 +133,7 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 }
 
 func getUploadConfigData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, error) {
-	data, ok := c.(uploadConfigData)
+	data, ok := c.(InitData)
 	if !ok {
 		return nil, nil, errors.New("upload-config phase invoked with an invalid data struct")
 	}

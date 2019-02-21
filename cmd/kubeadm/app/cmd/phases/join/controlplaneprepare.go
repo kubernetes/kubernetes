@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -30,11 +29,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 )
-
-type controlPlanePrepareData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-}
 
 // NewControlPlanePreparePhase creates a kubeadm workflow phase that implements the preparation of the node to serve a control plane
 func NewControlPlanePreparePhase() workflow.Phase {
@@ -97,7 +91,7 @@ func newControlPlanePrepareManifestsSubphases() workflow.Phase {
 }
 
 func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
-	data, ok := c.(controlPlanePrepareData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
 	}
@@ -117,7 +111,7 @@ func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
 }
 
 func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
-	data, ok := c.(controlPlanePrepareData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
 	}
@@ -137,7 +131,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 }
 
 func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
-	data, ok := c.(controlPlanePrepareData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
 	}

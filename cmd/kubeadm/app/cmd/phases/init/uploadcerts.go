@@ -21,23 +21,13 @@ import (
 
 	"github.com/pkg/errors"
 
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadcerts"
 )
-
-type uploadCertsData interface {
-	Client() (clientset.Interface, error)
-	UploadCerts() bool
-	Cfg() *kubeadmapi.InitConfiguration
-	CertificateKey() string
-	SetCertificateKey(key string)
-}
 
 // NewUploadCertsPhase returns the uploadCerts phase
 func NewUploadCertsPhase() workflow.Phase {
@@ -54,7 +44,7 @@ func NewUploadCertsPhase() workflow.Phase {
 }
 
 func runUploadCerts(c workflow.RunData) error {
-	data, ok := c.(uploadCertsData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("upload-certs phase invoked with an invalid data struct")
 	}
