@@ -184,7 +184,7 @@ func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	return
 }
 
-func TestRunInitMasterChecks(t *testing.T) {
+func TestRunInitNodeChecks(t *testing.T) {
 	var tests = []struct {
 		name     string
 		cfg      *kubeadmapi.InitConfiguration
@@ -231,11 +231,11 @@ func TestRunInitMasterChecks(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make RunInitMasterChecks accept a ClusterConfiguration object instead of InitConfiguration
-		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
+		// TODO: Make RunInitNodeChecks accept a ClusterConfiguration object instead of InitConfiguration
+		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
 				rt.expected,
 				(actual == nil),
 				actual,
