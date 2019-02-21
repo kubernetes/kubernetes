@@ -474,19 +474,33 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	count := 0
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
-		for i := range ss.Ports {
-			port := &ss.Ports[i]
-			if ports == nil || ports.Has(port.Name) {
-				for i := range ss.Addresses {
-					if len(list) == max {
-						more = true
+		if len(ss.Ports) == 0 {
+			// It's possible to have headless services with no ports.
+			for i := range ss.Addresses {
+				if len(list) == max {
+					more = true
+				}
+				if !more {
+					list = append(list, ss.Addresses[i].IP)
+				}
+				count++
+			}
+		} else {
+			// "Normal" services with ports defined.
+			for i := range ss.Ports {
+				port := &ss.Ports[i]
+				if ports == nil || ports.Has(port.Name) {
+					for i := range ss.Addresses {
+						if len(list) == max {
+							more = true
+						}
+						addr := &ss.Addresses[i]
+						if !more {
+							hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
+							list = append(list, hostPort)
+						}
+						count++
 					}
-					addr := &ss.Addresses[i]
-					if !more {
-						hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
-						list = append(list, hostPort)
-					}
-					count++
 				}
 			}
 		}

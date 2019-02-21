@@ -38,12 +38,12 @@ func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	allAddrs := map[addressKey]*api.EndpointAddress{}
 	portToAddrReadyMap := map[api.EndpointPort]addressSet{}
 	for i := range subsets {
-		for _, port := range subsets[i].Ports {
-			for k := range subsets[i].Addresses {
-				mapAddressByPort(&subsets[i].Addresses[k], port, true, allAddrs, portToAddrReadyMap)
-			}
-			for k := range subsets[i].NotReadyAddresses {
-				mapAddressByPort(&subsets[i].NotReadyAddresses[k], port, false, allAddrs, portToAddrReadyMap)
+		if len(subsets[i].Ports) == 0 {
+			// Don't discard endpoints with no ports defined, use a sentinel.
+			mapAddressesByPort(&subsets[i], api.EndpointPort{Port: -1}, allAddrs, portToAddrReadyMap)
+		} else {
+			for _, port := range subsets[i].Ports {
+				mapAddressesByPort(&subsets[i], port, allAddrs, portToAddrReadyMap)
 			}
 		}
 	}
@@ -58,7 +58,14 @@ func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	for port, addrs := range portToAddrReadyMap {
 		key := keyString(hashAddresses(addrs))
 		keyToAddrReadyMap[key] = addrs
-		addrReadyMapKeyToPorts[key] = append(addrReadyMapKeyToPorts[key], port)
+		if port.Port > 0 { // avoid sentinels
+			addrReadyMapKeyToPorts[key] = append(addrReadyMapKeyToPorts[key], port)
+		} else {
+			if _, found := addrReadyMapKeyToPorts[key]; !found {
+				// Force it to be present in the map
+				addrReadyMapKeyToPorts[key] = nil
+			}
+		}
 	}
 
 	// Next, build the N-to-M association the API wants.
@@ -85,7 +92,17 @@ type addressKey struct {
 	uid types.UID
 }
 
-// mapAddressByPort adds an address into a map by its ports, registering the address with a unique pointer, and preserving
+// mapAddressesByPort adds all ready and not-ready addresses into a map by a single port.
+func mapAddressesByPort(subset *api.EndpointSubset, port api.EndpointPort, allAddrs map[addressKey]*api.EndpointAddress, portToAddrReadyMap map[api.EndpointPort]addressSet) {
+	for k := range subset.Addresses {
+		mapAddressByPort(&subset.Addresses[k], port, true, allAddrs, portToAddrReadyMap)
+	}
+	for k := range subset.NotReadyAddresses {
+		mapAddressByPort(&subset.NotReadyAddresses[k], port, false, allAddrs, portToAddrReadyMap)
+	}
+}
+
+// mapAddressByPort adds one address into a map by port, registering the address with a unique pointer, and preserving
 // any existing ready state.
 func mapAddressByPort(addr *api.EndpointAddress, port api.EndpointPort, ready bool, allAddrs map[addressKey]*api.EndpointAddress, portToAddrReadyMap map[api.EndpointPort]addressSet) *api.EndpointAddress {
 	// use addressKey to distinguish between two endpoints that are identical addresses
