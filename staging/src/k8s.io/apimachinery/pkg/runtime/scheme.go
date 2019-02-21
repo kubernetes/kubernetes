@@ -401,6 +401,9 @@ func (s *Scheme) Default(src Object) {
 func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 	unstructuredIn, okIn := in.(Unstructured)
 	unstructuredOut, okOut := out.(Unstructured)
+	// Check if the underlying value of conversion in&out is nil to prevent nil panic
+	okIn = okIn && !reflect.ValueOf(in).IsNil()
+	okOut = okOut && !reflect.ValueOf(out).IsNil()
 	switch {
 	case okIn && okOut:
 		// converting unstructured input to an unstructured output is a straight copy - unstructured
