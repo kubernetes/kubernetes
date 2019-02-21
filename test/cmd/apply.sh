@@ -232,7 +232,6 @@ __EOF__
 run_kubectl_apply_tests() {
   set -o nounset
   set -o errexit
-  set -x
 
   create_and_use_new_namespace
   kube::log::status "Testing kubectl apply --server-side"
