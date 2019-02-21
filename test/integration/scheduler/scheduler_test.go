@@ -31,12 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
@@ -189,7 +189,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			informerFactory.Core().V1().Services(),
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			informerFactory.Storage().V1().StorageClasses(),
-			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+			eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
 					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -257,7 +257,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+		eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
 				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -537,7 +537,7 @@ func TestMultiScheduler(t *testing.T) {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
+	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(scheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
 
 	sched2 := scheduler.NewFromConfig(schedulerConfig2)

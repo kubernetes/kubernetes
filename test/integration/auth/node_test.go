@@ -37,10 +37,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -703,7 +703,7 @@ func crdFromManifest(filename string) (*apiextensionsv1beta1.CustomResourceDefin
 		return nil, err
 	}
 
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, &crd); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, &crd); err != nil {
 		return nil, err
 	}
 	return &crd, nil

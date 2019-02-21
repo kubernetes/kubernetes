@@ -605,7 +605,7 @@ type KubeUser struct {
 }
 
 type KubeCluster struct {
-	Name string `yaml:"name"`
+	Name    string `yaml:"name"`
 	Cluster struct {
 		CertificateAuthorityData string `yaml:"certificate-authority-data"`
 		Server                   string `yaml:"server"`
@@ -614,7 +614,7 @@ type KubeCluster struct {
 
 type KubeConfig struct {
 	Contexts []struct {
-		Name string `yaml:"name"`
+		Name    string `yaml:"name"`
 		Context struct {
 			Cluster string `yaml:"cluster"`
 			User    string
@@ -798,7 +798,7 @@ func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Names
 	unfilteredPods := pl.Items
 	filteredPods := []v1.Pod{}
 ReturnPodsSoFar:
-// Next: Pod must match at least one of the states that the user specified
+	// Next: Pod must match at least one of the states that the user specified
 	for _, pod := range unfilteredPods {
 		if !(passesPhasesFilter(pod, p.ValidPhases) && passesPodNameFilter(pod, p.PodName)) {
 			continue

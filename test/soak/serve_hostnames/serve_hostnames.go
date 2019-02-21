@@ -37,9 +37,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 )
 
@@ -278,7 +278,7 @@ func main() {
 			continue
 		}
 		var r metav1.Status
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), hostname, &r); err != nil {
+		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), hostname, &r); err != nil {
 			break
 		}
 		if r.Status == metav1.StatusFailure {

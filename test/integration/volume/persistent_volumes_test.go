@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 )
 
@@ -257,7 +257,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 	// putting a bind manually on a pv should only match the claim it is bound to
 	claim := claims[rand.Intn(maxClaims-1)]
-	claimRef, err := ref.GetReference(legacyscheme.Scheme, claim)
+	claimRef, err := ref.GetReference(scheme.Scheme, claim)
 	if err != nil {
 		t.Fatalf("Unexpected error getting claimRef: %v", err)
 	}
@@ -764,7 +764,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 
 		pv := createPV(pvName, "/tmp/foo"+strconv.Itoa(i), "1G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
-		claimRef, err := ref.GetReference(legacyscheme.Scheme, newPVC)
+		claimRef, err := ref.GetReference(scheme.Scheme, newPVC)
 		if err != nil {
 			klog.V(3).Infof("unexpected error getting claim reference: %v", err)
 			return

@@ -14,7 +14,6 @@ go_test(
     ],
     tags = ["integration"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
@@ -36,6 +35,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",

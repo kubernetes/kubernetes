@@ -45,7 +45,6 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -55,6 +54,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -395,7 +395,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.Sc
 			config.GroupVersion = &schema.GroupVersion{}
 		}
 		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = legacyscheme.Codecs
+			config.NegotiatedSerializer = scheme.Codecs
 		}
 		restClient, err := restclient.RESTClientFor(config)
 		if err != nil {

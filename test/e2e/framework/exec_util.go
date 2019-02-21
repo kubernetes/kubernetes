@@ -22,13 +22,12 @@ import (
 	"net/url"
 	"strings"
 
+	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
-	. "github.com/onsi/gomega"
 )
 
 // ExecOptions passed to ExecWithOptions
@@ -70,7 +69,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 		Stdout:    options.CaptureStdout,
 		Stderr:    options.CaptureStderr,
 		TTY:       tty,
-	}, legacyscheme.ParameterCodec)
+	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
 	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)

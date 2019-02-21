@@ -23,10 +23,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -71,7 +71,7 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
-	config.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+	config.Recorder = evtBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"})
 
 	sched := scheduler.NewFromConfig(config)
 	scheduler.AddAllEventHandlers(sched,

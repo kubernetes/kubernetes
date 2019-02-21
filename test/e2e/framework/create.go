@@ -31,8 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -54,7 +54,7 @@ func (f *Framework) LoadFromManifests(files ...string) ([]interface{}, error) {
 	err := visitManifests(func(data []byte) error {
 		// Ignore any additional fields for now, just determine what we have.
 		var what What
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, &what); err != nil {
+		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, &what); err != nil {
 			return errors.Wrap(err, "decode TypeMeta")
 		}
 
@@ -64,7 +64,7 @@ func (f *Framework) LoadFromManifests(files ...string) ([]interface{}, error) {
 		}
 
 		object := factory.New()
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, object); err != nil {
+		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, object); err != nil {
 			return errors.Wrapf(err, "decode %+v", what)
 		}
 		items = append(items, object)

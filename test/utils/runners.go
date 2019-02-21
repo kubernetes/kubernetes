@@ -285,7 +285,7 @@ func (config *DeploymentConfig) Run() error {
 }
 
 func (config *DeploymentConfig) GetKind() schema.GroupKind {
-	return schema.GroupKind{apps.GroupName, "Deployment"}
+	return schema.GroupKind{Group: apps.GroupName, Kind: "Deployment"}
 }
 
 func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
@@ -361,7 +361,7 @@ func (config *ReplicaSetConfig) Run() error {
 }
 
 func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
-	return schema.GroupKind{apps.GroupName, "ReplicaSet"}
+	return schema.GroupKind{Group: apps.GroupName, Kind: "ReplicaSet"}
 }
 
 func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
@@ -433,7 +433,7 @@ func (config *JobConfig) Run() error {
 }
 
 func (config *JobConfig) GetKind() schema.GroupKind {
-	return schema.GroupKind{batchv1.GroupName, "Job"}
+	return schema.GroupKind{Group: batchv1.GroupName, Kind: "Job"}
 }
 
 func (config *JobConfig) GetGroupResource() schema.GroupResource {
@@ -509,7 +509,7 @@ func (config *RCConfig) GetNamespace() string {
 }
 
 func (config *RCConfig) GetKind() schema.GroupKind {
-	return schema.GroupKind{v1.GroupName, "ReplicationController"}
+	return schema.GroupKind{Group: v1.GroupName, Kind: "ReplicationController"}
 }
 
 func (config *RCConfig) GetGroupResource() schema.GroupResource {
@@ -1156,7 +1156,8 @@ func (config *SecretConfig) Run() error {
 }
 
 func (config *SecretConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, schema.GroupKind{v1.GroupName, "Secret"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client,
+		schema.GroupKind{Group: v1.GroupName, Kind: "Secret"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
@@ -1214,7 +1215,7 @@ func (config *ConfigMapConfig) Run() error {
 }
 
 func (config *ConfigMapConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, schema.GroupKind{v1.GroupName, "ConfigMap"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, schema.GroupKind{Group: v1.GroupName, Kind: "ConfigMap"}, config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting configmap: %v", err)
 	}
 	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)

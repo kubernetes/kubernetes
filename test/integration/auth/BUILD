@@ -23,7 +23,6 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -79,6 +78,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",

@@ -44,11 +44,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -541,7 +541,7 @@ func TestRBAC(t *testing.T) {
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()
 
-		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs}}
 
 		// Bootstrap the API Server with the test case's initial roles.
 		superuserClient := clientsetForToken(superUser, clientConfig)

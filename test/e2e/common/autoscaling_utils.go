@@ -428,7 +428,8 @@ func (rc *ResourceConsumer) CleanUp() {
 	kind := rc.kind.GroupKind()
 	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.name, nil))
-	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(rc.clientSet, schema.GroupKind{corev1.GroupName, "ReplicationController"}, rc.nsName, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(rc.clientSet,
+		schema.GroupKind{Group: corev1.GroupName, Kind: "ReplicationController"}, rc.nsName, rc.controllerName))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.controllerName, nil))
 }
 
