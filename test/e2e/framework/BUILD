@@ -170,6 +170,7 @@ filegroup(
         "//test/e2e/framework/providers/azure:all-srcs",
         "//test/e2e/framework/providers/gce:all-srcs",
         "//test/e2e/framework/providers/kubemark:all-srcs",
+        "//test/e2e/framework/providers/openstack:all-srcs",
         "//test/e2e/framework/testfiles:all-srcs",
         "//test/e2e/framework/timer:all-srcs",
         "//test/e2e/framework/viperconfig:all-srcs",
