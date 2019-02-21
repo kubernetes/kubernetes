@@ -148,12 +148,16 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			},
 		}
 		config := convertTestConfig(l.config)
-		framework.InjectHtml(f.ClientSet, config, tests[0].Volume, tests[0].ExpectedContent)
 		var fsGroup *int64
 		if dInfo.Capabilities[CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
+		// We set same fsGroup for both pods, because for same volumes (e.g.
+		// local), plugin skips setting fsGroup if volume is already mounted
+		// and we don't have reliable way to detect volumes are unmounted or
+		// not before starting the second pod.
+		framework.InjectHtml(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
 		framework.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
 	})
 
