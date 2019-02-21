@@ -29,6 +29,7 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -53,19 +54,19 @@ var (
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
-	defaultTLS          = []extensions.IngressTLS{
+	defaultTLS          = []networking.IngressTLS{
 		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
 	}
 )
 
 type IngressRuleValues map[string]string
 
-func toHTTPIngressPaths(pathMap map[string]string) []extensions.HTTPIngressPath {
-	httpPaths := []extensions.HTTPIngressPath{}
+func toHTTPIngressPaths(pathMap map[string]string) []networking.HTTPIngressPath {
+	httpPaths := []networking.HTTPIngressPath{}
 	for path, backend := range pathMap {
-		httpPaths = append(httpPaths, extensions.HTTPIngressPath{
+		httpPaths = append(httpPaths, networking.HTTPIngressPath{
 			Path: path,
-			Backend: extensions.IngressBackend{
+			Backend: networking.IngressBackend{
 				ServiceName: backend,
 				ServicePort: defaultBackendPort,
 			},
@@ -74,13 +75,13 @@ func toHTTPIngressPaths(pathMap map[string]string) []extensions.HTTPIngressPath 
 	return httpPaths
 }
 
-func toIngressRules(hostRules map[string]IngressRuleValues) []extensions.IngressRule {
-	rules := []extensions.IngressRule{}
+func toIngressRules(hostRules map[string]IngressRuleValues) []networking.IngressRule {
+	rules := []networking.IngressRule{}
 	for host, pathMap := range hostRules {
-		rules = append(rules, extensions.IngressRule{
+		rules = append(rules, networking.IngressRule{
 			Host: host,
-			IngressRuleValue: extensions.IngressRuleValue{
-				HTTP: &extensions.HTTPIngressRuleValue{
+			IngressRuleValue: networking.IngressRuleValue{
+				HTTP: &networking.HTTPIngressRuleValue{
 					Paths: toHTTPIngressPaths(pathMap),
 				},
 			},
@@ -89,14 +90,14 @@ func toIngressRules(hostRules map[string]IngressRuleValues) []extensions.Ingress
 	return rules
 }
 
-func newIngress(pathMap map[string]string) *extensions.Ingress {
-	return &extensions.Ingress{
+func newIngress(pathMap map[string]string) *networking.Ingress {
+	return &networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: networking.IngressSpec{
+			Backend: &networking.IngressBackend{
 				ServiceName: defaultBackendName,
 				ServicePort: defaultBackendPort,
 			},
@@ -105,7 +106,7 @@ func newIngress(pathMap map[string]string) *extensions.Ingress {
 			}),
 			TLS: defaultTLS,
 		},
-		Status: extensions.IngressStatus{
+		Status: networking.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{IP: defaultLoadBalancer},
@@ -115,7 +116,7 @@ func newIngress(pathMap map[string]string) *extensions.Ingress {
 	}
 }
 
-func validIngress() *extensions.Ingress {
+func validIngress() *networking.Ingress {
 	return newIngress(defaultPathMap)
 }
 
@@ -126,8 +127,8 @@ func TestCreate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store)
 	ingress := validIngress()
 	noDefaultBackendAndRules := validIngress()
-	noDefaultBackendAndRules.Spec.Backend = &extensions.IngressBackend{}
-	noDefaultBackendAndRules.Spec.Rules = []extensions.IngressRule{}
+	noDefaultBackendAndRules.Spec.Backend = &networking.IngressBackend{}
+	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 		"foo.bar.com": {"/invalid[": "svc"}})
@@ -149,11 +150,11 @@ func TestUpdate(t *testing.T) {
 		validIngress(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
+			object := obj.(*networking.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 				"bar.foo.com": {"/bar": defaultBackendName},
 			})
-			object.Spec.TLS = append(object.Spec.TLS, extensions.IngressTLS{
+			object.Spec.TLS = append(object.Spec.TLS, networking.IngressTLS{
 				Hosts:      []string{"*.google.com"},
 				SecretName: "googleSecret",
 			})
@@ -161,13 +162,13 @@ func TestUpdate(t *testing.T) {
 		},
 		// invalid updateFunc: ObjeceMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
+			object := obj.(*networking.Ingress)
 			object.Name = ""
 			return object
 		},
 
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.Ingress)
+			object := obj.(*networking.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 				"foo.bar.com": {"/invalid[": "svc"}})
 			return object

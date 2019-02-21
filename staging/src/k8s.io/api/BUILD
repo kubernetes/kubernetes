@@ -80,6 +80,7 @@ filegroup(
         "//staging/src/k8s.io/api/extensions/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:all-srcs",
         "//staging/src/k8s.io/api/networking/v1:all-srcs",
+        "//staging/src/k8s.io/api/networking/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/policy/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/rbac/v1:all-srcs",
         "//staging/src/k8s.io/api/rbac/v1alpha1:all-srcs",
