@@ -752,7 +752,7 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 	return nodePorts
 }
 
-// GetIngressNodePorts returns related backend services' svcPorts.
+// GetServicePorts returns related backend services' svcPorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
 func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
