@@ -116,17 +116,19 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			p, err := f.ClientSet.CoreV1().Pods(namespace).Get("audit-proxy", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
+				framework.Logf("waiting for audit-proxy pod to be present")
 				return false, nil
 			} else if err != nil {
 				return false, err
 			}
 			podIP = p.Status.PodIP
 			if podIP == "" {
+				framework.Logf("waiting for audit-proxy pod IP to be ready")
 				return false, nil
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "could not look up pod ip")
+		framework.ExpectNoError(err, "timed out waiting for audit-proxy pod to be ready")
 
 		podURL := fmt.Sprintf("http://%s:8080", podIP)
 		// create audit sink
@@ -160,14 +162,16 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			logs, err := framework.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
+				framework.Logf("waiting for audit-proxy pod logs to be available")
 				return false, nil
 			}
 			if logs == "" {
+				framework.Logf("waiting for audit-proxy pod logs to be non-empty")
 				return false, nil
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "failed to get logs from sink")
+		framework.ExpectNoError(err, "failed to get logs from audit-proxy pod")
 
 		auditTestUser = "kubernetes-admin"
 		testCases := []struct {
