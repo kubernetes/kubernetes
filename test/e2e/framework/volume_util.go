@@ -487,7 +487,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 // Insert index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
+func InjectHtml(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.Prefix, " injector"))
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
@@ -523,6 +523,9 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 					},
 				},
 			},
+			SecurityContext: &v1.PodSecurityContext{
+				FSGroup: fsGroup,
+			},
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
@@ -537,8 +540,6 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 
 	defer func() {
 		podClient.Delete(podName, nil)
-		err := waitForPodNotFoundInNamespace(client, podName, injectPod.Namespace, PodDeleteTimeout)
-		ExpectNoError(err)
 	}()
 
 	injectPod, err := podClient.Create(injectPod)
