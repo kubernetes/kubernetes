@@ -994,11 +994,11 @@ __EOF__
 
   ### Create deployent and service
   # Pre-condition: no deployment exists
-  kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert deployment "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
   # Command
   kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
   # Check result
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$ID_FIELD}}:{{end}}" 'testmetadata:'
   kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
 
   ### Expose deployment as a new service
@@ -1011,11 +1011,11 @@ __EOF__
   # Command
   kubectl delete service exposemetadata testmetadata "${kube_flags[@]}"
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
-    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+    kube::test::wait_object_assert services "{{range.items}}{{$ID_FIELD}}:{{end}}" 'kubernetes:'
   fi
   kubectl delete deployment testmetadata "${kube_flags[@]}"
   if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
-    kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+    kube::test::wait_object_assert deployment "{{range.items}}{{$ID_FIELD}}:{{end}}" ''
   fi
 
   set +o nounset
