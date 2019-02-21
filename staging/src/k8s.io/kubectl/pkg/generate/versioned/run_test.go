@@ -42,6 +42,7 @@ func TestGenerate(t *testing.T) {
 			name: "test1",
 			params: map[string]interface{}{
 				"name":              "foo",
+				"namespace":         "bar",
 				"image":             "someimage",
 				"image-pull-policy": "Always",
 				"replicas":          "1",
@@ -49,8 +50,9 @@ func TestGenerate(t *testing.T) {
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -76,16 +78,18 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test2",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "",
-				"env":      []string{"a=b", "c=d"},
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"port":      "",
+				"env":       []string{"a=b", "c=d"},
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -121,6 +125,7 @@ func TestGenerate(t *testing.T) {
 			name: "test3",
 			params: map[string]interface{}{
 				"name":              "foo",
+				"namespace":         "bar",
 				"image":             "someimage",
 				"image-pull-policy": "Never",
 				"replicas":          "1",
@@ -129,8 +134,9 @@ func TestGenerate(t *testing.T) {
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -156,17 +162,19 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test3",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "",
-				"args":     []string{"bar", "baz", "blah"},
-				"command":  "true",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"port":      "",
+				"args":      []string{"bar", "baz", "blah"},
+				"command":   "true",
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -191,15 +199,17 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test4",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"port":      "80",
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -229,6 +239,7 @@ func TestGenerate(t *testing.T) {
 			name: "test5",
 			params: map[string]interface{}{
 				"name":              "foo",
+				"namespace":         "bar",
 				"image":             "someimage",
 				"image-pull-policy": "IfNotPresent",
 				"replicas":          "1",
@@ -237,8 +248,9 @@ func TestGenerate(t *testing.T) {
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -269,10 +281,11 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test6",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"hostport": "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"hostport":  "80",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -280,15 +293,17 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test7",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -312,10 +327,11 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test8",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"hostport": "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"hostport":  "80",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -323,11 +339,12 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test9",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
-				"requests": "cpu100m,memory=100Mi",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
+				"requests":  "cpu100m,memory=100Mi",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -335,11 +352,12 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test10",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
-				"requests": "cpu=100m&memory=100Mi",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
+				"requests":  "cpu=100m&memory=100Mi",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -347,11 +365,12 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test11",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
-				"requests": "cpu=",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
+				"requests":  "cpu=",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -359,17 +378,19 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "test12",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
-				"requests": "cpu=100m,memory=100Mi",
-				"limits":   "cpu=400m,memory=200Mi",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
+				"requests":  "cpu=100m,memory=100Mi",
+				"limits":    "cpu=400m,memory=200Mi",
 			},
 			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: &one,
@@ -393,6 +414,40 @@ func TestGenerate(t *testing.T) {
 											v1.ResourceMemory: resource.MustParse("200Mi"),
 										},
 									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "test13",
+			params: map[string]interface{}{
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"replicas":          "1",
+				"port":              "",
+			},
+			expected: &v1.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
+					Selector: map[string]string{"run": "foo"},
+					Template: &v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"run": "foo"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: v1.PullAlways,
 								},
 							},
 						},
@@ -430,14 +485,16 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test1",
 			params: map[string]interface{}{
-				"name":  "foo",
-				"image": "someimage",
-				"port":  "",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"port":      "",
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -454,9 +511,10 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test2",
 			params: map[string]interface{}{
-				"name":  "foo",
-				"image": "someimage",
-				"env":   []string{"a", "c"},
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"env":       []string{"a", "c"},
 			},
 
 			expected:  nil,
@@ -466,14 +524,16 @@ func TestGeneratePod(t *testing.T) {
 			name: "test3",
 			params: map[string]interface{}{
 				"name":              "foo",
+				"namespace":         "bar",
 				"image":             "someimage",
 				"image-pull-policy": "Always",
 				"env":               []string{"a=b", "c=d"},
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -501,14 +561,16 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test4",
 			params: map[string]interface{}{
-				"name":  "foo",
-				"image": "someimage",
-				"port":  "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"port":      "80",
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -530,15 +592,17 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test5",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"port":     "80",
-				"hostport": "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"port":      "80",
+				"hostport":  "80",
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"run": "foo"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -561,9 +625,10 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test6",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"hostport": "80",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"hostport":  "80",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -571,15 +636,17 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test7",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -596,16 +663,18 @@ func TestGeneratePod(t *testing.T) {
 		{
 			name: "test8",
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"labels":   "foo=bar,baz=blah",
-				"stdin":    "true",
+				"name":      "foo",
+				"namespace": "bar",
+				"image":     "someimage",
+				"replicas":  "1",
+				"labels":    "foo=bar,baz=blah",
+				"stdin":     "true",
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -625,6 +694,7 @@ func TestGeneratePod(t *testing.T) {
 			name: "test9",
 			params: map[string]interface{}{
 				"name":             "foo",
+				"namespace":        "bar",
 				"image":            "someimage",
 				"replicas":         "1",
 				"labels":           "foo=bar,baz=blah",
@@ -633,8 +703,9 @@ func TestGeneratePod(t *testing.T) {
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -681,6 +752,7 @@ func TestGenerateDeployment(t *testing.T) {
 			params: map[string]interface{}{
 				"labels":            "foo=bar,baz=blah",
 				"name":              "foo",
+				"namespace":         "bar",
 				"replicas":          "3",
 				"image":             "someimage",
 				"image-pull-policy": "Always",
@@ -695,8 +767,9 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			expected: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: &three,
@@ -778,6 +851,7 @@ func TestGenerateAppsDeployment(t *testing.T) {
 			params: map[string]interface{}{
 				"labels":            "foo=bar,baz=blah",
 				"name":              "foo",
+				"namespace":         "bar",
 				"replicas":          "3",
 				"image":             "someimage",
 				"image-pull-policy": "Always",
@@ -792,8 +866,9 @@ func TestGenerateAppsDeployment(t *testing.T) {
 			},
 			expected: &appsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: &three,
@@ -874,6 +949,7 @@ func TestGenerateJob(t *testing.T) {
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
+				"namespace":        "bar",
 				"image":            "someimage",
 				"port":             "80",
 				"hostport":         "80",
@@ -888,8 +964,9 @@ func TestGenerateJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
@@ -969,6 +1046,7 @@ func TestGenerateCronJobAlpha(t *testing.T) {
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
+				"namespace":        "bar",
 				"image":            "someimage",
 				"port":             "80",
 				"hostport":         "80",
@@ -984,8 +1062,9 @@ func TestGenerateCronJobAlpha(t *testing.T) {
 			},
 			expected: &batchv2alpha1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batchv2alpha1.CronJobSpec{
 					Schedule:          "0/5 * * * ?",
@@ -1071,6 +1150,7 @@ func TestGenerateCronJobBeta(t *testing.T) {
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
+				"namespace":        "bar",
 				"image":            "someimage",
 				"port":             "80",
 				"hostport":         "80",
@@ -1086,8 +1166,9 @@ func TestGenerateCronJobBeta(t *testing.T) {
 			},
 			expected: &batchv1beta1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+					Name:      "foo",
+					Namespace: "bar",
+					Labels:    map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batchv1beta1.CronJobSpec{
 					Schedule:          "0/5 * * * ?",

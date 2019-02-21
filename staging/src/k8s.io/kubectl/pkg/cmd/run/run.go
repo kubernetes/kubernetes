@@ -355,6 +355,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	names := generator.ParamNames()
 	params := generate.MakeParams(cmd, names)
 	params["name"] = args[0]
+	params["namespace"] = namespace
 	if len(args) > 1 {
 		params["args"] = args[1:]
 	}

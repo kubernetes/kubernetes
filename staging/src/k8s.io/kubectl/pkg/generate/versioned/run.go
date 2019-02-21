@@ -42,6 +42,7 @@ func (DeploymentV1Beta1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "replicas", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
@@ -120,6 +121,12 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 			},
 		},
 	}
+
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		deployment.ObjectMeta.Namespace = namespace
+	}
+
 	return &deployment, nil
 }
 
@@ -130,6 +137,7 @@ func (DeploymentAppsV1Beta1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "replicas", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
@@ -208,6 +216,12 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 			},
 		},
 	}
+
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		deployment.ObjectMeta.Namespace = namespace
+	}
+
 	return &deployment, nil
 }
 
@@ -218,6 +232,7 @@ func (DeploymentAppsV1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "replicas", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
@@ -296,6 +311,12 @@ func (DeploymentAppsV1) Generate(genericParams map[string]interface{}) (runtime.
 			},
 		},
 	}
+
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		deployment.ObjectMeta.Namespace = namespace
+	}
+
 	return &deployment, nil
 }
 
@@ -327,6 +348,12 @@ func getName(params map[string]string) (string, error) {
 		}
 	}
 	return name, nil
+}
+
+// getNamespace returns the namespace of newly created resource.
+func getNamespace(params map[string]string) string {
+	namespace, _ := params["namespace"]
+	return namespace
 }
 
 // getParams returns map of generic parameters.
@@ -383,6 +410,7 @@ func (JobV1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
 		{Name: "port", Required: false},
@@ -467,6 +495,11 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 		},
 	}
 
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		job.ObjectMeta.Namespace = namespace
+	}
+
 	return &job, nil
 }
 
@@ -477,6 +510,7 @@ func (CronJobV2Alpha1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
 		{Name: "port", Required: false},
@@ -568,6 +602,11 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 		},
 	}
 
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		cronJob.ObjectMeta.Namespace = namespace
+	}
+
 	return &cronJob, nil
 }
 
@@ -578,6 +617,7 @@ func (CronJobV1Beta1) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
 		{Name: "port", Required: false},
@@ -669,6 +709,11 @@ func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Ob
 		},
 	}
 
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		cronJob.ObjectMeta.Namespace = namespace
+	}
+
 	return &cronJob, nil
 }
 
@@ -679,6 +724,7 @@ func (BasicReplicationController) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "replicas", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
@@ -831,6 +877,12 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			},
 		},
 	}
+
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		controller.ObjectMeta.Namespace = namespace
+	}
+
 	return &controller, nil
 }
 
@@ -901,6 +953,7 @@ func (BasicPod) ParamNames() []generate.GeneratorParam {
 		{Name: "labels", Required: false},
 		{Name: "default-name", Required: false},
 		{Name: "name", Required: true},
+		{Name: "namespace", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
 		{Name: "port", Required: false},
@@ -988,6 +1041,12 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			RestartPolicy: restartPolicy,
 		},
 	}
+
+	namespace := getNamespace(params)
+	if len(namespace) > 0 {
+		pod.ObjectMeta.Namespace = namespace
+	}
+
 	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
 	if err = updatePodContainers(params, args, envs, imagePullPolicy, &pod.Spec); err != nil {
 		return nil, err
