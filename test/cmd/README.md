@@ -1,6 +1,6 @@
 # Kubernetes Command-Line Integration Test Suite
 
-This document describes how Kubernetes should interact with the Kubernetes command-line integration test suite.
+This document describes how you can use the Kubernetes command-line integration test-suite.
 
 ## Running Tests
 
@@ -27,7 +27,7 @@ if kube::test::if_supports_resource "${replicasets}" ; then
 fi
 ```
 
-Be sure to validate any supported resouces required for the test by using the `kue::test::if_supports_resource` function. 
+Be sure to validate any supported resouces required for the test by using the `kube::test::if_supports_resource` function. 
 
 
 ### New File

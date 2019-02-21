@@ -386,479 +386,485 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
+  cleanup(){
+     kube::test::clear_all
+    if [[ -n "${foundError}" ]]; then
+      echo "FAILED TESTS: ""${foundError}"
+      exit 1
+    fi
+  }
+
    if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do 
       record_command run_${pkg}_tests
     done
-  else
-    #########################
-    # Kubectl version #
-    #########################
+    cleanup
+    return
+  fi
 
-    record_command run_kubectl_version_tests
+  #########################
+  # Kubectl version #
+  #########################
 
-    #######################
-    # kubectl config set #
-    #######################
+  record_command run_kubectl_version_tests
 
-    record_command run_kubectl_config_set_tests
+  #######################
+  # kubectl config set #
+  #######################
 
-    #######################
-    # kubectl local proxy #
-    #######################
+  record_command run_kubectl_config_set_tests
 
-    record_command run_kubectl_local_proxy_tests
+  #######################
+  # kubectl local proxy #
+  #######################
 
-    #########################
-    # RESTMapper evaluation #
-    #########################
+  record_command run_kubectl_local_proxy_tests
 
-    record_command run_RESTMapper_evaluation_tests
+  #########################
+  # RESTMapper evaluation #
+  #########################
 
-    # find all resources
-    kubectl "${kube_flags[@]}" api-resources
-    # find all namespaced resources that support list by name and get them
-    kubectl "${kube_flags[@]}" api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl "${kube_flags[@]}" get -o name
+  record_command run_RESTMapper_evaluation_tests
 
-    ################
-    # Cluster Role #
-    ################
+  # find all resources
+  kubectl "${kube_flags[@]}" api-resources
+  # find all namespaced resources that support list by name and get them
+  kubectl "${kube_flags[@]}" api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl "${kube_flags[@]}" get -o name
 
-    if kube::test::if_supports_resource "${clusterroles}" ; then
-      record_command run_clusterroles_tests
-    fi
+  ################
+  # Cluster Role #
+  ################
 
-    ########
-    # Role #
-    ########
-    if kube::test::if_supports_resource "${roles}" ; then
-        record_command run_role_tests
-    fi
+  if kube::test::if_supports_resource "${clusterroles}" ; then
+    record_command run_clusterroles_tests
+  fi
 
-    #########################
-    # Assert short name     #
-    #########################
+  ########
+  # Role #
+  ########
+  if kube::test::if_supports_resource "${roles}" ; then
+      record_command run_role_tests
+  fi
 
-    record_command run_assert_short_name_tests
+  #########################
+  # Assert short name     #
+  #########################
 
-    #########################
-    # Assert categories     #
-    #########################
+  record_command run_assert_short_name_tests
 
-    ## test if a category is exported during discovery
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_assert_categories_tests
-    fi
+  #########################
+  # Assert categories     #
+  #########################
 
-    ###########################
-    # POD creation / deletion #
-    ###########################
+  ## test if a category is exported during discovery
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_assert_categories_tests
+  fi
 
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_pod_tests
-    fi
+  ###########################
+  # POD creation / deletion #
+  ###########################
 
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_save_config_tests
-    fi
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_pod_tests
+  fi
 
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_create_error_tests
-    fi
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_save_config_tests
+  fi
 
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_apply_tests
-      record_command run_kubectl_run_tests
-      record_command run_kubectl_create_filter_tests
-    fi
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_create_error_tests
+  fi
 
-    if kube::test::if_supports_resource "${deployments}" ; then
-      record_command run_kubectl_apply_deployments_tests
-    fi
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_apply_tests
+    record_command run_kubectl_run_tests
+    record_command run_kubectl_create_filter_tests
+  fi
 
-    ################
-    # Kubectl diff #
-    ################
-    record_command run_kubectl_diff_tests
-    record_command run_kubectl_diff_same_names
+  if kube::test::if_supports_resource "${deployments}" ; then
+    record_command run_kubectl_apply_deployments_tests
+  fi
 
-    ###############
-    # Kubectl get #
-    ###############
+  ################
+  # Kubectl diff #
+  ################
+  record_command run_kubectl_diff_tests
+  record_command run_kubectl_diff_same_names
 
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_get_tests
-      record_command run_kubectl_old_print_tests
-    fi
+  ###############
+  # Kubectl get #
+  ###############
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_get_tests
+    record_command run_kubectl_old_print_tests
+  fi
 
 
-    ######################
-    # Create             #
-    ######################
+  ######################
+  # Create             #
+  ######################
+  if kube::test::if_supports_resource "${secrets}" ; then
+    record_command run_create_secret_tests
+  fi
+
+  ######################
+  # Delete             #
+  ######################
+  if kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_kubectl_delete_allnamespaces_tests
+  fi
+
+  ##################
+  # Global timeout #
+  ##################
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_request_timeout_tests
+  fi
+
+  #####################################
+  # CustomResourceDefinitions         #
+  #####################################
+
+  # customresourcedefinitions cleanup after themselves.
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_crd_tests
+  fi
+
+  #################
+  # Run cmd w img #
+  #################
+
+  if kube::test::if_supports_resource "${deployments}" ; then
+    record_command run_cmd_with_img_tests
+  fi
+
+
+  #####################################
+  # Recursive Resources via directory #
+  #####################################
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    run_recursive_resources_tests
+  fi
+
+
+  ##############
+  # Namespaces #
+  ##############
+  if kube::test::if_supports_resource "${namespaces}" ; then
+    record_command run_namespace_tests
+  fi
+
+
+  ###########
+  # Secrets #
+  ###########
+  if kube::test::if_supports_resource "${namespaces}" ; then
     if kube::test::if_supports_resource "${secrets}" ; then
-      record_command run_create_secret_tests
+      record_command run_secrets_test
     fi
+  fi
 
-    ######################
-    # Delete             #
-    ######################
+
+  ######################
+  # ConfigMap          #
+  ######################
+
+  if kube::test::if_supports_resource "${namespaces}"; then
     if kube::test::if_supports_resource "${configmaps}" ; then
-      record_command run_kubectl_delete_allnamespaces_tests
+      record_command run_configmap_tests
     fi
-
-    ##################
-    # Global timeout #
-    ##################
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_request_timeout_tests
-    fi
-
-    #####################################
-    # CustomResourceDefinitions         #
-    #####################################
-
-    # customresourcedefinitions cleanup after themselves.
-    if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
-      record_command run_crd_tests
-    fi
-
-    #################
-    # Run cmd w img #
-    #################
-
-    if kube::test::if_supports_resource "${deployments}" ; then
-      record_command run_cmd_with_img_tests
-    fi
-
-
-    #####################################
-    # Recursive Resources via directory #
-    #####################################
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      run_recursive_resources_tests
-    fi
-
-
-    ##############
-    # Namespaces #
-    ##############
-    if kube::test::if_supports_resource "${namespaces}" ; then
-      record_command run_namespace_tests
-    fi
-
-
-    ###########
-    # Secrets #
-    ###########
-    if kube::test::if_supports_resource "${namespaces}" ; then
-      if kube::test::if_supports_resource "${secrets}" ; then
-        record_command run_secrets_test
-      fi
-    fi
-
-
-    ######################
-    # ConfigMap          #
-    ######################
-
-    if kube::test::if_supports_resource "${namespaces}"; then
-      if kube::test::if_supports_resource "${configmaps}" ; then
-        record_command run_configmap_tests
-      fi
-    fi
-
-    ####################
-    # Client Config    #
-    ####################
-
-    record_command run_client_config_tests
-
-    ####################
-    # Service Accounts #
-    ####################
-
-    if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${serviceaccounts}" ; then
-      record_command run_service_accounts_tests
-    fi
-
-    ####################
-    # Job              #
-    ####################
-
-    if kube::test::if_supports_resource "${job}" ; then
-      record_command run_job_tests
-      record_command run_create_job_tests
-    fi
-
-    #################
-    # Pod templates #
-    #################
-
-    if kube::test::if_supports_resource "${podtemplates}" ; then
-      record_command run_pod_templates_tests
-    fi
-
-    ############
-    # Services #
-    ############
-
-    if kube::test::if_supports_resource "${services}" ; then
-      record_command run_service_tests
-    fi
-
-    ##################
-    # DaemonSets     #
-    ##################
-
-    if kube::test::if_supports_resource "${daemonsets}" ; then
-      record_command run_daemonset_tests
-      if kube::test::if_supports_resource "${controllerrevisions}"; then
-        record_command run_daemonset_history_tests
-      fi
-    fi
-
-    ###########################
-    # Replication controllers #
-    ###########################
-
-    if kube::test::if_supports_resource "${namespaces}" ; then
-      if kube::test::if_supports_resource "${replicationcontrollers}" ; then
-        record_command run_rc_tests
-      fi
-    fi
-
-    ######################
-    # Deployments       #
-    ######################
-
-    if kube::test::if_supports_resource "${deployments}" ; then
-      record_command run_deployment_tests
-    fi
-
-    ######################
-    # Replica Sets       #
-    ######################
-
-    if kube::test::if_supports_resource "${replicasets}" ; then
-      record_command run_rs_tests
-    fi
-
-    #################
-    # Stateful Sets #
-    #################
-
-    if kube::test::if_supports_resource "${statefulsets}" ; then
-      record_command run_stateful_set_tests
-      if kube::test::if_supports_resource "${controllerrevisions}"; then
-        record_command run_statefulset_history_tests
-      fi
-    fi
-
-    ######################
-    # Lists              #
-    ######################
-
-    if kube::test::if_supports_resource "${services}" ; then
-      if kube::test::if_supports_resource "${deployments}" ; then
-        record_command run_lists_tests
-      fi
-    fi
-
-
-    ######################
-    # Multiple Resources #
-    ######################
-    if kube::test::if_supports_resource "${services}" ; then
-      if kube::test::if_supports_resource "${replicationcontrollers}" ; then
-        record_command run_multi_resources_tests
-      fi
-    fi
-
-    ######################
-    # Persistent Volumes #
-    ######################
-
-    if kube::test::if_supports_resource "${persistentvolumes}" ; then
-      record_command run_persistent_volumes_tests
-    fi
-
-    ############################
-    # Persistent Volume Claims #
-    ############################
-
-    if kube::test::if_supports_resource "${persistentvolumeclaims}" ; then
-      record_command run_persistent_volume_claims_tests
-    fi
-
-    ############################
-    # Storage Classes #
-    ############################
-
-    if kube::test::if_supports_resource "${storageclass}" ; then
-      record_command run_storage_class_tests
-    fi
-
-    #########
-    # Nodes #
-    #########
-
-    if kube::test::if_supports_resource "${nodes}" ; then
-      record_command run_nodes_tests
-    fi
-
-
-    ########################
-    # authorization.k8s.io #
-    ########################
-
-    if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
-      record_command run_authorization_tests
-    fi
-
-    # kubectl auth can-i
-    # kube-apiserver is started with authorization mode AlwaysAllow, so kubectl can-i always returns yes
-    if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
-      output_message=$(kubectl auth can-i '*' '*' 2>&1 "${kube_flags[@]}")
-      kube::test::if_has_string "${output_message}" "yes"
-
-      output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}")
-      kube::test::if_has_string "${output_message}" "yes"
-
-      output_message=$(kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
-      kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
-
-      output_message=$(kubectl auth can-i get /logs/ 2>&1 "${kube_flags[@]}")
-      kube::test::if_has_string "${output_message}" "yes"
-
-      output_message=$(! kubectl auth can-i get /logs/ --subresource=log 2>&1 "${kube_flags[@]}")
-      kube::test::if_has_string "${output_message}" "subresource can not be used with NonResourceURL"
-
-      output_message=$(kubectl auth can-i list jobs.batch/bar -n foo --quiet 2>&1 "${kube_flags[@]}")
-      kube::test::if_empty_string "${output_message}"
-
-      output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}"; echo $?)
-      kube::test::if_has_string "${output_message}" '0'
-
-      output_message=$(kubectl auth can-i get pods --subresource=log --quiet 2>&1 "${kube_flags[@]}"; echo $?)
-      kube::test::if_has_string "${output_message}" '0'
-    fi
-
-    # kubectl auth reconcile
-    if kube::test::if_supports_resource "${clusterroles}" ; then
-      kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
-      kube::test::get_object_assert 'rolebindings -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-RB:'
-      kube::test::get_object_assert 'roles -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-R:'
-      kube::test::get_object_assert 'clusterrolebindings -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CRB:'
-      kube::test::get_object_assert 'clusterroles -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CR:'
-
-      failure_message=$(! kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-v1beta1.yaml 2>&1 )
-      kube::test::if_has_string "${failure_message}" 'only rbac.authorization.k8s.io/v1 is supported'
-
-      kubectl delete "${kube_flags[@]}" rolebindings,role,clusterroles,clusterrolebindings -n some-other-random -l test-cmd=auth
-    fi
-
-    #####################
-    # Retrieve multiple #
-    #####################
-
-    if kube::test::if_supports_resource "${nodes}" ; then
-      if kube::test::if_supports_resource "${services}" ; then
-        record_command run_retrieve_multiple_tests
-      fi
-    fi
-
-
-    #####################
-    # Resource aliasing #
-    #####################
-
-    if kube::test::if_supports_resource "${services}" ; then
-      if kube::test::if_supports_resource "${replicationcontrollers}" ; then
-        record_command run_resource_aliasing_tests
-      fi
-    fi
-
-    ###########
-    # Explain #
-    ###########
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_explain_tests
-    fi
-
-
-    ###########
-    # Swagger #
-    ###########
-
-    record_command run_swagger_tests
-
-    #####################
-    # Kubectl --sort-by #
-    #####################
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_kubectl_sort_by_tests
-    fi
-
-    ############################
-    # Kubectl --all-namespaces #
-    ############################
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      if kube::test::if_supports_resource "${nodes}" ; then
-        record_command run_kubectl_all_namespace_tests
-      fi
-    fi
-
-    ######################
-    # kubectl --template #
-    ######################
-
-    if kube::test::if_supports_resource "${pods}" ; then
-      record_command run_template_output_tests
-    fi
-
-    ################
-    # Certificates #
-    ################
-
-    if kube::test::if_supports_resource "${csr}" ; then
-      record_command run_certificates_tests
-    fi
-
-    ######################
-    # Cluster Management #
-    ######################
-    if kube::test::if_supports_resource "${nodes}" ; then
-      record_command run_cluster_management_tests
-    fi
-
-    ###########
-    # Plugins #
-    ###########
-
-    record_command run_plugins_tests
-
-
-    #################
-    # Impersonation #
-    #################
-    record_command run_impersonation_tests
- 
-    ####################
-    # kubectl wait     #
-    ####################
-
-    record_command run_wait_tests
   fi
-  kube::test::clear_all
 
-  if [[ -n "${foundError}" ]]; then
-    echo "FAILED TESTS: ""${foundError}"
-    exit 1
+  ####################
+  # Client Config    #
+  ####################
+
+  record_command run_client_config_tests
+
+  ####################
+  # Service Accounts #
+  ####################
+
+  if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${serviceaccounts}" ; then
+    record_command run_service_accounts_tests
   fi
+
+  ####################
+  # Job              #
+  ####################
+
+  if kube::test::if_supports_resource "${job}" ; then
+    record_command run_job_tests
+    record_command run_create_job_tests
+  fi
+
+  #################
+  # Pod templates #
+  #################
+
+  if kube::test::if_supports_resource "${podtemplates}" ; then
+    record_command run_pod_templates_tests
+  fi
+
+  ############
+  # Services #
+  ############
+
+  if kube::test::if_supports_resource "${services}" ; then
+    record_command run_service_tests
+  fi
+
+  ##################
+  # DaemonSets     #
+  ##################
+
+  if kube::test::if_supports_resource "${daemonsets}" ; then
+    record_command run_daemonset_tests
+    if kube::test::if_supports_resource "${controllerrevisions}"; then
+      record_command run_daemonset_history_tests
+    fi
+  fi
+
+  ###########################
+  # Replication controllers #
+  ###########################
+
+  if kube::test::if_supports_resource "${namespaces}" ; then
+    if kube::test::if_supports_resource "${replicationcontrollers}" ; then
+      record_command run_rc_tests
+    fi
+  fi
+
+  ######################
+  # Deployments       #
+  ######################
+
+  if kube::test::if_supports_resource "${deployments}" ; then
+    record_command run_deployment_tests
+  fi
+
+  ######################
+  # Replica Sets       #
+  ######################
+
+  if kube::test::if_supports_resource "${replicasets}" ; then
+    record_command run_rs_tests
+  fi
+
+  #################
+  # Stateful Sets #
+  #################
+
+  if kube::test::if_supports_resource "${statefulsets}" ; then
+    record_command run_stateful_set_tests
+    if kube::test::if_supports_resource "${controllerrevisions}"; then
+      record_command run_statefulset_history_tests
+    fi
+  fi
+
+  ######################
+  # Lists              #
+  ######################
+
+  if kube::test::if_supports_resource "${services}" ; then
+    if kube::test::if_supports_resource "${deployments}" ; then
+      record_command run_lists_tests
+    fi
+  fi
+
+
+  ######################
+  # Multiple Resources #
+  ######################
+  if kube::test::if_supports_resource "${services}" ; then
+    if kube::test::if_supports_resource "${replicationcontrollers}" ; then
+      record_command run_multi_resources_tests
+    fi
+  fi
+
+  ######################
+  # Persistent Volumes #
+  ######################
+
+  if kube::test::if_supports_resource "${persistentvolumes}" ; then
+    record_command run_persistent_volumes_tests
+  fi
+
+  ############################
+  # Persistent Volume Claims #
+  ############################
+
+  if kube::test::if_supports_resource "${persistentvolumeclaims}" ; then
+    record_command run_persistent_volume_claims_tests
+  fi
+
+  ############################
+  # Storage Classes #
+  ############################
+
+  if kube::test::if_supports_resource "${storageclass}" ; then
+    record_command run_storage_class_tests
+  fi
+
+  #########
+  # Nodes #
+  #########
+
+  if kube::test::if_supports_resource "${nodes}" ; then
+    record_command run_nodes_tests
+  fi
+
+
+  ########################
+  # authorization.k8s.io #
+  ########################
+
+  if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
+    record_command run_authorization_tests
+  fi
+
+  # kubectl auth can-i
+  # kube-apiserver is started with authorization mode AlwaysAllow, so kubectl can-i always returns yes
+  if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
+    output_message=$(kubectl auth can-i '*' '*' 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
+
+    output_message=$(kubectl auth can-i get /logs/ 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(! kubectl auth can-i get /logs/ --subresource=log 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "subresource can not be used with NonResourceURL"
+
+    output_message=$(kubectl auth can-i list jobs.batch/bar -n foo --quiet 2>&1 "${kube_flags[@]}")
+    kube::test::if_empty_string "${output_message}"
+
+    output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}"; echo $?)
+    kube::test::if_has_string "${output_message}" '0'
+
+    output_message=$(kubectl auth can-i get pods --subresource=log --quiet 2>&1 "${kube_flags[@]}"; echo $?)
+    kube::test::if_has_string "${output_message}" '0'
+  fi
+
+  # kubectl auth reconcile
+  if kube::test::if_supports_resource "${clusterroles}" ; then
+    kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
+    kube::test::get_object_assert 'rolebindings -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-RB:'
+    kube::test::get_object_assert 'roles -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-R:'
+    kube::test::get_object_assert 'clusterrolebindings -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CRB:'
+    kube::test::get_object_assert 'clusterroles -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CR:'
+
+    failure_message=$(! kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-v1beta1.yaml 2>&1 )
+    kube::test::if_has_string "${failure_message}" 'only rbac.authorization.k8s.io/v1 is supported'
+
+    kubectl delete "${kube_flags[@]}" rolebindings,role,clusterroles,clusterrolebindings -n some-other-random -l test-cmd=auth
+  fi
+
+  #####################
+  # Retrieve multiple #
+  #####################
+
+  if kube::test::if_supports_resource "${nodes}" ; then
+    if kube::test::if_supports_resource "${services}" ; then
+      record_command run_retrieve_multiple_tests
+    fi
+  fi
+
+
+  #####################
+  # Resource aliasing #
+  #####################
+
+  if kube::test::if_supports_resource "${services}" ; then
+    if kube::test::if_supports_resource "${replicationcontrollers}" ; then
+      record_command run_resource_aliasing_tests
+    fi
+  fi
+
+  ###########
+  # Explain #
+  ###########
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_explain_tests
+  fi
+
+
+  ###########
+  # Swagger #
+  ###########
+
+  record_command run_swagger_tests
+
+  #####################
+  # Kubectl --sort-by #
+  #####################
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_sort_by_tests
+  fi
+
+  ############################
+  # Kubectl --all-namespaces #
+  ############################
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    if kube::test::if_supports_resource "${nodes}" ; then
+      record_command run_kubectl_all_namespace_tests
+    fi
+  fi
+
+  ######################
+  # kubectl --template #
+  ######################
+
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_template_output_tests
+  fi
+
+  ################
+  # Certificates #
+  ################
+
+  if kube::test::if_supports_resource "${csr}" ; then
+    record_command run_certificates_tests
+  fi
+
+  ######################
+  # Cluster Management #
+  ######################
+  if kube::test::if_supports_resource "${nodes}" ; then
+    record_command run_cluster_management_tests
+  fi
+
+  ###########
+  # Plugins #
+  ###########
+
+  record_command run_plugins_tests
+
+
+  #################
+  # Impersonation #
+  #################
+  record_command run_impersonation_tests
+
+  ####################
+  # kubectl wait     #
+  ####################
+
+  record_command run_wait_tests
+
+  cleanup
 }
