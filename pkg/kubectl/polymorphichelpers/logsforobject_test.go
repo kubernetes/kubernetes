@@ -21,40 +21,56 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
-	testclient "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
 )
 
-var (
-	podsResource = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
-	podsKind     = schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
-)
+func TestLogsForObjectWithClient(t *testing.T) {
+	namespace := "test"
+	makeTestPod := func() runtime.Object {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: namespace,
+				Labels:    map[string]string{"foo": "bar"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+		}
+	}
 
-func TestLogsForObject(t *testing.T) {
+	getLogsReq := func(name string, opts *corev1.PodLogOptions) *rest.Request {
+		return fakeexternal.NewSimpleClientset().CoreV1().Pods(namespace).GetLogs(name, opts)
+	}
+
 	tests := []struct {
-		name          string
-		obj           runtime.Object
-		opts          *corev1.PodLogOptions
-		allContainers bool
-		pods          []runtime.Object
-		actions       []testclient.Action
+		name             string
+		obj              runtime.Object
+		allContainers    bool
+		store            []runtime.Object
+		expectedRequests []*rest.Request
 	}{
 		{
 			name: "pod logs",
 			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: namespace},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("hello", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -72,14 +88,13 @@ func TestLogsForObject(t *testing.T) {
 					},
 				},
 			},
-			opts:          &corev1.PodLogOptions{},
 			allContainers: true,
-			pods:          []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+			store:         []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "initc1"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "initc2"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "c2"}),
 			},
 		},
 		{
@@ -101,9 +116,9 @@ func TestLogsForObject(t *testing.T) {
 					},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("hello", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -125,14 +140,13 @@ func TestLogsForObject(t *testing.T) {
 					},
 				},
 			},
-			opts:          &corev1.PodLogOptions{},
 			allContainers: true,
-			pods:          []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+			store:         []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "initc1"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "initc2"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsReq("hello", &corev1.PodLogOptions{Container: "c2"}),
 			},
 		},
 		{
@@ -143,10 +157,9 @@ func TestLogsForObject(t *testing.T) {
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("foo", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -157,10 +170,9 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("foo", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -171,10 +183,9 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("foo", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -185,10 +196,9 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("foo", &corev1.PodLogOptions{}),
 			},
 		},
 		{
@@ -199,61 +209,25 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
-			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", nil),
+			store: []runtime.Object{makeTestPod()},
+			expectedRequests: []*rest.Request{
+				getLogsReq("foo", &corev1.PodLogOptions{}),
 			},
 		},
 	}
 
-	for _, test := range tests {
-		fakeClientset := fakeexternal.NewSimpleClientset(test.pods...)
-		_, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, test.allContainers)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
-		}
-
-		for i := range test.actions {
-			if len(fakeClientset.Actions()) < i {
-				t.Errorf("%s: action %d does not exists in actual actions: %#v",
-					test.name, i, fakeClientset.Actions())
-				continue
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClientset := fakeexternal.NewSimpleClientset(tc.store...)
+			requests, err := logsForObjectWithClient(fakeClientset.CoreV1(), tc.obj, &corev1.PodLogOptions{}, 20*time.Second, tc.allContainers)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			got := fakeClientset.Actions()[i]
-			want := test.actions[i]
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("%s: unexpected action: %s", test.name, diff.ObjectDiff(got, want))
+
+			if !reflect.DeepEqual(tc.expectedRequests, requests) {
+				t.Logf("diff: %s", diff.ObjectReflectDiff(tc.expectedRequests, requests))
+				t.Error(spew.Errorf("expected %#+v, got %#+v", tc.expectedRequests, requests))
 			}
-		}
+		})
 	}
-}
-
-func testPod() runtime.Object {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: "test",
-			Labels:    map[string]string{"foo": "bar"},
-		},
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyAlways,
-			DNSPolicy:     corev1.DNSClusterFirst,
-			Containers: []corev1.Container{
-				{Name: "c1"},
-				{Name: "c2"},
-			},
-		},
-	}
-}
-
-func getLogsAction(namespace string, opts *corev1.PodLogOptions) testclient.Action {
-	action := testclient.GenericActionImpl{}
-	action.Verb = "get"
-	action.Namespace = namespace
-	action.Resource = podsResource
-	action.Subresource = "log"
-	action.Value = opts
-	return action
 }
