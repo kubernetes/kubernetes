@@ -38,4 +38,5 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(Scheme))
 	utilruntime.Must(v1beta1.AddToScheme(Scheme))
 	utilruntime.Must(auditinternal.AddToScheme(Scheme))
+	utilruntime.Must(Scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }

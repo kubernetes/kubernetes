@@ -56,6 +56,7 @@ type MissingEventsReport struct {
 	MissingEvents     []AuditEvent
 }
 
+// String returns a human readable string representation of the report
 func (m *MissingEventsReport) String() string {
 	return fmt.Sprintf(`missing %d events
 
