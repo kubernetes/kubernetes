@@ -7,7 +7,6 @@
 ./cluster/gce/config-common.sh
 ./cluster/gce/config-default.sh
 ./cluster/gce/config-test.sh
-./cluster/gce/delete-stranded-load-balancers.sh
 ./cluster/gce/gci/configure-helper.sh
 ./cluster/gce/gci/configure.sh
 ./cluster/gce/gci/flexvolume_node_setup.sh
@@ -21,7 +20,6 @@
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
 ./cluster/images/conformance/run_e2e.sh
-./cluster/images/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
 ./cluster/kube-up.sh
