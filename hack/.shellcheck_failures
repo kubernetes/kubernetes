@@ -133,7 +133,6 @@
 ./test/cmd/core.sh
 ./test/cmd/crd.sh
 ./test/cmd/create.sh
-./test/cmd/delete.sh
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
 ./test/cmd/generic-resources.sh

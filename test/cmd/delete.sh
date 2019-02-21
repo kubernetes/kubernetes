@@ -36,9 +36,9 @@ run_kubectl_delete_allnamespaces_tests() {
 
   # no configmaps should be in either of those namespaces
   kubectl config set-context "${CONTEXT}" --namespace="${ns_one}"
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kubectl config set-context "${CONTEXT}" --namespace="${ns_two}"
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   set +o nounset
   set +o errexit
