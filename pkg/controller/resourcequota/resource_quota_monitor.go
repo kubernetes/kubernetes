@@ -86,7 +86,7 @@ type QuotaMonitor struct {
 	resourceChanges workqueue.RateLimitingInterface
 
 	// interfaces with informers
-	informerFactory InformerFactory
+	informerFactory controller.InformerFactory
 
 	// list of resources to ignore
 	ignoredResources map[schema.GroupResource]struct{}
@@ -101,7 +101,7 @@ type QuotaMonitor struct {
 	registry quota.Registry
 }
 
-func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
+func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory controller.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
 	return &QuotaMonitor{
 		informersStarted:  informersStarted,
 		informerFactory:   informerFactory,
