@@ -27,6 +27,7 @@
   - k8s.io/api/core/v1
   - k8s.io/cli-runtime/pkg/genericclioptions/printers
   - k8s.io/cli-runtime/pkg/genericclioptions/resource
+  - k8s.io/cli-runtime/pkg/kustomize
 
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:
