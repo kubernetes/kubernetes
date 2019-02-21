@@ -35,8 +35,8 @@ data:
     __PILLAR__DNS__DOMAIN__:53 {
         errors
         cache {
-                success 10000 30
-                denial 10000 5
+                success 9984 30
+                denial 9984 5
         }
         reload
         loop
