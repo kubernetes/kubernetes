@@ -37,9 +37,6 @@
 ./cluster/test-smoke.sh
 ./cluster/update-storage-objects.sh
 ./cluster/validate-cluster.sh
-./hack/benchmark-go.sh
-./hack/build-cross.sh
-./hack/build-go.sh
 ./hack/cherry_pick_pull.sh
 ./hack/generate-bindata.sh
 ./hack/generate-docs.sh
@@ -77,10 +74,8 @@
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
 ./hack/make-rules/vet.sh
-./hack/test-go.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-./hack/update-all.sh
 ./hack/update-bazel.sh
 ./hack/update-codegen.sh
 ./hack/update-generated-kms-dockerized.sh
@@ -95,7 +90,6 @@
 ./hack/update-staging-godeps.sh
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
-./hack/verify-all.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
