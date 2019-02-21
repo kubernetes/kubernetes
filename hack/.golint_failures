@@ -673,8 +673,6 @@ test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress
-test/e2e/framework/providers/aws
-test/e2e/framework/providers/azure
 test/e2e/framework/providers/gce
 test/e2e/framework/providers/kubemark
 test/e2e/instrumentation
