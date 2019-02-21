@@ -88,14 +88,12 @@ func defaultVersion(versions []PackageVersion) Version {
 func ToGroupVersionInfo(groups []GroupVersions, groupGoNames map[GroupVersion]string) []GroupVersionInfo {
 	var groupVersionPackages []GroupVersionInfo
 	for _, group := range groups {
-		defaultVersion := defaultVersion(group.Versions)
 		for _, version := range group.Versions {
 			groupGoName := groupGoNames[GroupVersion{Group: group.Group, Version: version.Version}]
 			groupVersionPackages = append(groupVersionPackages, GroupVersionInfo{
 				Group:                Group(namer.IC(group.Group.NonEmpty())),
 				Version:              Version(namer.IC(version.Version.String())),
 				PackageAlias:         strings.ToLower(groupGoName + version.Version.NonEmpty()),
-				IsDefaultVersion:     version.Version == defaultVersion && version.Version != "",
 				GroupGoName:          groupGoName,
 				LowerCaseGroupGoName: namer.IL(groupGoName),
 			})
