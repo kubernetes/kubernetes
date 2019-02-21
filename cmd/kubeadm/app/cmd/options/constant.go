@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -118,4 +118,7 @@ const (
 
 	// ControlPlane flag instruct kubeadm to create a new control plane instance on this node
 	ControlPlane = "experimental-control-plane"
+
+	// UploadCerts flag instruct kubeadm to upload certificates
+	UploadCerts = "experimental-upload-certs"
 )

@@ -75,27 +75,27 @@ type pluginHandlerWithMetrics struct {
 }
 
 // Admit performs a mutating admission control check and emit metrics.
-func (p pluginHandlerWithMetrics) Admit(a admission.Attributes) error {
+func (p pluginHandlerWithMetrics) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	mutatingHandler, ok := p.Interface.(admission.MutationInterface)
 	if !ok {
 		return nil
 	}
 
 	start := time.Now()
-	err := mutatingHandler.Admit(a)
+	err := mutatingHandler.Admit(a, o)
 	p.observer(time.Since(start), err != nil, a, stepAdmit, p.extraLabels...)
 	return err
 }
 
 // Validate performs a non-mutating admission control check and emits metrics.
-func (p pluginHandlerWithMetrics) Validate(a admission.Attributes) error {
+func (p pluginHandlerWithMetrics) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	validatingHandler, ok := p.Interface.(admission.ValidationInterface)
 	if !ok {
 		return nil
 	}
 
 	start := time.Now()
-	err := validatingHandler.Validate(a)
+	err := validatingHandler.Validate(a, o)
 	p.observer(time.Since(start), err != nil, a, stepValidate, p.extraLabels...)
 	return err
 }

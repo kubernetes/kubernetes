@@ -254,9 +254,8 @@ function Download-HelperScripts {
   if (-not (ShouldWrite-File ${env:K8S_DIR}\hns.psm1)) {
     return
   }
-  Invoke-WebRequest `
-      https://github.com/Microsoft/SDN/raw/master/Kubernetes/windows/hns.psm1 `
-      -OutFile ${env:K8S_DIR}\hns.psm1
+  MustDownload-File -OutFile ${env:K8S_DIR}\hns.psm1 `
+    -URLs "https://github.com/Microsoft/SDN/raw/master/Kubernetes/windows/hns.psm1"
 }
 
 # Takes the Windows version string from the cluster bash scripts (e.g.
@@ -318,14 +317,13 @@ function DownloadAndInstall-KubernetesBinaries {
   $tmp_dir = 'C:\k8s_tmp'
   New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
 
-  $uri = ${kube_env}['NODE_BINARY_TAR_URL']
-  $filename = Split-Path -leaf $uri
-
-  # Disable progress bar to increase download speed.
-  $ProgressPreference = 'SilentlyContinue'
-  Invoke-WebRequest $uri -OutFile ${tmp_dir}\${filename}
-
-  # TODO(yujuhong): Verify hash of the tarball.
+  $urls = ${kube_env}['NODE_BINARY_TAR_URL'].Split(",")
+  $filename = Split-Path -leaf $urls[0]
+  $hash = $null
+  if ($kube_env.ContainsKey('NODE_BINARY_TAR_HASH')) {
+    $hash = ${kube_env}['NODE_BINARY_TAR_HASH']
+  }
+  MustDownload-File -Hash $hash -OutFile ${tmp_dir}\${filename} -URLs $urls
 
   # Change the directory to the parent directory of ${env:K8S_DIR} and untar.
   # This (over-)writes ${dest_dir}/kubernetes/node/bin/*.exe files.
@@ -791,9 +789,8 @@ function Configure-HostNetworkingService {
 function Configure-CniNetworking {
   if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
       (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
-    Invoke-WebRequest `
-        https://github.com/yujuhong/gce-k8s-windows-testing/raw/master/windows-cni-plugins.zip `
-        -OutFile ${env:CNI_DIR}\windows-cni-plugins.zip
+    MustDownload-File -OutFile ${env:CNI_DIR}\windows-cni-plugins.zip `
+      -URLs "https://github.com/yujuhong/gce-k8s-windows-testing/raw/master/windows-cni-plugins.zip"
     rm ${env:CNI_DIR}\*.exe
     Expand-Archive ${env:CNI_DIR}\windows-cni-plugins.zip ${env:CNI_DIR}
     mv ${env:CNI_DIR}\bin\*.exe ${env:CNI_DIR}\

@@ -101,7 +101,7 @@ type RollingUpdaterConfig struct {
 	// when the rolling update starts, such that the total number of old and new pods do not exceed
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
-	// the update is atmost 130% of desired pods.
+	// the update is at most 130% of desired pods.
 	MaxSurge intstr.IntOrString
 	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
 	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value

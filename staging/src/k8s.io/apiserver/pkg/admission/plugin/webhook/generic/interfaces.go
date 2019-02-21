@@ -41,5 +41,5 @@ type VersionedAttributes struct {
 // Dispatcher dispatches webhook call to a list of webhooks with admission attributes as argument.
 type Dispatcher interface {
 	// Dispatch a request to the webhooks using the given webhooks. A non-nil error means the request is rejected.
-	Dispatch(ctx context.Context, a *VersionedAttributes, hooks []*v1beta1.Webhook) error
+	Dispatch(ctx context.Context, a *VersionedAttributes, o admission.ObjectInterfaces, hooks []*v1beta1.Webhook) error
 }

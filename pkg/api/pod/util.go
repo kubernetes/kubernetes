@@ -350,6 +350,20 @@ func dropDisabledFields(
 		}
 	}
 
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
+		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].SubPathExpr = ""
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr = ""
+			}
+		}
+	}
+
 	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
@@ -591,6 +605,28 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	for i := range podSpec.InitContainers {
 		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
 			return true
+		}
+	}
+	return false
+}
+
+// subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
+func subpathExprInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		for j := range podSpec.Containers[i].VolumeMounts {
+			if len(podSpec.Containers[i].VolumeMounts[j].SubPathExpr) > 0 {
+				return true
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		for j := range podSpec.InitContainers[i].VolumeMounts {
+			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr) > 0 {
+				return true
+			}
 		}
 	}
 	return false

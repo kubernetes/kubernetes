@@ -70,7 +70,6 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		aggregatorscheme.Scheme,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err

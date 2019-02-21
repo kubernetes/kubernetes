@@ -148,13 +148,103 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.4.5",
-			"Rev": "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+			"Comment": "v0.4.11",
+			"Rev": "97e4973ce50b2ff5f09635a57e2b88a037aae829"
 		},
 		{
 			"ImportPath": "github.com/Microsoft/hcsshim",
-			"Comment": "v0.6.11",
-			"Rev": "800683ae704ac360b2f3f47fa88f3a6c8c9091b5"
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/hcn",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/cni",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/guestrequest",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/guid",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hcs",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hcserror",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hns",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/interop",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/logfields",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/longpath",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/mergemaps",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/regstate",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/runhcs",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/safefile",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/schema1",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/schema2",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/timeout",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/wclayer",
+			"Comment": "v0.8.3-65-g69ac8d3f7fc10a",
+			"Rev": "69ac8d3f7fc10a0623f3a2655958a1a5bb71f58f"
 		},
 		{
 			"ImportPath": "github.com/NYTimes/gziphandler",
@@ -3158,23 +3248,23 @@
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/netutil",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/serror",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/types",
-			"Comment": "0.3.4",
-			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+			"Comment": "1.0.0-rc1-2-g343b3eff91fcc8",
+			"Rev": "343b3eff91fcc84b0165e252eb843f5fd720fa4e"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",

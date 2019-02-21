@@ -17,10 +17,8 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -32,9 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -47,9 +43,9 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
-	drivers.InitGcePDCSIDriver,
+	func() testsuites.TestDriver { return drivers.InitGcePDCSIDriver(false /* topology enabled */) },
 	drivers.InitGcePDExternalCSIDriver,
 	drivers.InitHostPathV0CSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
@@ -65,133 +61,58 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitSnapshottableTestSuite,
 }
 
-func csiTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	tunedPatterns := []testpatterns.TestPattern{}
-
-	for _, pattern := range patterns {
-		// Skip inline volume and pre-provsioned PV tests for csi drivers
-		if pattern.VolType == testpatterns.InlineVolume || pattern.VolType == testpatterns.PreprovisionedPV {
-			continue
-		}
-		tunedPatterns = append(tunedPatterns, pattern)
-	}
-
-	return tunedPatterns
-}
-
 // This executes testSuites for csi volumes.
 var _ = utils.SIGDescribe("CSI Volumes", func() {
-	f := framework.NewDefaultFramework("csi-volumes")
-
-	var (
-		cancel context.CancelFunc
-		cs     clientset.Interface
-		csics  csiclient.Interface
-		ns     *v1.Namespace
-		// Common configuration options for each driver.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "csi",
-		}
-	)
-
-	BeforeEach(func() {
-		ctx, c := context.WithCancel(context.Background())
-		cancel = c
-		cs = f.ClientSet
-		csics = f.CSIClientSet
-		ns = f.Namespace
-
-		// Debugging of the following tests heavily depends on the log output
-		// of the different containers. Therefore include all of that in log
-		// files (when using --report-dir, as in the CI) or the output stream
-		// (otherwise).
-		to := podlogs.LogOutput{
-			StatusWriter: GinkgoWriter,
-		}
-		if framework.TestContext.ReportDir == "" {
-			to.LogWriter = GinkgoWriter
-		} else {
-			test := CurrentGinkgoTestDescription()
-			reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
-			// We end the prefix with a slash to ensure that all logs
-			// end up in a directory named after the current test.
-			to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
-				reg.ReplaceAllString(test.FullTestText, "_") + "/"
-		}
-		podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
-
-		// pod events are something that the framework already collects itself
-		// after a failed test. Logging them live is only useful for interactive
-		// debugging, not when we collect reports.
-		if framework.TestContext.ReportDir == "" {
-			podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
-		}
-	})
-
-	AfterEach(func() {
-		cancel()
-	})
-
 	for _, initDriver := range csiTestDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
+		curDriver := initDriver()
+
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
-
-				// setupDriver
-				curDriver.CreateDriver()
-			})
-
-			AfterEach(func() {
-				// Cleanup driver
-				curDriver.CleanupDriver()
-			})
-
-			testsuites.RunTestSuite(f, curDriver, csiTestSuites, csiTunePattern)
+			testsuites.DefineTestSuite(curDriver, csiTestSuites)
 		})
 	}
 
 	Context("CSI Topology test using GCE PD driver [Feature:CSINodeInfo]", func() {
-		newConfig := config
-		newConfig.TopologyEnabled = true
-		driver := drivers.InitGcePDCSIDriver(newConfig).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		f := framework.NewDefaultFramework("csitopology")
+		driver := drivers.InitGcePDCSIDriver(true /* topology enabled */).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		var (
+			config      *testsuites.PerTestConfig
+			testCleanup func()
+		)
 		BeforeEach(func() {
-			driver.CreateDriver()
+			config, testCleanup = driver.PrepareTest(f)
 		})
 
 		AfterEach(func() {
-			driver.CleanupDriver()
+			if testCleanup != nil {
+				testCleanup()
+			}
 		})
 
 		It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "topology-positive"
-			testTopologyPositive(cs, suffix, ns.GetName(), false /* delayBinding */, true /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */, true /* allowedTopologies */)
 		})
 
 		It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
 			suffix := "delayed"
-			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, false /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, false /* allowedTopologies */)
 		})
 
 		It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "delayed-topology-positive"
-			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, true /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, true /* allowedTopologies */)
 		})
 
 		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
-			framework.SkipUnlessMultizone(cs)
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "topology-negative"
-			testTopologyNegative(cs, suffix, ns.GetName(), false /* delayBinding */)
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */)
 		})
 
 		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
-			framework.SkipUnlessMultizone(cs)
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "delayed-topology-negative"
-			testTopologyNegative(cs, suffix, ns.GetName(), true /* delayBinding */)
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */)
 		})
 	})
 
@@ -227,29 +148,30 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 		for _, t := range tests {
 			test := t
-			It(test.name, func() {
-				By("Deploying mock CSI driver")
-				config := testsuites.TestConfig{
-					Framework: f,
-					Prefix:    "csi-attach",
-				}
+			f := framework.NewDefaultFramework("csiattach")
 
-				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, test.driverAttachable, nil)
-				driver.CreateDriver()
-				defer driver.CleanupDriver()
+			It(test.name, func() {
+				cs := f.ClientSet
+				csics := f.CSIClientSet
+				ns := f.Namespace
+
+				driver = drivers.InitMockCSIDriver(test.deployDriverCRD, test.driverAttachable, nil)
+				config, testCleanup := driver.PrepareTest(f)
+				driverName := config.GetUniqueDriverName()
+				defer testCleanup()
 
 				if test.deployDriverCRD {
-					err = waitForCSIDriver(csics, driver)
+					err = waitForCSIDriver(csics, driverName)
 					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
-					defer destroyCSIDriver(csics, driver)
+					defer destroyCSIDriver(csics, driverName)
 				}
 
 				By("Creating pod")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass("")
+					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
 				}
-				nodeName := driver.GetDriverInfo().Config.ClientNodeName
+				nodeName := config.ClientNodeName
 				scTest := testsuites.StorageClassTest{
 					Name:         driver.GetDriverInfo().Name,
 					Provisioner:  sc.Provisioner,
@@ -347,29 +269,30 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		}
 		for _, t := range tests {
 			test := t
-			It(test.name, func() {
-				By("Deploying mock CSI driver")
-				config := testsuites.TestConfig{
-					Framework: f,
-					Prefix:    "csi-workload",
-				}
+			f := framework.NewDefaultFramework("csiworkload")
 
-				driver = drivers.InitMockCSIDriver(config, test.deployDriverCRD, true, test.podInfoOnMountVersion)
-				driver.CreateDriver()
-				defer driver.CleanupDriver()
+			It(test.name, func() {
+				cs := f.ClientSet
+				csics := f.CSIClientSet
+				ns := f.Namespace
+
+				driver = drivers.InitMockCSIDriver(test.deployDriverCRD, true, test.podInfoOnMountVersion)
+				config, testCleanup := driver.PrepareTest(f)
+				driverName := config.GetUniqueDriverName()
+				defer testCleanup()
 
 				if test.deployDriverCRD {
-					err = waitForCSIDriver(csics, driver)
+					err = waitForCSIDriver(csics, driverName)
 					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
-					defer destroyCSIDriver(csics, driver)
+					defer destroyCSIDriver(csics, driverName)
 				}
 
 				By("Creating pod")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass("")
+					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
 				}
-				nodeName := driver.GetDriverInfo().Config.ClientNodeName
+				nodeName := config.ClientNodeName
 				scTest := testsuites.StorageClassTest{
 					Name:         driver.GetDriverInfo().Name,
 					Parameters:   sc.Parameters,
@@ -420,14 +343,16 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 		topoZone := getRandomClusterZone(cs)
 		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
 	}
-	claim := newClaim(test, namespace, suffix)
-	claim.Spec.StorageClassName = &class.Name
+	test.Client = cs
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &class.Name
+	test.Class = class
 
 	if delayBinding {
-		_, node := testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class, nil /* node selector */, false /* expect unschedulable */)
+		_, node := test.TestBindingWaitForFirstConsumer(nil /* node selector */, false /* expect unschedulable */)
 		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
 	} else {
-		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+		test.TestDynamicProvisioning()
 	}
 }
 
@@ -447,12 +372,13 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	test.DelayBinding = delayBinding
 	nodeSelector := map[string]string{v1.LabelZoneFailureDomain: podZone}
 
-	class := newStorageClass(test, namespace, suffix)
-	addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, pvZone)
-	claim := newClaim(test, namespace, suffix)
-	claim.Spec.StorageClassName = &class.Name
+	test.Client = cs
+	test.Class = newStorageClass(test, namespace, suffix)
+	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &test.Class.Name
 	if delayBinding {
-		testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class, nodeSelector, true /* expect unschedulable */)
+		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {
 		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			// Ensure that a pod cannot be scheduled in an unsuitable zone.
@@ -461,13 +387,12 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 			defer testsuites.StopPod(cs, pod)
 			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
 		}
-		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+		test.TestDynamicProvisioning()
 	}
 }
 
-func waitForCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) error {
+func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
 	timeout := 2 * time.Minute
-	driverName := testsuites.GetUniqueDriverName(driver)
 
 	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
@@ -479,8 +404,7 @@ func waitForCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) e
 	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
 }
 
-func destroyCSIDriver(csics csiclient.Interface, driver testsuites.TestDriver) {
-	driverName := testsuites.GetUniqueDriverName(driver)
+func destroyCSIDriver(csics csiclient.Interface, driverName string) {
 	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 	if err == nil {
 		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)

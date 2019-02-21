@@ -225,7 +225,6 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
-		// TODO(EKF): can we avoid loading these certificates every time?
 		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
@@ -258,7 +257,6 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
-		// TODO(EKF): can we avoid loading these certificates every time?
 		if certData, _, err := pkiutil.TryLoadCertAndKeyFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
 			caCertData, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), caCert.BaseName)
 			if err != nil {

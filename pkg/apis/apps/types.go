@@ -407,7 +407,7 @@ type RollingUpdateDeployment struct {
 	// Example: when this is set to 30%, the new RC can be scaled up by 30%
 	// immediately when the rolling update starts. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
-	// at any time during the update is atmost 130% of original pods.
+	// at any time during the update is at most 130% of original pods.
 	// +optional
 	MaxSurge intstr.IntOrString
 }

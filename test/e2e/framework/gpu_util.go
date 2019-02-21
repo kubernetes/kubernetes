@@ -20,8 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-
-	. "github.com/onsi/gomega"
 	"k8s.io/klog"
 )
 
@@ -53,7 +51,7 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin() *v1.Pod {
 	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
