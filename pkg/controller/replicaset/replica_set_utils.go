@@ -32,13 +32,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-func isNewUIDError(err error) bool {
-	if err == ErrUIDNotMatch {
-		return true
-	}
-	return false
-}
-
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
 func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSet, newStatus apps.ReplicaSetStatus) (*apps.ReplicaSet, error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
