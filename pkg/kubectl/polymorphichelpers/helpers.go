@@ -32,51 +32,78 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 )
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*corev1.Pod) sort.Interface) (*corev1.Pod, int, error) {
-	options := metav1.ListOptions{LabelSelector: selector}
-
-	podList, err := client.Pods(namespace).List(options)
-	if err != nil {
-		return nil, 0, err
-	}
-	pods := []*corev1.Pod{}
-	for i := range podList.Items {
-		pod := podList.Items[i]
-		pods = append(pods, &pod)
-	}
-	if len(pods) > 0 {
-		sort.Sort(sortBy(pods))
-		return pods[0], len(podList.Items), nil
+func GetFirstPod(client coreclientv1.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*corev1.Pod) sort.Interface) (*corev1.Pod, int, error) {
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.LabelSelector = selector
+			return client.Pods(namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = selector
+			return client.Pods(namespace).Watch(options)
+		},
 	}
 
-	// Watch until we observe a pod
-	options.ResourceVersion = podList.ResourceVersion
-	w, err := client.Pods(namespace).Watch(options)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer w.Stop()
+	var initialPods []*corev1.Pod
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		items := store.List()
+		if len(items) > 0 {
+			for _, item := range items {
+				pod, ok := item.(*corev1.Pod)
+				if !ok {
+					return true, fmt.Errorf("unexpected store item type: %#v", item)
+				}
 
-	condition := func(event watch.Event) (bool, error) {
-		return event.Type == watch.Added || event.Type == watch.Modified, nil
+				initialPods = append(initialPods, pod)
+			}
+
+			sort.Sort(sortBy(initialPods))
+
+			return true, nil
+		}
+
+		// Continue by watching for a new pod to appear
+		return false, nil
 	}
 
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	event, err := watchtools.UntilWithoutRetry(ctx, w, condition)
+	event, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, preconditionFunc, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			// Any pod is good enough
+			return true, nil
+
+		case watch.Deleted:
+			return true, fmt.Errorf("object was deleted before reaching a %#v", event.Object)
+
+		case watch.Error:
+			return true, fmt.Errorf("unexpected error %#v", event.Object)
+
+		default:
+			return true, fmt.Errorf("unexpected event type: %T", event.Type)
+		}
+	})
 	if err != nil {
 		return nil, 0, err
 	}
+
+	if len(initialPods) > 0 {
+		return initialPods[0], len(initialPods), nil
+	}
+
 	pod, ok := event.Object.(*corev1.Pod)
 	if !ok {
 		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
 	}
+
 	return pod, 1, nil
 }
 
