@@ -26,8 +26,6 @@
 ./cluster/validate-cluster.sh
 ./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
-./hack/godep-restore.sh
-./hack/godep-save.sh
 ./hack/grab-profiles.sh
 ./hack/jenkins/benchmark-dockerized.sh
 ./hack/jenkins/build.sh
