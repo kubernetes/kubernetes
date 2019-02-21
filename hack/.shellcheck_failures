@@ -83,17 +83,8 @@
 ./hack/update-all.sh
 ./hack/update-bazel.sh
 ./hack/update-codegen.sh
-./hack/update-generated-device-plugin-dockerized.sh
-./hack/update-generated-device-plugin.sh
-./hack/update-generated-docs.sh
 ./hack/update-generated-kms-dockerized.sh
-./hack/update-generated-kms.sh
-./hack/update-generated-kubelet-plugin-registration-dockerized.sh
-./hack/update-generated-kubelet-plugin-registration.sh
-./hack/update-generated-pod-resources-dockerized.sh
-./hack/update-generated-pod-resources.sh
 ./hack/update-generated-protobuf-dockerized.sh
-./hack/update-generated-protobuf.sh
 ./hack/update-generated-runtime-dockerized.sh
 ./hack/update-generated-runtime.sh
 ./hack/update-generated-swagger-docs.sh
