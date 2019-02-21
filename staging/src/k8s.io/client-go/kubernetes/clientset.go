@@ -61,74 +61,38 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 	AppsV1() appsv1.AppsV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Apps() appsv1.AppsV1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AuditregistrationV1alpha1() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Authentication() authenticationv1.AuthenticationV1Interface
 	AuthenticationV1beta1() authenticationv1beta1.AuthenticationV1beta1Interface
 	AuthorizationV1() authorizationv1.AuthorizationV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Authorization() authorizationv1.AuthorizationV1Interface
 	AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface
 	AutoscalingV1() autoscalingv1.AutoscalingV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Autoscaling() autoscalingv1.AutoscalingV1Interface
 	AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface
 	AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface
 	BatchV1() batchv1.BatchV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Batch() batchv1.BatchV1Interface
 	BatchV1beta1() batchv1beta1.BatchV1beta1Interface
 	BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Certificates() certificatesv1beta1.CertificatesV1beta1Interface
 	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
 	CoordinationV1() coordinationv1.CoordinationV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Coordination() coordinationv1.CoordinationV1Interface
 	CoreV1() corev1.CoreV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Core() corev1.CoreV1Interface
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Events() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Extensions() extensionsv1beta1.ExtensionsV1beta1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Networking() networkingv1.NetworkingV1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Policy() policyv1beta1.PolicyV1beta1Interface
 	RbacV1() rbacv1.RbacV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Rbac() rbacv1.RbacV1Interface
 	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	SchedulingV1() schedulingv1.SchedulingV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Scheduling() schedulingv1.SchedulingV1Interface
 	SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Settings() settingsv1alpha1.SettingsV1alpha1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 	StorageV1() storagev1.StorageV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Storage() storagev1.StorageV1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
 }
 
@@ -177,20 +141,8 @@ func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.
 	return c.admissionregistrationV1beta1
 }
 
-// Deprecated: Admissionregistration retrieves the default version of AdmissionregistrationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
-	return c.admissionregistrationV1beta1
-}
-
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
-	return c.appsV1
-}
-
-// Deprecated: Apps retrieves the default version of AppsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Apps() appsv1.AppsV1Interface {
 	return c.appsV1
 }
 
@@ -209,20 +161,8 @@ func (c *Clientset) AuditregistrationV1alpha1() auditregistrationv1alpha1.Auditr
 	return c.auditregistrationV1alpha1
 }
 
-// Deprecated: Auditregistration retrieves the default version of AuditregistrationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface {
-	return c.auditregistrationV1alpha1
-}
-
 // AuthenticationV1 retrieves the AuthenticationV1Client
 func (c *Clientset) AuthenticationV1() authenticationv1.AuthenticationV1Interface {
-	return c.authenticationV1
-}
-
-// Deprecated: Authentication retrieves the default version of AuthenticationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Authentication() authenticationv1.AuthenticationV1Interface {
 	return c.authenticationV1
 }
 
@@ -236,12 +176,6 @@ func (c *Clientset) AuthorizationV1() authorizationv1.AuthorizationV1Interface {
 	return c.authorizationV1
 }
 
-// Deprecated: Authorization retrieves the default version of AuthorizationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Authorization() authorizationv1.AuthorizationV1Interface {
-	return c.authorizationV1
-}
-
 // AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
 func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface {
 	return c.authorizationV1beta1
@@ -249,12 +183,6 @@ func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1b
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
-	return c.autoscalingV1
-}
-
-// Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
-// Please explicitly pick a version.
-func (c *Clientset) Autoscaling() autoscalingv1.AutoscalingV1Interface {
 	return c.autoscalingV1
 }
 
@@ -273,12 +201,6 @@ func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
 	return c.batchV1
 }
 
-// Deprecated: Batch retrieves the default version of BatchClient.
-// Please explicitly pick a version.
-func (c *Clientset) Batch() batchv1.BatchV1Interface {
-	return c.batchV1
-}
-
 // BatchV1beta1 retrieves the BatchV1beta1Client
 func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
 	return c.batchV1beta1
@@ -294,12 +216,6 @@ func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta
 	return c.certificatesV1beta1
 }
 
-// Deprecated: Certificates retrieves the default version of CertificatesClient.
-// Please explicitly pick a version.
-func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interface {
-	return c.certificatesV1beta1
-}
-
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
 func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
 	return c.coordinationV1beta1
@@ -310,20 +226,8 @@ func (c *Clientset) CoordinationV1() coordinationv1.CoordinationV1Interface {
 	return c.coordinationV1
 }
 
-// Deprecated: Coordination retrieves the default version of CoordinationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Coordination() coordinationv1.CoordinationV1Interface {
-	return c.coordinationV1
-}
-
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	return c.coreV1
-}
-
-// Deprecated: Core retrieves the default version of CoreClient.
-// Please explicitly pick a version.
-func (c *Clientset) Core() corev1.CoreV1Interface {
 	return c.coreV1
 }
 
@@ -332,31 +236,13 @@ func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 	return c.eventsV1beta1
 }
 
-// Deprecated: Events retrieves the default version of EventsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Events() eventsv1beta1.EventsV1beta1Interface {
-	return c.eventsV1beta1
-}
-
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return c.extensionsV1beta1
 }
 
-// Deprecated: Extensions retrieves the default version of ExtensionsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
-	return c.extensionsV1beta1
-}
-
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
-	return c.networkingV1
-}
-
-// Deprecated: Networking retrieves the default version of NetworkingClient.
-// Please explicitly pick a version.
-func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
 	return c.networkingV1
 }
 
@@ -370,20 +256,8 @@ func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
 	return c.policyV1beta1
 }
 
-// Deprecated: Policy retrieves the default version of PolicyClient.
-// Please explicitly pick a version.
-func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
-	return c.policyV1beta1
-}
-
 // RbacV1 retrieves the RbacV1Client
 func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
-	return c.rbacV1
-}
-
-// Deprecated: Rbac retrieves the default version of RbacClient.
-// Please explicitly pick a version.
-func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
 	return c.rbacV1
 }
 
@@ -412,20 +286,8 @@ func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
 	return c.schedulingV1
 }
 
-// Deprecated: Scheduling retrieves the default version of SchedulingClient.
-// Please explicitly pick a version.
-func (c *Clientset) Scheduling() schedulingv1.SchedulingV1Interface {
-	return c.schedulingV1
-}
-
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client
 func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
-	return c.settingsV1alpha1
-}
-
-// Deprecated: Settings retrieves the default version of SettingsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
 	return c.settingsV1alpha1
 }
 
@@ -436,12 +298,6 @@ func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 
 // StorageV1 retrieves the StorageV1Client
 func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
-	return c.storageV1
-}
-
-// Deprecated: Storage retrieves the default version of StorageClient.
-// Please explicitly pick a version.
-func (c *Clientset) Storage() storagev1.StorageV1Interface {
 	return c.storageV1
 }
 
