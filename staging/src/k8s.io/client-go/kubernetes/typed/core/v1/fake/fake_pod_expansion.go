@@ -19,6 +19,7 @@ package fake
 import (
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 )
@@ -54,7 +55,15 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
-	return &restclient.Request{}
+
+	r := &restclient.Request{}
+	r.Name(name)
+	r.Namespace(c.ns)
+	r.Resource(podsResource.Resource)
+	r.SubResource("log")
+	r.SpecificallyVersionedParams(opts, scheme.ParameterCodec, podsResource.GroupVersion())
+
+	return r
 }
 
 func (c *FakePods) Evict(eviction *policy.Eviction) error {
