@@ -39,7 +39,13 @@ var ProberResults = prometheus.NewGaugeVec(
 		Name:      "probe_result",
 		Help:      "The result of a liveness or readiness probe for a container.",
 	},
-	[]string{"probe_type", "container_name", "pod_name", "namespace", "pod_uid"},
+	[]string{"probe_type",
+		"container_name",
+		"container",
+		"pod_name",
+		"pod",
+		"namespace",
+		"pod_uid"},
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
