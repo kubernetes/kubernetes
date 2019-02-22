@@ -43,6 +43,7 @@ type ServerRunOptions struct {
 	RequestTimeout              time.Duration
 	MaxStartupSequenceDuration  time.Duration
 	MinRequestTimeout           int
+	ShutdownDelayDuration       time.Duration
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	JSONPatchMaxCopyBytes int64
@@ -63,6 +64,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		RequestTimeout:              defaults.RequestTimeout,
 		MaxStartupSequenceDuration:  defaults.MaxStartupSequenceDuration,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
+		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
 	}
@@ -77,6 +79,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxStartupSequenceDuration = s.MaxStartupSequenceDuration
 	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
@@ -143,6 +146,10 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
 	}
 
+	if s.ShutdownDelayDuration < 0 {
+		errors = append(errors, fmt.Errorf("--shutdown-delay-duration can not be negative value"))
+	}
+
 	if s.JSONPatchMaxCopyBytes < 0 {
 		errors = append(errors, fmt.Errorf("--json-patch-max-copy-bytes can not be negative value"))
 	}
@@ -205,6 +212,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
 		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+
+	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
+		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
+		"returns success, but /readzy immediately returns failure. Graceful termination starts after this delay "+
+		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
