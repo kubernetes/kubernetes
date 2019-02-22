@@ -42,6 +42,7 @@ const (
 	masterInternalYAMLNonLinux  = "testdata/conversion/master/internal_non_linux.yaml"
 	masterIncompleteYAML        = "testdata/defaulting/master/incomplete.yaml"
 	masterDefaultedYAML         = "testdata/defaulting/master/defaulted.yaml"
+	masterDefaultedYAMLDarwin   = "testdata/defaulting/master/defaulted_darwin.yaml"
 	masterDefaultedYAMLNonLinux = "testdata/defaulting/master/defaulted_non_linux.yaml"
 	masterInvalidYAML           = "testdata/validation/invalid_mastercfg.yaml"
 )
@@ -145,7 +146,9 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 	masterV1beta1YAMLAbstracted := masterV1beta1YAML
 	masterInternalYAMLAbstracted := masterInternalYAML
 	masterDefaultedYAMLAbstracted := masterDefaultedYAML
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS == "darwin" {
+		masterDefaultedYAMLAbstracted = masterDefaultedYAMLDarwin
+	} else if runtime.GOOS != "linux" {
 		masterV1alpha3YAMLAbstracted = masterV1alpha3YAMLNonLinux
 		masterV1beta1YAMLAbstracted = masterV1beta1YAMLNonLinux
 		masterInternalYAMLAbstracted = masterInternalYAMLNonLinux
