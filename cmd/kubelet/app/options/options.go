@@ -263,9 +263,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		}
 	}
 	if len(unknownLabels) > 0 {
-		// TODO(liggitt): in 1.15, return an error
+		// TODO(liggitt): in 1.16, return an error
 		klog.Warningf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v", unknownLabels.List())
-		klog.Warningf("in 1.15, --node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+		klog.Warningf("in 1.16, --node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
 	}
 
 	return nil
