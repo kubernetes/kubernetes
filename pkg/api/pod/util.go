@@ -318,10 +318,6 @@ func dropDisabledFields(
 		podSpec.PriorityClassName = ""
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates) && !podReadinessGatesInUse(oldPodSpec) {
-		podSpec.ReadinessGates = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil
@@ -529,17 +525,6 @@ func podPriorityInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
-	}
-	return false
-}
-
-// podReadinessGatesInUse returns true if the pod spec is non-nil and has ReadinessGates
-func podReadinessGatesInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.ReadinessGates != nil {
 		return true
 	}
 	return false
