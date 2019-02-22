@@ -116,7 +116,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -171,7 +171,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -231,7 +231,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -301,7 +301,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -382,7 +382,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -482,7 +482,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -572,7 +572,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
 	informers.Start(controllerStopCh)
@@ -862,7 +862,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
 
 	storageClass := storage.StorageClass{
@@ -957,7 +957,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -1025,7 +1025,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w watch.Interface, phase v1.PersistentVolumePhase) {
 	// Check if the volume is already in requested phase
-	volume, err := client.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	volume, err := client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 	if err == nil && volume.Status.Phase == phase {
 		return
 	}
@@ -1046,7 +1046,7 @@ func waitForPersistentVolumePhase(client *clientset.Clientset, pvName string, w 
 
 func waitForPersistentVolumeClaimPhase(client *clientset.Clientset, claimName, namespace string, w watch.Interface, phase v1.PersistentVolumeClaimPhase) {
 	// Check if the claim is already in requested phase
-	claim, err := client.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	claim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	if err == nil && claim.Status.Phase == phase {
 		return
 	}

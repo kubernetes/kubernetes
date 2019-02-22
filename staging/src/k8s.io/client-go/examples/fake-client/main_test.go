@@ -61,7 +61,7 @@ func TestFakeClient(t *testing.T) {
 
 	// Inject an event into the fake client.
 	p := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "my-pod"}}
-	_, err := client.Core().Pods("test-ns").Create(p)
+	_, err := client.CoreV1().Pods("test-ns").Create(p)
 	if err != nil {
 		t.Errorf("error injecting pod add: %v", err)
 	}

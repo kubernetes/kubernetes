@@ -73,7 +73,7 @@ func (a sortableSliceOfVersions) Less(i, j int) bool {
 }
 
 // Determine the default version among versions. If a user calls a group client
-// without specifying the version (e.g., c.Core(), instead of c.CoreV1()), the
+// without specifying the version (e.g., c.CoreV1(), instead of c.CoreV1()), the
 // default version will be returned.
 func defaultVersion(versions []PackageVersion) Version {
 	var versionStrings []string

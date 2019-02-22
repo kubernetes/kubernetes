@@ -62,7 +62,7 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			_, err := client.Core().Nodes().Create(&tc.node)
+			_, err := client.CoreV1().Nodes().Create(&tc.node)
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}

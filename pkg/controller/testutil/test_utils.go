@@ -96,7 +96,7 @@ func (m *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 
 // Core returns fake CoreInterface.
 func (m *FakeNodeHandler) Core() v1core.CoreV1Interface {
-	return &FakeLegacyHandler{m.Clientset.Core(), m}
+	return &FakeLegacyHandler{m.Clientset.CoreV1(), m}
 }
 
 // CoreV1 returns fake CoreV1Interface

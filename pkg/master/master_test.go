@@ -237,7 +237,7 @@ func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.Node
 func TestGetNodeAddresses(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).Core().Nodes()
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).CoreV1().Nodes()
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
@@ -261,7 +261,7 @@ func TestGetNodeAddresses(t *testing.T) {
 func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).Core().Nodes()
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).CoreV1().Nodes()
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
