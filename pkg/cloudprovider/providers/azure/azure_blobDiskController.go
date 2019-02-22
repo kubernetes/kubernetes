@@ -18,6 +18,7 @@ package azure
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net/url"
@@ -439,7 +440,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
-	ctx, cancel := getContextWithCancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	accountListResult, err := c.common.cloud.StorageAccountClient.ListByResourceGroup(ctx, c.common.resourceGroup)
 	if err != nil {
