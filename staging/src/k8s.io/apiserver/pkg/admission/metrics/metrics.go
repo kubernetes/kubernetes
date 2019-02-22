@@ -166,7 +166,7 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 			prometheus.SummaryOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_seconds_summary", name),
+				Name:      fmt.Sprintf("%s_admission_duration_seconds_summary", name),
 				Help:      fmt.Sprintf(helpTemplate, "latency summary in seconds"),
 				MaxAge:    latencySummaryMaxAge,
 			},
@@ -189,7 +189,7 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 			prometheus.HistogramOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_seconds", name),
+				Name:      fmt.Sprintf("%s_admission_duration_seconds", name),
 				Help:      fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
 				Buckets:   latencyBuckets,
 			},
