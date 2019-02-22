@@ -52,8 +52,8 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 		return errors.Wrap(err, "error when creating kube-proxy service account")
 	}
 
-	// Generate Master Enpoint kubeconfig file
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
+	// Generate ControlPlane Enpoint kubeconfig file
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 			ProxyConfigMap    string
 			ProxyConfigMapKey string
 		}{
-			MasterEndpoint:    masterEndpoint,
+			MasterEndpoint:    controlPlaneEndpoint,
 			ProxyConfig:       prefixBytes.String(),
 			ProxyConfigMap:    constants.KubeProxyConfigMap,
 			ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
