@@ -77,11 +77,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -97,11 +97,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpNotIn,
+									Operator: v1.LabelSelectorOpNotIn,
 									Values:   []string{"securityscan3", "value3"},
 								},
 							},
@@ -117,11 +117,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -142,11 +142,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"antivirusscan", "value2"},
 								},
 							},
@@ -166,28 +166,28 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								}, {
 									Key:      "wrongkey",
-									Operator: metav1.LabelSelectorOpDoesNotExist,
+									Operator: v1.LabelSelectorOpDoesNotExist,
 								},
 							},
 						},
 						TopologyKey: "region",
 					}, {
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan"},
 								}, {
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpNotIn,
+									Operator: v1.LabelSelectorOpNotIn,
 									Values:   []string{"WrongValue"},
 								},
 							},
@@ -203,28 +203,28 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								}, {
 									Key:      "wrongkey",
-									Operator: metav1.LabelSelectorOpDoesNotExist,
+									Operator: v1.LabelSelectorOpDoesNotExist,
 								},
 							},
 						},
 						TopologyKey: "region",
 					}, {
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan2"},
 								}, {
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpNotIn,
+									Operator: v1.LabelSelectorOpNotIn,
 									Values:   []string{"WrongValue"},
 								},
 							},
@@ -245,11 +245,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -259,11 +259,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				},
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"antivirusscan", "value2"},
 								},
 							},
@@ -279,11 +279,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -293,11 +293,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				},
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"antivirusscan", "value2"},
 								},
 							},
@@ -309,11 +309,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"antivirusscan", "value2"},
 									},
 								},
@@ -329,11 +329,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -343,11 +343,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				},
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -368,11 +368,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -382,11 +382,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				},
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"antivirusscan", "value2"},
 								},
 							},
@@ -398,11 +398,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"securityscan", "value2"},
 									},
 								},
@@ -423,11 +423,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpNotIn,
+									Operator: v1.LabelSelectorOpNotIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},
@@ -454,11 +454,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"securityscan", "value2"},
 									},
 								},
@@ -485,11 +485,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "service",
-										Operator: metav1.LabelSelectorOpNotIn,
+										Operator: v1.LabelSelectorOpNotIn,
 										Values:   []string{"securityscan", "value2"},
 									},
 								},
@@ -505,22 +505,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "region",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "security",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -531,11 +531,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel2, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -555,22 +555,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "zone",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "security",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -581,11 +581,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel2, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -605,11 +605,11 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "security",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -620,22 +620,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", podLabel, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "service",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "zone",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -655,22 +655,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"abc": "", "xyz": ""}, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "abc",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "zone",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "def",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -681,22 +681,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", map[string]string{"def": "", "xyz": ""}, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "abc",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "zone",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "def",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -716,22 +716,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"def": "", "xyz": ""}, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "abc",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "zone",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "def",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -742,22 +742,22 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "machine1", map[string]string{"abc": "", "xyz": ""}, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "abc",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "zone",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "def",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -820,11 +820,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"bar"},
 								},
 							},
@@ -855,11 +855,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"foo": "bar", "service": "securityscan"},
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"bar"},
 								},
 							},
@@ -867,11 +867,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 						TopologyKey: "zone",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan"},
 								},
 							},
@@ -892,11 +892,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"abc"},
 								},
 							},
@@ -929,11 +929,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"abc"},
 								},
 							},
@@ -941,11 +941,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 						TopologyKey: "region",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan"},
 								},
 							},
@@ -978,11 +978,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"abc"},
 								},
 							},
@@ -1017,11 +1017,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms("NS1", "", map[string]string{"foo": "123"}, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"bar"},
 								},
 							},
@@ -1040,11 +1040,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms("NS2", "nodeC", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"123"},
 									},
 								},
@@ -1081,11 +1081,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1104,11 +1104,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1138,11 +1138,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1152,11 +1152,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "bar",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1186,22 +1186,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "zone",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "bar",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1248,22 +1248,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "invalid-node-label",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "bar",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1289,22 +1289,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "invalid-node-label",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "bar",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1341,22 +1341,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "region",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "bar",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1386,22 +1386,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "region",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "bar",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1442,22 +1442,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeA", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "zone",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "labelA",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1467,22 +1467,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				createPodWithAffinityTerms(defaultNamespace, "nodeB", nil, nil,
 					[]v1.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "bar",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
 							TopologyKey: "zone",
 						},
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "labelB",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1514,22 +1514,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "region",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "bar",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1555,22 +1555,22 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil,
 				[]v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "foo",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
 						TopologyKey: "region",
 					},
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "bar",
-									Operator: metav1.LabelSelectorOpExists,
+									Operator: v1.LabelSelectorOpExists,
 								},
 							},
 						},
@@ -1649,11 +1649,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	antiAffinityFooBar := &v1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   []string{"bar"},
 						},
 					},
@@ -1665,11 +1665,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	antiAffinityComplex := &v1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   []string{"bar", "buzz"},
 						},
 					},
@@ -1677,11 +1677,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				TopologyKey: "region",
 			},
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "service",
-							Operator: metav1.LabelSelectorOpNotIn,
+							Operator: v1.LabelSelectorOpNotIn,
 							Values:   []string{"bar", "security", "test"},
 						},
 					},
@@ -1693,11 +1693,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	affinityComplex := &v1.PodAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   []string{"bar", "buzz"},
 						},
 					},
@@ -1705,11 +1705,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				TopologyKey: "region",
 			},
 			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      "service",
-							Operator: metav1.LabelSelectorOpNotIn,
+							Operator: v1.LabelSelectorOpNotIn,
 							Values:   []string{"bar", "security", "test"},
 						},
 					},
@@ -1937,11 +1937,11 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		var terms []v1.PodAffinityTerm
 		for _, key := range keys {
 			terms = append(terms, v1.PodAffinityTerm{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
+				LabelSelector: &v1.PodSelector{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      key,
-							Operator: metav1.LabelSelectorOpExists,
+							Operator: v1.LabelSelectorOpExists,
 						},
 					},
 				},

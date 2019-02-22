@@ -256,7 +256,7 @@ var _ = SIGDescribe("Network", func() {
 					PodAntiAffinity: &v1.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 							{
-								LabelSelector: &metav1.LabelSelector{
+								LabelSelector: &v1.PodSelector{
 									MatchLabels: clientLabel,
 								},
 								TopologyKey: "kubernetes.io/hostname",
@@ -312,7 +312,7 @@ var _ = SIGDescribe("Network", func() {
 					PodAntiAffinity: &v1.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 							{
-								LabelSelector: &metav1.LabelSelector{
+								LabelSelector: &v1.PodSelector{
 									MatchLabels: serverLabel,
 								},
 								TopologyKey: "kubernetes.io/hostname",

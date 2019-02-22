@@ -222,7 +222,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 
-	if req.Operator != v1.NodeSelectorOpIn {
+	if req.Operator != v1.LabelSelectorOpIn {
 		t.Errorf("Provision() returned unexpected requirement operator in NodeAffinity %v", req.Operator)
 	}
 

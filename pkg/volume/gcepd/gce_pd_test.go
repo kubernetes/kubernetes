@@ -97,7 +97,7 @@ func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
 	return nil
 }
 
-func getNodeSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v1.NodeSelectorRequirement, error) {
+func getNumericAwareSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v1.NumericAwareSelectorRequirement, error) {
 	for _, r := range term.MatchExpressions {
 		if r.Key == key {
 			return &r, nil
@@ -212,16 +212,16 @@ func TestPlugin(t *testing.T) {
 	}
 	term := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0]
 	if len(term.MatchExpressions) != 2 {
-		t.Errorf("Unexpected number of NodeSelectorRequirements in volume NodeAffinity: %d", len(term.MatchExpressions))
+		t.Errorf("Unexpected number of NumericAwareSelectorRequirements in volume NodeAffinity: %d", len(term.MatchExpressions))
 	}
-	r, _ := getNodeSelectorRequirementWithKey("fakepdmanager", term)
-	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
-		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
+	r, _ := getNumericAwareSelectorRequirementWithKey("fakepdmanager", term)
+	if r == nil || r.Values[0] != "yes" || r.Operator != v1.LabelSelectorOpIn {
+		t.Errorf("NumericAwareSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
+	r, _ = getNumericAwareSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
-		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
+		t.Errorf("NumericAwareSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
 	}
 	sort.Strings(r.Values)
 	if !reflect.DeepEqual(r.Values, zones.List()) {

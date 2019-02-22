@@ -129,9 +129,9 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
 	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
 
-	topology := v1.NodeSelectorRequirement{
+	topology := v1.NumericAwareSelectorRequirement{
 		Key:      topologyKey,
-		Operator: v1.NodeSelectorOpIn,
+		Operator: v1.LabelSelectorOpIn,
 		Values:   zones,
 	}
 

@@ -795,10 +795,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"bar", "value2"},
 											},
 										},
@@ -823,10 +823,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "kernel-version",
-												Operator: v1.NodeSelectorOpGt,
+												Operator: v1.LabelSelectorOpNumericallyGreaterthan,
 												Values:   []string{"0204"},
 											},
 										},
@@ -852,10 +852,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "mem-type",
-												Operator: v1.NodeSelectorOpNotIn,
+												Operator: v1.LabelSelectorOpNotIn,
 												Values:   []string{"DDR", "DDR2"},
 											},
 										},
@@ -880,10 +880,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "GPU",
-												Operator: v1.NodeSelectorOpExists,
+												Operator: v1.LabelSelectorOpExists,
 											},
 										},
 									},
@@ -907,10 +907,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"value1", "value2"},
 											},
 										},
@@ -971,7 +971,7 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{},
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{},
 									},
 								},
 							},
@@ -1017,13 +1017,13 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "GPU",
-												Operator: v1.NodeSelectorOpExists,
+												Operator: v1.LabelSelectorOpExists,
 											}, {
 												Key:      "GPU",
-												Operator: v1.NodeSelectorOpNotIn,
+												Operator: v1.LabelSelectorOpNotIn,
 												Values:   []string{"AMD", "INTER"},
 											},
 										},
@@ -1048,13 +1048,13 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "GPU",
-												Operator: v1.NodeSelectorOpExists,
+												Operator: v1.LabelSelectorOpExists,
 											}, {
 												Key:      "GPU",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"AMD", "INTER"},
 											},
 										},
@@ -1079,19 +1079,19 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"bar", "value2"},
 											},
 										},
 									},
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "diffkey",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"wrong", "value2"},
 											},
 										},
@@ -1119,10 +1119,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
+												Operator: v1.LabelSelectorOpExists,
 											},
 										},
 									},
@@ -1150,10 +1150,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpExists,
+												Operator: v1.LabelSelectorOpExists,
 											},
 										},
 									},
@@ -1178,10 +1178,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpNotIn,
+												Operator: v1.LabelSelectorOpNotIn,
 												Values:   []string{"invalid value: ___@#$%^"},
 											},
 										},
@@ -1206,10 +1206,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
@@ -1232,10 +1232,10 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
@@ -1258,19 +1258,19 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
 									},
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"bar"},
 											},
 										},
@@ -1294,17 +1294,17 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"bar"},
 											},
 										},
@@ -1328,17 +1328,17 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"bar"},
 											},
 										},
@@ -1362,19 +1362,19 @@ func TestPodFitsSelector(t *testing.T) {
 							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 								NodeSelectorTerms: []v1.NodeSelectorTerm{
 									{
-										MatchFields: []v1.NodeSelectorRequirement{
+										MatchFields: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      api.ObjectNameField,
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
 										},
 									},
 									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
+										MatchExpressions: []v1.NumericAwareSelectorRequirement{
 											{
 												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
+												Operator: v1.LabelSelectorOpIn,
 												Values:   []string{"not-match-to-bar"},
 											},
 										},

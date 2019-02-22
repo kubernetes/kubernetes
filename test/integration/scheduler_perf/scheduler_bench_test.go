@@ -287,7 +287,7 @@ func makeBasePodWithPodAntiAffinity(podLabels, affinityLabels map[string]string)
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
-					LabelSelector: &metav1.LabelSelector{
+					LabelSelector: &v1.PodSelector{
 						MatchLabels: affinityLabels,
 					},
 					TopologyKey: v1.LabelHostname,
@@ -371,7 +371,7 @@ func makeBasePodWithPodAffinity(podLabels, affinityZoneLabels map[string]string)
 		PodAffinity: &v1.PodAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
-					LabelSelector: &metav1.LabelSelector{
+					LabelSelector: &v1.PodSelector{
 						MatchLabels: affinityZoneLabels,
 					},
 					TopologyKey: v1.LabelZoneFailureDomain,
@@ -397,10 +397,10 @@ func makeBasePodWithNodeAffinity(key string, vals []string) *v1.Pod {
 			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{
 					{
-						MatchExpressions: []v1.NodeSelectorRequirement{
+						MatchExpressions: []v1.NumericAwareSelectorRequirement{
 							{
 								Key:      key,
-								Operator: v1.NodeSelectorOpIn,
+								Operator: v1.LabelSelectorOpIn,
 								Values:   vals,
 							},
 						},

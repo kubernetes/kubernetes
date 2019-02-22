@@ -472,11 +472,11 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 			PodAffinity: &v1.PodAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
+						LabelSelector: &v1.PodSelector{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "service",
-									Operator: metav1.LabelSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"securityscan", "value2"},
 								},
 							},

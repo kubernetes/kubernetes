@@ -150,16 +150,16 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 // NodeAffinity of the given affinity with a new NodeAffinity that selects the given nodeName.
 // Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
 func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
-	nodeSelReq := v1.NodeSelectorRequirement{
+	nodeSelReq := v1.NumericAwareSelectorRequirement{
 		Key:      api.ObjectNameField,
-		Operator: v1.NodeSelectorOpIn,
+		Operator: v1.LabelSelectorOpIn,
 		Values:   []string{nodename},
 	}
 
 	nodeSelector := &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{
 			{
-				MatchFields: []v1.NodeSelectorRequirement{nodeSelReq},
+				MatchFields: []v1.NumericAwareSelectorRequirement{nodeSelReq},
 			},
 		},
 	}
@@ -189,7 +189,7 @@ func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename str
 	// Replace node selector with the new one.
 	nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []v1.NodeSelectorTerm{
 		{
-			MatchFields: []v1.NodeSelectorRequirement{nodeSelReq},
+			MatchFields: []v1.NumericAwareSelectorRequirement{nodeSelReq},
 		},
 	}
 
@@ -221,7 +221,7 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 	for _, term := range terms {
 		for _, exp := range term.MatchFields {
 			if exp.Key == api.ObjectNameField &&
-				exp.Operator == v1.NodeSelectorOpIn {
+				exp.Operator == v1.LabelSelectorOpIn {
 				if len(exp.Values) != 1 {
 					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
 						api.ObjectNameField, pod.Namespace, pod.Name)

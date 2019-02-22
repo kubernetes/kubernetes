@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/framework/plugins/migration:go_default_library",
@@ -18,7 +19,6 @@ go_library(
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

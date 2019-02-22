@@ -1628,7 +1628,7 @@ func buildAntiAffinity(labels map[string]string) *v1.Affinity {
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
-					LabelSelector: &metav1.LabelSelector{
+					LabelSelector: &v1.PodSelector{
 						MatchLabels: labels,
 					},
 					TopologyKey: "kubernetes.io/hostname",

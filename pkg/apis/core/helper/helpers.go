@@ -336,9 +336,9 @@ func containsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// NumericAwareSelectorRequirementsAsSelector converts the []NumericAwareSelectorRequirement core type into a struct that implements
 // labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (labels.Selector, error) {
+func NumericAwareSelectorRequirementsAsSelector(nsm []core.NumericAwareSelectorRequirement) (labels.Selector, error) {
 	if len(nsm) == 0 {
 		return labels.Nothing(), nil
 	}
@@ -346,20 +346,20 @@ func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (lab
 	for _, expr := range nsm {
 		var op selection.Operator
 		switch expr.Operator {
-		case core.NodeSelectorOpIn:
+		case core.LabelSelectorOpIn:
 			op = selection.In
-		case core.NodeSelectorOpNotIn:
+		case core.LabelSelectorOpNotIn:
 			op = selection.NotIn
-		case core.NodeSelectorOpExists:
+		case core.LabelSelectorOpExists:
 			op = selection.Exists
-		case core.NodeSelectorOpDoesNotExist:
+		case core.LabelSelectorOpDoesNotExist:
 			op = selection.DoesNotExist
-		case core.NodeSelectorOpGt:
+		case core.LabelSelectorOpNumericallyGreaterthan:
 			op = selection.GreaterThan
-		case core.NodeSelectorOpLt:
+		case core.LabelSelectorOpNumericallyLessthan:
 			op = selection.LessThan
 		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
+			return nil, fmt.Errorf("%q is not a valid label selector operator", expr.Operator)
 		}
 		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
 		if err != nil {
@@ -370,9 +370,9 @@ func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (lab
 	return selector, nil
 }
 
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// NumericAwareSelectorRequirementsAsFieldSelector converts the []NumericAwareSelectorRequirement core type into a struct that implements
 // fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {
+func NumericAwareSelectorRequirementsAsFieldSelector(nsm []core.NumericAwareSelectorRequirement) (fields.Selector, error) {
 	if len(nsm) == 0 {
 		return fields.Nothing(), nil
 	}
@@ -380,22 +380,22 @@ func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement)
 	selectors := []fields.Selector{}
 	for _, expr := range nsm {
 		switch expr.Operator {
-		case core.NodeSelectorOpIn:
+		case core.LabelSelectorOpIn:
 			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+				return nil, fmt.Errorf("unexpected number of value (%d) for label field selector operator %q",
 					len(expr.Values), expr.Operator)
 			}
 			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
 
-		case core.NodeSelectorOpNotIn:
+		case core.LabelSelectorOpNotIn:
 			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+				return nil, fmt.Errorf("unexpected number of value (%d) for label field selector operator %q",
 					len(expr.Values), expr.Operator)
 			}
 			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
 
 		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+			return nil, fmt.Errorf("%q is not a valid label field selector operator", expr.Operator)
 		}
 	}
 

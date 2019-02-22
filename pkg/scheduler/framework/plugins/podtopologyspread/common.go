@@ -18,8 +18,8 @@ package podtopologyspread
 
 import (
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 type topologyPair struct {
@@ -49,7 +49,7 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 	var result []topologySpreadConstraint
 	for _, c := range constraints {
 		if c.WhenUnsatisfiable == action {
-			selector, err := metav1.LabelSelectorAsSelector(c.LabelSelector)
+			selector, err := v1helper.PodSelectorAsSelector(c.LabelSelector)
 			if err != nil {
 				return nil, err
 			}

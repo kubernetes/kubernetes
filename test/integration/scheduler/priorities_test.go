@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -69,10 +68,10 @@ func TestNodeAffinity(t *testing.T) {
 				PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
 					{
 						Preference: v1.NodeSelectorTerm{
-							MatchExpressions: []v1.NodeSelectorRequirement{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      labelKey,
-									Operator: v1.NodeSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{labelValue},
 								},
 							},
@@ -143,20 +142,20 @@ func TestPodAffinity(t *testing.T) {
 				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
 					{
 						PodAffinityTerm: v1.PodAffinityTerm{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{labelValue, "S3"},
 									},
 									{
 										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpNotIn,
+										Operator: v1.LabelSelectorOpNotIn,
 										Values:   []string{"S2"},
 									}, {
 										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},

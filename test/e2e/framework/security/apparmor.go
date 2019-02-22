@@ -85,7 +85,7 @@ done`, testCmd)
 		PodAffinity: &v1.PodAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
 				Namespaces: []string{nsName},
-				LabelSelector: &metav1.LabelSelector{
+				LabelSelector: &v1.PodSelector{
 					MatchLabels: map[string]string{loaderLabelKey: loaderLabelValue},
 				},
 				TopologyKey: "kubernetes.io/hostname",

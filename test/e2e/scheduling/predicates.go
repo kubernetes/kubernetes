@@ -271,10 +271,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 							NodeSelectorTerms: []v1.NodeSelectorTerm{
 								{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+									MatchExpressions: []v1.NumericAwareSelectorRequirement{
 										{
 											Key:      "node",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: v1.LabelSelectorOpIn,
 											Values:   []string{nodeName},
 										},
 									},
@@ -382,18 +382,18 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: v1.NodeSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"bar", "value2"},
 									},
 								},
 							}, {
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "diffkey",
-										Operator: v1.NodeSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{"wrong", "value2"},
 									},
 								},
@@ -429,10 +429,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      k,
-										Operator: v1.NodeSelectorOpIn,
+										Operator: v1.LabelSelectorOpIn,
 										Values:   []string{v},
 									},
 								},

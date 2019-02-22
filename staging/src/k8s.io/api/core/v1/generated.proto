@@ -2276,36 +2276,17 @@ message NodeSelector {
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
 }
 
-// A node selector requirement is a selector that contains values, a key, and an operator
-// that relates the key and values.
-message NodeSelectorRequirement {
-  // The label key that the selector applies to.
-  optional string key = 1;
-
-  // Represents a key's relationship to a set of values.
-  // Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-  optional string operator = 2;
-
-  // An array of string values. If the operator is In or NotIn,
-  // the values array must be non-empty. If the operator is Exists or DoesNotExist,
-  // the values array must be empty. If the operator is Gt or Lt, the values
-  // array must have a single element, which will be interpreted as an integer.
-  // This array is replaced during a strategic merge patch.
-  // +optional
-  repeated string values = 3;
-}
-
 // A null or empty node selector term matches no objects. The requirements of
 // them are ANDed.
 // The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 message NodeSelectorTerm {
   // A list of node selector requirements by node's labels.
   // +optional
-  repeated NodeSelectorRequirement matchExpressions = 1;
+  repeated NumericAwareSelectorRequirement matchExpressions = 1;
 
   // A list of node selector requirements by node's fields.
   // +optional
-  repeated NodeSelectorRequirement matchFields = 2;
+  repeated NumericAwareSelectorRequirement matchFields = 2;
 }
 
 // NodeSpec describes the attributes that a node is created with.
@@ -2442,6 +2423,26 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+}
+
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NumericAwareSelectorRequirement.
+message NumericAwareSelectorRequirement {
+  // The label key that the selector applies to.
+  optional string key = 1;
+
+  // Represents a key's relationship to a set of values.
+  // Valid operators are In, NotIn, Exists, DoesNotExist, Gt and Lt.
+  optional string operator = 2;
+
+  // An array of string values. If the operator is In or NotIn,
+  // the values array must be non-empty. If the operator is Exists or DoesNotExist,
+  // the values array must be empty. If the operator is Gt or Lt, the values
+  // array must have a single element, which will be interpreted as an integer.
+  // This array is replaced during a strategic merge patch.
+  // +optional
+  repeated string values = 3;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -2915,7 +2916,7 @@ message PodAffinity {
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
+  optional PodSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
   // null or empty list means "this pod's namespace"
@@ -3247,6 +3248,21 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // +optional
   repeated Sysctl sysctls = 7;
+}
+
+// A pod selector is a label query over a set of pod resources. The result of matchLabels and
+// matchExpressions are ANDed. An empty label selector matches all objects. A null
+// label selector matches no objects.
+message PodSelector {
+  // matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+  // map is equivalent to an element of matchExpressions, whose key field is "key", the
+  // operator is "In", and the values array contains only "value". The requirements are ANDed.
+  // +optional
+  map<string, string> matchLabels = 1;
+
+  // matchExpressions is a list of label selector requirements. The requirements are ANDed.
+  // +optional
+  repeated NumericAwareSelectorRequirement matchExpressions = 2;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4984,7 +5000,7 @@ message TopologySpreadConstraint {
   // Pods that match this label selector are counted to determine the number of pods
   // in their corresponding topology domain.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 4;
+  optional PodSelector labelSelector = 4;
 }
 
 // TypedLocalObjectReference contains enough information to let you locate the

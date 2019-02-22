@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -982,9 +982,9 @@ func (s *preFilterState) sortCriticalPaths() {
 	}
 }
 
-func mustConvertLabelSelectorAsSelector(t *testing.T, ls *metav1.LabelSelector) labels.Selector {
+func mustConvertLabelSelectorAsSelector(t *testing.T, ls *v1.PodSelector) labels.Selector {
 	t.Helper()
-	s, err := metav1.LabelSelectorAsSelector(ls)
+	s, err := v1helper.PodSelectorAsSelector(ls)
 	if err != nil {
 		t.Fatal(err)
 	}

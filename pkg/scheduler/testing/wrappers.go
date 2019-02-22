@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var zero int64
@@ -37,9 +36,9 @@ func MakeNodeSelector() *NodeSelectorWrapper {
 // to the inner nodeSelector.
 // NOTE: appended selecterTerms are ORed.
 func (s *NodeSelectorWrapper) In(key string, vals []string) *NodeSelectorWrapper {
-	expression := v1.NodeSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      key,
-		Operator: v1.NodeSelectorOpIn,
+		Operator: v1.LabelSelectorOpIn,
 		Values:   vals,
 	}
 	selectorTerm := v1.NodeSelectorTerm{}
@@ -51,9 +50,9 @@ func (s *NodeSelectorWrapper) In(key string, vals []string) *NodeSelectorWrapper
 // NotIn injects a matchExpression (with an operator NotIn) as a selectorTerm
 // to the inner nodeSelector.
 func (s *NodeSelectorWrapper) NotIn(key string, vals []string) *NodeSelectorWrapper {
-	expression := v1.NodeSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      key,
-		Operator: v1.NodeSelectorOpNotIn,
+		Operator: v1.LabelSelectorOpNotIn,
 		Values:   vals,
 	}
 	selectorTerm := v1.NodeSelectorTerm{}
@@ -67,15 +66,15 @@ func (s *NodeSelectorWrapper) Obj() *v1.NodeSelector {
 	return &s.NodeSelector
 }
 
-// LabelSelectorWrapper wraps a LabelSelector inside.
-type LabelSelectorWrapper struct{ metav1.LabelSelector }
+// LabelSelectorWrapper wraps a PodSelector inside.
+type LabelSelectorWrapper struct{ v1.PodSelector }
 
-// MakeLabelSelector creates a LabelSelector wrapper.
+// MakeLabelSelector creates a PodSelector wrapper.
 func MakeLabelSelector() *LabelSelectorWrapper {
-	return &LabelSelectorWrapper{metav1.LabelSelector{}}
+	return &LabelSelectorWrapper{v1.PodSelector{}}
 }
 
-// Label applies a {k,v} pair to the inner LabelSelector.
+// Label applies a {k,v} pair to the inner PodSelector.
 func (s *LabelSelectorWrapper) Label(k, v string) *LabelSelectorWrapper {
 	if s.MatchLabels == nil {
 		s.MatchLabels = make(map[string]string)
@@ -86,9 +85,9 @@ func (s *LabelSelectorWrapper) Label(k, v string) *LabelSelectorWrapper {
 
 // In injects a matchExpression (with an operator In) to the inner labelSelector.
 func (s *LabelSelectorWrapper) In(key string, vals []string) *LabelSelectorWrapper {
-	expression := metav1.LabelSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      key,
-		Operator: metav1.LabelSelectorOpIn,
+		Operator: v1.LabelSelectorOpIn,
 		Values:   vals,
 	}
 	s.MatchExpressions = append(s.MatchExpressions, expression)
@@ -97,9 +96,9 @@ func (s *LabelSelectorWrapper) In(key string, vals []string) *LabelSelectorWrapp
 
 // NotIn injects a matchExpression (with an operator NotIn) to the inner labelSelector.
 func (s *LabelSelectorWrapper) NotIn(key string, vals []string) *LabelSelectorWrapper {
-	expression := metav1.LabelSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      key,
-		Operator: metav1.LabelSelectorOpNotIn,
+		Operator: v1.LabelSelectorOpNotIn,
 		Values:   vals,
 	}
 	s.MatchExpressions = append(s.MatchExpressions, expression)
@@ -108,9 +107,9 @@ func (s *LabelSelectorWrapper) NotIn(key string, vals []string) *LabelSelectorWr
 
 // Exists injects a matchExpression (with an operator Exists) to the inner labelSelector.
 func (s *LabelSelectorWrapper) Exists(k string) *LabelSelectorWrapper {
-	expression := metav1.LabelSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      k,
-		Operator: metav1.LabelSelectorOpExists,
+		Operator: v1.LabelSelectorOpExists,
 	}
 	s.MatchExpressions = append(s.MatchExpressions, expression)
 	return s
@@ -118,17 +117,17 @@ func (s *LabelSelectorWrapper) Exists(k string) *LabelSelectorWrapper {
 
 // NotExist injects a matchExpression (with an operator NotExist) to the inner labelSelector.
 func (s *LabelSelectorWrapper) NotExist(k string) *LabelSelectorWrapper {
-	expression := metav1.LabelSelectorRequirement{
+	expression := v1.NumericAwareSelectorRequirement{
 		Key:      k,
-		Operator: metav1.LabelSelectorOpDoesNotExist,
+		Operator: v1.LabelSelectorOpDoesNotExist,
 	}
 	s.MatchExpressions = append(s.MatchExpressions, expression)
 	return s
 }
 
 // Obj returns the inner LabelSelector.
-func (s *LabelSelectorWrapper) Obj() *metav1.LabelSelector {
-	return &s.LabelSelector
+func (s *LabelSelectorWrapper) Obj() *v1.PodSelector {
+	return &s.PodSelector
 }
 
 // PodWrapper wraps a Pod inside.
@@ -317,7 +316,7 @@ func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind Po
 
 // SpreadConstraint constructs a TopologySpreadConstraint object and injects
 // into the inner pod.
-func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector) *PodWrapper {
+func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *v1.PodSelector) *PodWrapper {
 	c := v1.TopologySpreadConstraint{
 		MaxSkew:           int32(maxSkew),
 		TopologyKey:       tpKey,

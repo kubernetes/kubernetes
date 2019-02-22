@@ -22,11 +22,11 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -176,7 +176,7 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]*affinityTer
 	var terms []*affinityTerm
 	for _, term := range v1Terms {
 		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+		selector, err := v1helper.PodSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
@@ -496,7 +496,7 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 
 	topologyMap := make(topologyToMatchedTermCount)
 	for _, term := range schedutil.GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+		selector, err := v1helper.PodSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
 		}

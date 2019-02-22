@@ -601,11 +601,11 @@ func TestGenericScheduler(t *testing.T) {
 							MaxSkew:           1,
 							TopologyKey:       "hostname",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -647,11 +647,11 @@ func TestGenericScheduler(t *testing.T) {
 							MaxSkew:           2,
 							TopologyKey:       "hostname",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1424,11 +1424,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 					PodAntiAffinity: &v1.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &v1.PodSelector{
+									MatchExpressions: []v1.NumericAwareSelectorRequirement{
 										{
 											Key:      "pod",
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: v1.LabelSelectorOpIn,
 											Values:   []string{"preemptor", "value2"},
 										},
 									},
@@ -1468,11 +1468,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 							MaxSkew:           1,
 							TopologyKey:       "zone",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -1481,11 +1481,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 							MaxSkew:           1,
 							TopologyKey:       "hostname",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -2066,11 +2066,11 @@ func TestPreempt(t *testing.T) {
 							MaxSkew:           1,
 							TopologyKey:       "zone",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},
@@ -2079,11 +2079,11 @@ func TestPreempt(t *testing.T) {
 							MaxSkew:           1,
 							TopologyKey:       "hostname",
 							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &v1.PodSelector{
+								MatchExpressions: []v1.NumericAwareSelectorRequirement{
 									{
 										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
+										Operator: v1.LabelSelectorOpExists,
 									},
 								},
 							},

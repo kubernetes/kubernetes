@@ -220,11 +220,11 @@ func (na nodeAffinity) mutateNodeTemplate(node *v1.Node) {
 
 // mutatePodTemplate returns the modified pod template after applying mutations.
 func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
-	var nodeSelectorRequirements []v1.NodeSelectorRequirement
+	var nodeSelectorRequirements []v1.NumericAwareSelectorRequirement
 	for i := 0; i < na.LabelCount; i++ {
 		value := strconv.Itoa(i)
 		key := na.nodeAffinityKey + value
-		nodeSelector := v1.NodeSelectorRequirement{Key: key, Values: []string{value}, Operator: v1.NodeSelectorOpIn}
+		nodeSelector := v1.NumericAwareSelectorRequirement{Key: key, Values: []string{value}, Operator: v1.LabelSelectorOpIn}
 		nodeSelectorRequirements = append(nodeSelectorRequirements, nodeSelector)
 	}
 	pod.Spec.Affinity = &v1.Affinity{

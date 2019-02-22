@@ -2324,19 +2324,33 @@ type NodeSelector struct {
 // The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
-	MatchExpressions []NodeSelectorRequirement
+	MatchExpressions []NumericAwareSelectorRequirement
 	// A list of node selector requirements by node's fields.
-	MatchFields []NodeSelectorRequirement
+	MatchFields []NumericAwareSelectorRequirement
 }
 
-// NodeSelectorRequirement is a selector that contains values, a key, and an operator
-// that relates the key and values.
-type NodeSelectorRequirement struct {
+// A pod selector is a label query over a set of pod resources. The result of matchLabels and
+// matchExpressions are ANDed. An empty label selector matches all objects. A null
+// label selector matches no objects.
+type PodSelector struct {
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	// +optional
+	MatchLabels map[string]string
+	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	// +optional
+	MatchExpressions []NumericAwareSelectorRequirement
+}
+
+// A numeric aware selector requirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
+type NumericAwareSelectorRequirement struct {
 	// The label key that the selector applies to.
 	Key string
 	// Represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-	Operator NodeSelectorOperator
+	Operator LabelSelectorOperator
 	// An array of string values. If the operator is In or NotIn,
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
 	// the values array must be empty. If the operator is Gt or Lt, the values
@@ -2346,18 +2360,18 @@ type NodeSelectorRequirement struct {
 	Values []string
 }
 
-// NodeSelectorOperator is the set of operators that can be used in
-// a node selector requirement.
-type NodeSelectorOperator string
+// A label selector operator is the set of operators that can be used in a
+// numeric aware selector requirement.
+type LabelSelectorOperator string
 
-// These are valid values of NodeSelectorOperator
+// These are valid values of LabelSelectorOperator
 const (
-	NodeSelectorOpIn           NodeSelectorOperator = "In"
-	NodeSelectorOpNotIn        NodeSelectorOperator = "NotIn"
-	NodeSelectorOpExists       NodeSelectorOperator = "Exists"
-	NodeSelectorOpDoesNotExist NodeSelectorOperator = "DoesNotExist"
-	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
-	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
+	LabelSelectorOpIn                     LabelSelectorOperator = "In"
+	LabelSelectorOpNotIn                  LabelSelectorOperator = "NotIn"
+	LabelSelectorOpExists                 LabelSelectorOperator = "Exists"
+	LabelSelectorOpDoesNotExist           LabelSelectorOperator = "DoesNotExist"
+	LabelSelectorOpNumericallyGreaterthan LabelSelectorOperator = "Gt"
+	LabelSelectorOpNumericallyLessthan    LabelSelectorOperator = "Lt"
 )
 
 // TopologySelectorTerm represents the result of label queries.
@@ -2483,7 +2497,7 @@ type WeightedPodAffinityTerm struct {
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
-	LabelSelector *metav1.LabelSelector
+	LabelSelector *PodSelector
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
 	// null or empty list means "this pod's namespace"
 	// +optional
@@ -5181,5 +5195,5 @@ type TopologySpreadConstraint struct {
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +optional
-	LabelSelector *metav1.LabelSelector
+	LabelSelector *PodSelector
 }

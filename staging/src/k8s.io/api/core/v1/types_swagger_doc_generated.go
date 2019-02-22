@@ -1149,17 +1149,6 @@ func (NodeSelector) SwaggerDoc() map[string]string {
 	return map_NodeSelector
 }
 
-var map_NodeSelectorRequirement = map[string]string{
-	"":         "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-	"key":      "The label key that the selector applies to.",
-	"operator": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
-	"values":   "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
-}
-
-func (NodeSelectorRequirement) SwaggerDoc() map[string]string {
-	return map_NodeSelectorRequirement
-}
-
 var map_NodeSelectorTerm = map[string]string{
 	"":                 "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
 	"matchExpressions": "A list of node selector requirements by node's labels.",
@@ -1220,6 +1209,17 @@ var map_NodeSystemInfo = map[string]string{
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
 	return map_NodeSystemInfo
+}
+
+var map_NumericAwareSelectorRequirement = map[string]string{
+	"":         "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NumericAwareSelectorRequirement.",
+	"key":      "The label key that the selector applies to.",
+	"operator": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist, Gt and Lt.",
+	"values":   "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+}
+
+func (NumericAwareSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_NumericAwareSelectorRequirement
 }
 
 var map_ObjectFieldSelector = map[string]string{
@@ -1585,6 +1585,16 @@ var map_PodSecurityContext = map[string]string{
 
 func (PodSecurityContext) SwaggerDoc() map[string]string {
 	return map_PodSecurityContext
+}
+
+var map_PodSelector = map[string]string{
+	"":                 "A pod selector is a label query over a set of pod resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+	"matchLabels":      "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+	"matchExpressions": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+}
+
+func (PodSelector) SwaggerDoc() map[string]string {
+	return map_PodSelector
 }
 
 var map_PodSignature = map[string]string{

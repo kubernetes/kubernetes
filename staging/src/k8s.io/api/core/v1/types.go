@@ -2534,20 +2534,35 @@ type NodeSelector struct {
 type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
 	// +optional
-	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
+	MatchExpressions []NumericAwareSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 	// A list of node selector requirements by node's fields.
 	// +optional
-	MatchFields []NodeSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
+	MatchFields []NumericAwareSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
 
-// A node selector requirement is a selector that contains values, a key, and an operator
-// that relates the key and values.
-type NodeSelectorRequirement struct {
+// A pod selector is a label query over a set of pod resources. The result of matchLabels and
+// matchExpressions are ANDed. An empty label selector matches all objects. A null
+// label selector matches no objects.
+type PodSelector struct {
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	// +optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
+	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	// +optional
+	MatchExpressions []NumericAwareSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
+}
+
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NumericAwareSelectorRequirement.
+type NumericAwareSelectorRequirement struct {
 	// The label key that the selector applies to.
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Represents a key's relationship to a set of values.
-	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
-	Operator NodeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=NodeSelectorOperator"`
+	// Valid operators are In, NotIn, Exists, DoesNotExist, Gt and Lt.
+	Operator LabelSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=LabelSelectorOperator"`
 	// An array of string values. If the operator is In or NotIn,
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
 	// the values array must be empty. If the operator is Gt or Lt, the values
@@ -2557,17 +2572,17 @@ type NodeSelectorRequirement struct {
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
-// A node selector operator is the set of operators that can be used in
-// a node selector requirement.
-type NodeSelectorOperator string
+// A label selector operator is the set of operators that can be used in
+// a numeric aware selector requirement.
+type LabelSelectorOperator string
 
 const (
-	NodeSelectorOpIn           NodeSelectorOperator = "In"
-	NodeSelectorOpNotIn        NodeSelectorOperator = "NotIn"
-	NodeSelectorOpExists       NodeSelectorOperator = "Exists"
-	NodeSelectorOpDoesNotExist NodeSelectorOperator = "DoesNotExist"
-	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
-	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
+	LabelSelectorOpIn                     LabelSelectorOperator = "In"
+	LabelSelectorOpNotIn                  LabelSelectorOperator = "NotIn"
+	LabelSelectorOpExists                 LabelSelectorOperator = "Exists"
+	LabelSelectorOpDoesNotExist           LabelSelectorOperator = "DoesNotExist"
+	LabelSelectorOpNumericallyGreaterthan LabelSelectorOperator = "Gt"
+	LabelSelectorOpNumericallyLessthan    LabelSelectorOperator = "Lt"
 )
 
 // A topology selector term represents the result of label queries.
@@ -2692,7 +2707,7 @@ type WeightedPodAffinityTerm struct {
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
-	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+	LabelSelector *PodSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
 	// null or empty list means "this pod's namespace"
 	// +optional
@@ -3108,7 +3123,7 @@ type TopologySpreadConstraint struct {
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +optional
-	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
+	LabelSelector *PodSelector `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
 }
 
 const (

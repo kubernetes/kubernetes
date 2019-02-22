@@ -205,20 +205,20 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 					PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
 						{
 							PodAffinityTerm: v1.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &v1.PodSelector{
+									MatchExpressions: []v1.NumericAwareSelectorRequirement{
 										{
 											Key:      "security",
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: v1.LabelSelectorOpIn,
 											Values:   []string{"S1", "value2"},
 										},
 										{
 											Key:      "security",
-											Operator: metav1.LabelSelectorOpNotIn,
+											Operator: v1.LabelSelectorOpNotIn,
 											Values:   []string{"S2"},
 										}, {
 											Key:      "security",
-											Operator: metav1.LabelSelectorOpExists,
+											Operator: v1.LabelSelectorOpExists,
 										},
 									},
 								},

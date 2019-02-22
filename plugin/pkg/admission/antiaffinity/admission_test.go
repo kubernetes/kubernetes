@@ -52,11 +52,11 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 						{
 							Weight: 5,
 							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &api.PodSelector{
+									MatchExpressions: []api.NumericAwareSelectorRequirement{
 										{
 											Key:      "security",
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"S2"},
 										},
 									},
@@ -78,11 +78,11 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 						{
 							Weight: 5,
 							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &api.PodSelector{
+									MatchExpressions: []api.NumericAwareSelectorRequirement{
 										{
 											Key:      "security",
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: api.LabelSelectorOpIn,
 											Values:   []string{"S2"},
 										},
 									},
@@ -93,11 +93,11 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 					},
 					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},
@@ -115,11 +115,11 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 				PodAntiAffinity: &api.PodAntiAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},
@@ -137,11 +137,11 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 				PodAntiAffinity: &api.PodAntiAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},
@@ -159,33 +159,33 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 				PodAntiAffinity: &api.PodAntiAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
 						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},
 							},
 							TopologyKey: v1.LabelHostname,
 						}, {
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},
 							},
 							TopologyKey: " zone ",
 						}, {
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
+							LabelSelector: &api.PodSelector{
+								MatchExpressions: []api.NumericAwareSelectorRequirement{
 									{
 										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
+										Operator: api.LabelSelectorOpIn,
 										Values:   []string{"S2"},
 									},
 								},

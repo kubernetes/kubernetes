@@ -361,10 +361,10 @@ func GetVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
 		Required: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
+					MatchExpressions: []v1.NumericAwareSelectorRequirement{
 						{
 							Key:      key,
-							Operator: v1.NodeSelectorOpIn,
+							Operator: v1.LabelSelectorOpIn,
 							Values:   []string{value},
 						},
 					},

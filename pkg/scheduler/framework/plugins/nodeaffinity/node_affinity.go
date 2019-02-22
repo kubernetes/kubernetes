@@ -80,7 +80,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 			}
 
 			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
-			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
+			nodeSelector, err := v1helper.NumericAwareSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
 			if err != nil {
 				return 0, framework.NewStatus(framework.Error, err.Error())
 			}

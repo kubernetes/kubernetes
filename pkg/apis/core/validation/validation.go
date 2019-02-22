@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -3242,22 +3243,26 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ValidateNodeSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data
-func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
+// ValidateNumericAwareSelectorRequirement tests that the specified NumericAwareSelectorRequirement fields has valid data
+func ValidateNumericAwareSelectorRequirement(rq core.NumericAwareSelectorRequirement, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch rq.Operator {
-	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
+	case core.LabelSelectorOpIn, core.LabelSelectorOpNotIn:
 		if len(rq.Values) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
 		}
-	case core.NodeSelectorOpExists, core.NodeSelectorOpDoesNotExist:
+	case core.LabelSelectorOpExists, core.LabelSelectorOpDoesNotExist:
 		if len(rq.Values) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}
 
-	case core.NodeSelectorOpGt, core.NodeSelectorOpLt:
+	case core.LabelSelectorOpNumericallyGreaterthan, core.LabelSelectorOpNumericallyLessthan:
 		if len(rq.Values) != 1 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+		} else {
+			if _, err := strconv.ParseInt(rq.Values[0], 10, 64); err != nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("values"), "for 'Gt', 'Lt' operators, the value must be an integer"))
+			}
 		}
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
@@ -3272,12 +3277,12 @@ var nodeFieldSelectorValidators = map[string]func(string, bool) []string{
 	core.ObjectNameField: ValidateNodeName,
 }
 
-// ValidateNodeFieldSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data
-func ValidateNodeFieldSelectorRequirement(req core.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
+// ValidateNodeFieldSelectorRequirement tests that the specified NumericAwareSelectorRequirement fields has valid data
+func ValidateNodeFieldSelectorRequirement(req core.NumericAwareSelectorRequirement, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	switch req.Operator {
-	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
+	case core.LabelSelectorOpIn, core.LabelSelectorOpNotIn:
 		if len(req.Values) != 1 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"),
 				"must be only one value when `operator` is 'In' or 'NotIn' for node field selector"))
@@ -3304,7 +3309,7 @@ func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, fldPath *field.Path) f
 	allErrs := field.ErrorList{}
 
 	for j, req := range term.MatchExpressions {
-		allErrs = append(allErrs, ValidateNodeSelectorRequirement(req, fldPath.Child("matchExpressions").Index(j))...)
+		allErrs = append(allErrs, ValidateNumericAwareSelectorRequirement(req, fldPath.Child("matchExpressions").Index(j))...)
 	}
 
 	for j, req := range term.MatchFields {
@@ -3434,7 +3439,7 @@ func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldP
 func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidatePodSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
 	for _, name := range podAffinityTerm.Namespaces {
 		for _, msg := range ValidateNamespaceName(name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
@@ -5818,4 +5823,37 @@ func ValidateSpreadConstraintNotRepeat(fldPath *field.Path, constraint core.Topo
 		}
 	}
 	return nil
+}
+
+func ValidatePodSelector(ps *core.PodSelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ps == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, ValidateLabels(ps.MatchLabels, fldPath.Child("matchLabels"))...)
+	for i, expr := range ps.MatchExpressions {
+		allErrs = append(allErrs, ValidateNumericAwareSelectorRequirement(expr, fldPath.Child("matchExpressions").Index(i))...)
+	}
+	return allErrs
+}
+
+// ValidateLabelName validates that the label name is correctly defined.
+func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsQualifiedName(labelName) {
+		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg))
+	}
+	return allErrs
+}
+
+// ValidateLabels validates that a set of labels are correctly defined.
+func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k, v := range labels {
+		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
+		for _, msg := range validation.IsValidLabelValue(v) {
+			allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
+		}
+	}
+	return allErrs
 }

@@ -542,14 +542,14 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
-	requirements := make([]v1.NodeSelectorRequirement, 0)
+	requirements := make([]v1.NumericAwareSelectorRequirement, 0)
 	if len(labels) != 0 {
 		if pv.Labels == nil {
 			pv.Labels = make(map[string]string)
 		}
 		for k, v := range labels {
 			pv.Labels[k] = v
-			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+			requirements = append(requirements, v1.NumericAwareSelectorRequirement{Key: k, Operator: v1.LabelSelectorOpIn, Values: []string{v}})
 		}
 	}
 

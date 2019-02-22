@@ -532,19 +532,19 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
+							MatchExpressions: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      "zone",
-									Operator: v1.NodeSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"test"},
 								},
 							},
 						},
 						{
-							MatchFields: []v1.NodeSelectorRequirement{
+							MatchFields: []v1.NumericAwareSelectorRequirement{
 								{
 									Key:      api.ObjectNameField,
-									Operator: v1.NodeSelectorOpIn,
+									Operator: v1.LabelSelectorOpIn,
 									Values:   []string{"node-1"},
 								},
 							},
