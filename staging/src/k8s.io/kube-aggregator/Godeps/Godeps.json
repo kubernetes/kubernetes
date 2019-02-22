@@ -220,11 +220,13 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Rev": "abad2d1bd44235a26707c172eab6bca5bf2dbad3"
+			"Comment": "v0.9.2",
+			"Rev": "505eaef017263e299324067d40ca2c48f6a2cf50"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus/internal",
-			"Rev": "abad2d1bd44235a26707c172eab6bca5bf2dbad3"
+			"Comment": "v0.9.2",
+			"Rev": "505eaef017263e299324067d40ca2c48f6a2cf50"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
