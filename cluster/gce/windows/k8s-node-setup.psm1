@@ -1030,5 +1030,25 @@ function Verify-WorkerServices {
   Log_Todo "run more verification commands."
 }
 
+# Add a registry key for docker in EventLog so that log messages are mapped
+# correctly. This is a workaround since the key is missing in the base image.
+# https://github.com/MicrosoftDocs/Virtualization-Documentation/pull/503
+# TODO: Fix this in the base image.
+function Create-DockerRegistryKey {
+  $tmp_dir = 'C:\tmp_docker_reg'
+  New-Item -Force -ItemType 'directory' ${tmp_dir} | Out-Null
+  $reg_file = 'docker.reg'
+  Set-Content ${tmp_dir}\${reg_file} `
+'Windows Registry Editor Version 5.00
+ [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application\docker]
+"CustomSource"=dword:00000001
+"EventMessageFile"="C:\\Program Files\\docker\\dockerd.exe"
+"TypesSupported"=dword:00000007'
+
+  Log-Output "Importing registry key for Docker"
+  reg import ${tmp_dir}\${reg_file}
+  Remove-Item -Force -Recurse ${tmp_dir}
+}
+
 # Export all public functions:
 Export-ModuleMember -Function *-*

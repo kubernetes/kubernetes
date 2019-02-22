@@ -96,6 +96,7 @@ try {
   Create-Directories
   Download-HelperScripts
 
+  Create-DockerRegistryKey
   Create-PauseImage
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
