@@ -4288,55 +4288,55 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/io",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/keymutex",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/net",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/nsenter",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/path",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/strings",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/commands/build",

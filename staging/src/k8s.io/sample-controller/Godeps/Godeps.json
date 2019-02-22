@@ -1160,15 +1160,15 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/buffer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/integer",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "k8s.io/utils/trace",
-			"Rev": "ed37f7428a91fc2a81070808937195dcd46d320e"
+			"Rev": "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
