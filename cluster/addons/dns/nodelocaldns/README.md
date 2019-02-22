@@ -6,7 +6,7 @@ Design details [here](https://git.k8s.io/enhancements/keps/sig-network/0030-node
 
 ## nodelocaldns addon template
 
-This directory contains the addon config yaml - `nodelocaldns.yaml` 
+This directory contains the addon config yaml - `nodelocaldns.yaml`
 The variables will be substituted by the configure scripts when the yaml is copied into master.
 To create a GCE cluster with nodelocaldns enabled, use  the command:
 `KUBE_ENABLE_NODELOCAL_DNS=true go run hack/e2e.go -v --up`

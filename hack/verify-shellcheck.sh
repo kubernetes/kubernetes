@@ -127,7 +127,7 @@ for f in "${all_shell_scripts[@]}"; do
   else
     failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
                  shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
-  fi  
+  fi
   set -o errexit
   kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then

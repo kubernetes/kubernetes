@@ -153,7 +153,7 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		'drain' evicts the pods if the APIServer supports 
+		'drain' evicts the pods if the APIServer supports
 		[eviction](http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through

@@ -274,7 +274,7 @@ filename | sha512 hash
 * fix UnmountDevice failure on Windows ([#68608](https://github.com/kubernetes/kubernetes/pull/68608), [@andyzhangx](https://github.com/andyzhangx))
 * adjusted http/2 buffer sizes for apiservers to prevent starvation issues between concurrent streams ([#67902](https://github.com/kubernetes/kubernetes/pull/67902), [@liggitt](https://github.com/liggitt))
 * Bump up version number of debian-base, debian-hyperkube-base and debian-iptables.  ([#67026](https://github.com/kubernetes/kubernetes/pull/67026), [@satyasm](https://github.com/satyasm))
-    * Also updates dependencies of users of debian-base. 
+    * Also updates dependencies of users of debian-base.
     * debian-base version 0.3.1 is already available.
 * Update debian-iptables and hyperkube-base images to include CVE fixes. ([#67365](https://github.com/kubernetes/kubernetes/pull/67365), [@ixdy](https://github.com/ixdy))
 * Immediately close the other side of the connection when proxying. ([#67288](https://github.com/kubernetes/kubernetes/pull/67288), [@MHBauer](https://github.com/MHBauer))
@@ -1121,7 +1121,7 @@ Extensibility. SIG API Machinery added a new class of admission control webhooks
 
 ### Apps
 
-The core workloads API, which is composed of the DaemonSet, Deployment, ReplicaSet, and StatefulSet kinds, has been promoted to GA stability in the apps/v1 group version. As such, the apps/v1beta2 group version is deprecated, and all new code should use the kinds in the apps/v1 group version. 
+The core workloads API, which is composed of the DaemonSet, Deployment, ReplicaSet, and StatefulSet kinds, has been promoted to GA stability in the apps/v1 group version. As such, the apps/v1beta2 group version is deprecated, and all new code should use the kinds in the apps/v1 group version.
 
 ### Auth
 
@@ -1151,7 +1151,7 @@ In v1.9 SIG Network has implemented alpha support for IPv6, and alpha support fo
 
 ### Node
 
-SIG Node iterated on the ability to support more workloads with better performance and improved reliability.  Alpha features were improved around hardware accelerator support, device plugins enablement, and cpu pinning policies to enable us to graduate these features to beta in a future release.  In addition, a number of reliability and performance enhancements were made across the node to help operators in production. 
+SIG Node iterated on the ability to support more workloads with better performance and improved reliability.  Alpha features were improved around hardware accelerator support, device plugins enablement, and cpu pinning policies to enable us to graduate these features to beta in a future release.  In addition, a number of reliability and performance enhancements were made across the node to help operators in production.
 
 ### OpenStack
 
@@ -1175,7 +1175,7 @@ The SIG also focused on adding functionality to the Kubernetes volume subsystem,
 
 We are advancing support for Windows Server and Windows Server Containers to beta along with continued feature and functional advancements on both the Kubernetes and Windows platforms. This opens the door for many Windows-specific applications and workloads to run on Kubernetes, significantly expanding the implementation scenarios and the enterprise reach of Kubernetes.
 
-## Before Upgrading 
+## Before Upgrading
 
 Consider the following changes, limitations, and guidelines before you upgrade:
 
@@ -1206,7 +1206,7 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 ### **Multicluster**
 
-*   Development of Kubernetes Federation has moved to [github.com/kubernetes/federation](https://github.com/kubernetes/federation). This move out of tree also means that Federation will begin releasing separately from Kubernetes. Impact: 
+*   Development of Kubernetes Federation has moved to [github.com/kubernetes/federation](https://github.com/kubernetes/federation). This move out of tree also means that Federation will begin releasing separately from Kubernetes. Impact:
     *   Federation-specific behavior will no longer be included in kubectl
     *   kubefed will no longer be released as part of Kubernetes
     *   The Federation servers will no longer be included in the hyperkube binary and image. ([#53816](https://github.com/kubernetes/kubernetes/pull/53816),[ @marun](https://github.com/marun))
@@ -1236,7 +1236,7 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 ### **Storage**
 
-*   [alpha] The LocalPersistentVolumes alpha feature now also requires the VolumeScheduling alpha feature.  This is a breaking change, and the following changes are required: 
+*   [alpha] The LocalPersistentVolumes alpha feature now also requires the VolumeScheduling alpha feature.  This is a breaking change, and the following changes are required:
     *   The VolumeScheduling feature gate must also be enabled on kube-scheduler and kube-controller-manager components.
     *   The NoVolumeNodeConflict predicate has been removed.  For non-default schedulers, update your scheduler policy.
     *   The CheckVolumeBinding predicate must be enabled in non-default schedulers. ([#55039](https://github.com/kubernetes/kubernetes/pull/55039),[ @msau42](https://github.com/msau42))
@@ -1384,7 +1384,7 @@ As announced with the release of version 1.8, the Kubernetes Workloads API is at
 
 *   New permissions have been added to default RBAC roles ([#52654](https://github.com/kubernetes/kubernetes/pull/52654),[ @liggitt](https://github.com/liggitt)):
     *   The default admin and edit roles now include read/write permissions
-    *   The view role includes read permissions on poddisruptionbudget.policy resources. 
+    *   The view role includes read permissions on poddisruptionbudget.policy resources.
 *   RBAC rules can now match the same subresource on any resource using the form `*/(subresource)`. For example, `*/scale` matches requests to `replicationcontroller/scale`. ([#53722](https://github.com/kubernetes/kubernetes/pull/53722),[ @deads2k](https://github.com/deads2k))
 *   The RBAC bootstrapping policy now allows authenticated users to create selfsubjectrulesreviews. ([#56095](https://github.com/kubernetes/kubernetes/pull/56095),[ @ericchiang](https://github.com/ericchiang))
 *   RBAC ClusterRoles can now select other roles to aggregate. ([#54005](https://github.com/kubernetes/kubernetes/pull/54005),[ @deads2k](https://github.com/deads2k))
@@ -1665,7 +1665,7 @@ This release passes 129/145 Kubernetes e2e conformance tests.
 *   Load balancing is now more flexible:
     *   The OpenStack LBaaS v2 Provider is now [configurable](https://kubernetes.io/docs/concepts/cluster-administration/cloud-providers/#openstack). ([#54176](https://github.com/kubernetes/kubernetes/pull/54176),[ @gonzolino](https://github.com/gonzolino))
     *   OpenStack Octavia v2 is now supported as a load balancer provider in addition to the existing support for the Neutron LBaaS V2 implementation. Neutron LBaaS V1 support has been removed. ([#55393](https://github.com/kubernetes/kubernetes/pull/55393),[ @jamiehannaford](https://github.com/jamiehannaford))
-*   OpenStack security group support has been beefed up  ([#50836](https://github.com/kubernetes/kubernetes/pull/50836),[ @FengyunPan](https://github.com/FengyunPan)): 
+*   OpenStack security group support has been beefed up  ([#50836](https://github.com/kubernetes/kubernetes/pull/50836),[ @FengyunPan](https://github.com/FengyunPan)):
     *   Kubernetes will now automatically determine the security group for the node
     *   Nodes can now belong to multiple security groups
 
@@ -1679,7 +1679,7 @@ This release passes 129/145 Kubernetes e2e conformance tests.
 
 *   Scheduler cache ignores updates to an assumed pod if updates are limited to pod annotations.  ([#54008](https://github.com/kubernetes/kubernetes/pull/54008),[ @yguo0905](https://github.com/yguo0905))
 *   Issues with namespace deletion have been resolved. ([#53720](https://github.com/kubernetes/kubernetes/pull/53720),[ @shyamjvs](https://github.com/shyamjvs)) ([#53793](https://github.com/kubernetes/kubernetes/pull/53793),[ @wojtek-t](https://github.com/wojtek-t))
-*   Pod preemption has been improved.  
+*   Pod preemption has been improved.
     *   Now takes PodDisruptionBudget into account. ([#56178](https://github.com/kubernetes/kubernetes/pull/56178),[ @bsalamat](https://github.com/bsalamat))
     *   Nominated pods are taken into account during scheduling to avoid starvation of higher priority pods. ([#55933](https://github.com/kubernetes/kubernetes/pull/55933),[ @bsalamat](https://github.com/bsalamat))
 *   Fixed 'Schedulercache is corrupted' error in kube-scheduler ([#55262](https://github.com/kubernetes/kubernetes/pull/55262),[ @liggitt](https://github.com/liggitt))
@@ -1699,12 +1699,12 @@ This release passes 129/145 Kubernetes e2e conformance tests.
 *   [alpha] Deletion of `PersistentVolumeClaim` objects that are in use by a pod no longer permitted (if alpha feature is enabled).
 *   [alpha] Container Storage Interface
     *   New CSIVolumeSource enables Kubernetes to use external CSI drivers to provision, attach, and mount volumes.
-*   [alpha] Raw block volumes 
+*   [alpha] Raw block volumes
     *   Support for surfacing volumes as raw block devices added to Kubernetes storage system.
     *   Only Fibre Channel volume plugin supports exposes this functionality, in this release.
 *   [alpha] Volume resizing
     *   Added file system resizing for the following volume plugins: GCE PD, Ceph RBD, AWS EBS, OpenStack Cinder
-*   [alpha] Topology Aware Volume Scheduling 
+*   [alpha] Topology Aware Volume Scheduling
     *   Improved volume scheduling for Local PersistentVolumes, by allowing the scheduler to make PersistentVolume binding decisions while respecting the Pod's scheduling requirements.
     *   Dynamic provisioning is not supported with this feature yet.
 *   [alpha] Containerized mount utilities
@@ -2082,7 +2082,7 @@ filename | sha256 hash
 * The minimum supported go version bumps to 1.9.1. ([#55301](https://github.com/kubernetes/kubernetes/pull/55301), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * GCE: provide an option to disable docker's live-restore on COS/ubuntu ([#55260](https://github.com/kubernetes/kubernetes/pull/55260), [@yujuhong](https://github.com/yujuhong))
 * Azure NSG rules for services exposed via external load balancer  ([#54177](https://github.com/kubernetes/kubernetes/pull/54177), [@itowlson](https://github.com/itowlson))
-    * now limit the destination IP address to the relevant front end load 
+    * now limit the destination IP address to the relevant front end load
     * balancer IP.
 * DaemonSet status now has a new field named "conditions", making it consistent with other workloads controllers. ([#55272](https://github.com/kubernetes/kubernetes/pull/55272), [@janetkuo](https://github.com/janetkuo))
 * kubeadm: Add an experimental mode to deploy CoreDNS instead of KubeDNS ([#52501](https://github.com/kubernetes/kubernetes/pull/52501), [@rajansandeep](https://github.com/rajansandeep))
@@ -2358,10 +2358,10 @@ filename | sha256 hash
 * Add monitoring of Windows Server containers metrics in the kubelet via the stats/summary endpoint. ([#50396](https://github.com/kubernetes/kubernetes/pull/50396), [@bobbypage](https://github.com/bobbypage))
 * Restores redirect behavior for proxy subresources ([#52933](https://github.com/kubernetes/kubernetes/pull/52933), [@liggitt](https://github.com/liggitt))
 * A new service annotation has been added for services of type LoadBalancer on Azure,  ([#51757](https://github.com/kubernetes/kubernetes/pull/51757), [@itowlson](https://github.com/itowlson))
-    * to specify the subnet on which the service's front end IP should be provisioned. The 
-    * annotation is service.beta.kubernetes.io/azure-load-balancer-internal-subnet and its 
-    * value is the subnet name (not the subnet ARM ID).  If omitted, the default is the 
-    * master subnet.  It is ignored if the service is not on Azure, if the type is not 
+    * to specify the subnet on which the service's front end IP should be provisioned. The
+    * annotation is service.beta.kubernetes.io/azure-load-balancer-internal-subnet and its
+    * value is the subnet name (not the subnet ARM ID).  If omitted, the default is the
+    * master subnet.  It is ignored if the service is not on Azure, if the type is not
     * LoadBalancer, or if the load balancer is not internal.
 * Adds a command-line argument to kube-apiserver called ([#51698](https://github.com/kubernetes/kubernetes/pull/51698), [@rphillips](https://github.com/rphillips))
     * --alpha-endpoint-reconciler-type=(master-count, lease, none) (default
@@ -2544,7 +2544,7 @@ filename | sha256 hash
 * PersistentVolumeClaim metrics like "volume_stats_inodes" and "volume_stats_capacity_bytes" are now reported via kubelet prometheus ([#51553](https://github.com/kubernetes/kubernetes/pull/51553), [@wongma7](https://github.com/wongma7))
 * When using IP aliases, use a secondary range rather than subnetwork to reserve cluster IPs. ([#51690](https://github.com/kubernetes/kubernetes/pull/51690), [@bowei](https://github.com/bowei))
 * IPAM controller unifies handling of node pod CIDR range allocation. ([#51374](https://github.com/kubernetes/kubernetes/pull/51374), [@bowei](https://github.com/bowei))
-    * It is intended to supersede the logic that is currently in range_allocator 
+    * It is intended to supersede the logic that is currently in range_allocator
     * and cloud_cidr_allocator. (ALPHA FEATURE)
     * Note: for this change, the other allocators still exist and are the default.
     * It supports two modes:

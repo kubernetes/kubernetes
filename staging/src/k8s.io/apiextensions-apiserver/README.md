@@ -6,7 +6,7 @@ It provides an API for registering `CustomResourceDefinitions`.
 
 ## Purpose
 
-This API server provides the implementation for `CustomResourceDefinitions` which is included as 
+This API server provides the implementation for `CustomResourceDefinitions` which is included as
 delegate server inside of `kube-apiserver`.
 
 

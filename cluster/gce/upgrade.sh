@@ -210,7 +210,7 @@ function setup-base-image() {
     if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
         NODE_OS_DISTRIBUTION="gci"
     fi
-    
+
     source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-linux-node-image

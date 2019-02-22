@@ -45,7 +45,7 @@ var (
 			short: "Generates a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
 			long: normalizer.LongDesc(`
 					Generates the kubeconfig file for the kubelet to use and saves it to %s file.
-			
+
 					Please note that this should *only* be used for cluster bootstrapping purposes. After your control plane is up,
 					you should request all kubelet credentials from the CSR API.`),
 		},

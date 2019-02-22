@@ -452,7 +452,7 @@ filename | sha512 hash
 * Get public IP for Azure vmss nodes. ([#68498](https://github.com/kubernetes/kubernetes/pull/68498), [@feiskyer](https://github.com/feiskyer))
 * Role, ClusterRole and their bindings for cloud-provider is put under system namespace. Their addonmanager mode switches to EnsureExists. ([#67224](https://github.com/kubernetes/kubernetes/pull/67224), [@grayluck](https://github.com/grayluck))
 * Bump up version number of debian-base, debian-hyperkube-base and debian-iptables.  ([#67026](https://github.com/kubernetes/kubernetes/pull/67026), [@satyasm](https://github.com/satyasm))
-    * Also updates dependencies of users of debian-base. 
+    * Also updates dependencies of users of debian-base.
     * debian-base version 0.3.1 is already available.
 * Update debian-iptables and hyperkube-base images to include CVE fixes. ([#67365](https://github.com/kubernetes/kubernetes/pull/67365), [@ixdy](https://github.com/ixdy))
 * Support configuring the Azure load balancer idle connection timeout for services ([#66045](https://github.com/kubernetes/kubernetes/pull/66045), [@cpuguy83](https://github.com/cpuguy83))
