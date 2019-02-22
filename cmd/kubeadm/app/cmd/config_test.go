@@ -31,6 +31,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	phaseworkflow "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -385,6 +386,116 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 
 			if !reflect.DeepEqual(gotKinds, test.expectedKinds) {
 				t.Fatalf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", test.expectedKinds, gotKinds)
+			}
+		})
+	}
+}
+
+func TestConfigUploadPhaseToCommand(t *testing.T) {
+	tests := []struct {
+		desc    string
+		phase   *phaseworkflow.Phase
+		aliases []string
+	}{
+		{
+			desc: "Phase attrs are translated correctly",
+			phase: &phaseworkflow.Phase{
+				Name:    "test",
+				Short:   "Short phase description.",
+				Long:    "Long phase description.",
+				Example: "Example of test.",
+				Aliases: []string{"tst"},
+			},
+		},
+		{
+			desc: "kubeadm phase gets extra from-file alias",
+			phase: &phaseworkflow.Phase{
+				Name:    "kubeadm",
+				Aliases: []string{"alias1"},
+			},
+			aliases: []string{"alias1", "from-file"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			result := configUploadPhaseToCommand(nil, test.phase, nil)
+
+			if result.Name() != test.phase.Name {
+				t.Errorf("cmd.Name() != phase.Name\n\texpect: %s\n\tgot: %s", test.phase.Name, result.Name())
+			}
+
+			if result.Short != test.phase.Short {
+				t.Errorf("cmd.Short != phase.Short\n\texpect: %s\n\tgot: %s", test.phase.Short, result.Short)
+			}
+
+			if result.Long != test.phase.Long {
+				t.Errorf("cmd.Long != phase.Long\n\texpect: %s\n\tgot: %s", test.phase.Long, result.Long)
+			}
+
+			if result.Example != test.phase.Example {
+				t.Errorf("cmd.Example != phase.Example\n\texpect: %s\n\tgot: %s", test.phase.Example, result.Example)
+			}
+
+			expectedAliases := test.aliases
+			if expectedAliases == nil {
+				expectedAliases = test.phase.Aliases
+			}
+
+			if !reflect.DeepEqual(expectedAliases, result.Aliases) {
+				t.Errorf("cmd.Aliases != expectedAliases\n\texpect: %s\n\tgot: %s", expectedAliases, result.Aliases)
+			}
+		})
+	}
+}
+
+func TestRunConfigUploadPhase(t *testing.T) {
+	tests := []struct {
+		desc           string
+		name           string
+		args           []string
+		kubeConfigFile string
+		expected       []string
+	}{
+		{
+			desc:     "test phase with no args and no kubeConfigFile specified",
+			name:     "test1",
+			expected: []string{"init", "phase", "upload-config", "test1"},
+		},
+		{
+			desc:     "test phase with args and no kubeConfigFile specified",
+			name:     "test2",
+			args:     []string{"arg1", "arg2"},
+			expected: []string{"init", "phase", "upload-config", "test2", "arg1", "arg2"},
+		},
+		{
+			desc:           "test phase with no args and but with kubeConfigFile specified",
+			name:           "test3",
+			kubeConfigFile: "/path/to/file.yaml",
+			expected:       []string{"init", "phase", "upload-config", "test3", "--kubeconfig", "/path/to/file.yaml"},
+		},
+		{
+			desc:           "test phase with args and kubeConfigFile specified",
+			name:           "test4",
+			args:           []string{"--kubeconfig", "/another/file.yaml", "arg3", "arg4"},
+			kubeConfigFile: "/path/to/file.yaml",
+			expected:       []string{"init", "phase", "upload-config", "test4", "--kubeconfig", "/path/to/file.yaml", "--kubeconfig", "/another/file.yaml", "arg3", "arg4"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			var got []string
+			baseCmd := &cobra.Command{
+				Use:                "kubeadm",
+				DisableFlagParsing: true,
+				Run: func(_ *cobra.Command, args []string) {
+					got = args
+				},
+			}
+
+			runConfigUploadPhase(baseCmd, test.name, test.args, test.kubeConfigFile)
+
+			if !reflect.DeepEqual(test.expected, got) {
+				t.Errorf("expected != got\n\texpected: %v\n\tgot: %v", test.expected, got)
 			}
 		})
 	}

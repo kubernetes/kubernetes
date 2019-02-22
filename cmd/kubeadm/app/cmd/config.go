@@ -37,6 +37,8 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	initphases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
+	phaseworkflow "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -270,13 +272,60 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
-		Short: "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster.",
+		Short: "Uploads the kubeadm and kubelet configuration to a ConfigMap. This is a simple shorthand for the upload-config init phase.",
+		Long:  cmdutil.MacroCommandLongDescription,
 		RunE:  cmdutil.SubCmdRunE("upload"),
 	}
 
-	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
+	// Add legacy deprecated sub-command
 	cmd.AddCommand(NewCmdConfigUploadFromFlags(out, kubeConfigFile))
+
+	// We actually need only the init cmd here, the fake kubeadm cmd is used only for generating correct help messages
+	fakeKubeadmCmd := &cobra.Command{Use: "kubeadm"}
+	fakeKubeadmCmd.AddCommand(NewCmdInit(out, nil))
+
+	// Wrap the upload config init sub-phases into sub-commands
+	uploadConfigPhase := initphases.NewUploadConfigPhase()
+	for _, phase := range uploadConfigPhase.Phases {
+		cmd.AddCommand(configUploadPhaseToCommand(fakeKubeadmCmd, &phase, kubeConfigFile))
+	}
+
 	return cmd
+}
+
+// configUploadPhaseToCommand creates a wrapper cobra command for a given upload-config sub-phase
+func configUploadPhaseToCommand(baseCmd *cobra.Command, phase *phaseworkflow.Phase, kubeConfigFile *string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:                phase.Name,
+		Short:              phase.Short,
+		Long:               phase.Long,
+		Example:            phase.Example,
+		Aliases:            phase.Aliases,
+		DisableFlagParsing: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			runConfigUploadPhase(baseCmd, cmd.Name(), args, *kubeConfigFile)
+		},
+	}
+
+	// setup the extra "from-file" alias to the "kubeadm" phase command
+	if phase.Name == "kubeadm" {
+		cmd.Aliases = append([]string{}, cmd.Aliases...)
+		cmd.Aliases = append(cmd.Aliases, "from-file")
+	}
+
+	return cmd
+}
+
+func runConfigUploadPhase(baseCmd *cobra.Command, phaseName string, args []string, kubeConfigFile string) {
+	phaseArgs := []string{"init", "phase", "upload-config", phaseName}
+	// If we are given a specific kubeconfig path by the parent commands, prepend that.
+	// That way it will be taken into account or overwritten if the user specified another one in args.
+	if kubeConfigFile != "" {
+		phaseArgs = append(phaseArgs, "--"+options.KubeconfigPath, kubeConfigFile)
+	}
+	phaseArgs = append(phaseArgs, args...)
+	baseCmd.SetArgs(phaseArgs)
+	baseCmd.Execute()
 }
 
 // NewCmdConfigView returns cobra.Command for "kubeadm config view" command
@@ -300,43 +349,6 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	}
 }
 
-// NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
-// "kubeadm config upload from-file" command
-func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	var cfgPath string
-	cmd := &cobra.Command{
-		Use:   "from-file",
-		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration.",
-		Long: fmt.Sprintf(dedent.Dedent(`
-			Using this command, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to 'kubeadm init'.
-			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option, you need to run this command with the
-			same config file before upgrading to v1.8 using 'kubeadm upgrade'.
-
-			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --config flag is mandatory"))
-			}
-
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
-			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
-			kubeadmutil.CheckErr(err)
-
-			// Default both statically and dynamically, convert to internal API type, and validate everything
-			internalcfg, err := configutil.LoadInitConfigurationFromFile(cfgPath)
-			kubeadmutil.CheckErr(err)
-
-			// Upload the configuration using the file
-			klog.V(1).Infof("[config] uploading configuration")
-			err = uploadconfig.UploadConfiguration(internalcfg, client)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
-}
-
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1beta1.InitConfiguration{}
@@ -354,6 +366,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 
 			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
+		Deprecated: "This command is deprecated. Please, use 'kubeadm config upload kubeadm' instead.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			klog.V(1).Infoln("[config] creating new FeatureGates")
