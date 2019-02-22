@@ -7797,7 +7797,7 @@
      },
      "enableServiceLinks": {
       "type": "boolean",
-      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links."
+      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links. Optional: Defaults to true."
      }
     }
    },
