@@ -173,11 +173,11 @@ func buildContainerLogsPath(containerName string, restartCount int) string {
 
 // BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
 func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID, containerName string) string {
-	return filepath.Join(buildPodLogsDirectory(podNamespace, podName, podUID), containerName)
+	return filepath.Join(BuildPodLogsDirectory(podNamespace, podName, podUID), containerName)
 }
 
-// buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
-func buildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
+// BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
+func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
 		string(podUID)}, logPathDelimiter))
 }
