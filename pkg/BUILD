@@ -44,6 +44,7 @@ filegroup(
         "//pkg/apis/extensions:all-srcs",
         "//pkg/apis/imagepolicy:all-srcs",
         "//pkg/apis/networking:all-srcs",
+        "//pkg/apis/node:all-srcs",
         "//pkg/apis/policy:all-srcs",
         "//pkg/apis/rbac:all-srcs",
         "//pkg/apis/scheduling:all-srcs",

@@ -279,6 +279,7 @@ pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
+pkg/registry/node/rest
 pkg/registry/policy/poddisruptionbudget/storage
 pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole
