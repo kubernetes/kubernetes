@@ -86,7 +86,7 @@ limitations under the License.
 // This file was generated using openssl by the gencerts.sh script
 // and holds raw certificates for the imagepolicy webhook tests.
 
-package imagepolic
+package imagepolicy
 EOF
 
 for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
