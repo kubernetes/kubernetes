@@ -26,7 +26,7 @@ import (
 // Data to be stored as checkpoint
 type Checksum uint64
 
-// VerifyChecksum verifies that passed checksum is same as calculated checksum
+// Verify verifies that passed checksum is same as calculated checksum
 func (cs Checksum) Verify(data interface{}) error {
 	if cs != New(data) {
 		return errors.ErrCorruptCheckpoint
@@ -38,7 +38,7 @@ func New(data interface{}) Checksum {
 	return Checksum(getChecksum(data))
 }
 
-// Get returns calculated checksum of checkpoint data
+// getChecksum returns calculated checksum of checkpoint data
 func getChecksum(data interface{}) uint64 {
 	hash := fnv.New32a()
 	hashutil.DeepHashObject(hash, data)
