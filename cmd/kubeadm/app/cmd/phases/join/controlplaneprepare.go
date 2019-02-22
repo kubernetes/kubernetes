@@ -91,12 +91,12 @@ func newControlPlanePrepareManifestsSubphases() workflow.Phase {
 	return workflow.Phase{
 		Name:         "manifests",
 		Short:        "Generates the manifests for the new control plane components",
-		Run:          runControlPlaneSubphase,
+		Run:          runControlPlanePrepareManifestsSubphase,
 		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each component
 	}
 }
 
-func runControlPlaneSubphase(c workflow.RunData) error {
+func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
 	data, ok := c.(controlPlanePrepareData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -162,28 +162,4 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 	}
 
 	return nil
-}
-
-func runControlPlanePrepareJoinSubphase(component string) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
-		data, ok := c.(controlPlanePrepareData)
-		if !ok {
-			return errors.New("control-plane-prepare phase invoked with an invalid data struct")
-		}
-
-		// Skip if this is not a control plane
-		if data.Cfg().ControlPlane == nil {
-			return nil
-		}
-
-		cfg, err := data.InitCfg()
-		if err != nil {
-			return err
-		}
-
-		// Creates static pod manifests file for the control plane components to be deployed on this node
-		// Static pods will be created and managed by the kubelet as soon as it starts
-		fmt.Printf("[control-plane-prepare] Creating static Pod manifest for %q\n", component)
-		return controlplane.CreateStaticPodFiles(kubeadmconstants.GetStaticPodDirectory(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, component)
-	}
 }
