@@ -749,35 +749,32 @@ contexts:
 EOF
   fi
 
-if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
-    # This is the config file for the image review webhook.
-    cat <<EOF >/etc/gcp_image_review.config
-clusters:
-  - name: gcp-image-review-server
-    cluster:
-      server: ${GCP_IMAGE_VERIFICATION_URL}
+  # This is the config file for the image review webhook.
+  cat <<EOF >/etc/srv/kubernetes/webhook_kubeconfig.yaml
+apiVersion: v1
+kind: Config
 users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-image-review-server
-    user: kube-apiserver
-  name: webhook
+- name: '*.googleapis.com'
+  user:
+    exec:
+      apiVersion: "client.authentication.k8s.io/v1alpha1"
+      command: /usr/bin/gke-exec-auth-plugin
+      args:
+      - --mode=alt-token
+      - --alt-token-url=${TOKEN_URL?}
+      - --alt-token-body=${TOKEN_BODY?}
 EOF
     # This is the config for the image review admission controller.
-    cat <<EOF >/etc/admission_controller.config
-imagePolicy:
-  kubeConfigFile: /etc/gcp_image_review.config
-  allowTTL: 30
-  denyTTL: 30
-  retryBackoff: 500
-  defaultAllow: true
+    cat <<EOF >/etc/srv/kubernetes/admission_config.yaml
+apiVersion: apiserver.k8s.io/v1alpha1
+kind: AdmissionConfiguration
+plugins:
+- name: ValidatingAdmissionWebhook
+  configuration:
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kind: WebhookAdmission
+    kubeConfigFile: /etc/srv/kubernetes/webhook_kubeconfig.yaml
 EOF
-  fi
 }
 
 # Write the config for the audit policy.
@@ -1719,20 +1716,10 @@ function start-kube-apiserver {
     params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi
 
-  local admission_controller_config_mount=""
-  local admission_controller_config_volume=""
-  local image_policy_webhook_config_mount=""
-  local image_policy_webhook_config_volume=""
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
     params+=" --admission-control=${ADMISSION_CONTROL}"
-    if [[ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]]; then
-      params+=" --admission-control-config-file=/etc/admission_controller.config"
-      # Mount the file to configure admission controllers if ImagePolicyWebhook is set.
-      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
-      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\", \"type\": \"FileOrCreate\"}},"
-      # Mount the file to configure the ImagePolicyWebhook's webhook.
-      image_policy_webhook_config_mount="{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false},"
-      image_policy_webhook_config_volume="{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\", \"type\": \"FileOrCreate\"}},"
+    if [[ "${ADMISSION_CONTROL}" == *"AdmissionWebhook"* ]]; then
+      params+=" --admission-control-config-file=/etc/srv/kubernetes/admission_config.yaml"
     fi
   fi
 
@@ -1855,10 +1842,6 @@ function start-kube-apiserver {
   sed -i -e "s@{{audit_policy_config_volume}}@${audit_policy_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_mount}}@${audit_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_volume}}@${audit_webhook_config_volume}@g" "${src_file}"
-  sed -i -e "s@{{admission_controller_config_mount}}@${admission_controller_config_mount}@g" "${src_file}"
-  sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
-  sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
-  sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

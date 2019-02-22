@@ -65,8 +65,6 @@
         {{webhook_authn_config_mount}}
         {{audit_policy_config_mount}}
         {{audit_webhook_config_mount}}
-        {{admission_controller_config_mount}}
-        {{image_policy_webhook_config_mount}}
         { "name": "srvkube",
         "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
@@ -93,7 +91,10 @@
         "readOnly": true},
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
-        "readOnly": false}
+        "readOnly": false},
+	{ "name": "gkeauth",
+	  "mountPath": "/usr/bin/gke-exec-auth-plugin",
+	  "readOnly": true}
       ]
     }
 ],
@@ -106,8 +107,6 @@
   {{webhook_authn_config_volume}}
   {{audit_policy_config_volume}}
   {{audit_webhook_config_volume}}
-  {{admission_controller_config_volume}}
-  {{image_policy_webhook_config_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "/etc/srv/kubernetes"}
@@ -145,6 +144,11 @@
   { "name": "srvsshproxy",
     "hostPath": {
         "path": "{{srv_sshproxy_path}}"}
+  },
+  { "name": "gkeauth",
+    "hostPath": {
+        "path": "/home/kubernetes/bin/gke-exec-auth-plugin",
+	"type": "File"}
   }
 ]
 }}
