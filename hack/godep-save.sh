@@ -70,11 +70,24 @@ REQUIRED_BINS=(
   "./..."
 )
 
+# Workaround "httplex" was dropped from golang.org/x/net repo and the code
+# was moved to the "golang.org/x/net/http/httpguts" directory, we do not use
+# this directly, however many packages we vendor are still using the older
+# golang.org/x/net and we need to keep this until all those dependencies
+# are switched to newer golang.org/x/net.
+mkdir -p "${GOPATH}/src/golang.org/x/net/lex/httplex"
+echo -n "package httplex" > "${GOPATH}/src/golang.org/x/net/lex/httplex/doc.go"
+
 kube::log::status "Running godep save - this might take a while"
 # This uses $(pwd) rather than ${KUBE_ROOT} because KUBE_ROOT will be
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
 GOPATH="${GOPATH}:$(pwd)/staging" ${KUBE_GODEP:?} save "${REQUIRED_BINS[@]}"
+
+# Remove the extra httplex package
+jq 'del(.Deps[] | select(.ImportPath == "golang.org/x/net/lex/httplex"))' Godeps/Godeps.json |
+  unexpand --first-only --tabs=2 > Godeps/Godeps.json.out
+mv Godeps/Godeps.json.out Godeps/Godeps.json
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.
