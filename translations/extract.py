@@ -18,7 +18,7 @@
 Expects to be run from the root directory of the repository.
 
 Usage:
-   extract.py pkg/kubectl/cmd/apply.go
+   ./extract.py ../pkg/kubectl/cmd/apply/apply.go
 
 """
 import fileinput
