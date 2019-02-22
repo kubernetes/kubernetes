@@ -131,15 +131,12 @@ pkg/kubectl/cmd/attach
 pkg/kubectl/cmd/autoscale
 pkg/kubectl/cmd/certificates
 pkg/kubectl/cmd/clusterinfo
-pkg/kubectl/cmd/completion
 pkg/kubectl/cmd/convert
-pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/create
 pkg/kubectl/cmd/delete
 pkg/kubectl/cmd/describe
 pkg/kubectl/cmd/diff
 pkg/kubectl/cmd/drain
-pkg/kubectl/cmd/edit
 pkg/kubectl/cmd/exec
 pkg/kubectl/cmd/explain
 pkg/kubectl/cmd/expose
