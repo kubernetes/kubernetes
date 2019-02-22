@@ -65,8 +65,7 @@
         {{webhook_authn_config_mount}}
         {{audit_policy_config_mount}}
         {{audit_webhook_config_mount}}
-        {{admission_controller_config_mount}}
-        {{image_policy_webhook_config_mount}}
+	{{webhook_exec_auth_plugin_mount}}
         { "name": "srvkube",
         "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
@@ -106,8 +105,7 @@
   {{webhook_authn_config_volume}}
   {{audit_policy_config_volume}}
   {{audit_webhook_config_volume}}
-  {{admission_controller_config_volume}}
-  {{image_policy_webhook_config_volume}}
+  {{webhook_exec_auth_plugin_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "/etc/srv/kubernetes"}
