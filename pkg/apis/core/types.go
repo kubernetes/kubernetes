@@ -2035,8 +2035,15 @@ type Lifecycle struct {
 	// is terminated and restarted.
 	// +optional
 	PostStart *Handler
-	// PreStop is called immediately before a container is terminated.  The reason for termination is
-	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
+	// PreStop is called immediately before a container is terminated due to an
+	// API request or management event such as liveness probe failure,
+	// preemption, resource contention, etc. The handler is not called if the
+	// container crashes or exits. The reason for termination is passed to the
+	// handler. The Pod's termination grace period countdown begins before the
+	// PreStop hooked is executed. Regardless of the outcome of the handler, the
+	// container will eventually terminate within the Pod's termination grace
+	// period. Other management of the container blocks until the hook completes
+	// or until the termination grace period is reached.
 	// +optional
 	PreStop *Handler
 }
