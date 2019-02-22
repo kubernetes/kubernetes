@@ -127,7 +127,6 @@ go_library(
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
