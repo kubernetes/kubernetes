@@ -265,11 +265,10 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 	sched.config.Error(pod, err)
 	sched.config.Recorder.Event(pod, v1.EventTypeWarning, "FailedScheduling", message)
 	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-		Type:          v1.PodScheduled,
-		Status:        v1.ConditionFalse,
-		LastProbeTime: metav1.Now(),
-		Reason:        reason,
-		Message:       err.Error(),
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  reason,
+		Message: err.Error(),
 	})
 }
 
