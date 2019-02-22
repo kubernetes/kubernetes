@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-func alwaysReady() bool { return true }
-
 func TestIsResponsibleForRoute(t *testing.T) {
 	myClusterName := "my-awesome-cluster"
 	myClusterRoute := "my-awesome-cluster-12345678-90ab-cdef-1234-567890abcdef"
@@ -66,7 +64,6 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
-		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetNode:      types.NodeName("doesnt-matter-for-this-test"),
@@ -240,7 +237,6 @@ func TestReconcile(t *testing.T) {
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
 		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
 		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
-		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}

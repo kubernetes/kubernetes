@@ -59,14 +59,14 @@ var updateNetworkConditionBackoff = wait.Backoff{
 }
 
 type RouteController struct {
-	routes           cloudprovider.Routes
-	kubeClient       clientset.Interface
-	clusterName      string
-	clusterCIDR      *net.IPNet
-	nodeLister       corelisters.NodeLister
-	nodeListerSynced cache.InformerSynced
-	broadcaster      record.EventBroadcaster
-	recorder         record.EventRecorder
+	routes       cloudprovider.Routes
+	kubeClient   clientset.Interface
+	clusterName  string
+	clusterCIDR  *net.IPNet
+	nodeLister   corelisters.NodeLister
+	nodeInformer cache.SharedIndexInformer
+	broadcaster  record.EventBroadcaster
+	recorder     record.EventRecorder
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
@@ -83,15 +83,39 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
-		routes:           routes,
-		kubeClient:       kubeClient,
-		clusterName:      clusterName,
-		clusterCIDR:      clusterCIDR,
-		nodeLister:       nodeInformer.Lister(),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		broadcaster:      eventBroadcaster,
-		recorder:         recorder,
+		routes:       routes,
+		kubeClient:   kubeClient,
+		clusterName:  clusterName,
+		clusterCIDR:  clusterCIDR,
+		nodeLister:   nodeInformer.Lister(),
+		nodeInformer: nodeInformer.Informer(),
+		broadcaster:  eventBroadcaster,
+		recorder:     recorder,
 	}
+
+	notified := func() {
+		if err := rc.reconcileNodeRoutes(); err != nil {
+			klog.Errorf("Couldn't reconcile node routes: %v when notified", err)
+		}
+	}
+
+	rc.nodeInformer.AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch obj.(type) {
+				case *v1.Node:
+					return true
+				default:
+					return false
+				}
+			},
+
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					notified()
+				},
+			},
+		})
 
 	return rc
 }
@@ -102,7 +126,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
 
-	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
+	if !controller.WaitForCacheSync("route", stopCh, rc.nodeInformer.HasSynced) {
 		return
 	}
 
@@ -111,10 +135,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
-	// that means that we may wait up to 5 minutes before even starting
-	// creating a route for it. This is bad.
-	// We should have a watch on node and if we observe a new node (with CIDR?)
-	// trigger reconciliation for that node.
+	// trigger reconciliation periodically to match up routes with nodes
 	go wait.NonSlidingUntil(func() {
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			klog.Errorf("Couldn't reconcile node routes: %v", err)
