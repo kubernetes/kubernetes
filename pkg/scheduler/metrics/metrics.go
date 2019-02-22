@@ -28,7 +28,8 @@ const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
 	// SchedulingLatencyName - scheduler latency metric name
-	SchedulingLatencyName           = "scheduling_duration_seconds"
+	SchedulingLatencyName = "scheduling_duration_seconds"
+	// DeprecatedSchedulingLatencyName - scheduler latency metric name which is deprecated
 	DeprecatedSchedulingLatencyName = "scheduling_latency_seconds"
 
 	// OperationLabel - operation label name
