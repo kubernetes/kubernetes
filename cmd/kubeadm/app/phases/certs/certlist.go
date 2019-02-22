@@ -265,7 +265,7 @@ var (
 		CAName:   "ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}
@@ -341,7 +341,7 @@ var (
 		CAName:   "etcd-ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}
@@ -353,7 +353,7 @@ var (
 		CAName:   "etcd-ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}

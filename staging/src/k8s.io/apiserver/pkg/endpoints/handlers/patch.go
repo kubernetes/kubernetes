@@ -191,10 +191,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			subresource:     scope.Subresource,
 			dryRun:          dryrun.IsDryRun(options.DryRun),
 
+			objectInterfaces: &scope,
+
 			hubGroupVersion: scope.HubGroupVersion,
 
-			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
-			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, &scope), scope.Authorizer, createAuthorizerAttributes),
+			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, &scope),
 			admissionCheck:   mutatingAdmission,
 
 			codec: codec,
@@ -256,6 +258,8 @@ type patcher struct {
 	kind            schema.GroupVersionKind
 	subresource     string
 	dryRun          bool
+
+	objectInterfaces admission.ObjectInterfaces
 
 	hubGroupVersion schema.GroupVersion
 
@@ -507,7 +511,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 	}
 	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
 		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation)
-		return patchedObject, p.admissionCheck.Admit(attributes)
+		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
 	}
 	return patchedObject, nil
 }

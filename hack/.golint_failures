@@ -52,7 +52,6 @@ pkg/apis/events
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/extensions/validation
 pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
@@ -132,15 +131,12 @@ pkg/kubectl/cmd/attach
 pkg/kubectl/cmd/autoscale
 pkg/kubectl/cmd/certificates
 pkg/kubectl/cmd/clusterinfo
-pkg/kubectl/cmd/completion
 pkg/kubectl/cmd/convert
-pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/create
 pkg/kubectl/cmd/delete
 pkg/kubectl/cmd/describe
 pkg/kubectl/cmd/diff
 pkg/kubectl/cmd/drain
-pkg/kubectl/cmd/edit
 pkg/kubectl/cmd/exec
 pkg/kubectl/cmd/explain
 pkg/kubectl/cmd/expose
@@ -304,8 +300,6 @@ pkg/registry/core/service/storage
 pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
-pkg/registry/extensions/ingress
-pkg/registry/extensions/ingress/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
@@ -532,7 +526,6 @@ staging/src/k8s.io/apiserver/pkg/endpoints
 staging/src/k8s.io/apiserver/pkg/endpoints/discovery
 staging/src/k8s.io/apiserver/pkg/endpoints/filters
 staging/src/k8s.io/apiserver/pkg/endpoints/handlers
-staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation
 staging/src/k8s.io/apiserver/pkg/endpoints/metrics
 staging/src/k8s.io/apiserver/pkg/endpoints/openapi/testing
 staging/src/k8s.io/apiserver/pkg/endpoints/request
@@ -675,9 +668,6 @@ test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress
-test/e2e/framework/metrics
-test/e2e/framework/providers/aws
-test/e2e/framework/providers/azure
 test/e2e/framework/providers/gce
 test/e2e/framework/providers/kubemark
 test/e2e/instrumentation

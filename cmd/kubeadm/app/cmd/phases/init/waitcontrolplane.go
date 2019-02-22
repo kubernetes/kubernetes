@@ -126,7 +126,7 @@ func printFilesIfDryRunning(data waitControlPlaneData) error {
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
 	// Print static pod manifests
-	for _, component := range kubeadmconstants.MasterComponents {
+	for _, component := range kubeadmconstants.ControlPlaneComponents {
 		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
 		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))

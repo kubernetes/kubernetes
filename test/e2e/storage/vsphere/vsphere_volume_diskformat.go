@@ -106,7 +106,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	scParameters["diskformat"] = diskFormat
 
 	By("Creating Storage Class With DiskFormat")
-	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters)
+	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil)
 	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 	Expect(err).NotTo(HaveOccurred())
 

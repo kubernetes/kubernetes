@@ -17,7 +17,9 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
+	"regexp"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -32,6 +34,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -39,10 +42,10 @@ import (
 type TestSuite interface {
 	// getTestSuiteInfo returns the TestSuiteInfo for this TestSuite
 	getTestSuiteInfo() TestSuiteInfo
-	// skipUnsupportedTest skips the test if this TestSuite is not suitable to be tested with the combination of TestPattern and TestDriver
-	skipUnsupportedTest(testpatterns.TestPattern, TestDriver)
-	// execTest executes test of the testpattern for the driver
-	execTest(TestDriver, testpatterns.TestPattern)
+	// defineTest defines tests of the testpattern for the driver.
+	// Called inside a Ginkgo context that reflects the current driver and test pattern,
+	// so the test suite can define tests directly with ginkgo.It.
+	defineTests(TestDriver, testpatterns.TestPattern)
 }
 
 // TestSuiteInfo represents a set of parameters for TestSuite
@@ -54,11 +57,8 @@ type TestSuiteInfo struct {
 
 // TestResource represents an interface for resources that is used by TestSuite
 type TestResource interface {
-	// setupResource sets up test resources to be used for the tests with the
-	// combination of TestDriver and TestPattern
-	setupResource(TestDriver, testpatterns.TestPattern)
-	// cleanupResource clean up the test resources created in SetupResource
-	cleanupResource(TestDriver, testpatterns.TestPattern)
+	// cleanupResource cleans up the test resources created when setting up the resource
+	cleanupResource()
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
@@ -66,27 +66,34 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 	return fmt.Sprintf("[Testpattern: %s]%s %s%s", pattern.Name, pattern.FeatureTag, tsInfo.name, tsInfo.featureTag)
 }
 
-// RunTestSuite runs all testpatterns of all testSuites for a driver
-func RunTestSuite(f *framework.Framework, driver TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
+// DefineTestSuite defines tests for all testpatterns and all testSuites for a driver
+func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
-		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
-
-		for _, pattern := range patterns {
-			suite.execTest(driver, pattern)
+		for _, pattern := range suite.getTestSuiteInfo().testPatterns {
+			p := pattern
+			Context(getTestNameStr(suite, p), func() {
+				BeforeEach(func() {
+					// Skip unsupported tests to avoid unnecessary resource initialization
+					skipUnsupportedTest(driver, p)
+				})
+				suite.defineTests(driver, p)
+			})
 		}
 	}
 }
 
-// skipUnsupportedTest will skip tests if the combination of driver, testsuite, and testpattern
+// skipUnsupportedTest will skip tests if the combination of driver,  and testpattern
 // is not suitable to be tested.
 // Whether it needs to be skipped is checked by following steps:
 // 1. Check if Whether SnapshotType is supported by driver from its interface
 // 2. Check if Whether volType is supported by driver from its interface
 // 3. Check if fsType is supported
 // 4. Check with driver specific logic
-// 5. Check with testSuite specific logic
-func skipUnsupportedTest(suite TestSuite, driver TestDriver, pattern testpatterns.TestPattern) {
+//
+// Test suites can also skip tests inside their own defineTests function or in
+// individual tests.
+func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 
@@ -130,9 +137,6 @@ func skipUnsupportedTest(suite TestSuite, driver TestDriver, pattern testpattern
 
 	// 4. Check with driver specific logic
 	driver.SkipUnsupportedTest(pattern)
-
-	// 5. Check with testSuite specific logic
-	suite.skipUnsupportedTest(pattern, driver)
 }
 
 // genericVolumeTestResource is a generic implementation of TestResource that wil be able to
@@ -141,40 +145,45 @@ func skipUnsupportedTest(suite TestSuite, driver TestDriver, pattern testpattern
 // Also, see subpath.go in the same directory for how to extend and use it.
 type genericVolumeTestResource struct {
 	driver    TestDriver
+	config    *PerTestConfig
+	pattern   testpatterns.TestPattern
 	volType   string
 	volSource *v1.VolumeSource
 	pvc       *v1.PersistentVolumeClaim
 	pv        *v1.PersistentVolume
 	sc        *storagev1.StorageClass
 
-	driverTestResource interface{}
+	volume TestVolume
 }
 
 var _ TestResource = &genericVolumeTestResource{}
 
-// setupResource sets up genericVolumeTestResource
-func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	r.driver = driver
+func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, pattern testpatterns.TestPattern) *genericVolumeTestResource {
+	r := genericVolumeTestResource{
+		driver:  driver,
+		config:  config,
+		pattern: pattern,
+	}
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Config.Framework
+	f := config.Framework
 	cs := f.ClientSet
 	fsType := pattern.FsType
 	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.driverTestResource = CreateVolume(driver, volType)
+	r.volume = CreateVolume(driver, config, volType)
 
 	switch volType {
 	case testpatterns.InlineVolume:
 		framework.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.driverTestResource)
+			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.driverTestResource)
+			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
 			if pvSource != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false)
 			}
@@ -184,7 +193,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			claimSize := dDriver.GetClaimSize()
-			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
+			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
 			var err error
@@ -204,13 +213,14 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	if r.volSource == nil {
 		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, volType)
 	}
+
+	return &r
 }
 
 // cleanupResource cleans up genericVolumeTestResource
-func (r *genericVolumeTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	dInfo := driver.GetDriverInfo()
-	f := dInfo.Config.Framework
-	volType := pattern.VolType
+func (r *genericVolumeTestResource) cleanupResource() {
+	f := r.config.Framework
+	volType := r.pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
 		switch volType {
@@ -241,7 +251,9 @@ func (r *genericVolumeTestResource) cleanupResource(driver TestDriver, pattern t
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	DeleteVolume(driver, volType, r.driverTestResource)
+	if r.volume != nil {
+		r.volume.DeleteVolume()
+	}
 }
 
 func createVolumeSourceWithPVCPV(
@@ -354,7 +366,7 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 // the testsuites package whereas framework.VolumeTestConfig is merely
 // an implementation detail. It contains fields that have no effect,
 // which makes it unsuitable for use in the testsuits public API.
-func convertTestConfig(in *TestConfig) framework.VolumeTestConfig {
+func convertTestConfig(in *PerTestConfig) framework.VolumeTestConfig {
 	if in.ServerConfig != nil {
 		return *in.ServerConfig
 	}
@@ -387,4 +399,43 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 	}
 
 	return snapshot
+}
+
+// StartPodLogs begins capturing log output and events from current
+// and future pods running in the namespace of the framework. That
+// ends when the returned cleanup function is called.
+//
+// The output goes to log files (when using --report-dir, as in the
+// CI) or the output stream (otherwise).
+func StartPodLogs(f *framework.Framework) func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	cs := f.ClientSet
+	ns := f.Namespace
+
+	to := podlogs.LogOutput{
+		StatusWriter: GinkgoWriter,
+	}
+	if framework.TestContext.ReportDir == "" {
+		to.LogWriter = GinkgoWriter
+	} else {
+		test := CurrentGinkgoTestDescription()
+		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
+		// We end the prefix with a slash to ensure that all logs
+		// end up in a directory named after the current test.
+		//
+		// TODO: use a deeper directory hierarchy once gubernator
+		// supports that (https://github.com/kubernetes/test-infra/issues/10289).
+		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
+			reg.ReplaceAllString(test.FullTestText, "_") + "/"
+	}
+	podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
+
+	// pod events are something that the framework already collects itself
+	// after a failed test. Logging them live is only useful for interactive
+	// debugging, not when we collect reports.
+	if framework.TestContext.ReportDir == "" {
+		podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
+	}
+
+	return cancel
 }

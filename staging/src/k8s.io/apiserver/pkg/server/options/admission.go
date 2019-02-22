@@ -117,16 +117,10 @@ func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
 	kubeAPIServerClientConfig *rest.Config,
-	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	if a == nil {
 		return nil
-	}
-
-	// Admission need scheme to construct admission initializer.
-	if scheme == nil {
-		return fmt.Errorf("admission depends on a scheme, it cannot be nil")
 	}
 
 	// Admission depends on CoreAPI to set SharedInformerFactory and ClientConfig.
@@ -145,7 +139,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, scheme)
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)

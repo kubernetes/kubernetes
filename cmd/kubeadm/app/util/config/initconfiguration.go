@@ -85,16 +85,16 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 }
 
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
-func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, masterTaint bool) error {
+func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
 	var err error
 	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
 
-	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
-	if masterTaint && cfg.Taints == nil {
-		cfg.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	// Only if the slice is nil, we should append the control-plane taint. This allows the user to specify an empty slice for no default control-plane taint
+	if ControlPlaneTaint && cfg.Taints == nil {
+		cfg.Taints = []v1.Taint{kubeadmconstants.ControlPlaneTaint}
 	}
 
 	if cfg.CRISocket == "" {

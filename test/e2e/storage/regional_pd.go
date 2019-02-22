@@ -143,10 +143,11 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 	}
 
 	for _, test := range tests {
-		class := newStorageClass(test, ns, "" /* suffix */)
-		claim := newClaim(test, ns, "" /* suffix */)
-		claim.Spec.StorageClassName = &class.Name
-		testsuites.TestDynamicProvisioning(test, c, claim, class)
+		test.Client = c
+		test.Class = newStorageClass(test, ns, "" /* suffix */)
+		test.Claim = newClaim(test, ns, "" /* suffix */)
+		test.Claim.Spec.StorageClassName = &test.Class.Name
+		test.TestDynamicProvisioning()
 	}
 }
 
@@ -301,6 +302,7 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 
 func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
+		Client:      c,
 		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
@@ -312,14 +314,14 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 	}
 
 	suffix := "delayed-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Class = newStorageClass(test, ns, suffix)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
 		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &class.Name
+		claim.Spec.StorageClassName = &test.Class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
+	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -345,17 +347,20 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	}
 
 	suffix := "topo-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Client = c
+	test.Class = newStorageClass(test, ns, suffix)
 	zones := getTwoRandomZones(c)
-	addAllowedTopologiesToStorageClass(c, class, zones)
-	claim := newClaim(test, ns, suffix)
-	claim.Spec.StorageClassName = &class.Name
-	pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+	addAllowedTopologiesToStorageClass(c, test.Class, zones)
+	test.Claim = newClaim(test, ns, suffix)
+	test.Claim.Spec.StorageClassName = &test.Class.Name
+
+	pv := test.TestDynamicProvisioning()
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
 }
 
 func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
+		Client:      c,
 		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
@@ -367,16 +372,16 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	}
 
 	suffix := "topo-delayed-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Class = newStorageClass(test, ns, suffix)
 	topoZones := getTwoRandomZones(c)
-	addAllowedTopologiesToStorageClass(c, class, topoZones)
+	addAllowedTopologiesToStorageClass(c, test.Class, topoZones)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
 		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &class.Name
+		claim.Spec.StorageClassName = &test.Class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
+	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}

@@ -38,8 +38,6 @@ import (
 
 type planFlags struct {
 	*applyPlanFlags
-
-	newK8sVersionStr string
 }
 
 // NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
@@ -52,6 +50,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
 		Run: func(_ *cobra.Command, args []string) {
+			var userVersion string
 			var err error
 			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
@@ -65,15 +64,15 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
-					flags.newK8sVersionStr = cfg.KubernetesVersion
+					userVersion = cfg.KubernetesVersion
 				}
 			}
 			// If option was specified in both args and config file, args will overwrite the config file.
 			if len(args) == 1 {
-				flags.newK8sVersionStr = args[0]
+				userVersion = args[0]
 			}
 
-			err = runPlan(flags)
+			err = runPlan(flags, userVersion)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -84,11 +83,11 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flags *planFlags) error {
+func runPlan(flags *planFlags, userVersion string) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, flags.newK8sVersionStr)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
 	if err != nil {
 		return err
 	}

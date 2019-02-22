@@ -46,6 +46,8 @@ type ClusterInterrogator interface {
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
 	AddMember(name string, peerAddrs string) ([]Member, error)
+	GetMemberID(peerURL string) (uint64, error)
+	RemoveMember(id uint64) ([]Member, error)
 }
 
 // Client provides connection parameters for an etcd cluster
@@ -144,6 +146,62 @@ func (c *Client) Sync() error {
 type Member struct {
 	Name    string
 	PeerURL string
+}
+
+// GetMemberID returns the member ID of the given peer URL
+func (c Client) GetMemberID(peerURL string) (uint64, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 30 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer cli.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberList(ctx)
+	cancel()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, member := range resp.Members {
+		if member.GetPeerURLs()[0] == peerURL {
+			return member.GetID(), nil
+		}
+	}
+	return 0, nil
+}
+
+// RemoveMember notifies an etcd cluster to remove an existing member
+func (c Client) RemoveMember(id uint64) ([]Member, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 30 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// Remove an existing member from the cluster
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberRemove(ctx, id)
+	cancel()
+	if err != nil {
+		return nil, err
+	}
+
+	// Returns the updated list of etcd members
+	ret := []Member{}
+	for _, m := range resp.Members {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	}
+
+	return ret, nil
 }
 
 // AddMember notifies an existing etcd cluster that a new member is joining

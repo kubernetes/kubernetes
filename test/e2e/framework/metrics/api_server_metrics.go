@@ -16,26 +16,28 @@ limitations under the License.
 
 package metrics
 
-type ApiServerMetrics Metrics
+// APIServerMetrics is metrics for API server
+type APIServerMetrics Metrics
 
-func (m *ApiServerMetrics) Equal(o ApiServerMetrics) bool {
+// Equal returns true if all metrics are the same as the arguments.
+func (m *APIServerMetrics) Equal(o APIServerMetrics) bool {
 	return (*Metrics)(m).Equal(Metrics(o))
 }
 
-func NewApiServerMetrics() ApiServerMetrics {
+func newAPIServerMetrics() APIServerMetrics {
 	result := NewMetrics()
-	return ApiServerMetrics(result)
+	return APIServerMetrics(result)
 }
 
-func parseApiServerMetrics(data string) (ApiServerMetrics, error) {
-	result := NewApiServerMetrics()
+func parseAPIServerMetrics(data string) (APIServerMetrics, error) {
+	result := newAPIServerMetrics()
 	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
-		return ApiServerMetrics{}, err
+		return APIServerMetrics{}, err
 	}
 	return result, nil
 }
 
-func (g *MetricsGrabber) getMetricsFromApiServer() (string, error) {
+func (g *Grabber) getMetricsFromAPIServer() (string, error) {
 	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics").Do().Raw()
 	if err != nil {
 		return "", err

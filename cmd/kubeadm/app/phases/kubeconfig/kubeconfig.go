@@ -147,7 +147,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 			ClientName: "kubernetes-admin",
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
-				Organizations: []string{kubeadmconstants.MastersGroup},
+				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {

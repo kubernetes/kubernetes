@@ -90,7 +90,7 @@ func (a *podPresetPlugin) SetExternalKubeInformerFactory(f informers.SharedInfor
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (c *podPresetPlugin) Admit(a admission.Attributes) error {
+func (c *podPresetPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {

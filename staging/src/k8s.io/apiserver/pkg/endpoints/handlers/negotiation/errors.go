@@ -29,6 +29,7 @@ type errNotAcceptable struct {
 	accepted []string
 }
 
+// NewNotAcceptableError returns an error of NotAcceptable which contains specified string
 func NewNotAcceptableError(accepted []string) error {
 	return errNotAcceptable{accepted}
 }
@@ -51,6 +52,7 @@ type errUnsupportedMediaType struct {
 	accepted []string
 }
 
+// NewUnsupportedMediaTypeError returns an error of UnsupportedMediaType which contains specified string
 func NewUnsupportedMediaTypeError(accepted []string) error {
 	return errUnsupportedMediaType{accepted}
 }

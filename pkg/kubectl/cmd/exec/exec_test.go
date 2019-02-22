@@ -244,6 +244,10 @@ func TestExec(t *testing.T) {
 				t.Errorf("%s: Did not get expected path for exec request", test.name)
 				return
 			}
+			if strings.Count(ex.url.RawQuery, "container=bar") != 1 {
+				t.Errorf("%s: Did not get expected container query param for exec request", test.name)
+				return
+			}
 			if ex.method != "POST" {
 				t.Errorf("%s: Did not get method for exec request: %s", test.name, ex.method)
 			}

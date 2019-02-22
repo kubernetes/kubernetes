@@ -387,6 +387,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 			HostPort:      *pm.HostPort,
 			ContainerPort: *pm.ContainerPort,
 			Protocol:      proto,
+			HostIP:        pm.HostIP,
 		})
 	}
 	return portMappings, nil

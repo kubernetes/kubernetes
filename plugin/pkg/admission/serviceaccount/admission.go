@@ -148,7 +148,7 @@ func (a *serviceAccount) ValidateInitialization() error {
 	return nil
 }
 
-func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
+func (s *serviceAccount) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -159,7 +159,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(a)
+		return s.Validate(a, o)
 	}
 
 	// Set the default service account if needed
@@ -186,10 +186,10 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
-	return s.Validate(a)
+	return s.Validate(a, o)
 }
 
-func (s *serviceAccount) Validate(a admission.Attributes) (err error) {
+func (s *serviceAccount) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if shouldIgnore(a) {
 		return nil
 	}

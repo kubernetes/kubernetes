@@ -25,16 +25,11 @@ import (
 
 type ExtensionsInterface interface {
 	RESTClient() rest.Interface
-	IngressesGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
 type ExtensionsClient struct {
 	restClient rest.Interface
-}
-
-func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
-	return newIngresses(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.

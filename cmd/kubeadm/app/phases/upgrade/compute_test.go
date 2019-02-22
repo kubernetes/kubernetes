@@ -113,6 +113,14 @@ func (f fakeEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Mem
 	return []etcdutil.Member{}, nil
 }
 
+func (f fakeEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+	return 0, nil
+}
+
+func (f fakeEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 func TestGetAvailableUpgrades(t *testing.T) {
 	etcdClient := fakeEtcdClient{}
 	tests := []struct {

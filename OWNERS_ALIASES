@@ -125,13 +125,11 @@ aliases:
   sig-storage-reviewers:
     - saad-ali
     - childsb
+
   sig-scheduling-maintainers:
     - bsalamat
-    - davidopp
     - k82cn
-    - timothysc
     - wojtek-t
-    - aveshagarwal
     - ravisantoshgudimetla
   sig-scheduling:
     - bsalamat
@@ -141,6 +139,7 @@ aliases:
     - misterikkit
     - Huang-Wei
     - wgliang
+
   sig-cli-maintainers:
     - adohe
     - brendandburns

@@ -47,6 +47,8 @@ type PortMapping struct {
 	ContainerPort *int32 `json:"container_port,omitempty"`
 	// Port number on the host.
 	HostPort *int32 `json:"host_port,omitempty"`
+	// Host ip to expose.
+	HostIP string `json:"host_ip,omitempty"`
 }
 
 // CheckpointData contains all types of data that can be stored in the checkpoint.

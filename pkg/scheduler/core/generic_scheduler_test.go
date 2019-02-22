@@ -513,7 +513,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		emptyPluginSet,
 		nil, nil, nil, nil, false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateNodeNameToInfoMap(s.(*genericScheduler).cachedNodeInfoMap)
+	cache.UpdateNodeInfoSnapshot(&s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 
 }

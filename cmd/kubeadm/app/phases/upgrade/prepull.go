@@ -42,7 +42,7 @@ type Prepuller interface {
 	DeleteFunc(string) error
 }
 
-// DaemonSetPrepuller makes sure the control plane images are available on all masters
+// DaemonSetPrepuller makes sure the control-plane images are available on all masters
 type DaemonSetPrepuller struct {
 	client clientset.Interface
 	cfg    *kubeadmapi.ClusterConfiguration
@@ -181,7 +181,7 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 					NodeSelector: map[string]string{
 						constants.LabelNodeRoleMaster: "",
 					},
-					Tolerations:                   []v1.Toleration{constants.MasterToleration},
+					Tolerations:                   []v1.Toleration{constants.ControlPlaneToleration},
 					TerminationGracePeriodSeconds: &gracePeriodSecs,
 				},
 			},

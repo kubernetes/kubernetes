@@ -264,7 +264,11 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 
 		for _, host := range hosts {
 			var hostSystemMo mo.HostSystem
-			host.Properties(ctx, host.Reference(), []string{"datastore"}, &hostSystemMo)
+			err = host.Properties(ctx, host.Reference(), []string{"datastore"}, &hostSystemMo)
+			if err != nil {
+				klog.Errorf("Failed to get datastore property for host %s. err : %+v", host, err)
+				return nil, err
+			}
 
 			klog.V(4).Infof("Datastores mounted on host %s : %s", host, hostSystemMo.Datastore)
 			var dsRefList []types.ManagedObjectReference
@@ -278,7 +282,7 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 			err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
 			if err != nil {
 				klog.Errorf("Failed to get Datastore managed objects from datastore objects."+
-					" dsObjList: %+v, properties: %+v, err: %v", dsRefList, properties, err)
+					" dsObjList: %+v, properties: %+v, err: %+v", dsRefList, properties, err)
 				return nil, err
 			}
 			klog.V(9).Infof("Datastore mo details: %+v", dsMoList)
