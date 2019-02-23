@@ -14,16 +14,21 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "gcs_upload")
+load("//build:platforms.bzl", "for_platforms")
 
 filegroup(
     name = "_binary-artifacts-and-hashes",
-    srcs = [
-        "//build:client-targets-and-hashes",
-        "//build:docker-artifacts-and-hashes",
-        "//build:node-targets-and-hashes",
-        "//build:server-targets-and-hashes",
-        "//build/debs:debs-and-hashes",
-    ],
+    srcs = select(for_platforms(
+        for_client = ["//build:client-targets-and-hashes"],
+        for_node = [
+            "//build:node-targets-and-hashes",
+            "//build/debs:debs-and-hashes",
+        ],
+        for_server = [
+            "//build:docker-artifacts-and-hashes",
+            "//build:server-targets-and-hashes",
+        ],
+    )),
     visibility = ["//visibility:private"],
 )
 
@@ -35,11 +40,21 @@ gcs_upload(
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes",
     ],
     tags = ["manual"],
-    upload_paths = {
-        "//:_binary-artifacts-and-hashes": "bin/linux/amd64",
+    # Use for_platforms to format the upload path based on the configured
+    # platform (os/arch).
+    # For example, this will turn into something like
+    # upload_paths = select({
+    #    "@io_bazel_rules_go//go/platform:windows_386": {
+    #        ...,"//:binary-artifacts-and-hashes": "bin/windows/386"},
+    #    "@io_bazel_rules_go//go/platform:linux_ppc64le": {
+    #        ...,"//:binary-artifacts-and-hashes": "bin/linux/ppc64le"},
+    #})
+    # and bazel will select the correct entry.
+    upload_paths = select(for_platforms(for_all = {
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes": "extra/gce",
-    },
+        "//:_binary-artifacts-and-hashes": "bin/{OS}/{ARCH}",
+    })),
 )
 
 filegroup(
