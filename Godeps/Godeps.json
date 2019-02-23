@@ -2385,7 +2385,7 @@
 		},
 		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-middleware",
-			"Comment": "v1.0.0-8-gcfaf568",
+			"Comment": "v1.0.0-8-gcfaf5686ec79ff",
 			"Rev": "cfaf5686ec79ff8344257723b6f5ba1ae0ffeb4d"
 		},
 		{
@@ -3634,6 +3634,10 @@
 			"Rev": "a4630153038d3cb8c57f83d95200aea356145cf5"
 		},
 		{
+			"ImportPath": "golang.org/x/net/http/httpguts",
+			"Rev": "a4630153038d3cb8c57f83d95200aea356145cf5"
+		},
+		{
 			"ImportPath": "golang.org/x/net/http2",
 			"Rev": "a4630153038d3cb8c57f83d95200aea356145cf5"
 		},
@@ -4472,14 +4476,6 @@
 		{
 			"ImportPath": "vbom.ml/util/sortorder",
 			"Rev": "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
-		},
-		{
-			"ImportPath": "golang.org/x/net/http/httpguts",
-			"Rev": "a4630153038d3cb8c57f83d95200aea356145cf5"
-		},
-		{
-			"ImportPath": "golang.org/x/net/internal/socks",
-			"Rev": "a4630153038d3cb8c57f83d95200aea356145cf5"
 		}
 	]
 }
