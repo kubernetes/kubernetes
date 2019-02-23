@@ -19,7 +19,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     deps = [
-        "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
