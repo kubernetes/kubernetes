@@ -81,7 +81,6 @@
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
 ./hack/update-generated-runtime.sh
-./hack/update-generated-swagger-docs.sh
 ./hack/update-godep-licenses.sh
 ./hack/update-gofmt.sh
 ./hack/update-openapi-spec.sh
@@ -102,7 +101,6 @@
 ./hack/verify-generated-pod-resources.sh
 ./hack/verify-generated-protobuf.sh
 ./hack/verify-generated-runtime.sh
-./hack/verify-generated-swagger-docs.sh
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
