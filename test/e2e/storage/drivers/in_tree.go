@@ -45,7 +45,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1651,6 +1651,17 @@ func (l *localDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (l *localDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+}
+
+func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	// choose a randome node to test against
+	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	l.node = &nodes.Items[rand.Intn(len(nodes.Items))]
+
+	l.hostExec = utils.NewHostExec(f)
+	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
+
+	// This can't be done in SkipUnsupportedTest because the test framework is not initialized yet
 	if l.volumeType == utils.LocalVolumeGCELocalSSD {
 		ssdInterface := "scsi"
 		filesystemType := "fs"
@@ -1663,15 +1674,6 @@ func (l *localDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 			framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}
 	}
-}
-
-func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	// choose a randome node to test against
-	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	l.node = &nodes.Items[rand.Intn(len(nodes.Items))]
-
-	l.hostExec = utils.NewHostExec(f)
-	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
 
 	return &testsuites.PerTestConfig{
 			Driver:         l,
