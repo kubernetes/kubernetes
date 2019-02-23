@@ -135,7 +135,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}

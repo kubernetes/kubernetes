@@ -27,9 +27,9 @@ import (
 )
 
 func TestHandleGetAction(t *testing.T) {
-	masterName := "master-foo"
+	controlPlaneName := "control-plane-foo"
 	serviceSubnet := "10.96.0.1/12"
-	idr := NewInitDryRunGetter(masterName, serviceSubnet)
+	idr := NewInitDryRunGetter(controlPlaneName, serviceSubnet)
 
 	var tests = []struct {
 		name               string
@@ -47,9 +47,9 @@ func TestHandleGetAction(t *testing.T) {
 		},
 		{
 			name:               "get nodes",
-			action:             core.NewRootGetAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, masterName),
+			action:             core.NewRootGetAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, controlPlaneName),
 			expectedHandled:    true,
-			expectedObjectJSON: []byte(`{"metadata":{"name":"master-foo","creationTimestamp":null,"labels":{"kubernetes.io/hostname":"master-foo"}},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}`),
+			expectedObjectJSON: []byte(`{"metadata":{"name":"control-plane-foo","creationTimestamp":null,"labels":{"kubernetes.io/hostname":"control-plane-foo"}},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}`),
 			expectedErr:        false,
 		},
 		{
@@ -80,7 +80,7 @@ func TestHandleGetAction(t *testing.T) {
 			expectedObjectJSON: []byte(``),
 			expectedErr:        false,
 		},
-		{ // an ask for an other node than the master should not be answered
+		{ // an ask for an other node than the control-plane should not be answered
 			name:               "get other-node",
 			action:             core.NewRootGetAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "other-node"),
 			expectedHandled:    false,
