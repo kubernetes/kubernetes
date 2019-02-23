@@ -12,7 +12,6 @@
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
 ./cluster/gce/gci/mounter/stage-upload.sh
-./cluster/gce/gci/node-helper.sh
 ./cluster/gce/gci/shutdown.sh
 ./cluster/gce/list-resources.sh
 ./cluster/gce/upgrade-aliases.sh
@@ -34,7 +33,6 @@
 ./cluster/test-e2e.sh
 ./cluster/test-network.sh
 ./cluster/test-smoke.sh
-./cluster/update-storage-objects.sh
 ./cluster/validate-cluster.sh
 ./hack/cherry_pick_pull.sh
 ./hack/generate-bindata.sh
@@ -79,7 +77,6 @@
 ./hack/update-generated-kms-dockerized.sh
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
-./hack/update-generated-runtime.sh
 ./hack/update-godep-licenses.sh
 ./hack/update-gofmt.sh
 ./hack/update-openapi-spec.sh
