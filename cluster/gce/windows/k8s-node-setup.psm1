@@ -221,13 +221,6 @@ function Set-PrerequisiteOptions {
   sc.exe config wuauserv start=disabled
   sc.exe stop wuauserv
 
-  # Windows Defender periodically consumes 100% of the CPU.
-  # TODO(pjh): this (all of a sudden, ugh) started failing with "The term
-  # 'Set-MpPreference' is not recognized...". Investigate and fix or remove.
-  #Log-Output "Disabling Windows Defender service"
-  #Set-MpPreference -DisableRealtimeMonitoring $true
-  #Uninstall-WindowsFeature -Name 'Windows-Defender'
-
   # Use TLS 1.2: needed for Invoke-WebRequest downloads from github.com.
   [Net.ServicePointManager]::SecurityProtocol = `
       [Net.SecurityProtocolType]::Tls12
@@ -235,6 +228,24 @@ function Set-PrerequisiteOptions {
   # https://github.com/cloudbase/powershell-yaml
   Log-Output "Installing powershell-yaml module from external repo"
   Install-Module -Name powershell-yaml -Force
+}
+
+# Disables Windows Defender realtime scanning if this Windows node is part of a
+# test cluster.
+#
+# ${kube_env} must have already been set.
+function Disable-WindowsDefender {
+  # Windows Defender periodically consumes 100% of the CPU, so disable realtime
+  # scanning. Uninstalling the Windows Feature will prevent the service from
+  # starting after a reboot.
+  # TODO(pjh): move this step to image preparation, since we don't want to do a
+  # full reboot here.
+  if ((Test-IsTestCluster ${kube_env}) -and
+      ((Get-WindowsFeature -Name 'Windows-Defender').Installed)) {
+    Log-Output "Disabling Windows Defender service"
+    Set-MpPreference -DisableRealtimeMonitoring $true
+    Uninstall-WindowsFeature -Name 'Windows-Defender'
+  }
 }
 
 # Creates directories where other functions in this module will read and write
