@@ -487,17 +487,6 @@ func printJoinCommand(out io.Writer, adminKubeConfigPath, token, key string, ski
 	return initDoneTempl.Execute(out, ctx)
 }
 
-// getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
-// This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, dryRunDir string, defaultPkiDir string) (string, string, string, string, error) {
-	if dryRun {
-		// Use the same temp dir for all
-		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil
-	}
-
-	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
-}
-
 // showJoinCommand prints the join command after all the phases in init have finished
 func showJoinCommand(i *initData, out io.Writer) error {
 	adminKubeConfigPath := i.KubeConfigPath()
