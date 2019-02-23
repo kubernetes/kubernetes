@@ -113,9 +113,6 @@
 ./hack/verify-staging-meta-files.sh
 ./hack/verify-symbols.sh
 ./hack/verify-test-featuregates.sh
-./hack/verify-test-images.sh
-./hack/verify-test-owners.sh
-./hack/verify-typecheck.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
