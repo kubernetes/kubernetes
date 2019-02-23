@@ -152,8 +152,9 @@ pkg_tar(
     ],
 )
 
+# The mondo test tarball is deprecated.
 pkg_tar(
-    name = "_test-bin",
+    name = "_test-mondo-bin",
     srcs = ["//build:test-targets"],
     mode = "0755",
     package_dir = "platforms/" + PLATFORM_ARCH_STRING.replace("-", "/"),
@@ -162,9 +163,66 @@ pkg_tar(
     visibility = ["//visibility:private"],
 )
 
+genrule(
+    name = "kubernetes-test-mondo-deprecation",
+    outs = ["DEPRECATION_NOTICE"],
+    cmd = """cat <<EOF >$@
+The mondo test tarball containing binaries for all platforms is
+DEPRECATED as of Kubernetes 1.14.
+
+Users of this tarball should migrate to using the platform-specific
+tarballs in combination with the "portable" tarball which contains
+scripts, test images, and other manifests.
+
+For more details, please see KEP
+sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
+EOF
+""",
+    visibility = ["//visibility:private"],
+)
+
+# The mondo test tarball is deprecated.
+# This one was never really correct, anyway, since we can't include
+# binaries from multiple platforms in a single tarball.
 pkg_tar(
     name = "kubernetes-test",
+    srcs = [
+        ":kubernetes-test-mondo-deprecation",
+        "//build:test-portable-targets",
+    ],
+    extension = "tar.gz",
+    package_dir = "kubernetes",
+    remap_paths = {
+        "build/release-tars/DEPRECATION_NOTICE": "DEPRECATION_NOTICE",
+    },
+    strip_prefix = "//",
+    tags = ["no-cache"],
+    deps = [
+        # TODO: how to make this multiplatform?
+        ":_test-mondo-bin",
+    ],
+)
+
+pkg_tar(
+    name = "kubernetes-test-portable",
     srcs = ["//build:test-portable-targets"],
+    extension = "tar.gz",
+    package_dir = "kubernetes",
+    strip_prefix = "//",
+    tags = ["no-cache"],
+)
+
+pkg_tar(
+    name = "_test-bin",
+    srcs = ["//build:test-targets"],
+    mode = "0755",
+    package_dir = "test/bin",
+    tags = ["no-cache"],
+    visibility = ["//visibility:private"],
+)
+
+pkg_tar(
+    name = "kubernetes-test-%s" % PLATFORM_ARCH_STRING,
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
@@ -222,6 +280,8 @@ release_filegroup(
         ":kubernetes-server-%s.tar.gz" % PLATFORM_ARCH_STRING,
         ":kubernetes-manifests.tar.gz",
         ":kubernetes-src.tar.gz",
+        ":kubernetes-test-%s.tar.gz" % PLATFORM_ARCH_STRING,
         ":kubernetes-test.tar.gz",
+        ":kubernetes-test-portable.tar.gz",
     ],
 )

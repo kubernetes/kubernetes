@@ -150,11 +150,8 @@ function extract_arch_tarball() {
   platforms_dir="${KUBE_ROOT}/platforms/${platform}/${arch}"
   echo "Extracting ${tarfile} into ${platforms_dir}"
   mkdir -p "${platforms_dir}"
-  # Tarball looks like kubernetes/{client,server}/bin/BINARY"
+  # Tarball looks like kubernetes/{client,server,test}/bin/BINARY"
   tar -xzf "${tarfile}" --strip-components 3 -C "${platforms_dir}"
-  # Create convenience symlink
-  ln -sf "${platforms_dir}" "$(dirname "${tarfile}")/bin"
-  echo "Add '$(dirname "${tarfile}")/bin' to your PATH to use newly-installed binaries."
 }
 
 detect_kube_release
@@ -177,21 +174,8 @@ echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SE
 echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
 echo
 
-# TODO: remove this check and default to true when we stop shipping server
-# tarballs in kubernetes.tar.gz
-DOWNLOAD_SERVER_TAR=false
-if [[ ! -e "${KUBE_ROOT}/server/${SERVER_TAR}" ]]; then
-  DOWNLOAD_SERVER_TAR=true
-  echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
-
-# TODO: remove this check and default to true when we stop shipping kubectl
-# in kubernetes.tar.gz
-DOWNLOAD_CLIENT_TAR=false
-if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]; then
-  DOWNLOAD_CLIENT_TAR=true
-  echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
+echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
+echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 
 DOWNLOAD_NODE_TAR=false
 if [[ -n "${NODE_TAR:-}" ]]; then
@@ -199,18 +183,10 @@ if [[ -n "${NODE_TAR:-}" ]]; then
   echo "Will download and extract ${NODE_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
-TESTS_TAR="kubernetes-test.tar.gz"
 DOWNLOAD_TESTS_TAR=false
 if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
   DOWNLOAD_TESTS_TAR=true
-  echo "Will download and extract ${TESTS_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
-
-if [[ "${DOWNLOAD_CLIENT_TAR}" == false && \
-      "${DOWNLOAD_SERVER_TAR}" == false && \
-      "${DOWNLOAD_TESTS_TAR}" == false ]]; then
-  echo "Nothing additional to download."
-  exit 0
+  echo "Will download and extract kubernetes-test tarball(s) from ${DOWNLOAD_URL_PREFIX}"
 fi
 
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
@@ -222,22 +198,47 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   fi
 fi
 
-if "${DOWNLOAD_SERVER_TAR}"; then
-  download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
-fi
+download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
 
 if "${DOWNLOAD_NODE_TAR}"; then
   download_tarball "${KUBE_ROOT}/node" "${NODE_TAR}"
 fi
 
-if "${DOWNLOAD_CLIENT_TAR}"; then
-  download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
-  extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
-fi
+download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
+extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+ln -s "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}" "${KUBE_ROOT}/client/bin"
+echo "Add '${KUBE_ROOT}/client/bin' to your PATH to use newly-installed binaries."
 
 if "${DOWNLOAD_TESTS_TAR}"; then
-  download_tarball "${KUBE_ROOT}/test" "${TESTS_TAR}"
-  echo "Extracting ${TESTS_TAR} into ${KUBE_ROOT}"
-  # Strip leading "kubernetes/"
-  tar -xzf "${KUBE_ROOT}/test/${TESTS_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+  TESTS_PORTABLE_TAR="kubernetes-test-portable.tar.gz"
+  download_tarball "${KUBE_ROOT}/test" "${TESTS_PORTABLE_TAR}" || true
+  if [[ -f "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" ]]; then
+    echo "Extracting ${TESTS_PORTABLE_TAR} into ${KUBE_ROOT}"
+    # Strip leading "kubernetes/"
+    tar -xzf "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+
+    # Next, download platform-specific test tarballs for all relevant platforms
+    TEST_PLATFORM_TUPLES=(
+      "${CLIENT_PLATFORM}/${CLIENT_ARCH}"
+      "${SERVER_PLATFORM}/${SERVER_ARCH}"
+      )
+    if [[ -n "${NODE_PLATFORM:-}" && -n "${NODE_ARCH:-}" ]]; then
+      TEST_PLATFORM_TUPLES+=("${NODE_PLATFORM}/${NODE_ARCH}")
+    fi
+    # Loop over only the unique tuples
+    for TUPLE in $(printf "%s\n" "${TEST_PLATFORM_TUPLES[@]}" | sort -u); do
+        OS=$(echo "${TUPLE}" | cut -d/ -f1)
+        ARCH=$(echo "${TUPLE}" | cut -d/ -f2)
+        TEST_PLATFORM_TAR="kubernetes-test-${OS}-${ARCH}.tar.gz"
+        download_tarball "${KUBE_ROOT}/test" "${TEST_PLATFORM_TAR}"
+        extract_arch_tarball "${KUBE_ROOT}/test/${TEST_PLATFORM_TAR}" "${OS}" "${ARCH}"
+    done
+  else
+    echo "Failed to download portable test tarball, falling back to mondo test tarball."
+    TESTS_MONDO_TAR="kubernetes-test.tar.gz"
+    download_tarball "${KUBE_ROOT}/test" "${TESTS_MONDO_TAR}"
+    echo "Extracting ${TESTS_MONDO_TAR} into ${KUBE_ROOT}"
+    # Strip leading "kubernetes/"
+    tar -xzf "${KUBE_ROOT}/test/${TESTS_MONDO_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+  fi
 fi
