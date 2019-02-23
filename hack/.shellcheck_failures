@@ -21,9 +21,6 @@
 ./cluster/images/conformance/run_e2e.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
-./cluster/kube-up.sh
-./cluster/kube-util.sh
-./cluster/kubectl.sh
 ./cluster/kubemark/gce/config-default.sh
 ./cluster/kubemark/iks/config-default.sh
 ./cluster/kubemark/util.sh

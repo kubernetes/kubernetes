@@ -24,7 +24,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
@@ -84,6 +84,7 @@ elif [[ "${validate_result}" == "2" ]]; then
 fi
 
 if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
+  # shellcheck disable=SC1091
   . /tmp/kube-proxy-env
   echo ""
   echo "*** Please run the following to add the kube-apiserver endpoint to your proxy white-list ***"
