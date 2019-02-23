@@ -21,32 +21,38 @@ release_filegroup(
     name = "debs",
     conditioned_srcs = for_platforms(
         default = [],
-        for_client = [":kubectl-{ARCH}.deb"],
+        for_client = [":kubectl.deb"],
         for_node = [
-            ":cri-tools-{ARCH}.deb",
-            ":kubeadm-{ARCH}.deb",
-            ":kubelet-{ARCH}.deb",
-            ":kubernetes-cni-{ARCH}.deb",
+            ":cri-tools.deb",
+            ":kubeadm.deb",
+            ":kubelet.deb",
+            ":kubernetes-cni.deb",
         ],
         only_os = "linux",
     ),
 )
 
-# Create aliases from the non-arch names to the arch-specific names for backwards compatibility
-alias(
+# Create genrules to copy the arch-specific debs to debs without the arch in their filename.
+genrule(
     name = "kubectl",
-    actual = select(for_platforms(
-        for_client = ":kubectl-{ARCH}",
+    srcs = select(for_platforms(
+        for_client = [":kubectl-{ARCH}.deb"],
         only_os = "linux",
     )),
+    outs = ["kubectl.deb"],
+    cmd = "cp $< $@",
+    output_to_bindir = True,
 )
 
-[alias(
+[genrule(
     name = pkg,
-    actual = select(for_platforms(
-        for_node = ":%s-{ARCH}" % pkg,
+    srcs = select(for_platforms(
+        for_node = [":%s-{ARCH}.deb" % pkg],
         only_os = "linux",
     )),
+    outs = ["%s.deb" % pkg],
+    cmd = "cp $< $@",
+    output_to_bindir = True,
 ) for pkg in [
     "cri-tools",
     "kubeadm",
