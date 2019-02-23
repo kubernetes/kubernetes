@@ -650,7 +650,7 @@ filename | sha256 hash
 
 * Fix creation of custom resources when the CRD contains non-conventional pluralization and subresources ([#66249](https://github.com/kubernetes/kubernetes/pull/66249), [@deads2k](https://github.com/deads2k))
 * Bump up version number of debian-base, debian-hyperkube-base and debian-iptables.  ([#67026](https://github.com/kubernetes/kubernetes/pull/67026), [@satyasm](https://github.com/satyasm))
-    * Also updates dependencies of users of debian-base. 
+    * Also updates dependencies of users of debian-base.
     * debian-base version 0.3.1 is already available.
 * Fix an issue that pods using hostNetwork keep increasing. ([#67456](https://github.com/kubernetes/kubernetes/pull/67456), [@Huang-Wei](https://github.com/Huang-Wei))
 * Allows extension API server to dynamically discover the requestheader CA certificate when the core API server doesn't use certificate based authentication for it's clients ([#66394](https://github.com/kubernetes/kubernetes/pull/66394), [@rtripat](https://github.com/rtripat))
@@ -1223,7 +1223,7 @@ filename | sha256 hash
 
 ### Node
 
-Many of the changes within SIG-Node revolve around control. With the beta release of the `kubelet.config.k8s.io` API group, a significant subset of Kubelet configuration can now be [configured via a versioned config file](https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/). Kubernetes v1.10 adds alpha support for the ability to [configure whether containers in a pod should share a single process namespace](https://github.com/kubernetes/enhancements/issues/495), and the CRI has been upgraded to v1alpha2, which adds [support for Windows Container Configuration](https://github.com/kubernetes/enhancements/issues/547). Kubernetes v1.10 also ships with the beta release of the [CRI validation test suite](https://github.com/kubernetes/enhancements/issues/292). 
+Many of the changes within SIG-Node revolve around control. With the beta release of the `kubelet.config.k8s.io` API group, a significant subset of Kubelet configuration can now be [configured via a versioned config file](https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/). Kubernetes v1.10 adds alpha support for the ability to [configure whether containers in a pod should share a single process namespace](https://github.com/kubernetes/enhancements/issues/495), and the CRI has been upgraded to v1alpha2, which adds [support for Windows Container Configuration](https://github.com/kubernetes/enhancements/issues/547). Kubernetes v1.10 also ships with the beta release of the [CRI validation test suite](https://github.com/kubernetes/enhancements/issues/292).
 
 The Resource Management Working Group graduated three features to beta in the 1.10 release.  First, [CPU Manager](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/), which allows users to request exclusive CPU cores.  This helps performance in a variety of use-cases, including network latency sensitive applications, as well as applications that benefit from CPU cache residency.  Next, [Huge Pages](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/), which allows pods to consume either 2Mi or 1Gi Huge Pages.  This benefits applications that consume large amounts of memory.  Use of Huge Pages is a common tuning recommendation for databases and JVMs.  Finally, the [Device Plugin](https://kubernetes.io/docs/concepts/cluster-administration/device-plugins/) feature, which provides a framework for vendors to advertise their resources to the Kubelet without changing Kubernetes core code.  Targeted devices include GPUs, High-performance NICs, FPGAs, InfiniBand, and other similar computing resources that may require vendor specific initialization and setup.
 
@@ -1231,7 +1231,7 @@ The Resource Management Working Group graduated three features to beta in the 1.
 
 This release brings additional power to both local storage and Persistent Volumes. [Mount namespace propagation](https://github.com/kubernetes/enhancements/issues/432) allows a container to mount a volume as rslave so that host mounts can be seen inside the container, or as rshared so that mounts made inside a container can be seen by the host. (Note that this is [not supported on Windows](https://github.com/kubernetes/kubernetes/pull/60275).) [Local Ephemeral Storage Capacity Isolation](https://github.com/kubernetes/enhancements/issues/361) makes it possible to set requests and limits on ephemeral local storage resources. In addition, you can now create [Local Persistent Storage](https://github.com/kubernetes/enhancements/issues/121), which enables PersistentVolumes to be created with locally attached disks, and not just network volumes.
 
-On the Persistent Volumes side, this release [Prevents deletion of Persistent Volume Claims that are used by a pod](https://github.com/kubernetes/enhancements/issues/498) and [Persistent Volumes that are bound to a Persistent Volume Claim](https://github.com/kubernetes/enhancements/issues/499), making it impossible to delete storage that is in use by a pod. 
+On the Persistent Volumes side, this release [Prevents deletion of Persistent Volume Claims that are used by a pod](https://github.com/kubernetes/enhancements/issues/498) and [Persistent Volumes that are bound to a Persistent Volume Claim](https://github.com/kubernetes/enhancements/issues/499), making it impossible to delete storage that is in use by a pod.
 
 This release also includes [Topology Aware Volume Scheduling](https://github.com/kubernetes/enhancements/issues/490) for local persistent volumes, the stable release of [Detailed storage metrics of internal state](https://github.com/kubernetes/enhancements/issues/496), and beta support for [Out-of-tree CSI Volume Plugins](https://github.com/kubernetes/enhancements/issues/178).
 
@@ -1261,7 +1261,7 @@ This release includes a change to [kubectl get and describe to work better with 
 
 ### Network
 
-In terms of networking, Kubernetes 1.10 is about control. Users now have beta support for the ability to [configure a pod's resolv.conf](https://github.com/kubernetes/enhancements/issues/504), rather than relying on the cluster DNS, as well as [configuring the NodePort IP address](https://github.com/kubernetes/enhancements/issues/539). You can also  [switch the default DNS plugin to CoreDNS](https://github.com/kubernetes/enhancements/issues/427) (beta). 
+In terms of networking, Kubernetes 1.10 is about control. Users now have beta support for the ability to [configure a pod's resolv.conf](https://github.com/kubernetes/enhancements/issues/504), rather than relying on the cluster DNS, as well as [configuring the NodePort IP address](https://github.com/kubernetes/enhancements/issues/539). You can also  [switch the default DNS plugin to CoreDNS](https://github.com/kubernetes/enhancements/issues/427) (beta).
 
 ## Before Upgrading
 
@@ -1433,7 +1433,7 @@ If no featureGates was specified in `kubeadm-config`, just change `featureGates:
 
 * rktnetes has been deprecated in favor of rktlet. Please see [https://github.com/kubernetes-incubator/rktlet](https://github.com/kubernetes-incubator/rktlet) for more information. ([#58418](https://github.com/kubernetes/kubernetes/pull/58418), [@yujuhong](https://github.com/yujuhong))
 
-* The Kubelet now explicitly registers all of its command-line flags with an internal flagset, which prevents flags from third party libraries from unintentionally leaking into the Kubelet's command-line API. Many unintentionally leaked flags are now marked deprecated, so that users have a chance to migrate away from them before they are removed. In addition, one previously leaked flag, --cloud-provider-gce-lb-src-cidrs, has been entirely removed from the Kubelet's command-line API, because it is irrelevant to Kubelet operation. The deprecated flags are: 
+* The Kubelet now explicitly registers all of its command-line flags with an internal flagset, which prevents flags from third party libraries from unintentionally leaking into the Kubelet's command-line API. Many unintentionally leaked flags are now marked deprecated, so that users have a chance to migrate away from them before they are removed. In addition, one previously leaked flag, --cloud-provider-gce-lb-src-cidrs, has been entirely removed from the Kubelet's command-line API, because it is irrelevant to Kubelet operation. The deprecated flags are:
 
     * --application_metrics_count_limit
     * --boot_id_file
@@ -1474,17 +1474,17 @@ If no featureGates was specified in `kubeadm-config`, just change `featureGates:
   </tr>
   <tr>
     <td>GET /swagger.json</td>
-    <td>GET /openapi/v2 
+    <td>GET /openapi/v2
 Accept: application/json</td>
   </tr>
   <tr>
     <td>GET /swagger-2.0.0.pb-v1</td>
-    <td>GET /openapi/v2 
+    <td>GET /openapi/v2
 Accept: application/com.github.proto-openapi.spec.v2@v1.0+protobuf</td>
   </tr>
   <tr>
     <td>GET /swagger-2.0.0.pb-v1.gz</td>
-    <td>GET /openapi/v2 
+    <td>GET /openapi/v2
 Accept: application/com.github.proto-openapi.spec.v2@v1.0+protobuf Accept-Encoding: gzip</td>
   </tr>
 </table>
@@ -1598,7 +1598,7 @@ kubernetesVersion: v1.9.1
 noTaintMaster: true
 ```
 
-And point to the file using the --config flag, as in 
+And point to the file using the --config flag, as in
 
 `kubeadm init --config /etc/kubeadm/kubeadm.yaml`
 
@@ -2238,13 +2238,13 @@ parameters:
 * Updates kube-dns to v1.14.8 ([#57918](https://github.com/kubernetes/kubernetes/pull/57918), [@rramkumar1](https://github.com/rramkumar1))
 * Influxdb is unchanged from v1.9: v1.3.3 ([#53319](https://github.com/kubernetes/kubernetes/pull/53319))
 * Grafana is unchanged from v1.9: v4.4.3 ([#53319](https://github.com/kubernetes/kubernetes/pull/53319))
-* CAdvisor is v0.29.1 ([#60867](https://github.com/kubernetes/kubernetes/pull/60867)) 
-* fluentd-gcp-scaler is v0.3.0 ([#61269](https://github.com/kubernetes/kubernetes/pull/61269)) 
+* CAdvisor is v0.29.1 ([#60867](https://github.com/kubernetes/kubernetes/pull/60867))
+* fluentd-gcp-scaler is v0.3.0 ([#61269](https://github.com/kubernetes/kubernetes/pull/61269))
 * Updated fluentd in fluentd-es-image to fluentd v1.1.0 ([#58525](https://github.com/kubernetes/kubernetes/pull/58525), [@monotek](https://github.com/monotek))
-* fluentd-elasticsearch is v2.0.4 ([#58525](https://github.com/kubernetes/kubernetes/pull/58525)) 
+* fluentd-elasticsearch is v2.0.4 ([#58525](https://github.com/kubernetes/kubernetes/pull/58525))
 * Updated fluentd-gcp to v3.0.0. ([#60722](https://github.com/kubernetes/kubernetes/pull/60722))
-* Ingress glbc is v1.0.0 ([#61302](https://github.com/kubernetes/kubernetes/pull/61302)) 
-* OIDC authentication is coreos/go-oidc v2 ([#58544](https://github.com/kubernetes/kubernetes/pull/58544)) 
+* Ingress glbc is v1.0.0 ([#61302](https://github.com/kubernetes/kubernetes/pull/61302))
+* OIDC authentication is coreos/go-oidc v2 ([#58544](https://github.com/kubernetes/kubernetes/pull/58544))
 * Updated fluentd-gcp updated to v2.0.11. ([#56927](https://github.com/kubernetes/kubernetes/pull/56927), [@x13n](https://github.com/x13n))
 * Calico has been updated to v2.6.7 ([#59130](https://github.com/kubernetes/kubernetes/pull/59130), [@caseydavenport](https://github.com/caseydavenport))
 
@@ -2306,8 +2306,8 @@ filename | sha256 hash
 * Fix bug allowing garbage collector to enter a broken state that could only be fixed by restarting the controller-manager. ([#61201](https://github.com/kubernetes/kubernetes/pull/61201), [@jennybuckley](https://github.com/jennybuckley))
 * When `TaintNodesByCondition` enabled, added `node.kubernetes.io/unschedulable:NoSchedule` ([#61161](https://github.com/kubernetes/kubernetes/pull/61161), [@k82cn](https://github.com/k82cn))
     *  taint to the node if `spec.Unschedulable` is true.
-    * When `ScheduleDaemonSetPods` enabled, `node.kubernetes.io/unschedulable:NoSchedule` 
-    * toleration is added automatically to DaemonSet Pods; so the `unschedulable` field of 
+    * When `ScheduleDaemonSetPods` enabled, `node.kubernetes.io/unschedulable:NoSchedule`
+    * toleration is added automatically to DaemonSet Pods; so the `unschedulable` field of
     * a node is not respected by the DaemonSet controller.
 * Fixed kube-proxy to work correctly with iptables 1.6.2 and later. ([#60978](https://github.com/kubernetes/kubernetes/pull/60978), [@danwinship](https://github.com/danwinship))
 * Audit logging with buffering enabled can increase apiserver memory usage (e.g. up to 200MB in 100-node cluster). The increase is bounded by the buffer size (configurable). Ref: issue [#60500](https://github.com/kubernetes/kubernetes/pull/60500) ([#61118](https://github.com/kubernetes/kubernetes/pull/61118), [@shyamjvs](https://github.com/shyamjvs))

@@ -13,7 +13,7 @@ Resource Consumer starts an HTTP server and handle sent requests.
 It listens on port given as a flag (default 8080).
 Action of consuming resources is send to the container by a POST http request.
 Each http request creates new process.
-Http request handler is in file resource_consumer_handler.go 
+Http request handler is in file resource_consumer_handler.go
 
 The container consumes specified amount of resources:
 

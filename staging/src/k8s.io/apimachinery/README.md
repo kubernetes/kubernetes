@@ -5,7 +5,7 @@ Scheme, typing, encoding, decoding, and conversion packages for Kubernetes and K
 
 ## Purpose
 
-This library is a shared dependency for servers and clients to work with Kubernetes API infrastructure without direct 
+This library is a shared dependency for servers and clients to work with Kubernetes API infrastructure without direct
 type dependencies.  Its first consumers are `k8s.io/kubernetes`, `k8s.io/client-go`, and `k8s.io/apiserver`.
 
 

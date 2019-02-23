@@ -61,7 +61,7 @@ var (
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects.
 
 		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
-		
+
 		Existing roles are updated to include the permissions in the input objects,
 		and remove extra permissions if --remove-extra-permissions is specified.
 

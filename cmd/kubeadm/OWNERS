@@ -18,6 +18,6 @@ reviewers:
 - rosti
 - yagonobre
 # Might want to add @xiangpengzhao and @stealthybox back in the future
-labels: 
+labels:
 - area/kubeadm
 - sig/cluster-lifecycle

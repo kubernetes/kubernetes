@@ -77,7 +77,7 @@ var (
 	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
-		trust the Kubernetes Control Plane) and TLS bootstrap (having the 
+		trust the Kubernetes Control Plane) and TLS bootstrap (having the
 		Kubernetes Control Plane trust the Node).
 
 		There are 2 main schemes for discovery. The first is to use a shared
@@ -93,7 +93,7 @@ var (
 
 		If you use a shared token for discovery, you should also pass the
 		--discovery-token-ca-cert-hash flag to validate the public key of the
-		root certificate authority (CA) presented by the Kubernetes Control Plane. 
+		root certificate authority (CA) presented by the Kubernetes Control Plane.
 		The value of this flag is specified as "<hash-type>:<hex-encoded-value>",
 		where the supported hash type is "sha256". The hash is calculated over
 		the bytes of the Subject Public Key Info (SPKI) object (as in RFC7469).

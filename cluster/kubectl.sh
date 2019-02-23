@@ -23,7 +23,7 @@ set -o pipefail
 # echo "NOTE:"
 # echo "kubectl.sh is deprecated and will be removed soon."
 # echo "please replace all usage with calls to the kubectl"
-# echo "binary and ensure that it is in your PATH." 
+# echo "binary and ensure that it is in your PATH."
 # echo ""
 # echo "Please see 'kubectl help config' for more details"
 # echo "about configuring kubectl for your cluster."

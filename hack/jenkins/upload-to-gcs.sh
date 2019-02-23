@@ -106,7 +106,7 @@ function set_kubernetes_base_path () {
 function find_version() {
   (
   # Where are we?
-  # This could be set in the global scope at some point if we need to 
+  # This could be set in the global scope at some point if we need to
   # discover the kubernetes path elsewhere.
   set_kubernetes_base_path
 
