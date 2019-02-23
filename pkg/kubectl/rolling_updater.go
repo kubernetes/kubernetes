@@ -38,12 +38,8 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 	"k8s.io/utils/integer"
+	utilpointer "k8s.io/utils/pointer"
 )
-
-func newInt32Ptr(val int) *int32 {
-	ret := int32(val)
-	return &ret
-}
 
 func valOrZero(val *int32) int32 {
 	if val == nil {
@@ -393,12 +389,12 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *corev1.ReplicationController, d
 	nextOldVal := valOrZero(oldRc.Spec.Replicas) - decrement
 	oldRc.Spec.Replicas = &nextOldVal
 	if valOrZero(oldRc.Spec.Replicas) < 0 {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// If the new is already fully scaled and available up to the desired size, go
 	// ahead and scale old all the way down.
 	if valOrZero(newRc.Spec.Replicas) == desired && newAvailable == desired {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// Perform the scale-down.
 	fmt.Fprintf(config.Out, "Scaling %s down to %d\n", oldRc.Name, valOrZero(oldRc.Spec.Replicas))
@@ -482,7 +478,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 		}
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", valOrZero(controller.Spec.Replicas))
 		controller.Annotations[sourceIDAnnotation] = sourceID
-		controller.Spec.Replicas = newInt32Ptr(0)
+		controller.Spec.Replicas = utilpointer.Int32Ptr(0)
 		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(controller)
 		return newRc, false, err
 	}

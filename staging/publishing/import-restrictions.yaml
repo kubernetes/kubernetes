@@ -28,6 +28,7 @@
   - k8s.io/cli-runtime/pkg/printers
   - k8s.io/cli-runtime/pkg/resource
   - k8s.io/cli-runtime/pkg/kustomize
+  - k8s.io/utils/pointer
 
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:

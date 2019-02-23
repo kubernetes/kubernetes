@@ -50,6 +50,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -1251,7 +1252,7 @@ func TestForceApply(t *testing.T) {
 						var bodyRC io.ReadCloser
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
-							rcObj.Spec.Replicas = cmdtesting.Int32ptr(0)
+							rcObj.Spec.Replicas = utilpointer.Int32Ptr(0)
 							rcBytes, err := runtime.Encode(codec, rcObj)
 							if err != nil {
 								t.Fatal(err)
