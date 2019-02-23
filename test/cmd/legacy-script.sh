@@ -386,8 +386,8 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
-  cleanup(){
-     kube::test::clear_all
+  cleanup_tests(){
+    kube::test::clear_all
     if [[ -n "${foundError}" ]]; then
       echo "FAILED TESTS: ""${foundError}"
       exit 1
@@ -399,7 +399,7 @@ runTests() {
     do 
       record_command run_${pkg}_tests
     done
-    cleanup
+    cleanup_tests
     return
   fi
 
@@ -866,5 +866,5 @@ runTests() {
 
   record_command run_wait_tests
 
-  cleanup
+  cleanup_tests
 }
