@@ -40,6 +40,7 @@ source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
+source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/old-print.sh"
@@ -383,6 +384,23 @@ runTests() {
     kubectl create "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml || true
     # Require the service to exist (either we created it or the API server did)
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
+  fi
+
+  cleanup_tests(){
+    kube::test::clear_all
+    if [[ -n "${foundError}" ]]; then
+      echo "FAILED TESTS: ""${foundError}"
+      exit 1
+    fi
+  }
+
+   if [[ -n "${WHAT-}" ]]; then
+    for pkg in ${WHAT}
+    do 
+      record_command run_${pkg}_tests
+    done
+    cleanup_tests
+    return
   fi
 
   #########################
@@ -836,6 +854,7 @@ runTests() {
 
   record_command run_plugins_tests
 
+
   #################
   # Impersonation #
   #################
@@ -847,10 +866,5 @@ runTests() {
 
   record_command run_wait_tests
 
-  kube::test::clear_all
-
-  if [[ -n "${foundError}" ]]; then
-    echo "FAILED TESTS: ""${foundError}"
-    exit 1
-  fi
+  cleanup_tests
 }

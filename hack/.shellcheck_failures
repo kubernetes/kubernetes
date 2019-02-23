@@ -68,7 +68,6 @@
 ./hack/make-rules/test-cmd.sh
 ./hack/make-rules/test-e2e-node.sh
 ./hack/make-rules/test-integration.sh
-./hack/make-rules/test-kubeadm-cmd.sh
 ./hack/make-rules/test.sh
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
