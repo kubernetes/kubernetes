@@ -106,11 +106,11 @@ create_node
 SUPPORTED_RESOURCES=("*")
 
 
-if [ -z "${ITERATIONS:-}" ]; then
+if [ -z "${ITERATION:-}" ]; then
   ITERATIONS=1
 fi
 
-for i in $(seq 1 $ITERATIONS); do
+for i in $(seq 1 $ITERATION); do
   echo "Test Iteration $i"
   # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
   # Doing so will suppress errexit behavior inside runTests
