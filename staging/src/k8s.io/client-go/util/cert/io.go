@@ -17,11 +17,7 @@ limitations under the License.
 package cert
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/rsa"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -73,60 +69,6 @@ func WriteCert(certPath string, data []byte) error {
 	return ioutil.WriteFile(certPath, data, os.FileMode(0644))
 }
 
-// WriteKey writes the pem-encoded key data to keyPath.
-// The key file will be created with file mode 0600.
-// If the key file already exists, it will be overwritten.
-// The parent directory of the keyPath will be created as needed with file mode 0755.
-func WriteKey(keyPath string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
-		return err
-	}
-	return ioutil.WriteFile(keyPath, data, os.FileMode(0600))
-}
-
-// LoadOrGenerateKeyFile looks for a key in the file at the given path. If it
-// can't find one, it will generate a new key and store it there.
-func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err error) {
-	loadedData, err := ioutil.ReadFile(keyPath)
-	// Call verifyKeyData to ensure the file wasn't empty/corrupt.
-	if err == nil && verifyKeyData(loadedData) {
-		return loadedData, false, err
-	}
-	if !os.IsNotExist(err) {
-		return nil, false, fmt.Errorf("error loading key from %s: %v", keyPath, err)
-	}
-
-	generatedData, err := MakeEllipticPrivateKeyPEM()
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating key: %v", err)
-	}
-	if err := WriteKey(keyPath, generatedData); err != nil {
-		return nil, false, fmt.Errorf("error writing key to %s: %v", keyPath, err)
-	}
-	return generatedData, true, nil
-}
-
-// MarshalPrivateKeyToPEM converts a known private key type of RSA or ECDSA to
-// a PEM encoded block or returns an error.
-func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
-	switch t := privateKey.(type) {
-	case *ecdsa.PrivateKey:
-		derBytes, err := x509.MarshalECPrivateKey(t)
-		if err != nil {
-			return nil, err
-		}
-		privateKeyPemBlock := &pem.Block{
-			Type:  ECPrivateKeyBlockType,
-			Bytes: derBytes,
-		}
-		return pem.EncodeToMemory(privateKeyPemBlock), nil
-	case *rsa.PrivateKey:
-		return EncodePrivateKeyPEM(t), nil
-	default:
-		return nil, fmt.Errorf("private key is not a recognized type: %T", privateKey)
-	}
-}
-
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func NewPool(filename string) (*x509.CertPool, error) {
@@ -153,41 +95,4 @@ func CertsFromFile(file string) ([]*x509.Certificate, error) {
 		return nil, fmt.Errorf("error reading %s: %s", file, err)
 	}
 	return certs, nil
-}
-
-// PrivateKeyFromFile returns the private key in rsa.PrivateKey or ecdsa.PrivateKey format from a given PEM-encoded file.
-// Returns an error if the file could not be read or if the private key could not be parsed.
-func PrivateKeyFromFile(file string) (interface{}, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	key, err := ParsePrivateKeyPEM(data)
-	if err != nil {
-		return nil, fmt.Errorf("error reading private key file %s: %v", file, err)
-	}
-	return key, nil
-}
-
-// PublicKeysFromFile returns the public keys in rsa.PublicKey or ecdsa.PublicKey format from a given PEM-encoded file.
-// Reads public keys from both public and private key files.
-func PublicKeysFromFile(file string) ([]interface{}, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	keys, err := ParsePublicKeysPEM(data)
-	if err != nil {
-		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
-	}
-	return keys, nil
-}
-
-// verifyKeyData returns true if the provided data appears to be a valid private key.
-func verifyKeyData(data []byte) bool {
-	if len(data) == 0 {
-		return false
-	}
-	_, err := ParsePrivateKeyPEM(data)
-	return err == nil
 }

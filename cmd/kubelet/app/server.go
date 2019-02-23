@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
+	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
@@ -899,7 +900,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 				return nil, err
 			}
 
-			if err := certutil.WriteKey(kc.TLSPrivateKeyFile, key); err != nil {
+			if err := keyutil.WriteKey(kc.TLSPrivateKeyFile, key); err != nil {
 				return nil, err
 			}
 

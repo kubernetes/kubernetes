@@ -183,6 +183,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/util/flowcontrol:all-srcs",
         "//staging/src/k8s.io/client-go/util/homedir:all-srcs",
         "//staging/src/k8s.io/client-go/util/jsonpath:all-srcs",
+        "//staging/src/k8s.io/client-go/util/keyutil:all-srcs",
         "//staging/src/k8s.io/client-go/util/retry:all-srcs",
         "//staging/src/k8s.io/client-go/util/testing:all-srcs",
         "//staging/src/k8s.io/client-go/util/workqueue:all-srcs",
