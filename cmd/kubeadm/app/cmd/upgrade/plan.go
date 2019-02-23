@@ -98,22 +98,17 @@ func runPlan(flags *planFlags, userVersion string) error {
 	// external etcd vs static pod etcd
 	isExternalEtcd := cfg.Etcd.External != nil
 	if isExternalEtcd {
-		client, err := etcdutil.New(
+		etcdClient, err = etcdutil.New(
 			cfg.Etcd.External.Endpoints,
 			cfg.Etcd.External.CAFile,
 			cfg.Etcd.External.CertFile,
 			cfg.Etcd.External.KeyFile)
-		if err != nil {
-			return err
-		}
-		etcdClient = client
 	} else {
 		// Connects to local/stacked etcd existing in the cluster
-		client, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
-		if err != nil {
-			return err
-		}
-		etcdClient = client
+		etcdClient, err = etcdutil.NewFromCluster(client, cfg.CertificatesDir)
+	}
+	if err != nil {
+		return err
 	}
 
 	// Compute which upgrade possibilities there are
