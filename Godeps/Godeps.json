@@ -1244,8 +1244,8 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Comment": "v3.0.0-23-g94e38aa",
-			"Rev": "94e38aa1586e8a6c8a75770bddf5ff84c48a106b"
+			"Comment": "v4.1.0-19-g5858425f75500d",
+			"Rev": "5858425f75500d40c52783dce87d085a483ce135"
 		},
 		{
 			"ImportPath": "github.com/exponent-io/jsonpath",

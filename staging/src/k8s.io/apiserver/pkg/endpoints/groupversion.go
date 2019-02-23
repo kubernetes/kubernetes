@@ -81,6 +81,10 @@ type APIGroupVersion struct {
 
 	// OpenAPIConfig lets the individual handlers build a subset of the OpenAPI schema before they are installed.
 	OpenAPIConfig *openapicommon.Config
+
+	// The limit on the request body size that would be accepted and decoded in a write request.
+	// 0 means no limit.
+	MaxRequestBodyBytes int64
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
