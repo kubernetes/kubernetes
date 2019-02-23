@@ -89,6 +89,10 @@ oomScoreAdj: -999
 portRange: ""
 resourceContainer: /kube-proxy
 udpIdleTimeout: 250ms
+winkernel:
+  enableDSR: false
+  networkName: ""
+  sourceVip: ""
 ---
 address: 1.2.3.4
 apiVersion: kubelet.config.k8s.io/v1beta1

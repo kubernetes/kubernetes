@@ -67,6 +67,10 @@ ComponentConfigs:
     PortRange: ""
     ResourceContainer: /kube-proxy
     UDPIdleTimeout: 250ms
+    Winkernel:
+      EnableDSR: false
+      NetworkName: ""
+      SourceVip: ""
   Kubelet:
     Address: 1.2.3.4
     Authentication:
