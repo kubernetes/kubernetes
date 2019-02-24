@@ -95,14 +95,24 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		}
 	})
 
-	It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
+	/*
+		Release : v1.14
+		Testname: PV Protection, Delete PV that is not bound to a PVC
+		Description: A Persistent Volume created but is not associated with a Persistent volume claim can be deleted.
+	*/
+	It("Verify \"immediate\" deletion of a PV that is not bound to a PVC [StorageValidation]", func() {
 		By("Deleting the PV")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
 	})
 
-	It("Verify that PV bound to a PVC is not removed immediately", func() {
+	/*
+		Release : v1.14
+		Testname: PV Protection, Cannot delete a PV that is bound to a PVC
+		Description: A Persistent Volume created but is associated with a Persistent volume claim cannot be deleted immediately.
+	*/
+	It("Verify that PV bound to a PVC is not removed immediately [StorageValidation]", func() {
 		By("Creating a PVC")
 		pvc = framework.MakePersistentVolumeClaim(pvcConfig, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)

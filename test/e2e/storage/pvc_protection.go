@@ -79,7 +79,12 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		}
 	})
 
-	It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func() {
+	/*
+		Release : v1.14
+		Testname: PVC Protection, Delete a PVC that is not in use by a Pod
+		Description: A Persistent Volume claim can be deleted immediately if it is not in use by a Pod.
+	*/
+	It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod [StorageValidation]", func() {
 		By("Deleting the pod using the PVC")
 		err = framework.DeletePodWithWait(f, client, pod)
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
@@ -91,7 +96,12 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 
-	It("Verify that PVC in active use by a pod is not removed immediately", func() {
+	/*
+		Release : v1.14
+		Testname: PVC Protection, Cannot delete a PVC that is in use by a Pod
+		Description: A Persistent Volume claim cannot be deleted immediately if it is in use by a Pod.
+	*/
+	It("Verify that PVC in active use by a pod is not removed immediately [StorageValidation]", func() {
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
@@ -110,7 +120,13 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 
-	It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func() {
+	/*
+		Release : v1.14
+		Testname: PVC Protection, Cannot schedule a Pod that is trying to use a PVC that is being deleted
+		Description: When a Persistent Volume claim is being deleted, Scheduling a Pod to use that PVC will fail
+		and the Pod become unschedulable.
+	*/
+	It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable [StorageValidation]", func() {
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
