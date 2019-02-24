@@ -178,6 +178,7 @@ func autoConvert_v1beta1_Rule_To_admissionregistration_Rule(in *v1beta1.Rule, ou
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.Scope = (*admissionregistration.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 
@@ -190,6 +191,7 @@ func autoConvert_admissionregistration_Rule_To_v1beta1_Rule(in *admissionregistr
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.Scope = (*v1beta1.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 
