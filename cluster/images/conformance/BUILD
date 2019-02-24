@@ -1,4 +1,5 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer")
+load("//build:platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
 
 container_layer(
     name = "cluster-srcs",
@@ -19,7 +20,10 @@ container_layer(
 
 container_image(
     name = "conformance-internal",
-    base = "@debian-hyperkube-base-amd64//image",
+    base = select(for_platforms(
+        for_server = "@debian-hyperkube-base-{ARCH}//image",
+        only_os = "linux",
+    )),
     cmd = [
         "/bin/bash",
         "-c",
@@ -44,10 +48,20 @@ container_image(
     workdir = "/usr/local/bin",
 )
 
-container_bundle(
-    name = "conformance",
-    images = {"k8s.gcr.io/conformance-amd64:{STABLE_DOCKER_TAG}": "conformance-internal"},
-)
+[container_bundle(
+    name = "conformance-%s" % arch,
+    images = {"k8s.gcr.io/conformance-%s:{STABLE_DOCKER_TAG}" % arch: "conformance-internal"},
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+) for arch in SERVER_PLATFORMS["linux"]]
+
+[alias(
+    name = "conformance%s" % suffix,
+    actual = select(for_platforms(for_server = "conformance-{ARCH}%s" % suffix)),
+) for suffix in [
+    "",
+    ".tar",
+]]
 
 filegroup(
     name = "package-srcs",
