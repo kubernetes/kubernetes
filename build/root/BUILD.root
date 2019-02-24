@@ -32,6 +32,8 @@ filegroup(
     visibility = ["//visibility:private"],
 )
 
+# TODO: also add container_push rules,
+# and don't forget about the conformance and hyperkube images
 gcs_upload(
     name = "push-build",
     data = [
