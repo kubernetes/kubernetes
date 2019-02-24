@@ -16,10 +16,6 @@
 
 # A set of helpers for starting/running etcd for tests
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
 ETCD_VERSION=${ETCD_VERSION:-3.3.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
@@ -114,7 +110,7 @@ kube::etcd::install() {
     os=$(kube::util::host_os)
     arch=$(kube::util::host_arch)
 
-    cd "${KUBE_ROOT}/third_party"
+    cd "${KUBE_ROOT}/third_party" || return 1
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
       kube::log::info "etcd v${ETCD_VERSION} already installed at path:"
       kube::log::info "$(pwd)/$(readlink etcd)"
