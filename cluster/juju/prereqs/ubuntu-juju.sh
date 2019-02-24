@@ -22,7 +22,7 @@ set -o pipefail
 
 function check_for_ppa() {
     local repo="$1"
-    grep -qsw "$repo" /etc/apt/sources.list /etc/apt/sources.list.d/*
+    grep -qsw "${repo}" /etc/apt/sources.list /etc/apt/sources.list.d/*
 }
 
 function package_status() {
