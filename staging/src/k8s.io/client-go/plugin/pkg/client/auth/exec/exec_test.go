@@ -515,6 +515,14 @@ func TestRoundTripper(t *testing.T) {
 		env[0] = "TEST_OUTPUT=" + s
 	}
 
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"status": {
+			"token": "token1"
+		}
+	}`)
+
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		gotToken := ""
 		parts := strings.Split(r.Header.Get("Authorization"), " ")
@@ -562,13 +570,6 @@ func TestRoundTripper(t *testing.T) {
 		}
 	}
 
-	setOutput(`{
-		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1alpha1",
-		"status": {
-			"token": "token1"
-		}
-	}`)
 	wantToken = "token1"
 	get(t, http.StatusOK)
 
@@ -614,6 +615,10 @@ func TestRoundTripper(t *testing.T) {
 	wantToken = "token4"
 	// Old token is expired, should refresh automatically without hitting a 401.
 	get(t, http.StatusOK)
+
+	if tc.HasCertCallback() {
+		t.Error("config should not have cert callback set as token based authentication is used instead")
+	}
 }
 
 func TestTLSCredentials(t *testing.T) {
@@ -655,6 +660,13 @@ func TestTLSCredentials(t *testing.T) {
 
 	// We're not interested in server's cert, this test is about client cert.
 	tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true}}
+	output = &clientauthentication.ExecCredential{
+		Status: &clientauthentication.ExecCredentialStatus{
+			ClientCertificateData: string(cert),
+			ClientKeyData:         string(key),
+			ExpirationTimestamp:   &v1.Time{now.Add(time.Hour)},
+		},
+	}
 	if err := a.UpdateTransportConfig(tc); err != nil {
 		t.Fatal(err)
 	}
@@ -681,13 +693,6 @@ func TestTLSCredentials(t *testing.T) {
 		})
 	}
 
-	output = &clientauthentication.ExecCredential{
-		Status: &clientauthentication.ExecCredentialStatus{
-			ClientCertificateData: string(cert),
-			ClientKeyData:         string(key),
-			ExpirationTimestamp:   &v1.Time{now.Add(time.Hour)},
-		},
-	}
 	get(t, "valid TLS cert", false)
 
 	// Advance time to force re-exec.
@@ -711,6 +716,10 @@ func TestTLSCredentials(t *testing.T) {
 		},
 	}
 	get(t, "valid TLS cert again", false)
+
+	if !tc.HasCertCallback() {
+		t.Error("config should have cert callback set")
+	}
 }
 
 // genClientCert generates an x509 certificate for testing. Certificate and key

@@ -182,7 +182,13 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	if c.TLS.GetCert != nil {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")
 	}
-	c.TLS.GetCert = a.cert
+	cert, err := a.cert() // test if a.cert() returns an actual certificate
+	if err != nil {
+		return errors.New("cert generation failed")
+	}
+	if cert != nil {
+		c.TLS.GetCert = a.cert
+	}
 
 	var dial func(ctx context.Context, network, addr string) (net.Conn, error)
 	if c.Dial != nil {
