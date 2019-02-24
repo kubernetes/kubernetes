@@ -26,6 +26,13 @@ import (
 // Funcs returns the fuzzer functions for the admissionregistration api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(obj *admissionregistration.Rule, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.Scope == nil {
+				s := admissionregistration.AllScopes
+				obj.Scope = &s
+			}
+		},
 		func(obj *admissionregistration.Webhook, c fuzz.Continue) {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
 			p := admissionregistration.FailurePolicyType("Fail")
