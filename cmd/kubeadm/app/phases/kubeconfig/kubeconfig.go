@@ -136,7 +136,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 	var kubeConfigSpec = map[string]*kubeConfigSpec{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			CACert:     caCert,
-			APIServer:  masterEndpoint,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: "kubernetes-admin",
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
@@ -153,7 +153,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
-			APIServer:  masterEndpoint,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
@@ -162,7 +162,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			CACert:     caCert,
-			APIServer:  masterEndpoint,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: kubeadmconstants.ControllerManagerUser,
 			ClientCertAuth: &clientCertAuth{
 				CAKey: caKey,
@@ -170,7 +170,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
 			CACert:     caCert,
-			APIServer:  masterEndpoint,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: kubeadmconstants.SchedulerUser,
 			ClientCertAuth: &clientCertAuth{
 				CAKey: caKey,
@@ -290,14 +290,14 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
 
 	spec := &kubeConfigSpec{
 		ClientName: clientName,
-		APIServer:  masterEndpoint,
+		APIServer:  controlPlaneEndpoint,
 		CACert:     caCert,
 		ClientCertAuth: &clientCertAuth{
 			CAKey:         caKey,
@@ -317,14 +317,14 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
 
 	spec := &kubeConfigSpec{
 		ClientName: clientName,
-		APIServer:  masterEndpoint,
+		APIServer:  controlPlaneEndpoint,
 		CACert:     caCert,
 		TokenAuth: &tokenAuth{
 			Token: token,

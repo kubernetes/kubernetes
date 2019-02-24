@@ -120,11 +120,11 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
-				configData := masterCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
+				configData := controlPlaneCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
 				if configData == "" {
 					t2.Fatal("Fail to find ClusterConfigurationConfigMapKey key")
 				}
@@ -138,7 +138,7 @@ func TestUploadConfiguration(t *testing.T) {
 					t2.Errorf("the initial and decoded ClusterConfiguration didn't match")
 				}
 
-				statusData := masterCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
+				statusData := controlPlaneCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
 				if statusData == "" {
 					t2.Fatal("failed to find ClusterStatusConfigMapKey key")
 				}

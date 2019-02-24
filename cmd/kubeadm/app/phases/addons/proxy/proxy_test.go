@@ -103,12 +103,12 @@ func TestCompileManifests(t *testing.T) {
 		{
 			manifest: KubeProxyConfigMap19,
 			data: struct {
-				MasterEndpoint, ProxyConfig, ProxyConfigMap, ProxyConfigMapKey string
+				ControlPlaneEndpoint, ProxyConfig, ProxyConfigMap, ProxyConfigMapKey string
 			}{
-				MasterEndpoint:    "foo",
-				ProxyConfig:       "  bindAddress: 0.0.0.0\n  clusterCIDR: 192.168.1.1\n  enableProfiling: false",
-				ProxyConfigMap:    "bar",
-				ProxyConfigMapKey: "baz",
+				ControlPlaneEndpoint: "foo",
+				ProxyConfig:          "  bindAddress: 0.0.0.0\n  clusterCIDR: 192.168.1.1\n  enableProfiling: false",
+				ProxyConfigMap:       "bar",
+				ProxyConfigMapKey:    "baz",
 			},
 			expected: true,
 		},
@@ -140,7 +140,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 	const (
 		NoError SimulatedError = iota
 		ServiceAccountError
-		InvalidMasterEndpoint
+		InvalidControlPlaneEndpoint
 		IPv6SetBindAddress
 	)
 
@@ -177,7 +177,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
 		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-		masterConfig := &kubeadmapiv1beta1.InitConfiguration{
+		controlPlaneConfig := &kubeadmapiv1beta1.InitConfiguration{
 			LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,
@@ -197,19 +197,19 @@ func TestEnsureProxyAddon(t *testing.T) {
 			client.PrependReactor("create", "serviceaccounts", func(action core.Action) (bool, runtime.Object, error) {
 				return true, nil, apierrors.NewUnauthorized("")
 			})
-		case InvalidMasterEndpoint:
-			masterConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
+		case InvalidControlPlaneEndpoint:
+			controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 		case IPv6SetBindAddress:
-			masterConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-			masterConfig.Networking.PodSubnet = "2001:101::/96"
+			controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
+			controlPlaneConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 
-		intMaster, err := configutil.DefaultedInitConfiguration(masterConfig)
+		intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig)
 		if err != nil {
 			t.Errorf("test failed to convert external to internal version")
 			break
 		}
-		intMaster.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
+		intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress:        "",
 			HealthzBindAddress: "0.0.0.0:10256",
 			MetricsBindAddress: "127.0.0.1:10249",
@@ -222,11 +222,11 @@ func TestEnsureProxyAddon(t *testing.T) {
 			},
 		}
 		// Run dynamic defaulting again as we changed the internal cfg
-		if err := configutil.SetInitDynamicDefaults(intMaster); err != nil {
+		if err := configutil.SetInitDynamicDefaults(intControlPlane); err != nil {
 			t.Errorf("test failed to set dynamic defaults: %v", err)
 			break
 		}
-		err = EnsureProxyAddon(&intMaster.ClusterConfiguration, &intMaster.LocalAPIEndpoint, client)
+		err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)
 
 		// Compare actual to expected errors
 		actErr := "No error"
@@ -244,17 +244,17 @@ func TestEnsureProxyAddon(t *testing.T) {
 				expErr,
 				actErr)
 		}
-		if intMaster.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
+		if intControlPlane.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expBindAddr,
-				intMaster.ComponentConfigs.KubeProxy.BindAddress)
+				intControlPlane.ComponentConfigs.KubeProxy.BindAddress)
 		}
-		if intMaster.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
+		if intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expClusterCIDR,
-				intMaster.ComponentConfigs.KubeProxy.ClusterCIDR)
+				intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR)
 		}
 	}
 }
