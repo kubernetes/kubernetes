@@ -9,12 +9,12 @@ release_filegroup(
     name = "rpms",
     conditioned_srcs = for_platforms(
         default = [],
-        for_client = [":kubectl-{ARCH}"],
+        for_client = [":kubectl.rpm"],
         for_node = [
-            ":cri-tools-{ARCH}",
-            ":kubeadm-{ARCH}",
-            ":kubelet-{ARCH}",
-            ":kubernetes-cni-{ARCH}",
+            ":cri-tools.rpm",
+            ":kubeadm.rpm",
+            ":kubelet.rpm",
+            ":kubernetes-cni.rpm",
         ],
         only_os = "linux",
     ),
@@ -22,21 +22,27 @@ release_filegroup(
     visibility = ["//visibility:public"],
 )
 
-# Create aliases from the non-arch names to the arch-specific names for backwards compatibility
-alias(
+# Create genrules to copy the arch-specific RPMs to RPMs without the arch in their filename.
+genrule(
     name = "kubectl",
-    actual = select(for_platforms(
-        for_client = ":kubectl-{ARCH}",
+    srcs = select(for_platforms(
+        for_client = [":kubectl-{ARCH}.rpm"],
         only_os = "linux",
     )),
+    outs = ["kubectl.rpm"],
+    cmd = "cp $< $@",
+    output_to_bindir = True,
 )
 
-[alias(
+[genrule(
     name = pkg,
-    actual = select(for_platforms(
-        for_client = ":%s-{ARCH}" % pkg,
+    srcs = select(for_platforms(
+        for_client = [":%s-{ARCH}.rpm" % pkg],
         only_os = "linux",
     )),
+    outs = ["%s.rpm" % pkg],
+    cmd = "cp $< $@",
+    output_to_bindir = True,
 ) for pkg in [
     "cri-tools",
     "kubeadm",
