@@ -312,7 +312,14 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.DeleteAllStatefulSets(c, ns)
 			})
 
-			It("should be reschedulable [Slow]", func() {
+			/*
+				Release : v1.14
+				Testname: MultiVolume, Pods should be able read and write on multiple volumes
+				Description: A Pod is scheduled to use multiple volumes by creating multiple PVCs
+				and stateful sets. Stateful set is then deleted leaving volumes intact. Once a new 
+				stateful set is created, data retrieved MUST match.
+			*/
+			It("should be reschedulable [Slow] [StorageValidation]", func() {
 				// Only run on providers with default storageclass
 				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 
@@ -358,6 +365,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ssTester.WaitForStatusReplicas(ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
+
 
 				By("Creating a new Statefulset and validating the data")
 				validateCmd := "true"
