@@ -4,7 +4,7 @@ Schema of the external API types that are served by the Kubernetes API server.
 
 ## Purpose
 
-This library is the canonical location of the Kubernetes API definition. Most likely interaction with this repository is as a dependency of client-go.
+This library is the canonical location of the Kubernetes API definition. Most likely interaction with this repository is as a dependency of [client-go](https://github.com/kubernetes/client-go/).
 
 ## Compatibility
 
