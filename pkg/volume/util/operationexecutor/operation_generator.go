@@ -732,7 +732,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	podsDir string) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
-	if useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
 		pluginName = csi.CSIPluginName
 	} else {
 		pluginName = volumeToUnmount.PluginName
