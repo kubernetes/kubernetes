@@ -30,6 +30,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
@@ -305,7 +306,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
 				return err
 			}
-			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
+			if err := keyutil.WriteKey(keyCert.KeyFile, key); err != nil {
 				return err
 			}
 			klog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)

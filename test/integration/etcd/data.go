@@ -428,6 +428,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1
+		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
+			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,
+			ExpectedEtcdPath: "/registry/priorityclasses/pc3",
+			ExpectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
+		},
+		// --
+
 		// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 		// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
 		gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {

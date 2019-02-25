@@ -879,74 +879,85 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
 	for _, port := range ports {
-		lbRuleName := az.getLoadBalancerRuleName(service, port, subnet(service))
-
-		klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
-
-		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
-		if err != nil {
-			return expectedProbes, expectedRules, err
-		}
-
-		if servicehelpers.NeedsHealthCheck(service) {
-			podPresencePath, podPresencePort := servicehelpers.GetServiceHealthCheckPathPort(service)
-
-			expectedProbes = append(expectedProbes, network.Probe{
-				Name: &lbRuleName,
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					RequestPath:       to.StringPtr(podPresencePath),
-					Protocol:          network.ProbeProtocolHTTP,
-					Port:              to.Int32Ptr(podPresencePort),
-					IntervalInSeconds: to.Int32Ptr(5),
-					NumberOfProbes:    to.Int32Ptr(2),
-				},
-			})
-		} else if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
-			// we only add the expected probe if we're doing TCP
-			expectedProbes = append(expectedProbes, network.Probe{
-				Name: &lbRuleName,
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Protocol:          *probeProto,
-					Port:              to.Int32Ptr(port.NodePort),
-					IntervalInSeconds: to.Int32Ptr(5),
-					NumberOfProbes:    to.Int32Ptr(2),
-				},
-			})
-		}
-
-		loadDistribution := network.Default
-		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
-			loadDistribution = network.SourceIP
-		}
-
-		expectedRule := network.LoadBalancingRule{
-			Name: &lbRuleName,
-			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-				Protocol: *transportProto,
-				FrontendIPConfiguration: &network.SubResource{
-					ID: to.StringPtr(lbFrontendIPConfigID),
-				},
-				BackendAddressPool: &network.SubResource{
-					ID: to.StringPtr(lbBackendPoolID),
-				},
-				LoadDistribution: loadDistribution,
-				FrontendPort:     to.Int32Ptr(port.Port),
-				BackendPort:      to.Int32Ptr(port.Port),
-				EnableFloatingIP: to.BoolPtr(true),
-			},
-		}
-		if port.Protocol == v1.ProtocolTCP {
-			expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
-		}
-
-		// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-		if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
-			expectedRule.Probe = &network.SubResource{
-				ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+		protocols := []v1.Protocol{port.Protocol}
+		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerMixedProtocols]; ok && v == "true" {
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set", lbName, ServiceAnnotationLoadBalancerMixedProtocols)
+			if port.Protocol == v1.ProtocolTCP {
+				protocols = append(protocols, v1.ProtocolUDP)
+			} else if port.Protocol == v1.ProtocolUDP {
+				protocols = append(protocols, v1.ProtocolTCP)
 			}
 		}
 
-		expectedRules = append(expectedRules, expectedRule)
+		for _, protocol := range protocols {
+			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port, subnet(service))
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
+
+			transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(protocol)
+			if err != nil {
+				return expectedProbes, expectedRules, err
+			}
+
+			if servicehelpers.NeedsHealthCheck(service) {
+				podPresencePath, podPresencePort := servicehelpers.GetServiceHealthCheckPathPort(service)
+
+				expectedProbes = append(expectedProbes, network.Probe{
+					Name: &lbRuleName,
+					ProbePropertiesFormat: &network.ProbePropertiesFormat{
+						RequestPath:       to.StringPtr(podPresencePath),
+						Protocol:          network.ProbeProtocolHTTP,
+						Port:              to.Int32Ptr(podPresencePort),
+						IntervalInSeconds: to.Int32Ptr(5),
+						NumberOfProbes:    to.Int32Ptr(2),
+					},
+				})
+			} else if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+				// we only add the expected probe if we're doing TCP
+				expectedProbes = append(expectedProbes, network.Probe{
+					Name: &lbRuleName,
+					ProbePropertiesFormat: &network.ProbePropertiesFormat{
+						Protocol:          *probeProto,
+						Port:              to.Int32Ptr(port.NodePort),
+						IntervalInSeconds: to.Int32Ptr(5),
+						NumberOfProbes:    to.Int32Ptr(2),
+					},
+				})
+			}
+
+			loadDistribution := network.Default
+			if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+				loadDistribution = network.SourceIP
+			}
+
+			expectedRule := network.LoadBalancingRule{
+				Name: &lbRuleName,
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					Protocol: *transportProto,
+					FrontendIPConfiguration: &network.SubResource{
+						ID: to.StringPtr(lbFrontendIPConfigID),
+					},
+					BackendAddressPool: &network.SubResource{
+						ID: to.StringPtr(lbBackendPoolID),
+					},
+					LoadDistribution: loadDistribution,
+					FrontendPort:     to.Int32Ptr(port.Port),
+					BackendPort:      to.Int32Ptr(port.Port),
+					EnableFloatingIP: to.BoolPtr(true),
+				},
+			}
+			if protocol == v1.ProtocolTCP {
+				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
+			}
+
+			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
+			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+				expectedRule.Probe = &network.SubResource{
+					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+				}
+			}
+
+			expectedRules = append(expectedRules, expectedRule)
+		}
 	}
 
 	return expectedProbes, expectedRules, nil

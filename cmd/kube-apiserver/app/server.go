@@ -53,7 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
@@ -580,7 +580,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 
 	if s.ServiceAccountSigningKeyFile != "" && s.Authentication.ServiceAccounts.Issuer != "" {
-		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
+		sk, err := keyutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
 		if err != nil {
 			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 		}

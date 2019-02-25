@@ -20,7 +20,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/controller-manager/app:go_default_library",
-        "//cmd/controller-manager/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/config:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -131,6 +130,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",

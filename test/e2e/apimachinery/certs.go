@@ -21,7 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -44,7 +45,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create CA private key %v", err)
 	}
-	signingCert, err := certutil.NewSelfSignedCACert(certutil.Config{CommonName: "e2e-server-cert-ca"}, signingKey)
+	signingCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "e2e-server-cert-ca"}, signingKey)
 	if err != nil {
 		framework.Failf("Failed to create CA cert for apiserver %v", err)
 	}
@@ -60,7 +61,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 		framework.Failf("Failed to create private key for %v", err)
 	}
 	signedCert, err := pkiutil.NewSignedCert(
-		&certutil.Config{
+		&cert.Config{
 			CommonName: serviceName + "." + namespaceName + ".svc",
 			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		},
@@ -80,12 +81,16 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err = ioutil.WriteFile(certFile.Name(), pkiutil.EncodeCertPEM(signedCert), 0600); err != nil {
 		framework.Failf("Failed to write cert file %v", err)
 	}
-	if err = ioutil.WriteFile(keyFile.Name(), certutil.EncodePrivateKeyPEM(key), 0644); err != nil {
+	privateKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(key)
+	if err != nil {
+		framework.Failf("Failed to marshal key %v", err)
+	}
+	if err = ioutil.WriteFile(keyFile.Name(), privateKeyPEM, 0644); err != nil {
 		framework.Failf("Failed to write key file %v", err)
 	}
 	return &certContext{
 		cert:        pkiutil.EncodeCertPEM(signedCert),
-		key:         certutil.EncodePrivateKeyPEM(key),
+		key:         privateKeyPEM,
 		signingCert: pkiutil.EncodeCertPEM(signingCert),
 	}
 }

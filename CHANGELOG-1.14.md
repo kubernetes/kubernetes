@@ -128,7 +128,7 @@ filename | sha512 hash
     *    - A new `k8s_external` plugin that allows external zones to point to Kubernetes in-cluster services.
     *    - CoreDNS now checks if a zone transfer is allowed. Also allow a TTL of 0 to avoid caching in the cache plugin.
     *    - TTL is also applied to negative responses (NXDOMAIN, etc).
-   
+
 * Missing directories listed in a user's PATH are no longer considered errors and are instead logged by the "kubectl plugin list" command when listing available plugins. ([#73542](https://github.com/kubernetes/kubernetes/pull/73542), [@juanvallejo](https://github.com/juanvallejo))
 * remove kubelet flag '--experimental-fail-swap-on' (deprecated in v1.8) ([#69552](https://github.com/kubernetes/kubernetes/pull/69552), [@Pingan2017](https://github.com/Pingan2017))
 * Introduced support for Windows nodes into the cluster bringup scripts for GCE. ([#73442](https://github.com/kubernetes/kubernetes/pull/73442), [@pjh](https://github.com/pjh))
@@ -228,7 +228,7 @@ filename | sha512 hash
 * Remove deprecated args '--show-all' ([#69255](https://github.com/kubernetes/kubernetes/pull/69255), [@Pingan2017](https://github.com/Pingan2017))
 * As per deprecation policy in https://kubernetes.io/docs/reference/using-api/deprecation-policy/  ([#73001](https://github.com/kubernetes/kubernetes/pull/73001), [@shivnagarajan](https://github.com/shivnagarajan))
     * the taints "node.alpha.kubernetes.io/notReady" and "node.alpha.kubernetes.io/unreachable".  are no
-    * longer supported or adjusted. These uses should be replaced with "node.kubernetes.io/not-ready" 
+    * longer supported or adjusted. These uses should be replaced with "node.kubernetes.io/not-ready"
     * and "node.kubernetes.io/unreachable" respectively instead.
 * The /swagger.json and /swagger-2.0.0.pb-v1 schema documents, deprecated since v1.10, have been removed in favor of `/openapi/v2` ([#73148](https://github.com/kubernetes/kubernetes/pull/73148), [@liggitt](https://github.com/liggitt))
 * CoreDNS is only officially supported on Linux at this time.  As such, when kubeadm is used to deploy this component into your kubernetes cluster, it will be restricted (using nodeSelectors) to run only on nodes with that operating system. This ensures that in clusters which include Windows nodes, the scheduler will not ever attempt to place CoreDNS pods on these machines, reducing setup latency and enhancing initial cluster stability. ([#69940](https://github.com/kubernetes/kubernetes/pull/69940), [@MarcPow](https://github.com/MarcPow))
@@ -367,7 +367,7 @@ filename | sha512 hash
 * Fixes spurious 0-length API responses. ([#72856](https://github.com/kubernetes/kubernetes/pull/72856), [@liggitt](https://github.com/liggitt))
 * Updates Fluentd to 1.3.2 & added filter_parser  ([#71180](https://github.com/kubernetes/kubernetes/pull/71180), [@monotek](https://github.com/monotek))
 * The leaderelection package allows the lease holder to release its lease when the calling context is cancelled. This allows ([#71490](https://github.com/kubernetes/kubernetes/pull/71490), [@smarterclayton](https://github.com/smarterclayton))
-    * faster handoff when a leader-elected process is gracefully terminated. 
+    * faster handoff when a leader-elected process is gracefully terminated.
 * Make volume binder resilient to races between main schedule loop and async binding operation  ([#72045](https://github.com/kubernetes/kubernetes/pull/72045), [@cofyc](https://github.com/cofyc))
 * Bump minimum docker API version to 1.26 (1.13.1) ([#72831](https://github.com/kubernetes/kubernetes/pull/72831), [@yujuhong](https://github.com/yujuhong))
 * If the `TokenRequestProjection` feature gate is disabled, projected serviceAccountToken volume sources are now dropped at object creation time, or at object update time if the existing object did not have a projected serviceAccountToken volume source. Previously, these would result in validation errors. ([#72714](https://github.com/kubernetes/kubernetes/pull/72714), [@mourya007](https://github.com/mourya007))

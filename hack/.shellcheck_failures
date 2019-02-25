@@ -21,9 +21,6 @@
 ./cluster/images/conformance/run_e2e.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
-./cluster/kube-up.sh
-./cluster/kube-util.sh
-./cluster/kubectl.sh
 ./cluster/kubemark/gce/config-default.sh
 ./cluster/kubemark/iks/config-default.sh
 ./cluster/kubemark/util.sh
@@ -68,7 +65,6 @@
 ./hack/make-rules/test-cmd.sh
 ./hack/make-rules/test-e2e-node.sh
 ./hack/make-rules/test-integration.sh
-./hack/make-rules/test-kubeadm-cmd.sh
 ./hack/make-rules/test.sh
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
@@ -81,7 +77,6 @@
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
 ./hack/update-generated-runtime.sh
-./hack/update-generated-swagger-docs.sh
 ./hack/update-godep-licenses.sh
 ./hack/update-gofmt.sh
 ./hack/update-openapi-spec.sh
@@ -102,7 +97,6 @@
 ./hack/verify-generated-pod-resources.sh
 ./hack/verify-generated-protobuf.sh
 ./hack/verify-generated-runtime.sh
-./hack/verify-generated-swagger-docs.sh
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
@@ -116,12 +110,6 @@
 ./hack/verify-staging-meta-files.sh
 ./hack/verify-symbols.sh
 ./hack/verify-test-featuregates.sh
-./hack/verify-test-images.sh
-./hack/verify-test-owners.sh
-./hack/verify-typecheck.sh
-./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
-./pkg/util/verify-util-pkg.sh
-./plugin/pkg/admission/imagepolicy/gencerts.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh

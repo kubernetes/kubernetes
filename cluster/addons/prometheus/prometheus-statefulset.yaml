@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: prometheus 
+  name: prometheus
   namespace: kube-system
   labels:
     k8s-app: prometheus
@@ -85,7 +85,7 @@ spec:
             requests:
               cpu: 200m
               memory: 1000Mi
-            
+
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config

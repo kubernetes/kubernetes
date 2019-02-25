@@ -19,8 +19,6 @@ package cert
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -33,11 +31,11 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/util/keyutil"
 )
 
-const (
-	duration365d = time.Hour * 24 * 365
-)
+const duration365d = time.Hour * 24 * 365
 
 // Config contains the basic fields required for creating a certificate
 type Config struct {
@@ -76,25 +74,6 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
-}
-
-// MakeEllipticPrivateKeyPEM creates an ECDSA private key
-func MakeEllipticPrivateKeyPEM() ([]byte, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	derBytes, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKeyPemBlock := &pem.Block{
-		Type:  ECPrivateKeyBlockType,
-		Bytes: derBytes,
-	}
-	return pem.EncodeToMemory(privateKeyPemBlock), nil
 }
 
 // GenerateSelfSignedCertKey creates a self-signed certificate and key for the given host.
@@ -202,7 +181,7 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 
 	// Generate key
 	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+	if err := pem.Encode(&keyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
 		return nil, nil, err
 	}
 

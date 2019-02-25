@@ -321,11 +321,15 @@ func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	for _, urlstr := range urls {
 		u, err := url.Parse(urlstr)
-		if err != nil || u.Scheme == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "not a valid URL"))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, fmt.Sprintf("URL parse error: %v", err)))
+			continue
 		}
 		if requireHTTPS && u.Scheme != "https" {
 			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "the URL must be using the HTTPS scheme"))
+		}
+		if u.Scheme == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "the URL without scheme is not allowed"))
 		}
 	}
 	return allErrs
@@ -476,7 +480,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 
 	u, err := url.Parse(socket)
 	if err != nil {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url parsing error: %v", err)))
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL parsing error: %v", err)))
 	}
 
 	if u.Scheme == "" {
@@ -484,7 +488,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
 		}
 	} else if u.Scheme != kubeadmapiv1beta1.DefaultUrlScheme {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url scheme %s is not supported", u.Scheme)))
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
 	}
 
 	return allErrs

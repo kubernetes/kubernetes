@@ -63,9 +63,10 @@ func getControlPlaneJoinPhaseFlags() []string {
 // NewControlPlaneJoinPhase creates a kubeadm workflow phase that implements joining a machine as a control plane instance
 func NewControlPlaneJoinPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "control-plane-join",
-		Short: "Joins a machine as a control plane instance",
-		Long:  cmdutil.MacroCommandLongDescription,
+		Name:    "control-plane-join",
+		Short:   "Joins a machine as a control plane instance",
+		Long:    cmdutil.MacroCommandLongDescription,
+		Example: controlPlaneJoinExample,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",

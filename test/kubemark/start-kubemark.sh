@@ -435,7 +435,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   start=$(date +%s)
   nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
-  
+
   until [[ "${ready}" -ge "${NUM_REPLICAS}" ]]; do
     echo -n "."
     sleep 1

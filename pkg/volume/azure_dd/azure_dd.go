@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
@@ -164,7 +165,9 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	}
 
 	if vmSizeList == nil {
-		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		result, err := az.VirtualMachineSizesClient.List(ctx, az.Location)
 		if err != nil || result.Value == nil {
 			klog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
 			return volumeLimits, nil

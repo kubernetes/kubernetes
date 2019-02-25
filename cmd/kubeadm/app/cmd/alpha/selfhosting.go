@@ -53,7 +53,7 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 
 	selfhostingExample = normalizer.Examples(`
-		# Converts a static Pod-hosted control plane into a self-hosted one. 
+		# Converts a static Pod-hosted control plane into a self-hosted one.
 
 		kubeadm alpha phase self-hosting convert-from-staticpods
 		`)

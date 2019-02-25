@@ -162,7 +162,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts InitConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+			masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 			if err != nil {
 				t.Error(err)
 			}

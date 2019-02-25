@@ -37,7 +37,6 @@ import (
 
 const (
 	testCertsDir = "/var/lib/certs"
-	etcdDataDir  = "/var/lib/etcd"
 )
 
 var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()

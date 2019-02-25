@@ -12,7 +12,7 @@ container_layer(
     directory = "/usr/local/bin",
     files = [
         "//cmd/kubectl",
-        "//test/e2e:e2e.test",
+        "//test/e2e:e2e.test_binary",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
 )

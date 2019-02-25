@@ -3713,7 +3713,7 @@ type PriorityClassDescriber struct {
 }
 
 func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	pc, err := s.Scheduling().PriorityClasses().Get(name, metav1.GetOptions{})
+	pc, err := s.SchedulingV1beta1().PriorityClasses().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

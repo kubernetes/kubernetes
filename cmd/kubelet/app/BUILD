@@ -132,6 +132,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",

@@ -18,15 +18,19 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+run_kubeadm_tests() {
+  set -o nounset
+  set -o errexit
 
-KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/cluster/kubeadm.sh}"
+  KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/cluster/kubeadm.sh}"
 
-# If testing a different version of kubeadm than the current build, you can
-# comment this out to save yourself from needlessly building here.
-make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
+  # If testing a different version of kubeadm than the current build, you can
+  # comment this out to save yourself from needlessly building here.
+  make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
 
-make -C "${KUBE_ROOT}" test \
+  make -C "${KUBE_ROOT}" test \
   WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
   KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'"
+  set +o nounset
+  set +o errexit
+}
