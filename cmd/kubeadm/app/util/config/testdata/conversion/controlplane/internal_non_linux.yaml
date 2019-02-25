@@ -197,7 +197,7 @@ Networking:
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
   KubeletExtraArgs: null
-  Name: master-1
+  Name: control-plane-1
   Taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
