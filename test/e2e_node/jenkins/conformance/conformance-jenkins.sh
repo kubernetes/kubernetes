@@ -22,7 +22,7 @@ set -x
 
 : "${1:?Usage test/e2e_node/jenkins/conformance-node-jenkins.sh <path to properties>}"
 
-. $1
+. "${1}"
 
 make generated_files
 
@@ -30,7 +30,7 @@ WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 TIMEOUT=${TIMEOUT:-"45m"}
 
-mkdir -p ${ARTIFACTS}
+mkdir -p "${ARTIFACTS}"
 
 go run test/e2e_node/runner/remote/run_remote.go  --test-suite=conformance \
   --logtostderr --vmodule=*=4 --ssh-env="gce" --ssh-user="$GCE_USER" \
