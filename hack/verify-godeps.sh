@@ -18,15 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/' && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'hack/lib/' && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'hack/.*godep'; then
+  ! kube::util::has_changes "${branch}" 'Godeps/' && \
+  ! kube::util::has_changes "${branch}" 'vendor/' && \
+  ! kube::util::has_changes "${branch}" 'hack/lib/' && \
+  ! kube::util::has_changes "${branch}" 'hack/.*godep'; then
   exit 0
 fi
 
@@ -35,7 +35,7 @@ kube::util::ensure_godep_version
 
 if [[ -z ${TMP_GOPATH:-} ]]; then
   # Create a nice clean place to put our new godeps
-  _tmpdir="$(kube::realpath $(mktemp -d -t gopath.XXXXXX))"
+  _tmpdir="$(kube::realpath "$(mktemp -d -t gopath.XXXXXX)")"
 else
   # reuse what we might have saved previously
   _tmpdir="${TMP_GOPATH}"
@@ -51,7 +51,6 @@ function cleanup {
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
 trap cleanup EXIT
 
@@ -59,7 +58,7 @@ trap cleanup EXIT
 _kubetmp="${_tmpdir}/src/k8s.io"
 mkdir -p "${_kubetmp}"
 # should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
+git archive --format=tar --prefix=kubernetes/ "$(git write-tree)" | (cd "${_kubetmp}" && tar xf -)
 _kubetmp="${_kubetmp}/kubernetes"
 
 # Do all our work in the new GOPATH
@@ -85,7 +84,7 @@ ret=0
 
 pushd "${KUBE_ROOT}" > /dev/null 2>&1
   # Test for diffs
-  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' Godeps/Godeps.json "${_kubetmp}/Godeps/Godeps.json")"; then
     echo "Your Godeps.json is different:" >&2
     echo "${_out}" >&2
     echo "Godeps Verify failed." >&2
@@ -95,14 +94,14 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
     echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
-    if [[ -f godepdiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+    if [[ -f godepdiff.patch && -d "${ARTIFACTS:-}" ]]; then
       echo "Copying patch to artifacts.."
-      cp godepdiff.patch "${ARTIFACTS_DIR:-}/"
+      cp godepdiff.patch "${ARTIFACTS:-}/"
     fi
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
+  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
     echo "Your vendored results are different:" >&2
     echo "${_out}" >&2
     echo "Godeps Verify failed." >&2
@@ -112,9 +111,9 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
     echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
-    if [[ -f vendordiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+    if [[ -f vendordiff.patch && -d "${ARTIFACTS:-}" ]]; then
       echo "Copying patch to artifacts.."
-      cp vendordiff.patch "${ARTIFACTS_DIR:-}/"
+      cp vendordiff.patch "${ARTIFACTS:-}/"
     fi
     ret=1
   fi

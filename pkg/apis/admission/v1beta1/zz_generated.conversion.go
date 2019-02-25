@@ -37,15 +37,38 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest,
-		Convert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest,
-		Convert_v1beta1_AdmissionResponse_To_admission_AdmissionResponse,
-		Convert_admission_AdmissionResponse_To_v1beta1_AdmissionResponse,
-		Convert_v1beta1_AdmissionReview_To_admission_AdmissionReview,
-		Convert_admission_AdmissionReview_To_v1beta1_AdmissionReview,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.AdmissionRequest)(nil), (*admission.AdmissionRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(a.(*v1beta1.AdmissionRequest), b.(*admission.AdmissionRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admission.AdmissionRequest)(nil), (*v1beta1.AdmissionRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(a.(*admission.AdmissionRequest), b.(*v1beta1.AdmissionRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.AdmissionResponse)(nil), (*admission.AdmissionResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AdmissionResponse_To_admission_AdmissionResponse(a.(*v1beta1.AdmissionResponse), b.(*admission.AdmissionResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admission.AdmissionResponse)(nil), (*v1beta1.AdmissionResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admission_AdmissionResponse_To_v1beta1_AdmissionResponse(a.(*admission.AdmissionResponse), b.(*v1beta1.AdmissionResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.AdmissionReview)(nil), (*admission.AdmissionReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AdmissionReview_To_admission_AdmissionReview(a.(*v1beta1.AdmissionReview), b.(*admission.AdmissionReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admission.AdmissionReview)(nil), (*v1beta1.AdmissionReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admission_AdmissionReview_To_v1beta1_AdmissionReview(a.(*admission.AdmissionReview), b.(*v1beta1.AdmissionReview), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1beta1.AdmissionRequest, out *admission.AdmissionRequest, s conversion.Scope) error {
@@ -66,6 +89,7 @@ func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1be
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
+	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
 	return nil
 }
 
@@ -92,6 +116,7 @@ func autoConvert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(in *admi
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
+	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
 	return nil
 }
 
@@ -106,6 +131,7 @@ func autoConvert_v1beta1_AdmissionResponse_To_admission_AdmissionResponse(in *v1
 	out.Result = (*v1.Status)(unsafe.Pointer(in.Result))
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*admission.PatchType)(unsafe.Pointer(in.PatchType))
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 
@@ -120,6 +146,7 @@ func autoConvert_admission_AdmissionResponse_To_v1beta1_AdmissionResponse(in *ad
 	out.Result = (*v1.Status)(unsafe.Pointer(in.Result))
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*v1beta1.PatchType)(unsafe.Pointer(in.PatchType))
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 

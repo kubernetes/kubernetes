@@ -62,7 +62,7 @@ func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *v1beta2.DaemonSetLis
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta2.DaemonSetList{}
+	list := &v1beta2.DaemonSetList{ListMeta: obj.(*v1beta2.DaemonSetList).ListMeta}
 	for _, item := range obj.(*v1beta2.DaemonSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched daemonSet.
 func (c *FakeDaemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, data, subresources...), &v1beta2.DaemonSet{})
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, pt, data, subresources...), &v1beta2.DaemonSet{})
 
 	if obj == nil {
 		return nil, err

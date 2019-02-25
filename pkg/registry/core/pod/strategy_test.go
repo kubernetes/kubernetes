@@ -88,6 +88,20 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				Spec: api.PodSpec{ServiceAccountName: "serviceAccount1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount1"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "serviceAccount1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount2"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
 				Status: api.PodStatus{Phase: api.PodRunning},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.phase=Running"),
@@ -381,7 +395,7 @@ type mockConnectionInfoGetter struct {
 	info *client.ConnectionInfo
 }
 
-func (g mockConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*client.ConnectionInfo, error) {
+func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*client.ConnectionInfo, error) {
 	return g.info, nil
 }
 

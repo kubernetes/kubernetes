@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -40,7 +40,7 @@ func newTestHost(t *testing.T) (string, volume.VolumeHost) {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, nil, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -93,7 +93,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", gitUrl, "target_dir"},
+					cmd: []string{"git", "clone", "--", gitUrl, "target_dir"},
 					dir: "",
 				},
 				{
@@ -120,7 +120,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", gitUrl, "target_dir"},
+					cmd: []string{"git", "clone", "--", gitUrl, "target_dir"},
 					dir: "",
 				},
 			},
@@ -138,7 +138,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", gitUrl},
+					cmd: []string{"git", "clone", "--", gitUrl},
 					dir: "",
 				},
 			},
@@ -158,7 +158,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", gitUrl},
+					cmd: []string{"git", "clone", "--", gitUrl},
 					dir: "",
 				},
 				{
@@ -186,7 +186,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", gitUrl, "."},
+					cmd: []string{"git", "clone", "--", gitUrl, "."},
 					dir: "",
 				},
 				{
@@ -199,6 +199,72 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 			isExpectedFailure: false,
+		},
+		{
+			name: "current-dir-mess",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitUrl,
+						Revision:   revision,
+						Directory:  "./.",
+					},
+				},
+			},
+			expecteds: []expectedCommand{
+				{
+					cmd: []string{"git", "clone", "--", gitUrl, "./."},
+					dir: "",
+				},
+				{
+					cmd: []string{"git", "checkout", revision},
+					dir: "",
+				},
+				{
+					cmd: []string{"git", "reset", "--hard"},
+					dir: "",
+				},
+			},
+			isExpectedFailure: false,
+		},
+		{
+			name: "invalid-repository",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: "--foo",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
+		{
+			name: "invalid-revision",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitUrl,
+						Revision:   "--bar",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
+		{
+			name: "invalid-directory",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitUrl,
+						Directory:  "-b",
+					},
+				},
+			},
+			isExpectedFailure: true,
 		},
 	}
 

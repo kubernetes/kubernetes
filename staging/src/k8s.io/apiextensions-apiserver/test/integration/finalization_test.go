@@ -24,26 +24,26 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func TestFinalization(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	require.NoError(t, err)
-	defer close(stopCh)
+	defer tearDown()
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
-	instance := testserver.NewNoxuInstance(ns, name)
+	instance := fixtures.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func TestFinalization(t *testing.T) {
 	// object will be deleted as part of the finalizer update.
 	for {
 		gottenNoxuInstance.SetFinalizers(nil)
-		_, err = noxuResourceClient.Update(gottenNoxuInstance)
+		_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 		if err == nil {
 			break
 		}
@@ -94,21 +94,21 @@ func TestFinalization(t *testing.T) {
 }
 
 func TestFinalizationAndDeletion(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	require.NoError(t, err)
-	defer close(stopCh)
+	defer tearDown()
 
 	// Create a CRD.
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	// Create a CR with a finalizer.
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
-	instance := testserver.NewNoxuInstance(ns, name)
+	instance := fixtures.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	require.NotNil(t, gottenNoxuInstance.GetDeletionTimestamp())
 
 	// Delete the CRD.
-	testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
 
 	// Check is CR still there after the CRD deletion.
 	gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
@@ -137,7 +137,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	// Update the CR to remove the finalizer.
 	for {
 		gottenNoxuInstance.SetFinalizers(nil)
-		_, err = noxuResourceClient.Update(gottenNoxuInstance)
+		_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 		if err == nil {
 			break
 		}
@@ -156,7 +156,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	}
 
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+		_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
 		return errors.IsNotFound(err), err
 	})
 	if !errors.IsNotFound(err) {

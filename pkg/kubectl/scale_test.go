@@ -21,11 +21,15 @@ import (
 	"testing"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/scale"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	fakescale "k8s.io/client-go/scale/fake"
+	testcore "k8s.io/client-go/testing"
 )
 
 func TestReplicationControllerScaleRetry(t *testing.T) {
@@ -260,7 +264,7 @@ func TestStatefulSetScale(t *testing.T) {
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
-	err := scaler.Scale("default", name, count, &preconditions, nil, nil, schema.GroupResource{Group: "apps", Resource: "statefullset"})
+	err := scaler.Scale("default", name, count, &preconditions, nil, nil, schema.GroupResource{Group: "apps", Resource: "statefulset"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -625,4 +629,55 @@ func TestGenericScale(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createFakeScaleClient(resource string, resourceName string, replicas int, errorsOnVerb map[string]*kerrors.StatusError) *fakescale.FakeScaleClient {
+	shouldReturnAnError := func(verb string) (*kerrors.StatusError, bool) {
+		if anError, anErrorExists := errorsOnVerb[verb]; anErrorExists {
+			return anError, true
+		}
+		return &kerrors.StatusError{}, false
+	}
+	newReplicas := int32(replicas)
+	scaleClient := &fakescale.FakeScaleClient{}
+	scaleClient.AddReactor("get", resource, func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+		action := rawAction.(testcore.GetAction)
+		if action.GetName() != resourceName {
+			return true, nil, fmt.Errorf("expected = %s, got = %s", resourceName, action.GetName())
+		}
+		if anError, should := shouldReturnAnError("get"); should {
+			return true, nil, anError
+		}
+		obj := &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      action.GetName(),
+				Namespace: action.GetNamespace(),
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: newReplicas,
+			},
+		}
+		return true, obj, nil
+	})
+	scaleClient.AddReactor("update", resource, func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+		action := rawAction.(testcore.UpdateAction)
+		obj := action.GetObject().(*autoscalingv1.Scale)
+		if obj.Name != resourceName {
+			return true, nil, fmt.Errorf("expected = %s, got = %s", resourceName, obj.Name)
+		}
+		if anError, should := shouldReturnAnError("update"); should {
+			return true, nil, anError
+		}
+		newReplicas = obj.Spec.Replicas
+		return true, &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      obj.Name,
+				Namespace: action.GetNamespace(),
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: newReplicas,
+			},
+		}, nil
+	})
+	return scaleClient
 }

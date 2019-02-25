@@ -62,7 +62,7 @@ func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *core.ConfigMapList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.ConfigMapList{}
+	list := &core.ConfigMapList{ListMeta: obj.(*core.ConfigMapList).ListMeta}
 	for _, item := range obj.(*core.ConfigMapList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched configMap.
 func (c *FakeConfigMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, data, subresources...), &core.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, pt, data, subresources...), &core.ConfigMap{})
 
 	if obj == nil {
 		return nil, err

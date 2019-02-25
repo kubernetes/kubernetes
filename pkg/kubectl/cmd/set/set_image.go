@@ -19,21 +19,21 @@ package set
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -41,7 +41,7 @@ import (
 type SetImageOptions struct {
 	resource.FilenameOptions
 
-	PrintFlags  *printers.PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	Infos        []*resource.Info
@@ -50,12 +50,12 @@ type SetImageOptions struct {
 	All          bool
 	Output       string
 	Local        bool
-	ResolveImage func(in string) (string, error)
+	ResolveImage ImageResolver
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 	ContainerImages        map[string]string
 
@@ -63,16 +63,16 @@ type SetImageOptions struct {
 }
 
 var (
-	image_resources = `
+	imageResources = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = templates.LongDesc(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + image_resources)
+		` + imageResources)
 
-	image_example = templates.Examples(`
+	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -86,9 +86,10 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
+// NewImageOptions returns an initialized SetImageOptions instance
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
-		PrintFlags:  printers.NewPrintFlags("image updated", legacyscheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -97,15 +98,16 @@ func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	}
 }
 
+// NewCmdImage returns an initialized Command instance for the 'set image' sub command
 func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewImageOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
+		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update image of a pod template"),
-		Long:    image_long,
-		Example: image_example,
+		Short:                 i18n.T("Update image of a pod template"),
+		Long:                  imageLong,
+		Example:               imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -126,19 +128,20 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
+// Complete completes all required options
 func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = f.ResolveImage
+	o.ResolveImage = resolveImageFunc
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -150,7 +153,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -160,14 +163,12 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.Local {
@@ -191,6 +192,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return nil
 }
 
+// Validate makes sure provided values in SetImageOptions are valid
 func (o *SetImageOptions) Validate() error {
 	errors := []error{}
 	if o.All && len(o.Selector) > 0 {
@@ -207,42 +209,25 @@ func (o *SetImageOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
+// Run performs the execution of 'set image' sub command
 func (o *SetImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
-				var (
-					containerFound bool
-					err            error
-					resolved       string
-				)
-				// Find the container to update, and update its image
-				for i, c := range spec.Containers {
-					if c.Name == name || name == "*" {
-						containerFound = true
-						if len(resolved) == 0 {
-							if resolved, err = o.ResolveImage(image); err != nil {
-								allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
-								// Do not loop again if the image resolving failed for wildcard case as we
-								// will report the same error again for the next container.
-								if name == "*" {
-									break
-								}
-								continue
-							}
-						}
-						if spec.Containers[i].Image != resolved {
-							spec.Containers[i].Image = resolved
-							// Perform updates
-							transformed = true
-						}
+				resolvedImageName, err := o.ResolveImage(image)
+				if err != nil {
+					allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
+					if name == "*" {
+						break
 					}
+					continue
 				}
-				// Add a new container if not found
-				if !containerFound {
+
+				initContainerFound := setImage(spec.InitContainers, name, resolvedImageName)
+				containerFound := setImage(spec.Containers, name, resolvedImageName)
+				if !containerFound && !initContainerFound {
 					allErrs = append(allErrs, fmt.Errorf("error: unable to find container named %q", name))
 				}
 			}
@@ -251,21 +236,19 @@ func (o *SetImageOptions) Run() error {
 		if err != nil {
 			return nil, err
 		}
-		if !transformed {
-			return nil, nil
-		}
 		// record this change (for rollout history)
-		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+		if err := o.Recorder.Record(obj); err != nil {
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	})
 
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			name := info.ObjectName()
+			allErrs = append(allErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 
@@ -275,25 +258,36 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
-				return err
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
 		// patch the change
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
-			return err
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func setImage(containers []v1.Container, containerName string, image string) bool {
+	containerFound := false
+	// Find the container to update, and update its image
+	for i, c := range containers {
+		if c.Name == containerName || containerName == "*" {
+			containerFound = true
+			containers[i].Image = image
+		}
+	}
+	return containerFound
 }
 
 // getResourcesAndImages retrieves resources and container name:images pair from given args
@@ -310,4 +304,14 @@ func getResourcesAndImages(args []string) (resources []string, containerImages m
 func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
+}
+
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolver func(in string) (string, error)
+
+// implements ImageResolver
+func resolveImageFunc(in string) (string, error) {
+	return in, nil
 }

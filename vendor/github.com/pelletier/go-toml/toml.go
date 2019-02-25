@@ -11,14 +11,19 @@ import (
 )
 
 type tomlValue struct {
-	value    interface{} // string, int64, uint64, float64, bool, time.Time, [] of any of this list
-	position Position
+	value     interface{} // string, int64, uint64, float64, bool, time.Time, [] of any of this list
+	comment   string
+	commented bool
+	multiline bool
+	position  Position
 }
 
 // Tree is the result of the parsing of a TOML file.
 type Tree struct {
-	values   map[string]interface{} // string -> *tomlValue, *Tree, []*Tree
-	position Position
+	values    map[string]interface{} // string -> *tomlValue, *Tree, []*Tree
+	comment   string
+	commented bool
+	position  Position
 }
 
 func newTree() *Tree {
@@ -67,18 +72,15 @@ func (t *Tree) Keys() []string {
 }
 
 // Get the value at key in the Tree.
-// Key is a dot-separated path (e.g. a.b.c).
+// Key is a dot-separated path (e.g. a.b.c) without single/double quoted strings.
+// If you need to retrieve non-bare keys, use GetPath.
 // Returns nil if the path does not exist in the tree.
 // If keys is of length zero, the current tree is returned.
 func (t *Tree) Get(key string) interface{} {
 	if key == "" {
 		return t
 	}
-	comps, err := parseKey(key)
-	if err != nil {
-		return nil
-	}
-	return t.GetPath(comps)
+	return t.GetPath(strings.Split(key, "."))
 }
 
 // GetPath returns the element in the tree indicated by 'keys'.
@@ -174,17 +176,23 @@ func (t *Tree) GetDefault(key string, def interface{}) interface{} {
 	return val
 }
 
-// Set an element in the tree.
-// Key is a dot-separated path (e.g. a.b.c).
-// Creates all necessary intermediate trees, if needed.
-func (t *Tree) Set(key string, value interface{}) {
-	t.SetPath(strings.Split(key, "."), value)
+// SetOptions arguments are supplied to the SetWithOptions and SetPathWithOptions functions to modify marshalling behaviour.
+// The default values within the struct are valid default options.
+type SetOptions struct {
+	Comment   string
+	Commented bool
+	Multiline bool
 }
 
-// SetPath sets an element in the tree.
-// Keys is an array of path elements (e.g. {"a","b","c"}).
-// Creates all necessary intermediate trees, if needed.
-func (t *Tree) SetPath(keys []string, value interface{}) {
+// SetWithOptions is the same as Set, but allows you to provide formatting
+// instructions to the key, that will be used by Marshal().
+func (t *Tree) SetWithOptions(key string, opts SetOptions, value interface{}) {
+	t.SetPathWithOptions(strings.Split(key, "."), opts, value)
+}
+
+// SetPathWithOptions is the same as SetPath, but allows you to provide
+// formatting instructions to the key, that will be reused by Marshal().
+func (t *Tree) SetPathWithOptions(keys []string, opts SetOptions, value interface{}) {
 	subtree := t
 	for _, intermediateKey := range keys[:len(keys)-1] {
 		nextTree, exists := subtree.values[intermediateKey]
@@ -209,13 +217,80 @@ func (t *Tree) SetPath(keys []string, value interface{}) {
 
 	switch value.(type) {
 	case *Tree:
+		tt := value.(*Tree)
+		tt.comment = opts.Comment
 		toInsert = value
 	case []*Tree:
 		toInsert = value
 	case *tomlValue:
-		toInsert = value
+		tt := value.(*tomlValue)
+		tt.comment = opts.Comment
+		toInsert = tt
 	default:
-		toInsert = &tomlValue{value: value}
+		toInsert = &tomlValue{value: value, comment: opts.Comment, commented: opts.Commented, multiline: opts.Multiline}
+	}
+
+	subtree.values[keys[len(keys)-1]] = toInsert
+}
+
+// Set an element in the tree.
+// Key is a dot-separated path (e.g. a.b.c).
+// Creates all necessary intermediate trees, if needed.
+func (t *Tree) Set(key string, value interface{}) {
+	t.SetWithComment(key, "", false, value)
+}
+
+// SetWithComment is the same as Set, but allows you to provide comment
+// information to the key, that will be reused by Marshal().
+func (t *Tree) SetWithComment(key string, comment string, commented bool, value interface{}) {
+	t.SetPathWithComment(strings.Split(key, "."), comment, commented, value)
+}
+
+// SetPath sets an element in the tree.
+// Keys is an array of path elements (e.g. {"a","b","c"}).
+// Creates all necessary intermediate trees, if needed.
+func (t *Tree) SetPath(keys []string, value interface{}) {
+	t.SetPathWithComment(keys, "", false, value)
+}
+
+// SetPathWithComment is the same as SetPath, but allows you to provide comment
+// information to the key, that will be reused by Marshal().
+func (t *Tree) SetPathWithComment(keys []string, comment string, commented bool, value interface{}) {
+	subtree := t
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		nextTree, exists := subtree.values[intermediateKey]
+		if !exists {
+			nextTree = newTree()
+			subtree.values[intermediateKey] = nextTree // add new element here
+		}
+		switch node := nextTree.(type) {
+		case *Tree:
+			subtree = node
+		case []*Tree:
+			// go to most recent element
+			if len(node) == 0 {
+				// create element if it does not exist
+				subtree.values[intermediateKey] = append(node, newTree())
+			}
+			subtree = node[len(node)-1]
+		}
+	}
+
+	var toInsert interface{}
+
+	switch value.(type) {
+	case *Tree:
+		tt := value.(*Tree)
+		tt.comment = comment
+		toInsert = value
+	case []*Tree:
+		toInsert = value
+	case *tomlValue:
+		tt := value.(*tomlValue)
+		tt.comment = comment
+		toInsert = tt
+	default:
+		toInsert = &tomlValue{value: value, comment: comment, commented: commented}
 	}
 
 	subtree.values[keys[len(keys)-1]] = toInsert

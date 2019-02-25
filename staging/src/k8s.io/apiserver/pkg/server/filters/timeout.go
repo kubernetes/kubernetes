@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
@@ -57,7 +58,7 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apir
 
 		postTimeoutFn := func() {
 			cancel()
-			metrics.Record(req, requestInfo, "", http.StatusGatewayTimeout, 0, 0)
+			metrics.Record(req, requestInfo, metrics.APIServerComponent, "", http.StatusGatewayTimeout, 0, 0)
 		}
 		return req, time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
@@ -91,14 +92,26 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	done := make(chan struct{})
+	errCh := make(chan interface{})
 	tw := newTimeoutWriter(w)
 	go func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				const size = 64 << 10
+				buf := make([]byte, size)
+				buf = buf[:runtime.Stack(buf, false)]
+				err = fmt.Sprintf("%v\n%s", err, buf)
+			}
+			errCh <- err
+		}()
 		t.handler.ServeHTTP(tw, r)
-		close(done)
 	}()
 	select {
-	case <-done:
+	case err := <-errCh:
+		if err != nil {
+			panic(err)
+		}
 		return
 	case <-after:
 		postTimeoutFn()

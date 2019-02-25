@@ -119,6 +119,7 @@ func interestingGoroutines() (gs []string) {
 		stack := strings.TrimSpace(sl[1])
 		if stack == "" ||
 			strings.Contains(stack, "sync.(*WaitGroup).Done") ||
+			strings.Contains(stack, "os.(*file).close") ||
 			strings.Contains(stack, "created by os/signal.init") ||
 			strings.Contains(stack, "runtime/panic.go") ||
 			strings.Contains(stack, "created by testing.RunTests") ||
@@ -134,5 +135,5 @@ func interestingGoroutines() (gs []string) {
 		gs = append(gs, stack)
 	}
 	sort.Strings(gs)
-	return
+	return gs
 }

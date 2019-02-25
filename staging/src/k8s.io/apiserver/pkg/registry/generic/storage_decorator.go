@@ -17,11 +17,11 @@ limitations under the License.
 package generic
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/klog"
 )
 
 // StorageDecorator is a function signature for producing a storage.Interface
@@ -54,7 +54,7 @@ func UndecoratedStorage(
 func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc) {
 	s, d, err := factory.Create(*config)
 	if err != nil {
-		glog.Fatalf("Unable to create storage backend: config (%v), err (%v)", config, err)
+		klog.Fatalf("Unable to create storage backend: config (%v), err (%v)", config, err)
 	}
 	return s, d
 }

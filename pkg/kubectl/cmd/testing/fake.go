@@ -25,15 +25,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
@@ -43,18 +44,15 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
+// InternalType is the schema for internal type
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalType struct {
@@ -64,6 +62,7 @@ type InternalType struct {
 	Name string
 }
 
+// ExternalType is the schema for external type
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalType struct {
@@ -73,6 +72,7 @@ type ExternalType struct {
 	Name string `json:"name"`
 }
 
+// ExternalType2 is another schema for external type
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalType2 struct {
@@ -82,28 +82,46 @@ type ExternalType2 struct {
 	Name string `json:"name"`
 }
 
+// GetObjectKind returns the ObjectKind schema
 func (obj *InternalType) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind sets the version and kind
 func (obj *InternalType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns GroupVersionKind schema
 func (obj *InternalType) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+// GetObjectKind returns the ObjectKind schema
 func (obj *ExternalType) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind returns the GroupVersionKind schema
 func (obj *ExternalType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns the GroupVersionKind schema
 func (obj *ExternalType) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+// GetObjectKind returns the ObjectKind schema
 func (obj *ExternalType2) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind sets the API version and obj kind from schema
 func (obj *ExternalType2) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns the FromAPIVersionAndKind schema
 func (obj *ExternalType2) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
+// NewInternalType returns an initialized InternalType instance
 func NewInternalType(kind, apiversion, name string) *InternalType {
 	item := InternalType{Kind: kind,
 		APIVersion: apiversion,
@@ -111,6 +129,7 @@ func NewInternalType(kind, apiversion, name string) *InternalType {
 	return &item
 }
 
+// InternalNamespacedType schema for internal namespaced types
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalNamespacedType struct {
@@ -121,6 +140,7 @@ type InternalNamespacedType struct {
 	Namespace string
 }
 
+// ExternalNamespacedType schema for external namespaced types
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalNamespacedType struct {
@@ -131,6 +151,7 @@ type ExternalNamespacedType struct {
 	Namespace string `json:"namespace"`
 }
 
+// ExternalNamespacedType2 schema for external namespaced types
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalNamespacedType2 struct {
@@ -141,28 +162,46 @@ type ExternalNamespacedType2 struct {
 	Namespace string `json:"namespace"`
 }
 
+// GetObjectKind returns the ObjectKind schema
 func (obj *InternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind sets the API group and kind from schema
 func (obj *InternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns the GroupVersionKind schema
 func (obj *InternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+// GetObjectKind returns the ObjectKind schema
 func (obj *ExternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind sets the API version and kind from schema
 func (obj *ExternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns the GroupVersionKind schema
 func (obj *ExternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+// GetObjectKind returns the ObjectKind schema
 func (obj *ExternalNamespacedType2) GetObjectKind() schema.ObjectKind { return obj }
+
+// SetGroupVersionKind sets the API version and kind from schema
 func (obj *ExternalNamespacedType2) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
+// GroupVersionKind returns the GroupVersionKind schema
 func (obj *ExternalNamespacedType2) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
+// NewInternalNamespacedType returns an initialized instance of InternalNamespacedType
 func NewInternalNamespacedType(kind, apiversion, name, namespace string) *InternalNamespacedType {
 	item := InternalNamespacedType{Kind: kind,
 		APIVersion: apiversion,
@@ -171,26 +210,35 @@ func NewInternalNamespacedType(kind, apiversion, name, namespace string) *Intern
 	return &item
 }
 
-var versionErr = errors.New("not a version")
+var errInvalidVersion = errors.New("not a version")
 
 func versionErrIfFalse(b bool) error {
 	if b {
 		return nil
 	}
-	return versionErr
+	return errInvalidVersion
 }
 
+// ValidVersion of API
 var ValidVersion = "v1"
+
+// InternalGV is the internal group version object
 var InternalGV = schema.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
+
+// UnlikelyGV is a group version object for unrecognised version
 var UnlikelyGV = schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
+
+// ValidVersionGV is the valid group version object
 var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion}
 
+// NewExternalScheme returns required objects for ExternalScheme
 func NewExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	mapper, codec := AddToScheme(scheme)
 	return scheme, mapper, codec
 }
 
+// AddToScheme adds required objects into scheme
 func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("Type"), &InternalType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("Type"), &ExternalType{})
@@ -228,20 +276,25 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	return []*metav1.APIResourceList{}, nil
 }
 
+func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
+}
+
+// TestFactory extends cmdutil.Factory
 type TestFactory struct {
 	cmdutil.Factory
+
+	kubeConfigFlags *genericclioptions.TestConfigFlags
 
 	Client             kubectl.RESTClient
 	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient kubectl.RESTClient
-	DescriberVal       printers.Describer
-	Namespace          string
 	ClientConfigVal    *restclient.Config
-	CommandVal         string
 	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
 	tempConfigFile *os.File
@@ -250,6 +303,7 @@ type TestFactory struct {
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
+// NewTestFactory returns an initialized TestFactory instance
 func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
@@ -267,17 +321,32 @@ func NewTestFactory() *TestFactory {
 	fallbackReader := bytes.NewBuffer([]byte{})
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
-	configFlags := cmdutil.NewTestConfigFlags().
+	configFlags := genericclioptions.NewTestConfigFlags().
 		WithClientConfig(clientConfig).
 		WithRESTMapper(testRESTMapper())
 
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake restclient config: %v", err))
+	}
+
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
-		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
+		kubeConfigFlags:   configFlags,
+		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme),
 		tempConfigFile:    tmpFile,
+
+		ClientConfigVal: restConfig,
 	}
 }
 
+// WithNamespace is used to mention namespace reactively
+func (f *TestFactory) WithNamespace(ns string) *TestFactory {
+	f.kubeConfigFlags.WithNamespace(ns)
+	return f
+}
+
+// Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
 		return
@@ -286,22 +355,17 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
-	return resource.FakeCategoryExpander, nil
-}
-
-func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
+// ToRESTConfig is used to get ClientConfigVal from a TestFactory
+func (f *TestFactory) ToRESTConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
 
-func (f *TestFactory) BareClientConfig() (*restclient.Config, error) {
-	return f.ClientConfigVal, nil
-}
-
+// ClientForMapping is used to Client from a TestFactory
 func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	return f.Client, nil
 }
 
+// UnstructuredClientForMapping is used to get UnstructuredClient from a TestFactory
 func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.UnstructuredClientForMappingFunc != nil {
 		return f.UnstructuredClientForMappingFunc(mapping.GroupVersionKind.GroupVersion())
@@ -309,18 +373,12 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return f.UnstructuredClient, nil
 }
 
-func (f *TestFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
-	return f.DescriberVal, nil
-}
-
+// Validator returns a validation schema
 func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 
-func (f *TestFactory) DefaultNamespace() (string, bool, error) {
-	return f.Namespace, false, nil
-}
-
+// OpenAPISchema returns openapi resources
 func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 	if f.OpenAPISchemaFunc != nil {
 		return f.OpenAPISchemaFunc()
@@ -328,14 +386,8 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 	return openapitesting.EmptyResources{}, nil
 }
 
-func (f *TestFactory) Command(*cobra.Command, bool) string {
-	return f.CommandVal
-}
-
+// NewBuilder returns an initialized resource.Builder instance
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.RESTMapper()
-	categoryExpander, err2 := f.CategoryExpander()
-
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
 			if f.UnstructuredClientForMappingFunc != nil {
@@ -346,11 +398,14 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			}
 			return f.Client, nil
 		},
-		mapper,
-		categoryExpander,
-	).AddError(err).AddError(err2)
+		f.ToRESTMapper,
+		func() (restmapper.CategoryExpander, error) {
+			return resource.FakeCategoryExpander, nil
+		},
+	)
 }
 
+// KubernetesClientSet initializes and returns the Clientset using TestFactory
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
 	clientset := kubernetes.NewForConfigOrDie(f.ClientConfigVal)
@@ -372,32 +427,14 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.StorageV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AppsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AppsV1beta2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AppsV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	return clientset, nil
 }
 
-func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
-	// Swap the HTTP client out of the REST client with the fake
-	// version.
-	fakeClient := f.Client.(*fake.RESTClient)
-	clientset := internalclientset.NewForConfigOrDie(f.ClientConfigVal)
-	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Autoscaling().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Batch().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Certificates().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Extensions().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Rbac().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Storage().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	return clientset, nil
-}
-
+// DynamicClient returns a dynamic client from TestFactory
 func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
@@ -405,6 +442,7 @@ func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	return f.Factory.DynamicClient()
 }
 
+// RESTClient returns a REST client from TestFactory
 func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 	// Swap out the HTTP client out of the client with the fake's version.
 	fakeClient := f.Client.(*fake.RESTClient)
@@ -416,17 +454,18 @@ func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 	return restClient, nil
 }
 
+// DiscoveryClient returns a discovery client from TestFactory
 func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.ClientConfigVal)
-	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
-}
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
+	if err != nil {
+		return nil, err
+	}
+	cachedClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
-func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.ClientSet()
+	return cachedClient, nil
 }
 
 func testRESTMapper() meta.RESTMapper {
@@ -437,7 +476,7 @@ func testRESTMapper() meta.RESTMapper {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+			testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 		},
 	}
 
@@ -446,24 +485,7 @@ func testRESTMapper() meta.RESTMapper {
 	return expander
 }
 
-func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	c, err := f.ClientSet()
-	if err != nil {
-		panic(err)
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		return c.Core().Pods(f.Namespace).GetLogs(t.Name, opts), nil
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
-	}
-}
-
+// ScaleClient returns the ScalesGetter from a TestFactory
 func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {
 	return f.ScaleGetter, nil
 }
@@ -528,6 +550,24 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				"v1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 					{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+				},
+				"v1": {
+					{Name: "jobs", Namespaced: true, Kind: "Job"},
 				},
 			},
 		},

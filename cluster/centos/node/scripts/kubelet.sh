@@ -87,6 +87,7 @@ EnvironmentFile=-/opt/kubernetes/cfg/kubelet
 ExecStart=/opt/kubernetes/bin/kubelet ${KUBELET_OPTS}
 Restart=on-failure
 KillMode=process
+RestartSec=15s
 
 [Install]
 WantedBy=multi-user.target

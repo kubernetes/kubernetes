@@ -85,8 +85,6 @@ type ContainerReference struct {
 	// Namespace under which the aliases of a container are unique.
 	// An example of a namespace is "docker" for Docker containers.
 	Namespace string `json:"namespace,omitempty"`
-
-	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // Sorts by container name.
@@ -104,11 +102,11 @@ type ContainerInfoRequest struct {
 	NumStats int `json:"num_stats,omitempty"`
 
 	// Start time for which to query information.
-	// If ommitted, the beginning of time is assumed.
+	// If omitted, the beginning of time is assumed.
 	Start time.Time `json:"start,omitempty"`
 
 	// End time for which to query information.
-	// If ommitted, current time is assumed.
+	// If omitted, current time is assumed.
 	End time.Time `json:"end,omitempty"`
 }
 
@@ -295,10 +293,23 @@ type CpuCFS struct {
 	ThrottledTime uint64 `json:"throttled_time"`
 }
 
+// Cpu Aggregated scheduler statistics
+type CpuSchedstat struct {
+	// https://www.kernel.org/doc/Documentation/scheduler/sched-stats.txt
+
+	// time spent on the cpu
+	RunTime uint64 `json:"run_time"`
+	// time spent waiting on a runqueue
+	RunqueueTime uint64 `json:"runqueue_time"`
+	// # of timeslices run on this cpu
+	RunPeriods uint64 `json:"run_periods"`
+}
+
 // All CPU usage metrics are cumulative from the creation of the container
 type CpuStats struct {
-	Usage CpuUsage `json:"usage"`
-	CFS   CpuCFS   `json:"cfs"`
+	Usage     CpuUsage     `json:"usage"`
+	CFS       CpuCFS       `json:"cfs"`
+	Schedstat CpuSchedstat `json:"schedstat"`
 	// Smoothed average of number of runnable threads x 1000.
 	// We multiply by thousand to avoid using floats, but preserving precision.
 	// Load is smoothed over the last 10 seconds. Instantaneous value can be read
@@ -346,6 +357,9 @@ type MemoryStats struct {
 	// The amount of swap currently used by the processes in this cgroup
 	// Units: Bytes.
 	Swap uint64 `json:"swap"`
+
+	// The amount of memory used for mapped files (includes tmpfs/shmem)
+	MappedFile uint64 `json:"mapped_file"`
 
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
@@ -543,6 +557,14 @@ type AcceleratorStats struct {
 	DutyCycle uint64 `json:"duty_cycle"`
 }
 
+type ProcessStats struct {
+	// Number of processes
+	ProcessCount uint64 `json:"process_count"`
+
+	// Number of open file descriptors
+	FdCount uint64 `json:"fd_count"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time    `json:"timestamp"`
@@ -559,6 +581,9 @@ type ContainerStats struct {
 
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
+
+	// ProcessStats for Containers
+	Processes ProcessStats `json:"processes,omitempty"`
 
 	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`

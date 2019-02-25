@@ -20,11 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-
-	"github.com/Azure/go-autorest/autorest"
 )
 
-func TestShouldRetry(t *testing.T) {
+func TestShouldRetryHTTPRequest(t *testing.T) {
 	tests := []struct {
 		code     int
 		err      error
@@ -52,14 +50,11 @@ func TestShouldRetry(t *testing.T) {
 			expected: false,
 		},
 	}
-
 	for _, test := range tests {
-		resp := autorest.Response{
-			Response: &http.Response{
-				StatusCode: test.code,
-			},
+		resp := &http.Response{
+			StatusCode: test.code,
 		}
-		res := shouldRetryAPIRequest(resp, test.err)
+		res := shouldRetryHTTPRequest(resp, test.err)
 		if res != test.expected {
 			t.Errorf("expected: %v, saw: %v", test.expected, res)
 		}
@@ -86,12 +81,10 @@ func TestIsSuccessResponse(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resp := autorest.Response{
-			Response: &http.Response{
-				StatusCode: test.code,
-			},
+		resp := http.Response{
+			StatusCode: test.code,
 		}
-		res := isSuccessHTTPResponse(resp)
+		res := isSuccessHTTPResponse(&resp)
 		if res != test.expected {
 			t.Errorf("expected: %v, saw: %v", test.expected, res)
 		}
@@ -99,6 +92,7 @@ func TestIsSuccessResponse(t *testing.T) {
 }
 
 func TestProcessRetryResponse(t *testing.T) {
+	az := &Cloud{}
 	tests := []struct {
 		code int
 		err  error
@@ -132,12 +126,10 @@ func TestProcessRetryResponse(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resp := autorest.Response{
-			Response: &http.Response{
-				StatusCode: test.code,
-			},
+		resp := &http.Response{
+			StatusCode: test.code,
 		}
-		res, err := processRetryResponse(resp, test.err)
+		res, err := az.processHTTPRetryResponse(nil, "", resp, test.err)
 		if res != test.stop {
 			t.Errorf("expected: %v, saw: %v", test.stop, res)
 		}

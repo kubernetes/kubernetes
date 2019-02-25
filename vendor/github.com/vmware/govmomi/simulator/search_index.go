@@ -57,15 +57,18 @@ func (s *SearchIndex) FindByDatastorePath(r *types.FindByDatastorePath) soap.Has
 func (s *SearchIndex) FindByInventoryPath(req *types.FindByInventoryPath) soap.HasFault {
 	body := &methods.FindByInventoryPathBody{Res: new(types.FindByInventoryPathResponse)}
 
-	path := strings.Split(req.InventoryPath, "/")
-	if len(path) <= 1 {
+	split := func(c rune) bool {
+		return c == '/'
+	}
+	path := strings.FieldsFunc(req.InventoryPath, split)
+	if len(path) < 1 {
 		return body
 	}
 
 	root := Map.content().RootFolder
 	o := &root
 
-	for _, name := range path[1:] {
+	for _, name := range path {
 		f := s.FindChild(&types.FindChild{Entity: *o, Name: name})
 
 		o = f.(*methods.FindChildBody).Res.Returnval
@@ -132,9 +135,16 @@ func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 			if !ok {
 				continue
 			}
-			if vm.Config.Uuid == req.Uuid {
-				body.Res.Returnval = &ref
-				break
+			if req.InstanceUuid != nil && *req.InstanceUuid {
+				if vm.Config.InstanceUuid == req.Uuid {
+					body.Res.Returnval = &ref
+					break
+				}
+			} else {
+				if vm.Config.Uuid == req.Uuid {
+					body.Res.Returnval = &ref
+					break
+				}
 			}
 		}
 	} else {

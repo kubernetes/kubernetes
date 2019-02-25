@@ -83,6 +83,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
+// It sets zero values only if the object does not have a zero value for the respective field.
 func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
@@ -92,9 +93,10 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 		if !ValidNamespace(ctx, objectMeta) {
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
-	} else {
+	} else if len(objectMeta.GetNamespace()) > 0 {
 		objectMeta.SetNamespace(metav1.NamespaceNone)
 	}
+
 	// Ensure requests cannot update generation
 	oldMeta, err := meta.Accessor(old)
 	if err != nil {
@@ -102,16 +104,22 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		oldMeta.SetInitializers(nil)
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	oldMeta.SetInitializers(nil)
+	objectMeta.SetInitializers(nil)
+
+	// Ensure managedFields state is removed unless ServerSideApply is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		oldMeta.SetManagedFields(nil)
+		objectMeta.SetManagedFields(nil)
 	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 
 	// ClusterName is ignored and should not be saved
-	objectMeta.SetClusterName("")
+	if len(objectMeta.GetClusterName()) > 0 {
+		objectMeta.SetClusterName("")
+	}
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {
 		objectMeta.SetUID(oldMeta.GetUID())
@@ -248,7 +256,7 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 }
 
 // AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func
-func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
+func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
 		return func(obj, old runtime.Object) error { return nil }
@@ -263,11 +271,12 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes)
+		return validatingAdmission.Validate(finalAttributes, o)
 	}
 }

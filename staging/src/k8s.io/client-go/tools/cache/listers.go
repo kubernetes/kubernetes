@@ -17,7 +17,7 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,7 +31,14 @@ import (
 type AppendFunc func(interface{})
 
 func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
+	selectAll := selector.Empty()
 	for _, m := range store.List() {
+		if selectAll {
+			// Avoid computing labels of the objects to speed up common flows
+			// of listing all objects.
+			appendFn(m)
+			continue
+		}
 		metadata, err := meta.Accessor(m)
 		if err != nil {
 			return err
@@ -44,8 +51,15 @@ func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
 }
 
 func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
+	selectAll := selector.Empty()
 	if namespace == metav1.NamespaceAll {
 		for _, m := range indexer.List() {
+			if selectAll {
+				// Avoid computing labels of the objects to speed up common flows
+				// of listing all objects.
+				appendFn(m)
+				continue
+			}
 			metadata, err := meta.Accessor(m)
 			if err != nil {
 				return err
@@ -60,7 +74,7 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	items, err := indexer.Index(NamespaceIndex, &metav1.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
-		glog.Warningf("can not retrieve list of objects using index : %v", err)
+		klog.Warningf("can not retrieve list of objects using index : %v", err)
 		for _, m := range indexer.List() {
 			metadata, err := meta.Accessor(m)
 			if err != nil {
@@ -74,6 +88,12 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 		return nil
 	}
 	for _, m := range items {
+		if selectAll {
+			// Avoid computing labels of the objects to speed up common flows
+			// of listing all objects.
+			appendFn(m)
+			continue
+		}
 		metadata, err := meta.Accessor(m)
 		if err != nil {
 			return err

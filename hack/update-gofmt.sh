@@ -31,6 +31,7 @@ find_files() {
   find . -not \( \
       \( \
         -wholename './output' \
+        -o -wholename './.git' \
         -o -wholename './_output' \
         -o -wholename './_gopath' \
         -o -wholename './release' \
@@ -43,4 +44,4 @@ find_files() {
 }
 
 GOFMT="gofmt -s -w"
-find_files | xargs $GOFMT
+find_files | xargs ${GOFMT}

@@ -23,11 +23,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -37,14 +39,14 @@ const (
 
 // MatchVersionFlags is for setting the "match server version" function.
 type MatchVersionFlags struct {
-	Delegate RESTClientGetter
+	Delegate genericclioptions.RESTClientGetter
 
 	RequireMatchedServerVersion bool
 	checkServerVersion          sync.Once
 	matchesServerVersionErr     error
 }
 
-var _ RESTClientGetter = &MatchVersionFlags{}
+var _ genericclioptions.RESTClientGetter = &MatchVersionFlags{}
 
 func (f *MatchVersionFlags) checkMatchingServerVersion() error {
 	f.checkServerVersion.Do(func() {
@@ -90,7 +92,7 @@ func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterf
 	return f.Delegate.ToDiscoveryClient()
 }
 
-// RESTMapper returns a mapper.
+// ToRESTMapper returns a mapper.
 func (f *MatchVersionFlags) ToRESTMapper() (meta.RESTMapper, error) {
 	if err := f.checkMatchingServerVersion(); err != nil {
 		return nil, err
@@ -102,7 +104,7 @@ func (f *MatchVersionFlags) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&f.RequireMatchedServerVersion, flagMatchBinaryVersion, f.RequireMatchedServerVersion, "Require server version to match client version")
 }
 
-func NewMatchVersionFlags(delegate RESTClientGetter) *MatchVersionFlags {
+func NewMatchVersionFlags(delegate genericclioptions.RESTClientGetter) *MatchVersionFlags {
 	return &MatchVersionFlags{
 		Delegate: delegate,
 	}
@@ -119,7 +121,10 @@ func setKubernetesDefaults(config *rest.Config) error {
 		config.APIPath = "/api"
 	}
 	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = legacyscheme.Codecs
+		// This codec factory ensures the resources are not converted. Therefore, resources
+		// will not be round-tripped through internal versions. Defaulting does not happen
+		// on the client.
+		config.NegotiatedSerializer = &serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	}
 	return rest.SetKubernetesDefaults(config)
 }

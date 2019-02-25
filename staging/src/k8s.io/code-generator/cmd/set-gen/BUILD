@@ -18,12 +18,13 @@ exports_files([
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/set-gen",
     importpath = "k8s.io/code-generator/cmd/set-gen",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/code-generator/pkg/util:go_default_library",
+        "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/examples/set-gen/generators:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

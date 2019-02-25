@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	apistorage "k8s.io/apiserver/pkg/storage"
+	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -98,21 +98,28 @@ func (s strategy) Export(ctx context.Context, obj runtime.Object, exact bool) er
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	secret, ok := obj.(*api.Secret)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a secret")
+		return nil, nil, fmt.Errorf("not a secret")
 	}
-	return labels.Set(secret.Labels), SelectableFields(secret), secret.Initializers != nil, nil
+	return labels.Set(secret.Labels), SelectableFields(secret), nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
+func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+	return pkgstorage.SelectionPredicate{
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
+		IndexFields: []string{"metadata.name"},
 	}
+}
+
+func SecretNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
+	secret := obj.(*api.Secret)
+	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: secret.ObjectMeta.Name}
+	return []pkgstorage.MatchValue{result}
 }
 
 // SelectableFields returns a field set that can be used for filter selection

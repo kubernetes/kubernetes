@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "validation.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/validation",
     importpath = "github.com/Azure/go-autorest/autorest/validation",
     visibility = ["//visibility:public"],
 )

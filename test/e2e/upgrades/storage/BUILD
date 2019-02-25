@@ -7,15 +7,21 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["persistent_volumes.go"],
+    srcs = [
+        "persistent_volumes.go",
+        "volume_mode.go",
+    ],
     importpath = "k8s.io/kubernetes/test/e2e/upgrades/storage",
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/storage/utils:go_default_library",
         "//test/e2e/upgrades:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 

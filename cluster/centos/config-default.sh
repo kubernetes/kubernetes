@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly root=$(dirname "${BASH_SOURCE}")
+readonly root=$(dirname "${BASH_SOURCE[0]}")
 
 ## Contains configuration values for the CentOS cluster
 # The user should have sudo privilege
@@ -30,8 +30,9 @@ export MASTERS="${MASTERS:-$MASTER}"
 # Get the length of specific arg0, could be a space-separate string or array.
 function length-of() {
   local len=0
+  # shellcheck disable=SC2034  # Unused variables left for readability
   for part in $1; do
-    let ++len
+    ((++len))
   done
   echo $len
 }
@@ -41,9 +42,9 @@ export NUM_MASTERS="${NUM_MASTERS:-$(length-of "$MASTERS")}"
 # Get default master advertise address: first master node.
 function default-advertise-address() {
   # get the first master node
-  local masters_array=(${MASTERS})
+  local masters_array=("${MASTERS}")
   local master=${masters_array[0]}
-  echo ${master#*@}
+  echo "${master#*@}"
 }
 
 # Define advertise address of masters, could be a load balancer address.
@@ -76,7 +77,8 @@ function concat-etcd-servers() {
 
   echo "$etcd_servers"
 }
-export ETCD_SERVERS="$(concat-etcd-servers)"
+ETCD_SERVERS="$(concat-etcd-servers)"
+export ETCD_SERVERS
 
 # By default, etcd cluster will use runtime configuration
 #   https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
@@ -90,17 +92,19 @@ function concat-etcd-initial-cluster() {
       etcd_initial_cluster+=","
     fi
     etcd_initial_cluster+="infra${num_infra}=https://${master_ip}:2380"
-    let ++num_infra
+    ((++num_infra))
   done
 
   echo "$etcd_initial_cluster"
 }
-export ETCD_INITIAL_CLUSTER="$(concat-etcd-initial-cluster)"
+ETCD_INITIAL_CLUSTER="$(concat-etcd-initial-cluster)"
+export ETCD_INITIAL_CLUSTER
 
 CERT_DIR="${CERT_DIR:-${root}/ca-cert}"
 mkdir -p "${CERT_DIR}"
 # CERT_DIR path must be absolute.
-export CERT_DIR="$(cd "${CERT_DIR}"; pwd)"
+CERT_DIR="$(cd "${CERT_DIR}" && pwd)"
+export CERT_DIR
 
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
@@ -108,12 +112,14 @@ export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"192.168.3.0/24"}
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+export ENABLE_CLUSTER_DNS
 # DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
 DNS_SERVER_IP=${DNS_SERVER_IP:-"192.168.3.100"}
 DNS_DOMAIN=${DNS_DOMAIN:-"cluster.local"}
 
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+export ENABLE_CLUSTER_UI
 
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
@@ -124,7 +130,7 @@ export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 # modification is overwritten.
 # If we included ResourceQuota, we should keep it at the end of the list to
 # prevent incrementing quota usage prematurely.
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,StorageObjectInUseProtection,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,StorageObjectInUseProtection,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.

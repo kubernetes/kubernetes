@@ -1,4 +1,52 @@
 options:
+  audit-policy:
+    type: string
+    default: |
+      apiVersion: audit.k8s.io/v1beta1
+      kind: Policy
+      rules:
+      # Don't log read-only requests from the apiserver
+      - level: None
+        users: ["system:apiserver"]
+        verbs: ["get", "list", "watch"]
+      # Don't log kube-proxy watches
+      - level: None
+        users: ["system:kube-proxy"]
+        verbs: ["watch"]
+        resources:
+        - resources: ["endpoints", "services"]
+      # Don't log nodes getting their own status
+      - level: None
+        userGroups: ["system:nodes"]
+        verbs: ["get"]
+        resources:
+        - resources: ["nodes"]
+      # Don't log kube-controller-manager and kube-scheduler getting endpoints
+      - level: None
+        users: ["system:unsecured"]
+        namespaces: ["kube-system"]
+        verbs: ["get"]
+        resources:
+        - resources: ["endpoints"]
+      # Log everything else at the Request level.
+      - level: Request
+        omitStages:
+        - RequestReceived
+    description: |
+      Audit policy passed to kube-apiserver via --audit-policy-file.
+      For more info, please refer to the upstream documentation at
+      https://kubernetes.io/docs/tasks/debug-application-cluster/audit/
+  audit-webhook-config:
+    type: string
+    default: ""
+    description: |
+      Audit webhook config passed to kube-apiserver via --audit-webhook-config-file.
+      For more info, please refer to the upstream documentation at
+      https://kubernetes.io/docs/tasks/debug-application-cluster/audit/
+  addons-registry:
+    type: string
+    default: ""
+    description: Specify the docker registry to use when applying addons
   enable-dashboard-addons:
     type: boolean
     default: True
@@ -41,7 +89,7 @@ options:
       will not be loaded.
   channel:
     type: string
-    default: "1.10/stable"
+    default: "1.11/stable"
     description: |
       Snap channel to install Kubernetes master services from
   client_password:
@@ -99,3 +147,18 @@ options:
     default: true
     description: |
       If true the metrics server for Kubernetes will be deployed onto the cluster.
+  snapd_refresh:
+    default: "max"
+    type: string
+    description: |
+      How often snapd handles updates for installed snaps. Setting an empty
+      string will check 4x per day. Set to "max" to delay the refresh as long
+      as possible. You may also set a custom string as described in the
+      'refresh.timer' section here:
+        https://forum.snapcraft.io/t/system-options/87
+  default-storage:
+    type: string
+    default: "auto"
+    description: |
+      The storage class to make the default storage class. Allowed values are "auto",
+      "none", "ceph-xfs", "ceph-ext4". Note: Only works in Kubernetes >= 1.10

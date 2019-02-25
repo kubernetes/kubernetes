@@ -19,8 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,11 +40,11 @@ type PersistentVolumeInterface interface {
 	Create(*v1.PersistentVolume) (*v1.PersistentVolume, error)
 	Update(*v1.PersistentVolume) (*v1.PersistentVolume, error)
 	UpdateStatus(*v1.PersistentVolume) (*v1.PersistentVolume, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.PersistentVolume, error)
-	List(opts meta_v1.ListOptions) (*v1.PersistentVolumeList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.PersistentVolume, error)
+	List(opts metav1.ListOptions) (*v1.PersistentVolumeList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
 	PersistentVolumeExpansion
 }
@@ -60,7 +62,7 @@ func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
 }
 
 // Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
-func (c *persistentVolumes) Get(name string, options meta_v1.GetOptions) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) Get(name string, options metav1.GetOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
@@ -72,22 +74,32 @@ func (c *persistentVolumes) Get(name string, options meta_v1.GetOptions) (result
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
-func (c *persistentVolumes) List(opts meta_v1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+func (c *persistentVolumes) List(opts metav1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *persistentVolumes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -130,7 +142,7 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *v1.PersistentVolume) 
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
-func (c *persistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *persistentVolumes) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		Name(name).
@@ -140,10 +152,15 @@ func (c *persistentVolumes) Delete(name string, options *meta_v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumes) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *persistentVolumes) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

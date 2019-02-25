@@ -22,11 +22,11 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 const defaultProviderName = "fake"
@@ -45,6 +45,14 @@ type FakeUpdateBalancerCall struct {
 	Hosts   []*v1.Node
 }
 
+var _ cloudprovider.Interface = (*FakeCloud)(nil)
+var _ cloudprovider.Instances = (*FakeCloud)(nil)
+var _ cloudprovider.LoadBalancer = (*FakeCloud)(nil)
+var _ cloudprovider.Routes = (*FakeCloud)(nil)
+var _ cloudprovider.Zones = (*FakeCloud)(nil)
+var _ cloudprovider.PVLabeler = (*FakeCloud)(nil)
+var _ cloudprovider.Clusters = (*FakeCloud)(nil)
+
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists bool
@@ -57,6 +65,7 @@ type FakeCloud struct {
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
+	addressesMux  sync.Mutex
 	ExtID         map[types.NodeName]string
 	InstanceTypes map[types.NodeName]string
 	Machines      []types.NodeName
@@ -72,6 +81,8 @@ type FakeCloud struct {
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
+
+	RequestDelay time.Duration
 }
 
 type FakeRoute struct {
@@ -82,6 +93,9 @@ type FakeRoute struct {
 func (f *FakeCloud) addCall(desc string) {
 	f.addCallLock.Lock()
 	defer f.addCallLock.Unlock()
+
+	time.Sleep(f.RequestDelay)
+
 	f.Calls = append(f.Calls, desc)
 }
 
@@ -91,7 +105,8 @@ func (f *FakeCloud) ClearCalls() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (f *FakeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (f *FakeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 func (f *FakeCloud) ListClusters(ctx context.Context) ([]string, error) {
 	return f.ClusterList, f.Err
@@ -147,6 +162,12 @@ func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, ser
 	return status, f.Exists, f.Err
 }
 
+// GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName.
+func (f *FakeCloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
+	return cloudprovider.DefaultLoadBalancerName(service)
+}
+
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -155,7 +176,7 @@ func (f *FakeCloud) EnsureLoadBalancer(ctx context.Context, clusterName string, 
 		f.Balancers = make(map[string]FakeBalancer)
 	}
 
-	name := cloudprovider.GetLoadBalancerName(service)
+	name := f.GetLoadBalancerName(ctx, clusterName, service)
 	spec := service.Spec
 
 	zone, err := f.GetZone(context.TODO())
@@ -200,13 +221,23 @@ func (f *FakeCloud) CurrentNodeName(ctx context.Context, hostname string) (types
 // It adds an entry "node-addresses" into the internal method call record.
 func (f *FakeCloud) NodeAddresses(ctx context.Context, instance types.NodeName) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
 	return f.Addresses, f.Err
+}
+
+func (f *FakeCloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
+	f.Addresses = nodeAddresses
 }
 
 // NodeAddressesByProviderID is a test-spy implementation of Instances.NodeAddressesByProviderID.
 // It adds an entry "node-addresses-by-provider-id" into the internal method call record.
 func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses-by-provider-id")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
 	return f.Addresses, f.Err
 }
 

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -264,14 +264,12 @@ func TestPVCProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "deleted PVC with finalizer + pods with the PVC and is finished -> finalizer is removed",
+			name: "deleted PVC with finalizer + pods with the PVC finished but is not deleted -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
-			},
+			updatedPVC:                          deleted(withProtectionFinalizer(pvc())),
+			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		//
@@ -287,14 +285,12 @@ func TestPVCProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "updated finished Pod -> finalizer is removed",
+			name: "updated finished Pod -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			updatedPod: withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
-			},
+			updatedPod:                          withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
+			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
@@ -378,7 +374,7 @@ func TestPVCProtectionController(t *testing.T) {
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				glog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
+				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
 				ctrl.processNextWorkItem()
 			}
 			if ctrl.queue.Len() > 0 {
@@ -389,7 +385,7 @@ func TestPVCProtectionController(t *testing.T) {
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log evey wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					glog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.

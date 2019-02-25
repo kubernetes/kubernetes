@@ -28,15 +28,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
+	// ProxyProtocolPolicyName is the tag named used for the proxy protocol
+	// policy
 	ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
+	// SSLNegotiationPolicyNameFormat is a format string used for the SSL
+	// negotiation policy tag name
 	SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
 )
 
@@ -129,7 +134,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			})
 		}
 
-		glog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
+		klog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
 		createResponse, err := c.elbv2.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating load balancer: %q", err)
@@ -138,10 +143,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		loadBalancer = createResponse.LoadBalancers[0]
 
 		// Create Target Groups
-		addTagsInput := &elbv2.AddTagsInput{
-			ResourceArns: []*string{},
-			Tags:         []*elbv2.Tag{},
-		}
+		resourceArns := make([]*string, 0, len(mappings))
 
 		for i := range mappings {
 			// It is easier to keep track of updates by having possibly
@@ -150,20 +152,28 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			if err != nil {
 				return nil, fmt.Errorf("Error creating listener: %q", err)
 			}
-			addTagsInput.ResourceArns = append(addTagsInput.ResourceArns, targetGroupArn)
+			resourceArns = append(resourceArns, targetGroupArn)
 
 		}
 
 		// Add tags to targets
+		targetGroupTags := make([]*elbv2.Tag, 0, len(tags))
+
 		for k, v := range tags {
-			addTagsInput.Tags = append(addTagsInput.Tags, &elbv2.Tag{
+			targetGroupTags = append(targetGroupTags, &elbv2.Tag{
 				Key: aws.String(k), Value: aws.String(v),
 			})
 		}
-		if len(addTagsInput.ResourceArns) > 0 && len(addTagsInput.Tags) > 0 {
-			_, err = c.elbv2.AddTags(addTagsInput)
-			if err != nil {
-				return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+		if len(resourceArns) > 0 && len(targetGroupTags) > 0 {
+			// elbv2.AddTags doesn't allow to tag multiple resources at once
+			for _, arn := range resourceArns {
+				_, err = c.elbv2.AddTags(&elbv2.AddTagsInput{
+					ResourceArns: []*string{arn},
+					Tags:         targetGroupTags,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+				}
 			}
 		}
 	} else {
@@ -308,6 +318,64 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			}
 		}
 
+		desiredLoadBalancerAttributes := map[string]string{}
+		// Default values to ensured a remove annotation reverts back to the default
+		desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "false"
+
+		// Determine if cross zone load balancing enabled/disabled has been specified
+		crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
+		if crossZoneLoadBalancingEnabledAnnotation != "" {
+			crossZoneEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+					ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
+					crossZoneLoadBalancingEnabledAnnotation,
+				)
+			}
+
+			if crossZoneEnabled {
+				desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "true"
+			}
+		}
+
+		// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+		// that cannot be specified at the time of creation and can only be modified after the fact,
+		// e.g. idle connection timeout.
+		describeAttributesRequest := &elbv2.DescribeLoadBalancerAttributesInput{
+			LoadBalancerArn: loadBalancer.LoadBalancerArn,
+		}
+		describeAttributesOutput, err := c.elbv2.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve load balancer attributes during attribute sync: %q", err)
+		}
+
+		changedAttributes := []*elbv2.LoadBalancerAttribute{}
+
+		// Identify to be changed attributes
+		for _, foundAttribute := range describeAttributesOutput.Attributes {
+			if targetValue, ok := desiredLoadBalancerAttributes[*foundAttribute.Key]; ok {
+				if targetValue != *foundAttribute.Value {
+					changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+						Key:   foundAttribute.Key,
+						Value: aws.String(targetValue),
+					})
+				}
+			}
+		}
+
+		// Update attributes requiring changes
+		if len(changedAttributes) > 0 {
+			klog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
+
+			_, err = c.elbv2.ModifyLoadBalancerAttributes(&elbv2.ModifyLoadBalancerAttributesInput{
+				LoadBalancerArn: loadBalancer.LoadBalancerArn,
+				Attributes:      changedAttributes,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
+			}
+		}
+
 		// Subnets cannot be modified on NLBs
 		if dirty {
 			loadBalancers, err := c.elbv2.DescribeLoadBalancers(
@@ -335,7 +403,7 @@ func createTargetName(namespacedName types.NamespacedName, frontendPort, nodePor
 func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping, namespacedName types.NamespacedName, instanceIDs []string, vpcID string) (listener *elbv2.Listener, targetGroupArn *string, err error) {
 	targetName := createTargetName(namespacedName, mapping.FrontendPort, mapping.TrafficPort)
 
-	glog.Infof("Creating load balancer target group for %v with name: %s", namespacedName, targetName)
+	klog.Infof("Creating load balancer target group for %v with name: %s", namespacedName, targetName)
 	target, err := c.ensureTargetGroup(
 		nil,
 		mapping,
@@ -356,7 +424,7 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 			Type:           aws.String(elbv2.ActionTypeEnumForward),
 		}},
 	}
-	glog.Infof("Creating load balancer listener for %v", namespacedName)
+	klog.Infof("Creating load balancer listener for %v", namespacedName)
 	createListenerOutput, err := c.elbv2.CreateListener(createListernerInput)
 	if err != nil {
 		return nil, aws.String(""), fmt.Errorf("Error creating load balancer listener: %q", err)
@@ -564,12 +632,17 @@ func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName str
 	response := []*ec2.SecurityGroup{}
 	clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
 	healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
+	alreadyAdded := sets.NewString()
 	for i := range securityGroups {
 		for j := range securityGroups[i].IpPermissions {
 			for k := range securityGroups[i].IpPermissions[j].IpRanges {
 				description := aws.StringValue(securityGroups[i].IpPermissions[j].IpRanges[k].Description)
 				if description == clientRule || description == healthRule {
-					response = append(response, securityGroups[i])
+					sgIDString := aws.StringValue(securityGroups[i].GroupId)
+					if !alreadyAdded.Has(sgIDString) {
+						response = append(response, securityGroups[i])
+						alreadyAdded.Insert(sgIDString)
+					}
 				}
 			}
 		}
@@ -577,7 +650,7 @@ func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName str
 	return response
 }
 
-func (c *Cloud) getVpcCidrBlock() (*string, error) {
+func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 	vpcs, err := c.ec2.DescribeVpcs(&ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(c.vpcID)},
 	})
@@ -587,13 +660,19 @@ func (c *Cloud) getVpcCidrBlock() (*string, error) {
 	if len(vpcs.Vpcs) != 1 {
 		return nil, fmt.Errorf("Error querying VPC for ELB, got %d vpcs for %s", len(vpcs.Vpcs), c.vpcID)
 	}
-	return vpcs.Vpcs[0].CidrBlock, nil
+
+	cidrBlocks := make([]string, 0, len(vpcs.Vpcs[0].CidrBlockAssociationSet))
+	for _, cidr := range vpcs.Vpcs[0].CidrBlockAssociationSet {
+		cidrBlocks = append(cidrBlocks, aws.StringValue(cidr.CidrBlock))
+	}
+	return cidrBlocks, nil
 }
 
 // abstraction for updating SG rules
 // if clientTraffic is false, then only update HealthCheck rules
 func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.SecurityGroup, desiredSgIds []string, ports []int64, lbName string, clientCidrs []string, clientTraffic bool) error {
 
+	klog.V(8).Infof("updateInstanceSecurityGroupsForNLBTraffic: actualGroups=%v, desiredSgIds=%v, ports=%v, clientTraffic=%v", actualGroups, desiredSgIds, ports, clientTraffic)
 	// Map containing the groups we want to make changes on; the ports to make
 	// changes on; and whether to add or remove it. true to add, false to remove
 	portChanges := map[string]map[int64]bool{}
@@ -612,7 +691,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 	for _, actualGroup := range actualGroups {
 		actualGroupID := aws.StringValue(actualGroup.GroupId)
 		if actualGroupID == "" {
-			glog.Warning("Ignoring group without ID: ", actualGroup)
+			klog.Warning("Ignoring group without ID: ", actualGroup)
 			continue
 		}
 
@@ -647,17 +726,17 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 		for port, add := range portMap {
 			if add {
 				if clientTraffic {
-					glog.V(2).Infof("Adding rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					glog.V(2).Infof("Adding rule for client traffic from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					klog.V(2).Infof("Adding rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					klog.V(2).Infof("Adding rule for client traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				} else {
-					glog.V(2).Infof("Adding rule for health check traffic from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					klog.V(2).Infof("Adding rule for health check traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				}
 			} else {
 				if clientTraffic {
-					glog.V(2).Infof("Removing rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					glog.V(2).Infof("Removing rule for client traffic from the network load balancer (%s) to instance (%s)", clientCidrs, instanceSecurityGroupID)
+					klog.V(2).Infof("Removing rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					klog.V(2).Infof("Removing rule for client traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				}
-				glog.V(2).Infof("Removing rule for health check traffic from the network load balancer (%s) to instance (%s)", clientCidrs, instanceSecurityGroupID)
+				klog.V(2).Infof("Removing rule for health check traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 			}
 
 			if clientTraffic {
@@ -712,7 +791,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 				return err
 			}
 			if !changed {
-				glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 			}
 		}
 
@@ -722,7 +801,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 				return err
 			}
 			if !changed {
-				glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 			}
 		}
 
@@ -745,12 +824,12 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 
 			group, err := c.findSecurityGroup(instanceSecurityGroupID)
 			if err != nil {
-				glog.Warningf("Error retrieving security group: %q", err)
+				klog.Warningf("Error retrieving security group: %q", err)
 				return err
 			}
 
 			if group == nil {
-				glog.Warning("Security group not found: ", instanceSecurityGroupID)
+				klog.Warning("Security group not found: ", instanceSecurityGroupID)
 				return nil
 			}
 
@@ -771,21 +850,21 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 				// the icmp permission is missing
 				changed, err := c.addSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
 				if err != nil {
-					glog.Warningf("Error adding MTU permission to security group: %q", err)
+					klog.Warningf("Error adding MTU permission to security group: %q", err)
 					return err
 				}
 				if !changed {
-					glog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+					klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 				}
 			} else if icmpExists && permCount == 0 {
 				// there is no additional permissions, remove icmp
 				changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
 				if err != nil {
-					glog.Warningf("Error removing MTU permission to security group: %q", err)
+					klog.Warningf("Error removing MTU permission to security group: %q", err)
 					return err
 				}
 				if !changed {
-					glog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+					klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 				}
 			}
 		}
@@ -794,12 +873,12 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 }
 
 // Add SG rules for a given NLB
-func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[awsInstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
+func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[InstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
 
-	vpcCidr, err := c.getVpcCidrBlock()
+	vpcCidrBlocks, err := c.getVpcCidrBlocks()
 	if err != nil {
 		return err
 	}
@@ -864,13 +943,13 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 		}
 
 		if securityGroup == nil {
-			glog.Warningf("Ignoring instance without security group: %s", aws.StringValue(instance.InstanceId))
+			klog.Warningf("Ignoring instance without security group: %s", aws.StringValue(instance.InstanceId))
 			continue
 		}
 
 		id := aws.StringValue(securityGroup.GroupId)
 		if id == "" {
-			glog.Warningf("found security group without id: %v", securityGroup)
+			klog.Warningf("found security group without id: %v", securityGroup)
 			continue
 		}
 
@@ -884,7 +963,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 	}
 
 	// Run once for health check traffic
-	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, []string{aws.StringValue(vpcCidr)}, false)
+	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, vpcCidrBlocks, false)
 	if err != nil {
 		return err
 	}
@@ -912,9 +991,17 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
-		createRequest.Subnets = stringPointerArray(subnetIDs)
+		if subnetIDs == nil {
+			createRequest.Subnets = nil
+		} else {
+			createRequest.Subnets = aws.StringSlice(subnetIDs)
+		}
 
-		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
+		if securityGroupIDs == nil {
+			createRequest.SecurityGroups = nil
+		} else {
+			createRequest.SecurityGroups = aws.StringSlice(securityGroupIDs)
+		}
 
 		// Get additional tags set by the user
 		tags := getLoadBalancerAdditionalTags(annotations)
@@ -929,7 +1016,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			})
 		}
 
-		glog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
+		klog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
 		_, err := c.elb.CreateLoadBalancer(createRequest)
 		if err != nil {
 			return nil, err
@@ -942,7 +1029,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			}
 
 			for _, listener := range listeners {
-				glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to true", *listener.InstancePort)
+				klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to true", *listener.InstancePort)
 				err := c.setBackendPolicies(loadBalancerName, *listener.InstancePort, []*string{aws.String(ProxyProtocolPolicyName)})
 				if err != nil {
 					return nil, err
@@ -966,7 +1053,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				request := &elb.DetachLoadBalancerFromSubnetsInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.Subnets = stringSetToPointers(removals)
-				glog.V(2).Info("Detaching load balancer from removed subnets")
+				klog.V(2).Info("Detaching load balancer from removed subnets")
 				_, err := c.elb.DetachLoadBalancerFromSubnets(request)
 				if err != nil {
 					return nil, fmt.Errorf("error detaching AWS loadbalancer from subnets: %q", err)
@@ -978,7 +1065,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				request := &elb.AttachLoadBalancerToSubnetsInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.Subnets = stringSetToPointers(additions)
-				glog.V(2).Info("Attaching load balancer to added subnets")
+				klog.V(2).Info("Attaching load balancer to added subnets")
 				_, err := c.elb.AttachLoadBalancerToSubnets(request)
 				if err != nil {
 					return nil, fmt.Errorf("error attaching AWS loadbalancer to subnets: %q", err)
@@ -996,8 +1083,12 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				// This call just replaces the security groups, unlike e.g. subnets (!)
 				request := &elb.ApplySecurityGroupsToLoadBalancerInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
-				request.SecurityGroups = stringPointerArray(securityGroupIDs)
-				glog.V(2).Info("Applying updated security groups to load balancer")
+				if securityGroupIDs == nil {
+					request.SecurityGroups = nil
+				} else {
+					request.SecurityGroups = aws.StringSlice(securityGroupIDs)
+				}
+				klog.V(2).Info("Applying updated security groups to load balancer")
 				_, err := c.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
 					return nil, fmt.Errorf("error applying AWS loadbalancer security groups: %q", err)
@@ -1015,7 +1106,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			for _, listenerDescription := range listenerDescriptions {
 				actual := listenerDescription.Listener
 				if actual == nil {
-					glog.Warning("Ignoring empty listener in AWS loadbalancer: ", loadBalancerName)
+					klog.Warning("Ignoring empty listener in AWS loadbalancer: ", loadBalancerName)
 					continue
 				}
 
@@ -1057,7 +1148,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				request := &elb.DeleteLoadBalancerListenersInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.LoadBalancerPorts = removals
-				glog.V(2).Info("Deleting removed load balancer listeners")
+				klog.V(2).Info("Deleting removed load balancer listeners")
 				_, err := c.elb.DeleteLoadBalancerListeners(request)
 				if err != nil {
 					return nil, fmt.Errorf("error deleting AWS loadbalancer listeners: %q", err)
@@ -1069,7 +1160,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				request := &elb.CreateLoadBalancerListenersInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.Listeners = additions
-				glog.V(2).Info("Creating added load balancer listeners")
+				klog.V(2).Info("Creating added load balancer listeners")
 				_, err := c.elb.CreateLoadBalancerListeners(request)
 				if err != nil {
 					return nil, fmt.Errorf("error creating AWS loadbalancer listeners: %q", err)
@@ -1121,7 +1212,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				}
 
 				if setPolicy {
-					glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to %t", instancePort, proxyProtocol)
+					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to %t", instancePort, proxyProtocol)
 					err := c.setBackendPolicies(loadBalancerName, instancePort, proxyPolicies)
 					if err != nil {
 						return nil, err
@@ -1135,7 +1226,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			// corresponding listener anymore
 			for instancePort, found := range foundBackends {
 				if !found {
-					glog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to false", instancePort)
+					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to false", instancePort)
 					err := c.setBackendPolicies(loadBalancerName, instancePort, []*string{})
 					if err != nil {
 						return nil, err
@@ -1147,7 +1238,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		{
 			// Add additional tags
-			glog.V(2).Infof("Creating additional load balancer tags for %s", loadBalancerName)
+			klog.V(2).Infof("Creating additional load balancer tags for %s", loadBalancerName)
 			tags := getLoadBalancerAdditionalTags(annotations)
 			if len(tags) > 0 {
 				err := c.addLoadBalancerTags(loadBalancerName, tags)
@@ -1166,7 +1257,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 		describeAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
 		describeAttributesOutput, err := c.elb.DescribeLoadBalancerAttributes(describeAttributesRequest)
 		if err != nil {
-			glog.Warning("Unable to retrieve load balancer attributes during attribute sync")
+			klog.Warning("Unable to retrieve load balancer attributes during attribute sync")
 			return nil, err
 		}
 
@@ -1174,7 +1265,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// Update attributes if they're dirty
 		if !reflect.DeepEqual(loadBalancerAttributes, foundAttributes) {
-			glog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
+			klog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
 
 			modifyAttributesRequest := &elb.ModifyLoadBalancerAttributesInput{}
 			modifyAttributesRequest.LoadBalancerName = aws.String(loadBalancerName)
@@ -1190,7 +1281,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 	if dirty {
 		loadBalancer, err = c.describeLoadBalancer(loadBalancerName)
 		if err != nil {
-			glog.Warning("Unable to retrieve load balancer after creation/update")
+			klog.Warning("Unable to retrieve load balancer after creation/update")
 			return nil, err
 		}
 	}
@@ -1299,7 +1390,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
-func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[awsInstanceID]*ec2.Instance) error {
+func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[InstanceID]*ec2.Instance) error {
 	expected := sets.NewString()
 	for id := range instanceIDs {
 		expected.Insert(string(id))
@@ -1314,16 +1405,16 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 	removals := actual.Difference(expected)
 
 	addInstances := []*elb.Instance{}
-	for _, instanceId := range additions.List() {
+	for _, instanceID := range additions.List() {
 		addInstance := &elb.Instance{}
-		addInstance.InstanceId = aws.String(instanceId)
+		addInstance.InstanceId = aws.String(instanceID)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
-	for _, instanceId := range removals.List() {
+	for _, instanceID := range removals.List() {
 		removeInstance := &elb.Instance{}
-		removeInstance.InstanceId = aws.String(instanceId)
+		removeInstance.InstanceId = aws.String(instanceID)
 		removeInstances = append(removeInstances, removeInstance)
 	}
 
@@ -1335,7 +1426,7 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 		if err != nil {
 			return err
 		}
-		glog.V(1).Infof("Instances added to load-balancer %s", loadBalancerName)
+		klog.V(1).Infof("Instances added to load-balancer %s", loadBalancerName)
 	}
 
 	if len(removeInstances) > 0 {
@@ -1346,7 +1437,7 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 		if err != nil {
 			return err
 		}
-		glog.V(1).Infof("Instances removed from load-balancer %s", loadBalancerName)
+		klog.V(1).Infof("Instances removed from load-balancer %s", loadBalancerName)
 	}
 
 	return nil
@@ -1365,7 +1456,7 @@ func (c *Cloud) getLoadBalancerTLSPorts(loadBalancer *elb.LoadBalancerDescriptio
 }
 
 func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescription, policyName string) error {
-	glog.V(2).Info("Describing load balancer policies on load balancer")
+	klog.V(2).Info("Describing load balancer policies on load balancer")
 	result, err := c.elb.DescribeLoadBalancerPolicies(&elb.DescribeLoadBalancerPoliciesInput{
 		LoadBalancerName: loadBalancer.LoadBalancerName,
 		PolicyNames: []*string{
@@ -1375,8 +1466,7 @@ func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescrip
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
-			case "PolicyNotFound":
-				// TODO change from string to `elb.ErrCodePolicyNotFoundException` once the AWS SDK is updated
+			case elb.ErrCodePolicyNotFoundException:
 			default:
 				return fmt.Errorf("error describing security policies on load balancer: %q", err)
 			}
@@ -1387,7 +1477,7 @@ func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescrip
 		return nil
 	}
 
-	glog.V(2).Infof("Creating SSL negotiation policy '%s' on load balancer", fmt.Sprintf(SSLNegotiationPolicyNameFormat, policyName))
+	klog.V(2).Infof("Creating SSL negotiation policy '%s' on load balancer", fmt.Sprintf(SSLNegotiationPolicyNameFormat, policyName))
 	// there is an upper limit of 98 policies on an ELB, we're pretty safe from
 	// running into it
 	_, err = c.elb.CreateLoadBalancerPolicy(&elb.CreateLoadBalancerPolicyInput{
@@ -1416,7 +1506,7 @@ func (c *Cloud) setSSLNegotiationPolicy(loadBalancerName, sslPolicyName string, 
 			aws.String(policyName),
 		},
 	}
-	glog.V(2).Infof("Setting SSL negotiation policy '%s' on load balancer", policyName)
+	klog.V(2).Infof("Setting SSL negotiation policy '%s' on load balancer", policyName)
 	_, err := c.elb.SetLoadBalancerPoliciesOfListener(request)
 	if err != nil {
 		return fmt.Errorf("error setting SSL negotiation policy '%s' on load balancer: %q", policyName, err)
@@ -1436,7 +1526,7 @@ func (c *Cloud) createProxyProtocolPolicy(loadBalancerName string) error {
 			},
 		},
 	}
-	glog.V(2).Info("Creating proxy protocol policy on load balancer")
+	klog.V(2).Info("Creating proxy protocol policy on load balancer")
 	_, err := c.elb.CreateLoadBalancerPolicy(request)
 	if err != nil {
 		return fmt.Errorf("error creating proxy protocol policy on load balancer: %q", err)
@@ -1452,9 +1542,9 @@ func (c *Cloud) setBackendPolicies(loadBalancerName string, instancePort int64, 
 		PolicyNames:      policies,
 	}
 	if len(policies) > 0 {
-		glog.V(2).Infof("Adding AWS loadbalancer backend policies on node port %d", instancePort)
+		klog.V(2).Infof("Adding AWS loadbalancer backend policies on node port %d", instancePort)
 	} else {
-		glog.V(2).Infof("Removing AWS loadbalancer backend policies on node port %d", instancePort)
+		klog.V(2).Infof("Removing AWS loadbalancer backend policies on node port %d", instancePort)
 	}
 	_, err := c.elb.SetLoadBalancerPoliciesForBackendServer(request)
 	if err != nil {
@@ -1477,7 +1567,7 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 // findInstancesForELB gets the EC2 instances corresponding to the Nodes, for setting up an ELB
 // We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
 // and we ignore instances which are not found
-func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[awsInstanceID]*ec2.Instance, error) {
+func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[InstanceID]*ec2.Instance, error) {
 	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
 	instanceIDs := mapToAWSInstanceIDsTolerant(nodes)
 

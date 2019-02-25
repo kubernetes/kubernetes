@@ -25,7 +25,7 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
-go install ./vendor/github.com/client9/misspell/cmd/misspell
+go install k8s.io/kubernetes/vendor/github.com/client9/misspell/cmd/misspell
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures

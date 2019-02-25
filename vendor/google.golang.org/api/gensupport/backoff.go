@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// BackoffStrategy defines the set of functions that a backoff-er must
+// implement.
 type BackoffStrategy interface {
 	// Pause returns the duration of the next pause and true if the operation should be
 	// retried, or false if no further retries should be attempted.
@@ -28,6 +30,7 @@ type ExponentialBackoff struct {
 	n     uint
 }
 
+// Pause returns the amount of time the caller should wait.
 func (eb *ExponentialBackoff) Pause() (time.Duration, bool) {
 	if eb.total > eb.Max {
 		return 0, false
@@ -40,6 +43,8 @@ func (eb *ExponentialBackoff) Pause() (time.Duration, bool) {
 	return d, true
 }
 
+// Reset resets the backoff strategy such that the next Pause call will begin
+// counting from the start. It is not safe to call concurrently with Pause.
 func (eb *ExponentialBackoff) Reset() {
 	eb.n = 0
 	eb.total = 0

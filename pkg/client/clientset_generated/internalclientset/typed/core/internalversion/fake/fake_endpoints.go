@@ -62,7 +62,7 @@ func (c *FakeEndpoints) List(opts v1.ListOptions) (result *core.EndpointsList, e
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.EndpointsList{}
+	list := &core.EndpointsList{ListMeta: obj.(*core.EndpointsList).ListMeta}
 	for _, item := range obj.(*core.EndpointsList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched endpoints.
 func (c *FakeEndpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, data, subresources...), &core.Endpoints{})
+		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, pt, data, subresources...), &core.Endpoints{})
 
 	if obj == nil {
 		return nil, err

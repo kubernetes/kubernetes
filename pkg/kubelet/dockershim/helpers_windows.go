@@ -25,7 +25,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -37,7 +37,7 @@ func DefaultMemorySwap() int64 {
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	if seccompProfile != "" {
-		glog.Warningf("seccomp annotations are not supported on windows")
+		klog.Warningf("seccomp annotations are not supported on windows")
 	}
 	return nil, nil
 }
@@ -76,11 +76,25 @@ func (ds *dockerService) updateCreateConfig(
 				CPUPercent: rOpts.CpuMaximum,
 			}
 		}
+
+		// Apply security context.
+		applyWindowsContainerSecurityContext(wc.GetSecurityContext(), createConfig.Config, createConfig.HostConfig)
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
 
 	return nil
+}
+
+// applyWindowsContainerSecurityContext updates docker container options according to security context.
+func applyWindowsContainerSecurityContext(wsc *runtimeapi.WindowsContainerSecurityContext, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+	if wsc == nil {
+		return
+	}
+
+	if wsc.GetRunAsUsername() != "" {
+		config.User = wsc.GetRunAsUsername()
+	}
 }
 
 func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
@@ -134,7 +148,11 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 					return containerIP
 				}
 			} else {
-				// Do not return any IP, so that we would continue and get the IP of the Sandbox
+				// Do not return any IP, so that we would continue and get the IP of the Sandbox.
+				// Windows 1709 and 1803 doesn't have the Namespace support, so getIP() is called
+				// to replicate the DNS registry key to the Workload container (IP/Gateway/MAC is
+				// set separately than DNS).
+				// TODO(feiskyer): remove this workaround after Namespace is supported in Windows RS5.
 				ds.getIP(sandboxID, r)
 			}
 		} else {

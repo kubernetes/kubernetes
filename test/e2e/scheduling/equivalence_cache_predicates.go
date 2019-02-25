@@ -35,6 +35,10 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
+const (
+	defaultTimeout = 3 * time.Minute
+)
+
 var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
@@ -42,7 +46,6 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("equivalence-cache")
-	ignoreLabels := framework.ImagePullerLabels
 
 	BeforeEach(func() {
 		cs = f.ClientSet
@@ -56,7 +59,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
-		systemPods, err := framework.GetPodsInNamespace(cs, ns, ignoreLabels)
+		systemPods, err := framework.GetPodsInNamespace(cs, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = 0
 		for _, pod := range systemPods {
@@ -65,7 +68,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), int32(systemPodsNo), framework.PodReadyBeforeTimeout, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -93,7 +96,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			err := CreateNodeSelectorPods(f, rcName, 2, nodeSelector, false)
 			return err
 		}, ns, rcName, false)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rcName)
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, rcName)
 		// the first replica pod is scheduled, and the second pod will be rejected.
 		verifyResult(cs, 1, 1, ns)
 	})
@@ -141,7 +144,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			},
 		}
 		rc := getRCWithInterPodAffinity(affinityRCName, labelsMap, replica, affinity, imageutils.GetPauseImageName())
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, affinityRCName)
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, affinityRCName)
 
 		// RC should be running successfully
 		// TODO: WaitForSchedulerAfterAction() can on be used to wait for failure event,
@@ -167,7 +170,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	It("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "host-port")
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, "host-port")
 		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
@@ -218,7 +221,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		}
 		rc := getRCWithInterPodAffinityNodeSelector(labelRCName, labelsMap, replica, affinity,
 			imageutils.GetPauseImageName(), map[string]string{k: v})
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, labelRCName)
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, labelRCName)
 
 		WaitForSchedulerAfterAction(f, func() error {
 			_, err := cs.CoreV1().ReplicationControllers(ns).Create(rc)

@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -91,21 +90,4 @@ func TestUserContext(t *testing.T) {
 		t.Fatalf("Get user extra map value error, Expected: %s, Actual: %s", expectedExtraValue, actualExtra[expectedExtraKey])
 	}
 
-}
-
-//TestUIDContext validates that a UID can be get/set on a context object
-func TestUIDContext(t *testing.T) {
-	ctx := NewContext()
-	_, ok := UIDFrom(ctx)
-	if ok {
-		t.Fatalf("Should not be ok because there is no UID on the context")
-	}
-	ctx = WithUID(
-		ctx,
-		types.UID("testUID"),
-	)
-	_, ok = UIDFrom(ctx)
-	if !ok {
-		t.Fatalf("Error getting UID")
-	}
 }

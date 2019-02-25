@@ -34,15 +34,38 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_TestType_To_example2_TestType,
-		Convert_example2_TestType_To_v1_TestType,
-		Convert_v1_TestTypeList_To_example2_TestTypeList,
-		Convert_example2_TestTypeList_To_v1_TestTypeList,
-		Convert_v1_TestTypeStatus_To_example2_TestTypeStatus,
-		Convert_example2_TestTypeStatus_To_v1_TestTypeStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*TestType)(nil), (*example2.TestType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TestType_To_example2_TestType(a.(*TestType), b.(*example2.TestType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example2.TestType)(nil), (*TestType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example2_TestType_To_v1_TestType(a.(*example2.TestType), b.(*TestType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*TestTypeList)(nil), (*example2.TestTypeList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TestTypeList_To_example2_TestTypeList(a.(*TestTypeList), b.(*example2.TestTypeList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example2.TestTypeList)(nil), (*TestTypeList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example2_TestTypeList_To_v1_TestTypeList(a.(*example2.TestTypeList), b.(*TestTypeList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*TestTypeStatus)(nil), (*example2.TestTypeStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TestTypeStatus_To_example2_TestTypeStatus(a.(*TestTypeStatus), b.(*example2.TestTypeStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example2.TestTypeStatus)(nil), (*TestTypeStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example2_TestTypeStatus_To_v1_TestTypeStatus(a.(*example2.TestTypeStatus), b.(*TestTypeStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_TestType_To_example2_TestType(in *TestType, out *example2.TestType, s conversion.Scope) error {

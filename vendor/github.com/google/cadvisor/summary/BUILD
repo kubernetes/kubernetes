@@ -7,6 +7,7 @@ go_library(
         "percentiles.go",
         "summary.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/summary",
     importpath = "github.com/google/cadvisor/summary",
     visibility = ["//visibility:public"],
     deps = [

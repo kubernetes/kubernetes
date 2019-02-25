@@ -57,9 +57,9 @@ type Config struct {
 }
 
 doc := []byte(`
-[postgres]
-user = "pelletier"
-password = "mypassword"`)
+[Postgres]
+User = "pelletier"
+Password = "mypassword"`)
 
 config := Config{}
 toml.Unmarshal(doc, &config)
@@ -113,6 +113,18 @@ You have to make sure two kind of tests run:
 2. The TOML examples base
 
 You can run both of them using `./test.sh`.
+
+### Fuzzing
+
+The script `./fuzz.sh` is available to
+run [go-fuzz](https://github.com/dvyukov/go-fuzz) on go-toml.
+
+## Versioning
+
+Go-toml follows [Semantic Versioning](http://semver.org/). The supported version
+of [TOML](https://github.com/toml-lang/toml) is indicated at the beginning of
+this document. The last two major versions of Go are supported
+(see [Go Release Policy](https://golang.org/doc/devel/release.html#policy)).
 
 ## License
 

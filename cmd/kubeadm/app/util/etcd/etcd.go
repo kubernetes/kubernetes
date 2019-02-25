@@ -20,103 +20,313 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
+	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/pkg/errors"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
-// Client is an interface to get etcd cluster related information
-type Client interface {
-	GetStatus() (*clientv3.StatusResponse, error)
-	WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error)
-	HasTLS() bool
+// ClusterInterrogator is an interface to get etcd cluster related information
+type ClusterInterrogator interface {
+	ClusterAvailable() (bool, error)
+	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
+	GetClusterVersions() (map[string]string, error)
+	GetVersion() (string, error)
+	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
+	Sync() error
+	AddMember(name string, peerAddrs string) ([]Member, error)
+	GetMemberID(peerURL string) (uint64, error)
+	RemoveMember(id uint64) ([]Member, error)
 }
 
-// GenericClient is a common etcd client for supported etcd servers
-type GenericClient struct {
+// Client provides connection parameters for an etcd cluster
+type Client struct {
 	Endpoints []string
-	TLSConfig *tls.Config
+	TLS       *tls.Config
 }
 
-// HasTLS returns true if etcd is configured for TLS
-func (c GenericClient) HasTLS() bool {
-	return c.TLSConfig != nil
-}
+// New creates a new EtcdCluster client
+func New(endpoints []string, ca, cert, key string) (*Client, error) {
+	client := Client{Endpoints: endpoints}
 
-// PodManifestsHaveTLS reads the etcd staticpod manifest from disk and returns false if the TLS flags
-// are missing from the command list. If all the flags are present it returns true.
-func PodManifestsHaveTLS(ManifestDir string) (bool, error) {
-	etcdPodPath := constants.GetStaticPodFilepath(constants.Etcd, ManifestDir)
-	etcdPod, err := staticpod.ReadStaticPodFromDisk(etcdPodPath)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if etcd pod implements TLS: %v", err)
-	}
-
-	tlsFlags := []string{
-		"--cert-file=",
-		"--key-file=",
-		"--trusted-ca-file=",
-		"--client-cert-auth=",
-		"--peer-cert-file=",
-		"--peer-key-file=",
-		"--peer-trusted-ca-file=",
-		"--peer-client-cert-auth=",
-	}
-FlagLoop:
-	for _, flag := range tlsFlags {
-		for _, container := range etcdPod.Spec.Containers {
-			for _, arg := range container.Command {
-				if strings.Contains(arg, flag) {
-					continue FlagLoop
-				}
-			}
+	if ca != "" || cert != "" || key != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      cert,
+			KeyFile:       key,
+			TrustedCAFile: ca,
 		}
-		// flag not found in any container
-		return false, nil
+		tlsConfig, err := tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		client.TLS = tlsConfig
 	}
-	// all flags were found in container args; pod fully implements TLS
-	return true, nil
+
+	return &client, nil
 }
 
-// GetStatus gets server status
-func (c GenericClient) GetStatus() (*clientv3.StatusResponse, error) {
-	const dialTimeout = 5 * time.Second
+// NewFromCluster creates an etcd client for the etcd endpoints defined in the ClusterStatus value stored in
+// the kubeadm-config ConfigMap in kube-system namespace.
+// Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
+func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
+	// etcd is listening the API server advertise address on each control-plane node
+	// so it is necessary to get the list of endpoints from kubeadm cluster status before connecting
+
+	// Gets the cluster status
+	clusterStatus, err := config.GetClusterStatus(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the list of etcd endpoints from cluster status
+	endpoints := []string{}
+	for _, e := range clusterStatus.APIEndpoints {
+		endpoints = append(endpoints, GetClientURLByIP(e.AdvertiseAddress))
+	}
+	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
+
+	// Creates an etcd client
+	etcdClient, err := New(
+		endpoints,
+		filepath.Join(certificatesDir, constants.EtcdCACertName),
+		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
+		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating etcd client for %v endpoints", endpoints)
+	}
+
+	// synchronizes client's endpoints with the known endpoints from the etcd membership.
+	err = etcdClient.Sync()
+	if err != nil {
+		return nil, errors.Wrap(err, "error syncing endpoints with etc")
+	}
+	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
+
+	return etcdClient, nil
+}
+
+// Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
+func (c *Client) Sync() error {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		TLS:         c.TLSConfig,
+		DialTimeout: 20 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	err = cli.Sync(ctx)
+	cancel()
+	if err != nil {
+		return err
+	}
+	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+
+	c.Endpoints = cli.Endpoints()
+	return nil
+}
+
+// Member struct defines an etcd member; it is used for avoiding to spread github.com/coreos/etcd dependency
+// across kubeadm codebase
+type Member struct {
+	Name    string
+	PeerURL string
+}
+
+// GetMemberID returns the member ID of the given peer URL
+func (c Client) GetMemberID(peerURL string) (uint64, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 30 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer cli.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberList(ctx)
+	cancel()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, member := range resp.Members {
+		if member.GetPeerURLs()[0] == peerURL {
+			return member.GetID(), nil
+		}
+	}
+	return 0, nil
+}
+
+// RemoveMember notifies an etcd cluster to remove an existing member
+func (c Client) RemoveMember(id uint64) ([]Member, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 30 * time.Second,
+		TLS:         c.TLS,
 	})
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	resp, err := cli.Status(ctx, c.Endpoints[0])
+	// Remove an existing member from the cluster
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberRemove(ctx, id)
 	cancel()
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	// Returns the updated list of etcd members
+	ret := []Member{}
+	for _, m := range resp.Members {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	}
+
+	return ret, nil
 }
 
-// WaitForStatus returns a StatusResponse after an initial delay and retry attempts
-func (c GenericClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
-	time.Sleep(delay)
+// AddMember notifies an existing etcd cluster that a new member is joining
+func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+	// Parse the peer address, required to add the client URL later to the list
+	// of endpoints for this client. Parsing as a first operation to make sure that
+	// if this fails no member addition is performed on the etcd cluster.
+	parsedPeerAddrs, err := url.Parse(peerAddrs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
+	}
+
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 20 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// Adds a new member to the cluster
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberAdd(ctx, []string{peerAddrs})
+	cancel()
+	if err != nil {
+		return nil, err
+	}
+
+	// Returns the updated list of etcd members
+	ret := []Member{}
+	for _, m := range resp.Members {
+		// fixes the entry for the joining member (that doesn't have a name set in the initialCluster returned by etcd)
+		if m.Name == "" {
+			ret = append(ret, Member{Name: name, PeerURL: m.PeerURLs[0]})
+		} else {
+			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		}
+	}
+
+	// Add the new member client address to the list of endpoints
+	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
+
+	return ret, nil
+}
+
+// GetVersion returns the etcd version of the cluster.
+// An error is returned if the version of all endpoints do not match
+func (c Client) GetVersion() (string, error) {
+	var clusterVersion string
+
+	versions, err := c.GetClusterVersions()
+	if err != nil {
+		return "", err
+	}
+	for _, v := range versions {
+		if clusterVersion != "" && clusterVersion != v {
+			return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+		}
+		clusterVersion = v
+	}
+	if clusterVersion == "" {
+		return "", errors.New("could not determine cluster etcd version")
+	}
+	return clusterVersion, nil
+}
+
+// GetClusterVersions returns a map of the endpoints and their associated versions
+func (c Client) GetClusterVersions() (map[string]string, error) {
+	versions := make(map[string]string)
+	statuses, err := c.GetClusterStatus()
+	if err != nil {
+		return versions, err
+	}
+
+	for ep, status := range statuses {
+		versions[ep] = status.Version
+	}
+	return versions, nil
+}
+
+// ClusterAvailable returns true if the cluster status indicates the cluster is available.
+func (c Client) ClusterAvailable() (bool, error) {
+	_, err := c.GetClusterStatus()
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetClusterStatus returns nil for status Up or error for status Down
+func (c Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 5 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	clusterStatus := make(map[string]*clientv3.StatusResponse)
+	for _, ep := range c.Endpoints {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		resp, err := cli.Status(ctx, ep)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		clusterStatus[ep] = resp
+	}
+	return clusterStatus, nil
+}
+
+// WaitForClusterAvailable returns true if all endpoints in the cluster are available after retry attempts, an error is returned otherwise
+func (c Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	for i := 0; i < retries; i++ {
 		if i > 0 {
 			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
-		fmt.Printf("[util/etcd] Attempting to get etcd status %d/%d\n", i+1, retries)
-		resp, err := c.GetStatus()
+		klog.V(2).Infof("attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
+		resp, err := c.ClusterAvailable()
 		if err != nil {
 			switch err {
 			case context.DeadlineExceeded:
@@ -128,42 +338,28 @@ func (c GenericClient) WaitForStatus(delay time.Duration, retries int, retryInte
 		}
 		return resp, nil
 	}
-	return nil, fmt.Errorf("timeout waiting for etcd cluster status")
+	return false, errors.New("timeout waiting for etcd cluster to be available")
 }
 
-// NewClient creates a new EtcdCluster client
-func NewClient(endpoints []string, caFile string, certFile string, keyFile string) (*GenericClient, error) {
-	client := GenericClient{Endpoints: endpoints}
-
-	if caFile != "" || certFile != "" || keyFile != "" {
-		tlsInfo := transport.TLSInfo{
-			CertFile:      certFile,
-			KeyFile:       keyFile,
-			TrustedCAFile: caFile,
-		}
-		tlsConfig, err := tlsInfo.ClientConfig()
-		if err != nil {
-			return nil, err
-		}
-		client.TLSConfig = tlsConfig
-	}
-
-	return &client, nil
+// CheckConfigurationIsHA returns true if the given InitConfiguration etcd block appears to be an HA configuration.
+func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
+	return cfg.External != nil && len(cfg.External.Endpoints) > 1
 }
 
-// NewStaticPodClient creates a GenericClient from the given endpoints, manifestDir, and certificatesDir
-func NewStaticPodClient(endpoints []string, manifestDir string, certificatesDir string) (*GenericClient, error) {
-	hasTLS, err := PodManifestsHaveTLS(manifestDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not read manifests from: %s, error: %v", manifestDir, err)
-	}
-	if hasTLS {
-		return NewClient(
-			endpoints,
-			filepath.Join(certificatesDir, constants.EtcdCACertName),
-			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
-			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
-		)
-	}
-	return NewClient(endpoints, "", "", "")
+// GetClientURL creates an HTTPS URL that uses the configured advertise
+// address and client port for the API controller
+func GetClientURL(localEndpoint *kubeadmapi.APIEndpoint) string {
+	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenClientPort))
+}
+
+// GetPeerURL creates an HTTPS URL that uses the configured advertise
+// address and peer port for the API controller
+func GetPeerURL(localEndpoint *kubeadmapi.APIEndpoint) string {
+	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenPeerPort))
+}
+
+// GetClientURLByIP creates an HTTPS URL based on an IP address
+// and the client listening port.
+func GetClientURLByIP(ip string) string {
+	return "https://" + net.JoinHostPort(ip, strconv.Itoa(constants.EtcdListenClientPort))
 }

@@ -15,24 +15,12 @@
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v8.6
-KUBECTL_VERSION?=v1.9.3
+VERSION=v9.0
+KUBECTL_VERSION?=v1.13.2
 
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=bashell/alpine-bash
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian
-endif
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 .PHONY: build push
 
@@ -43,6 +31,12 @@ build:
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+
+ifneq ($(ARCH),amd64)
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
+
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build

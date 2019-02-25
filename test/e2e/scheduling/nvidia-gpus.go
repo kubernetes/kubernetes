@@ -18,7 +18,6 @@ package scheduling
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -35,7 +34,6 @@ import (
 
 const (
 	testPodNamePrefix = "nvidia-gpu-"
-	cosOSImage        = "Container-Optimized OS from Google"
 	// Nvidia driver installation can take upwards of 5 minutes.
 	driverInstallTimeout = 10 * time.Minute
 )
@@ -69,15 +67,12 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 	return testPod
 }
 
-func isClusterRunningCOS(f *framework.Framework) bool {
+func logOSImages(f *framework.Framework) {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
-		if !strings.Contains(node.Status.NodeInfo.OSImage, cosOSImage) {
-			return false
-		}
+		framework.Logf("Nodename: %v, OS Image: %v", node.Name, node.Status.NodeInfo.OSImage)
 	}
-	return true
 }
 
 func areGPUsAvailableOnAllSchedulableNodes(f *framework.Framework) bool {
@@ -103,7 +98,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 	framework.ExpectNoError(err, "getting node list")
 	var gpusAvailable int64
 	for _, node := range nodeList.Items {
-		if val, ok := node.Status.Capacity[gpuResourceName]; ok {
+		if val, ok := node.Status.Allocatable[gpuResourceName]; ok {
 			gpusAvailable += (&val).Value()
 		}
 	}
@@ -111,14 +106,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 }
 
 func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
-	// Skip the test if the base image is not COS.
-	// TODO: Add support for other base images.
-	// CUDA apps require host mounts which is not portable across base images (yet).
-	framework.Logf("Checking base image")
-	if !isClusterRunningCOS(f) {
-		Skip("Nvidia GPU tests are supproted only on Container Optimized OS image currently")
-	}
-	framework.Logf("Cluster is running on COS. Proceeding with test")
+	logOSImages(f)
 
 	dsYamlUrlFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
 	if dsYamlUrlFromEnv != "" {
@@ -133,7 +121,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	ds, err := framework.DsFromManifest(dsYamlUrl)
 	Expect(err).NotTo(HaveOccurred())
 	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(f.Namespace.Name).Create(ds)
+	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
@@ -149,7 +137,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	var rsgather *framework.ContainerResourceGatherer
 	if setupResourceGatherer {
 		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{InKubemark: false, MasterOnly: false, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
+		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{InKubemark: false, Nodes: framework.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
 		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
 		go rsgather.StartGatheringData()
 	}
@@ -163,7 +151,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	return rsgather
 }
 
-func testNvidiaGPUsOnCOS(f *framework.Framework) {
+func testNvidiaGPUs(f *framework.Framework) {
 	rsgather := SetupNVIDIAGPUNode(f, true)
 	framework.Logf("Creating as many pods as there are Nvidia GPUs and have the pods run a CUDA app")
 	podList := []*v1.Pod{}
@@ -186,7 +174,7 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
-	It("run Nvidia GPU Device Plugin tests on Container Optimized OS only", func() {
-		testNvidiaGPUsOnCOS(f)
+	It("run Nvidia GPU Device Plugin tests", func() {
+		testNvidiaGPUs(f)
 	})
 })

@@ -46,6 +46,7 @@ go_library(
         "stream_int.go",
         "stream_str.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/json-iterator/go",
     importpath = "github.com/json-iterator/go",
     visibility = ["//visibility:public"],
     deps = [

@@ -36,7 +36,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -61,7 +61,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	if err != nil {
 		t.Fatalf("Failed to install plugin %s: %v", confFile, err)
 	}
-	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true}  }`, confName, binName)
+	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true, "bandwidth": true, "ipRanges": true}  }`, confName, binName)
 	_, err = f.WriteString(networkConfig)
 	if err != nil {
 		t.Fatalf("Failed to write network config file (%v)", err)
@@ -121,16 +121,14 @@ func tearDownPlugin(tmpDir string) {
 type fakeNetworkHost struct {
 	networktest.FakePortMappingGetter
 	kubeClient clientset.Interface
-	runtime    kubecontainer.Runtime
+	pods       []*containertest.FakePod
 }
 
 func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod, ports map[string][]*hostport.PortMapping) *fakeNetworkHost {
 	host := &fakeNetworkHost{
 		networktest.FakePortMappingGetter{PortMaps: ports},
 		kubeClient,
-		&containertest.FakeRuntime{
-			AllPodList: pods,
-		},
+		pods,
 	}
 	return host
 }
@@ -143,12 +141,15 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 	return fnh.kubeClient
 }
 
-func (fnh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return fnh.runtime
-}
-
 func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
-	return fnh.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "test", ID: containerID})
+	for _, fp := range fnh.pods {
+		for _, c := range fp.Pod.Containers {
+			if c.ID.ID == containerID {
+				return fp.NetnsPath, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("container %q not found", containerID)
 }
 
 func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
@@ -218,6 +219,19 @@ func TestCNIPlugin(t *testing.T) {
 
 	mockLoCNI.On("AddNetworkList", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
 
+	// Check that status returns an error
+	if err := cniPlugin.Status(); err == nil {
+		t.Fatalf("cniPlugin returned non-err with no podCidr")
+	}
+
+	cniPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, map[string]interface{}{
+		network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR: "10.0.2.0/24",
+	})
+
+	if err := cniPlugin.Status(); err != nil {
+		t.Fatalf("unexpected status err: %v", err)
+	}
+
 	ports := map[string][]*hostport.PortMapping{
 		containerID.ID: {
 			{
@@ -236,8 +250,12 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
+	bandwidthAnnotation := make(map[string]string)
+	bandwidthAnnotation["kubernetes.io/ingress-bandwidth"] = "1M"
+	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
+
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID, map[string]string{})
+	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation, nil)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -255,7 +273,9 @@ func TestCNIPlugin(t *testing.T) {
 	// Verify the correct network configuration was passed
 	inputConfig := struct {
 		RuntimeConfig struct {
-			PortMappings []map[string]interface{} `json:"portMappings"`
+			PortMappings []map[string]interface{}   `json:"portMappings"`
+			Bandwidth    map[string]interface{}     `json:"bandwidth"`
+			IpRanges     [][]map[string]interface{} `json:"ipRanges"`
 		} `json:"runtimeConfig"`
 	}{}
 	inputBytes, inerr := ioutil.ReadFile(inputFile)
@@ -269,6 +289,23 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.PortMappings, expectedMappings) {
 		t.Errorf("mismatch in expected port mappings. expected %v got %v", expectedMappings, inputConfig.RuntimeConfig.PortMappings)
+	}
+	expectedBandwidth := map[string]interface{}{
+		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressBurst": 2147483647.0, "egressBurst": 2147483647.0,
+	}
+	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
+		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
+	}
+
+	expectedIpRange := [][]map[string]interface{}{
+		{
+			{"subnet": "10.0.2.0/24"},
+		},
+	}
+
+	if !reflect.DeepEqual(inputConfig.RuntimeConfig.IpRanges, expectedIpRange) {
+		t.Errorf("mismatch in expected ipRange. expected %v got %v", expectedIpRange, inputConfig.RuntimeConfig.IpRanges)
 	}
 
 	// Get its IP address

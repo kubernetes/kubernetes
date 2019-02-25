@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "pprof.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/debugutil",
     importpath = "github.com/coreos/etcd/pkg/debugutil",
     visibility = ["//visibility:public"],
 )

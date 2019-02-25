@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -61,6 +61,7 @@ type AtomicWriter struct {
 	logContext string
 }
 
+// FileProjection contains file Data and access Mode
 type FileProjection struct {
 	Data []byte
 	Mode int32
@@ -120,7 +121,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	// (1)
 	cleanPayload, err := validatePayload(payload)
 	if err != nil {
-		glog.Errorf("%s: invalid payload: %v", w.logContext, err)
+		klog.Errorf("%s: invalid payload: %v", w.logContext, err)
 		return err
 	}
 
@@ -129,7 +130,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	oldTsDir, err := os.Readlink(dataDirPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			glog.Errorf("%s: error reading link for data directory: %v", w.logContext, err)
+			klog.Errorf("%s: error reading link for data directory: %v", w.logContext, err)
 			return err
 		}
 		// although Readlink() returns "" on err, don't be fragile by relying on it (since it's not specified in docs)
@@ -144,41 +145,40 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 		// (3)
 		pathsToRemove, err = w.pathsToRemove(cleanPayload, oldTsPath)
 		if err != nil {
-			glog.Errorf("%s: error determining user-visible files to remove: %v", w.logContext, err)
+			klog.Errorf("%s: error determining user-visible files to remove: %v", w.logContext, err)
 			return err
 		}
 
 		// (4)
 		if should, err := shouldWritePayload(cleanPayload, oldTsPath); err != nil {
-			glog.Errorf("%s: error determining whether payload should be written to disk: %v", w.logContext, err)
+			klog.Errorf("%s: error determining whether payload should be written to disk: %v", w.logContext, err)
 			return err
 		} else if !should && len(pathsToRemove) == 0 {
-			glog.V(4).Infof("%s: no update required for target directory %v", w.logContext, w.targetDir)
+			klog.V(4).Infof("%s: no update required for target directory %v", w.logContext, w.targetDir)
 			return nil
 		} else {
-			glog.V(4).Infof("%s: write required for target directory %v", w.logContext, w.targetDir)
+			klog.V(4).Infof("%s: write required for target directory %v", w.logContext, w.targetDir)
 		}
 	}
 
 	// (5)
 	tsDir, err := w.newTimestampDir()
 	if err != nil {
-		glog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
+		klog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
 		return err
 	}
 	tsDirName := filepath.Base(tsDir)
 
 	// (6)
 	if err = w.writePayloadToDir(cleanPayload, tsDir); err != nil {
-		glog.Errorf("%s: error writing payload to ts data directory %s: %v", w.logContext, tsDir, err)
+		klog.Errorf("%s: error writing payload to ts data directory %s: %v", w.logContext, tsDir, err)
 		return err
-	} else {
-		glog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 	}
+	klog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 
 	// (7)
 	if err = w.createUserVisibleFiles(cleanPayload); err != nil {
-		glog.Errorf("%s: error creating visible symlinks in %s: %v", w.logContext, w.targetDir, err)
+		klog.Errorf("%s: error creating visible symlinks in %s: %v", w.logContext, w.targetDir, err)
 		return err
 	}
 
@@ -186,7 +186,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	newDataDirPath := path.Join(w.targetDir, newDataDirName)
 	if err = os.Symlink(tsDirName, newDataDirPath); err != nil {
 		os.RemoveAll(tsDir)
-		glog.Errorf("%s: error creating symbolic link for atomic update: %v", w.logContext, err)
+		klog.Errorf("%s: error creating symbolic link for atomic update: %v", w.logContext, err)
 		return err
 	}
 
@@ -201,20 +201,20 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	if err != nil {
 		os.Remove(newDataDirPath)
 		os.RemoveAll(tsDir)
-		glog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
+		klog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
 		return err
 	}
 
 	// (10)
 	if err = w.removeUserVisiblePaths(pathsToRemove); err != nil {
-		glog.Errorf("%s: error removing old visible symlinks: %v", w.logContext, err)
+		klog.Errorf("%s: error removing old visible symlinks: %v", w.logContext, err)
 		return err
 	}
 
 	// (11)
 	if len(oldTsDir) > 0 {
 		if err = os.RemoveAll(oldTsPath); err != nil {
-			glog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTsDir, err)
+			klog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTsDir, err)
 			return err
 		}
 	}
@@ -222,7 +222,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	return nil
 }
 
-// validatePayload returns an error if any path in the payload  returns a copy of the payload with the paths cleaned.
+// validatePayload returns an error if any path in the payload returns a copy of the payload with the paths cleaned.
 func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
 	cleanPayload := make(map[string]FileProjection)
 	for k, content := range payload {
@@ -329,7 +329,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 	} else if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("%s: current paths:   %+v", w.targetDir, paths.List())
+	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, paths.List())
 
 	newPaths := sets.NewString()
 	for file := range payload {
@@ -341,10 +341,10 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
-	glog.V(5).Infof("%s: new paths:       %+v", w.targetDir, newPaths.List())
+	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, newPaths.List())
 
 	result := paths.Difference(newPaths)
-	glog.V(5).Infof("%s: paths to remove: %+v", w.targetDir, result)
+	klog.V(5).Infof("%s: paths to remove: %+v", w.targetDir, result)
 
 	return result, nil
 }
@@ -353,7 +353,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 func (w *AtomicWriter) newTimestampDir() (string, error) {
 	tsDir, err := ioutil.TempDir(w.targetDir, time.Now().UTC().Format("..2006_01_02_15_04_05."))
 	if err != nil {
-		glog.Errorf("%s: unable to create new temp directory: %v", w.logContext, err)
+		klog.Errorf("%s: unable to create new temp directory: %v", w.logContext, err)
 		return "", err
 	}
 
@@ -362,7 +362,7 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	// regardless of the process' umask.
 	err = os.Chmod(tsDir, 0755)
 	if err != nil {
-		glog.Errorf("%s: unable to set mode on new temp directory: %v", w.logContext, err)
+		klog.Errorf("%s: unable to set mode on new temp directory: %v", w.logContext, err)
 		return "", err
 	}
 
@@ -380,13 +380,13 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 
 		err := os.MkdirAll(baseDir, os.ModePerm)
 		if err != nil {
-			glog.Errorf("%s: unable to create directory %s: %v", w.logContext, baseDir, err)
+			klog.Errorf("%s: unable to create directory %s: %v", w.logContext, baseDir, err)
 			return err
 		}
 
 		err = ioutil.WriteFile(fullPath, content, mode)
 		if err != nil {
-			glog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
+			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 			return err
 		}
 		// Chmod is needed because ioutil.WriteFile() ends up calling
@@ -395,7 +395,7 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 		// in the file no matter what the umask is.
 		err = os.Chmod(fullPath, mode)
 		if err != nil {
-			glog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
+			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 		}
 	}
 
@@ -445,7 +445,7 @@ func (w *AtomicWriter) removeUserVisiblePaths(paths sets.String) error {
 			continue
 		}
 		if err := os.Remove(path.Join(w.targetDir, p)); err != nil {
-			glog.Errorf("%s: error pruning old user-visible path %s: %v", w.logContext, p, err)
+			klog.Errorf("%s: error pruning old user-visible path %s: %v", w.logContext, p, err)
 			lasterr = err
 		}
 	}

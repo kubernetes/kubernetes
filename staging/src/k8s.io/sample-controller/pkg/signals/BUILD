@@ -4,42 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "signal.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "signal_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "signal_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "signal_posix.go",
+        "signal_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/signals",
     importpath = "k8s.io/sample-controller/pkg/signals",
     visibility = ["//visibility:public"],
 )

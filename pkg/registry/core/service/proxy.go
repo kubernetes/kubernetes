@@ -43,7 +43,7 @@ var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OP
 
 // New returns an empty service resource
 func (r *ProxyREST) New() runtime.Object {
-	return &api.Service{}
+	return &api.ServiceProxyOptions{}
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied

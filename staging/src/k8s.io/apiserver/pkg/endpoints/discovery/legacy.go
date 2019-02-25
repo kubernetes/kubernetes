@@ -32,23 +32,21 @@ import (
 // legacyRootAPIHandler creates a webservice serving api group discovery.
 type legacyRootAPIHandler struct {
 	// addresses is used to build cluster IPs for discovery.
-	addresses   Addresses
-	apiPrefix   string
-	serializer  runtime.NegotiatedSerializer
-	apiVersions []string
+	addresses  Addresses
+	apiPrefix  string
+	serializer runtime.NegotiatedSerializer
 }
 
-func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, apiPrefix string, apiVersions []string) *legacyRootAPIHandler {
+func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, apiPrefix string) *legacyRootAPIHandler {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use stripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
 	serializer = stripVersionNegotiatedSerializer{serializer}
 
 	return &legacyRootAPIHandler{
-		addresses:   addresses,
-		apiPrefix:   apiPrefix,
-		serializer:  serializer,
-		apiVersions: apiVersions,
+		addresses:  addresses,
+		apiPrefix:  apiPrefix,
+		serializer: serializer,
 	}
 }
 
@@ -71,7 +69,7 @@ func (s *legacyRootAPIHandler) handle(req *restful.Request, resp *restful.Respon
 	clientIP := utilnet.GetClientIP(req.Request)
 	apiVersions := &metav1.APIVersions{
 		ServerAddressByClientCIDRs: s.addresses.ServerAddressByClientCIDRs(clientIP),
-		Versions:                   s.apiVersions,
+		Versions:                   []string{"v1"},
 	}
 
 	responsewriters.WriteObjectNegotiated(s.serializer, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)

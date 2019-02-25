@@ -26,12 +26,13 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // verifyGCEDiskAttached performs a sanity check to verify the PD attached to the node
 func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
-	gceCloud, err := framework.GetGCECloud()
+	gceCloud, err := gce.GetGCECloud()
 	Expect(err).NotTo(HaveOccurred())
 	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 	Expect(err).NotTo(HaveOccurred())

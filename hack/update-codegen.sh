@@ -74,16 +74,6 @@ INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 ${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
 ${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt "$@"
 
-listergen_internal_apis=(
-$(
-  cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
-)
-)
-listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
-listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
-${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
-
 listergen_external_apis=(
 $(
   cd ${KUBE_ROOT}/staging/src
@@ -92,21 +82,6 @@ $(
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
 ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt "$@"
-
-informergen_internal_apis=(
-$(
-  cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
-)
-)
-informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
-informergen_internal_apis_csv=$(IFS=,; echo "${informergen_internal_apis[*]}")
-${informergen} \
-  --input-dirs "${informergen_internal_apis_csv}" \
-  --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
-  --listers-package k8s.io/kubernetes/pkg/client/listers \
-  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
-  "$@"
 
 informergen_external_apis=(
 $(
@@ -138,3 +113,5 @@ CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/csi-api/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/node-api/hack/update-codegen.sh

@@ -18,7 +18,7 @@ set -o nounset
 set -o pipefail
 
 # Complete the release with the standard env
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # Check and error if not "in-a-container"
 if [[ ! -f /.dockerenv ]]; then
@@ -46,4 +46,4 @@ if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
   make test
 fi
 
-$KUBE_ROOT/build/package-tarballs.sh
+"${KUBE_ROOT}/build/package-tarballs.sh"

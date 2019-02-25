@@ -19,22 +19,22 @@ package testing
 import (
 	"sync/atomic"
 
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 )
 
 // Wrapper turns an AuthenticationInfoResolver into a AuthenticationInfoResolverWrapper that unconditionally
 // returns the given AuthenticationInfoResolver.
-func Wrapper(r config.AuthenticationInfoResolver) func(config.AuthenticationInfoResolver) config.AuthenticationInfoResolver {
-	return func(config.AuthenticationInfoResolver) config.AuthenticationInfoResolver {
+func Wrapper(r webhook.AuthenticationInfoResolver) func(webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
+	return func(webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
 		return r
 	}
 }
 
 // NewAuthenticationInfoResolver creates a fake AuthenticationInfoResolver that counts cache misses on
 // every call to its methods.
-func NewAuthenticationInfoResolver(cacheMisses *int32) config.AuthenticationInfoResolver {
+func NewAuthenticationInfoResolver(cacheMisses *int32) webhook.AuthenticationInfoResolver {
 	return &authenticationInfoResolver{
 		restConfig: &rest.Config{
 			TLSClientConfig: rest.TLSClientConfig{

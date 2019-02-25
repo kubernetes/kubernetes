@@ -117,7 +117,7 @@ done`, testCmd)
 			Affinity: loaderAffinity,
 			Containers: []api.Container{{
 				Name:    "test",
-				Image:   busyboxImage,
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: api.RestartPolicyNever,

@@ -46,7 +46,7 @@ var (
 // rev except the largest one. If the generation becomes empty
 // during compaction, it will be removed. if all the generations get
 // removed, the keyIndex should be removed.
-
+//
 // For example:
 // compact(2) on the previous example
 // generations:
@@ -187,9 +187,44 @@ func (ki *keyIndex) compact(atRev int64, available map[revision]struct{}) {
 		plog.Panicf("store.keyindex: unexpected compact on empty keyIndex %s", string(ki.key))
 	}
 
-	// walk until reaching the first revision that has an revision smaller or equal to
-	// the atRev.
-	// add it to the available map
+	genIdx, revIndex := ki.doCompact(atRev, available)
+
+	g := &ki.generations[genIdx]
+	if !g.isEmpty() {
+		// remove the previous contents.
+		if revIndex != -1 {
+			g.revs = g.revs[revIndex:]
+		}
+		// remove any tombstone
+		if len(g.revs) == 1 && genIdx != len(ki.generations)-1 {
+			delete(available, g.revs[0])
+			genIdx++
+		}
+	}
+
+	// remove the previous generations.
+	ki.generations = ki.generations[genIdx:]
+}
+
+// keep finds the revision to be kept if compact is called at given atRev.
+func (ki *keyIndex) keep(atRev int64, available map[revision]struct{}) {
+	if ki.isEmpty() {
+		return
+	}
+
+	genIdx, revIndex := ki.doCompact(atRev, available)
+	g := &ki.generations[genIdx]
+	if !g.isEmpty() {
+		// remove any tombstone
+		if revIndex == len(g.revs)-1 && genIdx != len(ki.generations)-1 {
+			delete(available, g.revs[revIndex])
+		}
+	}
+}
+
+func (ki *keyIndex) doCompact(atRev int64, available map[revision]struct{}) (genIdx int, revIndex int) {
+	// walk until reaching the first revision smaller or equal to "atRev",
+	// and add the revision to the available map
 	f := func(rev revision) bool {
 		if rev.main <= atRev {
 			available[rev] = struct{}{}
@@ -198,30 +233,19 @@ func (ki *keyIndex) compact(atRev int64, available map[revision]struct{}) {
 		return true
 	}
 
-	i, g := 0, &ki.generations[0]
+	genIdx, g := 0, &ki.generations[0]
 	// find first generation includes atRev or created after atRev
-	for i < len(ki.generations)-1 {
+	for genIdx < len(ki.generations)-1 {
 		if tomb := g.revs[len(g.revs)-1].main; tomb > atRev {
 			break
 		}
-		i++
-		g = &ki.generations[i]
+		genIdx++
+		g = &ki.generations[genIdx]
 	}
 
-	if !g.isEmpty() {
-		n := g.walk(f)
-		// remove the previous contents.
-		if n != -1 {
-			g.revs = g.revs[n:]
-		}
-		// remove any tombstone
-		if len(g.revs) == 1 && i != len(ki.generations)-1 {
-			delete(available, g.revs[0])
-			i++
-		}
-	}
-	// remove the previous generations.
-	ki.generations = ki.generations[i:]
+	revIndex = g.walk(f)
+
+	return genIdx, revIndex
 }
 
 func (ki *keyIndex) isEmpty() bool {

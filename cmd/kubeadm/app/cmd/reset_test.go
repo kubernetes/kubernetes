@@ -17,20 +17,50 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"github.com/lithammer/dedent"
+
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+)
+
+const (
+	etcdPod = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /path/to/etcd
+      type: DirectoryOrCreate
+    name: etcd-data
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodWithoutDataVolume = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodInvalid = `invalid pod`
 )
 
 func assertExists(t *testing.T, path string) {
@@ -57,34 +87,17 @@ func assertDirEmpty(t *testing.T, path string) {
 
 func TestNewReset(t *testing.T) {
 	var in io.Reader
-	certsDir := kubeadmapiext.DefaultCertificatesDir
-	criSocketPath := "/var/run/dockershim.sock"
-	skipPreFlight := false
+	certsDir := kubeadmapiv1beta1.DefaultCertificatesDir
+	criSocketPath := kubeadmconstants.DefaultDockerCRISocket
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}
-	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 
 	ignorePreflightErrors = []string{}
-	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
-}
-
-func TestNewCmdReset(t *testing.T) {
-	var out io.Writer
-	var in io.Reader
-	cmd := NewCmdReset(in, out)
-
-	tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	args := []string{"--ignore-preflight-errors=all", "--cert-dir=" + tmpDir, "--force"}
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
-		t.Errorf("Cannot execute reset command: %v", err)
-	}
 }
 
 func TestConfigDirCleaner(t *testing.T) {
@@ -127,7 +140,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
-		"preserve cloud-config": {
+		"preserve unrelated file foo": {
 			setupDirs: []string{
 				"manifests",
 				"pki",
@@ -138,12 +151,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				"cloud-config",
+				"foo",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				"cloud-config",
+				"foo",
 			},
 		},
 		"preserve hidden files and directories": {
@@ -158,13 +171,11 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				".cloud-config",
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				".cloud-config",
 				".mydir",
 				".mydir/.myfile",
 			},
@@ -184,118 +195,64 @@ func TestConfigDirCleaner(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		t.Logf("Running test: %s", name)
+		t.Run(name, func(t *testing.T) {
+			t.Logf("Running test: %s", name)
 
-		// Create a temporary directory for our fake config dir:
-		tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
-		if err != nil {
-			t.Errorf("Unable to create temporary directory: %s", err)
-		}
-
-		for _, createDir := range test.setupDirs {
-			err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
+			// Create a temporary directory for our fake config dir:
+			tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
 			if err != nil {
-				t.Errorf("Unable to setup test config directory: %s", err)
+				t.Errorf("Unable to create temporary directory: %s", err)
 			}
-		}
 
-		for _, createFile := range test.setupFiles {
-			fullPath := filepath.Join(tmpDir, createFile)
-			f, err := os.Create(fullPath)
-			if err != nil {
-				t.Errorf("Unable to create test file: %s", err)
+			for _, createDir := range test.setupDirs {
+				err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
+				if err != nil {
+					t.Errorf("Unable to setup test config directory: %s", err)
+				}
 			}
-			f.Close()
-		}
 
-		if test.resetDir == "" {
-			test.resetDir = "pki"
-		}
-		resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
+			for _, createFile := range test.setupFiles {
+				fullPath := filepath.Join(tmpDir, createFile)
+				f, err := os.Create(fullPath)
+				if err != nil {
+					t.Errorf("Unable to create test file: %s", err)
+				}
+				f.Close()
+			}
 
-		// Verify the files we cleanup implicitly in every test:
-		assertExists(t, tmpDir)
-		assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.AdminKubeConfigFileName))
-		assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName))
-		assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
-		assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
+			if test.resetDir == "" {
+				test.resetDir = "pki"
+			}
+			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
 
-		// Verify the files as requested by the test:
-		for _, path := range test.verifyExists {
-			assertExists(t, filepath.Join(tmpDir, path))
-		}
-		for _, path := range test.verifyNotExists {
-			assertNotExists(t, filepath.Join(tmpDir, path))
-		}
+			// Verify the files we cleanup implicitly in every test:
+			assertExists(t, tmpDir)
+			assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.AdminKubeConfigFileName))
+			assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName))
+			assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
+			assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
 
-		os.RemoveAll(tmpDir)
+			// Verify the files as requested by the test:
+			for _, path := range test.verifyExists {
+				assertExists(t, filepath.Join(tmpDir, path))
+			}
+			for _, path := range test.verifyNotExists {
+				assertNotExists(t, filepath.Join(tmpDir, path))
+			}
+
+			os.RemoveAll(tmpDir)
+		})
 	}
 }
 
-type fakeDockerChecker struct {
-	warnings []error
-	errors   []error
-}
-
-func (c *fakeDockerChecker) Check() (warnings, errors []error) {
-	return c.warnings, c.errors
-}
-
-func (c *fakeDockerChecker) Name() string {
-	return "FakeDocker"
-}
-
-func newFakeDockerChecker(warnings, errors []error) preflight.Checker {
-	return &fakeDockerChecker{warnings: warnings, errors: errors}
-}
-
-func TestResetWithDocker(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, errors.New("docker error") },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	resetWithDocker(&fexec, newFakeDockerChecker(nil, nil))
-	if fcmd.RunCalls != 1 {
-		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
-	}
-	resetWithDocker(&fexec, newFakeDockerChecker(nil, nil))
-	if fcmd.RunCalls != 2 {
-		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
-	}
-	resetWithDocker(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}))
-	if fcmd.RunCalls != 2 {
-		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
-	}
-}
-
-func TestResetWithCrictl(t *testing.T) {
+func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// 2: socket path provided, not running with crictl (1x CombinedOutput, 2x Run)
-			func() ([]byte, error) { return []byte("1"), nil },
-			// 3: socket path provided, crictl fails, reset with docker (1x CombinedOuput fail, 1x Run)
-			func() ([]byte, error) { return nil, errors.New("crictl list err") },
-		},
-		RunScript: []fakeexec.FakeRunAction{
-			// 1: socket path not provided, running with docker
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// 2: socket path provided, now running with crictl (1x CombinedOutput, 2x Run)
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// 3: socket path provided, crictl fails, reset with docker (1x CombinedOuput, 1x Run)
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// 4: running with no socket and docker fails (1x Run)
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, error) { return []byte("id1\nid2"), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -305,87 +262,89 @@ func TestResetWithCrictl(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	// 1: socket path not provided, running with docker
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "", "crictl")
-	if fcmd.RunCalls != 1 {
-		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
-	}
-	if !strings.Contains(fcmd.RunLog[0][2], "docker") {
-		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
-	}
-
-	// 2: socket path provided, now running with crictl (1x CombinedOutput, 2x Run)
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
-	if fcmd.RunCalls != 3 {
-		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
-	}
-	if !strings.Contains(fcmd.RunLog[1][0], "crictl") {
-		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
-	}
-	if !strings.Contains(fcmd.RunLog[2][0], "crictl") {
-		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
-	}
-
-	// 3: socket path provided, crictl fails, reset with docker
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
-	if fcmd.RunCalls != 4 {
-		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
-	}
-	if !strings.Contains(fcmd.RunLog[3][2], "docker") {
-		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
-	}
-
-	// 4: running with no socket and docker fails (1x Run)
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}), "", "crictl")
-	if fcmd.RunCalls != 4 {
-		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
-	}
+	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
 }
 
-func TestReset(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1"), nil },
-			func() ([]byte, error) { return []byte("1"), nil },
-			func() ([]byte, error) { return []byte("1"), nil },
+func TestGetEtcdDataDir(t *testing.T) {
+	tests := map[string]struct {
+		dataDir       string
+		podYaml       string
+		expectErr     bool
+		writeManifest bool
+		validClient   bool
+	}{
+		"non-existent file returns error": {
+			expectErr:     true,
+			writeManifest: false,
+			validClient:   true,
 		},
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+		"return etcd data dir": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+			validClient:   true,
 		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		"invalid etcd pod": {
+			podYaml:       etcdPodInvalid,
+			expectErr:     true,
+			writeManifest: true,
+			validClient:   true,
 		},
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+		"etcd pod spec without data volume": {
+			podYaml:       etcdPodWithoutDataVolume,
+			expectErr:     true,
+			writeManifest: true,
+			validClient:   true,
+		},
+		"kubeconfig file doesn't exist": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+			validClient:   false,
+		},
 	}
 
-	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
-	if fcmd.RunCalls != 2 {
-		t.Errorf("expected 2 call to Run, got %d", fcmd.RunCalls)
-	}
-	if !strings.Contains(fcmd.RunLog[0][0], "crictl") {
-		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
-	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-	fexec.LookPathFunc = func(cmd string) (string, error) { return "", errors.New("no crictl") }
-	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
-	if fcmd.RunCalls != 3 {
-		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
-	}
-	if !strings.Contains(fcmd.RunLog[2][2], "docker") {
-		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
+			manifestPath := filepath.Join(tmpdir, "etcd.yaml")
+			if test.writeManifest {
+				err := ioutil.WriteFile(manifestPath, []byte(test.podYaml), 0644)
+				if err != nil {
+					t.Fatalf(dedent.Dedent("failed to write pod manifest\n%s\n\tfatal error: %v"), name, err)
+				}
+			}
+
+			var dataDir string
+			var err error
+			if test.validClient {
+				client := clientsetfake.NewSimpleClientset()
+				dataDir, err = getEtcdDataDir(manifestPath, client)
+			} else {
+				dataDir, err = getEtcdDataDir(manifestPath, nil)
+			}
+
+			if (err != nil) != test.expectErr {
+				t.Fatalf(dedent.Dedent(
+					"getEtcdDataDir failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+					name,
+					test.expectErr,
+					(err != nil),
+					err,
+				)
+			}
+
+			if dataDir != test.dataDir {
+				t.Fatalf(dedent.Dedent("getEtcdDataDir failed\n%s\n\texpected: %s\ngot: %s"), name, test.dataDir, dataDir)
+			}
+		})
 	}
 }

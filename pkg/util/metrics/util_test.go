@@ -57,27 +57,3 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 		}
 	}
 }
-
-func TestUnregisterMetricAndUntrackRateLimiterUsage(t *testing.T) {
-	RegisterMetricAndTrackRateLimiterUsage("owner_name", flowcontrol.NewTokenBucketRateLimiter(1, 1))
-	testCases := []struct {
-		ownerName string
-		ok        bool
-	}{
-		{
-			ownerName: "owner_name",
-			ok:        true,
-		},
-		{
-			ownerName: "owner_name",
-			ok:        false,
-		},
-	}
-
-	for i, tc := range testCases {
-		ok := UnregisterMetricAndUntrackRateLimiterUsage(tc.ownerName)
-		if tc.ok != ok {
-			t.Errorf("Case[%d] Expected %v, got %v", i, tc.ok, ok)
-		}
-	}
-}

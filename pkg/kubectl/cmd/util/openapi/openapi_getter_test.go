@@ -19,27 +19,36 @@ package openapi_test
 import (
 	"fmt"
 
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
+// FakeCounter returns a "null" document and the specified error. It
+// also counts how many times the OpenAPISchema method has been called.
+type FakeCounter struct {
+	Calls int
+	Err   error
+}
+
+func (f *FakeCounter) OpenAPISchema() (*openapi_v2.Document, error) {
+	f.Calls = f.Calls + 1
+	return nil, f.Err
+}
+
 var _ = Describe("Getting the Resources", func() {
-	var client *tst.FakeClient
-	var expectedData openapi.Resources
+	var client FakeCounter
 	var instance openapi.Getter
+	var expectedData openapi.Resources
 
 	BeforeEach(func() {
-		client = tst.NewFakeClient(&fakeSchema)
-		d, err := fakeSchema.OpenAPISchema()
+		client = FakeCounter{}
+		instance = openapi.NewOpenAPIGetter(&client)
+		var err error
+		expectedData, err = openapi.NewOpenAPIData(nil)
 		Expect(err).To(BeNil())
-
-		expectedData, err = openapi.NewOpenAPIData(d)
-		Expect(err).To(BeNil())
-
-		instance = openapi.NewOpenAPIGetter(client)
 	})
 
 	Context("when the server returns a successful result", func() {

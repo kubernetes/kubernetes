@@ -19,8 +19,8 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/utils/cpuload/netlink"
+	"k8s.io/klog"
 )
 
 type CpuLoadReader interface {
@@ -41,6 +41,6 @@ func New() (CpuLoadReader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a netlink based cpuload reader: %v", err)
 	}
-	glog.V(4).Info("Using a netlink-based load reader")
+	klog.V(4).Info("Using a netlink-based load reader")
 	return reader, nil
 }

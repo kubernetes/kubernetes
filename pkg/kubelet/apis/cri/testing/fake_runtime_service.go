@@ -35,6 +35,8 @@ var (
 type FakePodSandbox struct {
 	// PodSandboxStatus contains the runtime information for a sandbox.
 	runtimeapi.PodSandboxStatus
+	// RuntimeHandler is the runtime handler that was issued with the RunPodSandbox request.
+	RuntimeHandler string
 }
 
 type FakeContainer struct {
@@ -102,6 +104,12 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 	return nil
 }
 
+func (r *FakeRuntimeService) GetCalls() []string {
+	r.Lock()
+	defer r.Unlock()
+	return append([]string{}, r.Called...)
+}
+
 func (r *FakeRuntimeService) InjectError(f string, err error) {
 	r.Lock()
 	defer r.Unlock()
@@ -154,7 +162,7 @@ func (r *FakeRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	return r.FakeStatus, nil
 }
 
-func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -176,6 +184,7 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) 
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
+		RuntimeHandler: runtimeHandler,
 	}
 
 	return podSandboxID, nil

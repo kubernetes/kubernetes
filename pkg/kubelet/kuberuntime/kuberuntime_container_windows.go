@@ -19,24 +19,32 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"github.com/docker/docker/pkg/sysinfo"
 
 	"k8s.io/api/core/v1"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
-	config.Windows = m.generateWindowsContainerConfig(container, pod, uid, username)
+	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, username)
+	if err != nil {
+		return err
+	}
+
+	config.Windows = windowsConfig
 	return nil
 }
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.WindowsContainerConfig {
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
 	wc := &runtimeapi.WindowsContainerConfig{
-		Resources: &runtimeapi.WindowsContainerResources{},
+		Resources:       &runtimeapi.WindowsContainerResources{},
+		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
 	}
 
 	cpuRequest := container.Resources.Requests.Cpu()
@@ -77,5 +85,15 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.MemoryLimitInBytes = memoryLimit
 	}
 
-	return wc
+	// setup security context
+	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
+	if effectiveSc.RunAsUser != nil {
+		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
+	}
+	if username != "" {
+		wc.SecurityContext.RunAsUsername = username
+	}
+
+	return wc, nil
 }

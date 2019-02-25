@@ -9,6 +9,7 @@ go_library(
         "storageoserrorkind_string.go",
         "typed_error.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/storageos/go-api/serror",
     importpath = "github.com/storageos/go-api/serror",
     visibility = ["//visibility:public"],
 )

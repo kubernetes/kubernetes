@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	jobutil "k8s.io/kubernetes/pkg/controller/job"
 )
 
 const (
@@ -181,14 +182,25 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 	})
 }
 
-// WaitForJobFinish uses c to wait for compeletions to complete for the Job jobName in namespace ns.
-func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
+// WaitForJobComplete uses c to wait for compeletions to complete for the Job jobName in namespace ns.
+func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return curr.Status.Succeeded == completions, nil
+	})
+}
+
+// WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
+func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return jobutil.IsJobFinished(curr), nil
 	})
 }
 
@@ -210,6 +222,17 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 	})
 }
 
+// WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
+func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+	return wait.Poll(Poll, timeout, func() (bool, error) {
+		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+}
+
 // CheckForAllJobPodsRunning uses c to check in the Job named jobName in ns is running. If the returned error is not
 // nil the returned bool is true if the Job is running.
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {
@@ -228,6 +251,18 @@ func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parall
 	return count == parallelism, nil
 }
 
+// WaitForAllJobPodsRunning wait for all pods for the Job named jobName in namespace ns
+// to be deleted.
+func WaitForAllJobPodsGone(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		pods, err := GetJobPods(c, ns, jobName)
+		if err != nil {
+			return false, err
+		}
+		return len(pods.Items) == 0, nil
+	})
+}
+
 func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
@@ -239,7 +274,7 @@ type updateJobFunc func(*batch.Job)
 func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateJobFunc) (job *batch.Job, err error) {
 	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
 		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -256,4 +291,26 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
 	}
 	return job, pollErr
+}
+
+// WaitForJobDeleting uses c to wait for the Job jobName in namespace ns to have
+// a non-nil deletionTimestamp (i.e. being deleted).
+func WaitForJobDeleting(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return curr.ObjectMeta.DeletionTimestamp != nil, nil
+	})
+}
+
+func JobFinishTime(finishedJob *batch.Job) metav1.Time {
+	var finishTime metav1.Time
+	for _, c := range finishedJob.Status.Conditions {
+		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {
+			return c.LastTransitionTime
+		}
+	}
+	return finishTime
 }

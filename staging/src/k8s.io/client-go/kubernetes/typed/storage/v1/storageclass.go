@@ -19,8 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/storage/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,11 +39,11 @@ type StorageClassesGetter interface {
 type StorageClassInterface interface {
 	Create(*v1.StorageClass) (*v1.StorageClass, error)
 	Update(*v1.StorageClass) (*v1.StorageClass, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.StorageClass, error)
-	List(opts meta_v1.ListOptions) (*v1.StorageClassList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.StorageClass, error)
+	List(opts metav1.ListOptions) (*v1.StorageClassList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
 	StorageClassExpansion
 }
@@ -59,7 +61,7 @@ func newStorageClasses(c *StorageV1Client) *storageClasses {
 }
 
 // Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
-func (c *storageClasses) Get(name string, options meta_v1.GetOptions) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Get(name string, options metav1.GetOptions) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Get().
 		Resource("storageclasses").
@@ -71,22 +73,32 @@ func (c *storageClasses) Get(name string, options meta_v1.GetOptions) (result *v
 }
 
 // List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
-func (c *storageClasses) List(opts meta_v1.ListOptions) (result *v1.StorageClassList, err error) {
+func (c *storageClasses) List(opts metav1.ListOptions) (result *v1.StorageClassList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.StorageClassList{}
 	err = c.client.Get().
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested storageClasses.
-func (c *storageClasses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *storageClasses) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -114,7 +126,7 @@ func (c *storageClasses) Update(storageClass *v1.StorageClass) (result *v1.Stora
 }
 
 // Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
-func (c *storageClasses) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *storageClasses) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		Name(name).
@@ -124,10 +136,15 @@ func (c *storageClasses) Delete(name string, options *meta_v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *storageClasses) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *storageClasses) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("storageclasses").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

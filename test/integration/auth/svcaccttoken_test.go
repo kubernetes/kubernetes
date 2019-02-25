@@ -20,21 +20,29 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/square/go-jose.v2/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
-	externalclientset "k8s.io/client-go/kubernetes"
-	certutil "k8s.io/client-go/util/cert"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/keyutil"
+	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -51,29 +59,53 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
 
 	// Build client config, clientset, and informers
-	sk, err := certutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
+	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	pk := sk.(*ecdsa.PrivateKey).PublicKey
 
 	const iss = "https://foo.bar.example.com"
-	aud := []string{"api"}
+	aud := authenticator.Audiences{"api"}
+
+	maxExpirationSeconds := int64(60 * 60)
+	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
 
 	gcs := &clientset.Clientset{}
 
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
 		serviceaccount.JWTTokenAuthenticator(
 			iss,
 			[]interface{}{&pk},
-			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
+			aud,
+			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
+				gcs,
+				v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+				})),
+			)),
 		),
 	)
-	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
-	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
+	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -118,7 +150,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		one      = int64(1)
 		wrongUID = types.UID("wrong")
 		noUID    = types.UID("")
 	)
@@ -126,8 +157,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 			},
 		}
 
@@ -149,7 +179,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if info.Extra != nil {
+			t.Fatalf("expected Extra to be nil but got: %#v", info.Extra)
+		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -157,8 +190,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and pod", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -203,7 +235,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if len(info.Extra) != 2 {
+			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
+		}
+		if expected := map[string]authenticationv1.ExtraValue{
+			"authentication.kubernetes.io/pod-name": {pod.ObjectMeta.Name},
+			"authentication.kubernetes.io/pod-uid":  {string(pod.ObjectMeta.UID)},
+		}; !reflect.DeepEqual(info.Extra, expected) {
+			t.Fatalf("unexpected Extra:\ngot:\t%#v\nwant:\t%#v", info.Extra, expected)
+		}
 		delPod()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -211,8 +252,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and secret", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Secret",
 					APIVersion: "v1",
@@ -266,8 +306,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and pod running as different service account", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -289,8 +328,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("expired token", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 			},
 		}
 
@@ -303,7 +341,26 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 
 		doTokenReview(t, cs, treq, false)
-		time.Sleep(63 * time.Second)
+
+		// backdate the token
+		then := time.Now().Add(-2 * time.Hour)
+		sc := &jwt.Claims{
+			Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
+			Audience:  jwt.Audience([]string{"api"}),
+			IssuedAt:  jwt.NewNumericDate(then),
+			NotBefore: jwt.NewNumericDate(then),
+			Expiry:    jwt.NewNumericDate(then.Add(time.Duration(60*60) * time.Second)),
+		}
+		coresa := core.ServiceAccount{
+			ObjectMeta: sa.ObjectMeta,
+		}
+		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, nil)
+		tok, err := masterConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
+		if err != nil {
+			t.Fatalf("err signing expired token: %v", err)
+		}
+
+		treq.Status.Token = tok
 		doTokenReview(t, cs, treq, true)
 	})
 
@@ -346,8 +403,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("a token should be invalid after recreating same name pod", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -386,8 +442,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("a token should be invalid after recreating same name secret", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Secret",
 					APIVersion: "v1",
@@ -424,9 +479,97 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		doTokenReview(t, cs, treq, true)
 	})
+
+	t.Run("a token request within expiration time", func(t *testing.T) {
+		normalExpirationTime := maxExpirationSeconds - 10*60
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &normalExpirationTime,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Secret",
+					APIVersion: "v1",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		originalSecret, originalDelSecret := createDeleteSecret(t, cs, secret)
+		defer originalDelSecret()
+
+		treq.Spec.BoundObjectRef.UID = originalSecret.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+		checkExpiration(t, treq, normalExpirationTime)
+
+		doTokenReview(t, cs, treq, false)
+		originalDelSecret()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelSecret := createDeleteSecret(t, cs, secret)
+		defer recreateDelSecret()
+
+		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("a token request with out-of-range expiration", func(t *testing.T) {
+		tooLongExpirationTime := maxExpirationSeconds + 10*60
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &tooLongExpirationTime,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Secret",
+					APIVersion: "v1",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		originalSecret, originalDelSecret := createDeleteSecret(t, cs, secret)
+		defer originalDelSecret()
+
+		treq.Spec.BoundObjectRef.UID = originalSecret.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+		checkExpiration(t, treq, maxExpirationSeconds)
+
+		doTokenReview(t, cs, treq, false)
+		originalDelSecret()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelSecret := createDeleteSecret(t, cs, secret)
+		defer recreateDelSecret()
+
+		doTokenReview(t, cs, treq, true)
+	})
 }
 
-func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
+func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) authenticationv1.UserInfo {
 	t.Helper()
 	trev, err := cs.AuthenticationV1().TokenReviews().Create(&authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
@@ -446,6 +589,7 @@ func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authentic
 	if !trev.Status.Authenticated && !expectErr {
 		t.Fatal("expected token to be authenticated but it wasn't")
 	}
+	return trev.Status.User
 }
 
 func checkPayload(t *testing.T, tok string, want string, parts ...string) {
@@ -453,6 +597,16 @@ func checkPayload(t *testing.T, tok string, want string, parts ...string) {
 	got := getSubObject(t, getPayload(t, tok), parts...)
 	if got != want {
 		t.Errorf("unexpected payload.\nsaw:\t%v\nwant:\t%v", got, want)
+	}
+}
+
+func checkExpiration(t *testing.T, treq *authenticationv1.TokenRequest, expectedExpiration int64) {
+	t.Helper()
+	if treq.Spec.ExpirationSeconds == nil {
+		t.Errorf("unexpected nil expiration seconds.")
+	}
+	if *treq.Spec.ExpirationSeconds != expectedExpiration {
+		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", treq.Spec.ExpirationSeconds, expectedExpiration)
 	}
 }
 
@@ -541,4 +695,24 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			t.Fatalf("err: %v", err)
 		}
 	}
+}
+
+func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
+	return &fakeIndexer{get: get}
+}
+
+type fakeIndexer struct {
+	cache.Indexer
+	get func(namespace, name string) (interface{}, error)
+}
+
+func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
+	parts := strings.SplitN(key, "/", 2)
+	namespace := parts[0]
+	name := ""
+	if len(parts) == 2 {
+		name = parts[1]
+	}
+	obj, err := f.get(namespace, name)
+	return obj, err == nil, err
 }

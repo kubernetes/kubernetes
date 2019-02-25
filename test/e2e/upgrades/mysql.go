@@ -29,9 +29,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 const mysqlManifestPath = "test/e2e/testing-manifests/statefulset/mysql-upgrade"
@@ -58,8 +59,8 @@ func (MySqlUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func mysqlKubectlCreate(ns, file string) {
-	path := filepath.Join(framework.TestContext.RepoRoot, mysqlManifestPath, file)
-	framework.RunKubectlOrDie("create", "-f", path, fmt.Sprintf("--namespace=%s", ns))
+	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file), Fail))
+	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 func (t *MySqlUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {

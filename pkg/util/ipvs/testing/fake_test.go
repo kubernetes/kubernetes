@@ -71,12 +71,22 @@ func TestVirtualServer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when add virtual server, error: %v", err)
 	}
+	// Add another virtual server
+	vs3 := &utilipvs.VirtualServer{
+		Address:  net.ParseIP("10::40"),
+		Port:     uint16(7777),
+		Protocol: string("SCTP"),
+	}
+	err = fake.AddVirtualServer(vs3)
+	if err != nil {
+		t.Errorf("Unexpected error when add virtual server, error: %v", err)
+	}
 	// List all virtual servers
 	list, err := fake.GetVirtualServers()
 	if err != nil {
 		t.Errorf("Fail to list virtual servers, error: %v", err)
 	}
-	if len(list) != 2 {
+	if len(list) != 3 {
 		t.Errorf("Expect 2 virtual servers, got: %d", len(list))
 	}
 	// Delete a virtual server
@@ -114,9 +124,9 @@ func TestRealServer(t *testing.T) {
 		Protocol: string("TCP"),
 	}
 	rss := []*utilipvs.RealServer{
-		{net.ParseIP("172.16.2.1"), 8080, 1},
-		{net.ParseIP("172.16.2.2"), 8080, 2},
-		{net.ParseIP("172.16.2.3"), 8080, 3},
+		{Address: net.ParseIP("172.16.2.1"), Port: 8080, Weight: 1},
+		{Address: net.ParseIP("172.16.2.2"), Port: 8080, Weight: 2},
+		{Address: net.ParseIP("172.16.2.3"), Port: 8080, Weight: 3},
 	}
 	err := fake.AddVirtualServer(vs)
 	if err != nil {

@@ -6,12 +6,13 @@ go_library(
         "nvidia.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/accelerators",
     importpath = "github.com/google/cadvisor/accelerators",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/mindprince/gonvml:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

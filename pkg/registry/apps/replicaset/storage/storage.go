@@ -29,12 +29,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -51,12 +51,11 @@ type ReplicaSetStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) ReplicaSetStorage {
 	replicaSetRest, replicaSetStatusRest := NewREST(optsGetter)
-	replicaSetRegistry := replicaset.NewRegistry(replicaSetRest)
 
 	return ReplicaSetStorage{
 		ReplicaSet: replicaSetRest,
 		Status:     replicaSetStatusRest,
-		Scale:      &ScaleREST{registry: replicaSetRegistry},
+		Scale:      &ScaleREST{store: replicaSetRest.Store},
 	}
 }
 
@@ -68,10 +67,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &extensions.ReplicaSet{} },
-		NewListFunc:              func() runtime.Object { return &extensions.ReplicaSetList{} },
+		NewFunc:                  func() runtime.Object { return &apps.ReplicaSet{} },
+		NewListFunc:              func() runtime.Object { return &apps.ReplicaSetList{} },
 		PredicateFunc:            replicaset.MatchReplicaSet,
-		DefaultQualifiedResource: extensions.Resource("replicasets"),
+		DefaultQualifiedResource: apps.Resource("replicasets"),
 
 		CreateStrategy: replicaset.Strategy,
 		UpdateStrategy: replicaset.Strategy,
@@ -117,7 +116,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.ReplicaSet{}
+	return &apps.ReplicaSet{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -126,12 +125,14 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 type ScaleREST struct {
-	registry replicaset.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -157,10 +158,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
+		return nil, errors.NewNotFound(apps.Resource("replicasets/scale"), name)
 	}
+	rs := obj.(*apps.ReplicaSet)
 	scale, err := scaleFromReplicaSet(rs)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -168,11 +170,12 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, err
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name, &metav1.GetOptions{})
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
-		return nil, false, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
+		return nil, false, errors.NewNotFound(apps.Resource("replicasets/scale"), name)
 	}
+	rs := obj.(*apps.ReplicaSet)
 
 	oldScale, err := scaleFromReplicaSet(rs)
 	if err != nil {
@@ -180,7 +183,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	// TODO: should this pass admission?
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -193,15 +196,16 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
 	}
 
 	rs.Spec.Replicas = scale.Spec.Replicas
 	rs.ResourceVersion = scale.ResourceVersion
-	rs, err = r.registry.UpdateReplicaSet(ctx, rs, createValidation, updateValidation)
+	obj, _, err = r.store.Update(ctx, rs.Name, rest.DefaultUpdatedObjectInfo(rs), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	rs = obj.(*apps.ReplicaSet)
 	newScale, err := scaleFromReplicaSet(rs)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -210,7 +214,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 // scaleFromReplicaSet returns a scale subresource for a replica set.
-func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*autoscaling.Scale, error) {
+func scaleFromReplicaSet(rs *apps.ReplicaSet) (*autoscaling.Scale, error) {
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return nil, err

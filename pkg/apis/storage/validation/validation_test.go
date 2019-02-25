@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
@@ -138,40 +137,6 @@ func TestValidateStorageClass(t *testing.T) {
 	}
 }
 
-func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
-	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
-	falseVar := false
-	testSC := &storage.StorageClass{
-		// empty parameters
-		ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
-		Provisioner:          "kubernetes.io/foo-provisioner",
-		Parameters:           map[string]string{},
-		ReclaimPolicy:        &deleteReclaimPolicy,
-		AllowVolumeExpansion: &falseVar,
-		VolumeBindingMode:    &immediateMode1,
-	}
-
-	// Enable alpha feature ExpandPersistentVolumes
-	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
-		return
-	}
-	if errs := ValidateStorageClass(testSC); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	// Disable alpha feature ExpandPersistentVolumes
-	err = utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
-		return
-	}
-	if errs := ValidateStorageClass(testSC); len(errs) == 0 {
-		t.Errorf("expected failure, but got no error")
-	}
-
-}
-
 func TestVolumeAttachmentValidation(t *testing.T) {
 	volumeName := "pv-name"
 	empty := ""
@@ -224,14 +189,9 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "",
 				NodeName: "mynode",
-			},
-		},
-		{
-			// Invalid attacher name
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: storage.VolumeAttachmentSpec{
-				Attacher: "invalid!@#$%^&*()",
-				NodeName: "mynode",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
 			},
 		},
 		{
@@ -240,6 +200,9 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
 				NodeName: "",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
 			},
 		},
 		{
@@ -378,7 +341,7 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 
 	for _, volumeAttachment := range successCases {
 		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+			t.Errorf("expected success: %+v", errs)
 		}
 	}
 
@@ -445,36 +408,72 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 
 	for _, volumeAttachment := range errorCases {
 		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %v", volumeAttachment)
+			t.Errorf("Expected failure for test: %+v", volumeAttachment)
 		}
 	}
 }
 
-func makeClassWithBinding(mode *storage.VolumeBindingMode) *storage.StorageClass {
+func TestVolumeAttachmentValidationV1(t *testing.T) {
+	volumeName := "pv-name"
+	invalidVolumeName := "-invalid-@#$%^&*()-"
+	successCases := []storage.VolumeAttachment{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachmentV1(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %+v", errs)
+		}
+	}
+
+	errorCases := []storage.VolumeAttachment{
+		{
+			// Invalid attacher name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "invalid-@#$%^&*()",
+				NodeName: "mynode",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+		},
+		{
+			// Invalid PV name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "mynode",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &invalidVolumeName,
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachmentV1(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %+v", volumeAttachment)
+		}
+	}
+}
+
+func makeClass(mode *storage.VolumeBindingMode, topologies []api.TopologySelectorTerm) *storage.StorageClass {
 	return &storage.StorageClass{
 		ObjectMeta:        metav1.ObjectMeta{Name: "foo", ResourceVersion: "foo"},
 		Provisioner:       "kubernetes.io/foo-provisioner",
 		ReclaimPolicy:     &deleteReclaimPolicy,
 		VolumeBindingMode: mode,
-	}
-}
-
-// TODO: Remove these tests once feature gate is not required
-func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
-	errorCases := map[string]*storage.StorageClass{
-		"immediate mode": makeClassWithBinding(&immediateMode1),
-		"waiting mode":   makeClassWithBinding(&waitingMode),
-		"invalid mode":   makeClassWithBinding(&invalidMode),
-	}
-
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-	for testName, storageClass := range errorCases {
-		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %v", testName)
-		}
+		AllowedTopologies: topologies,
 	}
 }
 
@@ -486,27 +485,21 @@ type bindingTest struct {
 func TestValidateVolumeBindingMode(t *testing.T) {
 	cases := map[string]bindingTest{
 		"no mode": {
-			class:         makeClassWithBinding(nil),
+			class:         makeClass(nil, nil),
 			shouldSucceed: false,
 		},
 		"immediate mode": {
-			class:         makeClassWithBinding(&immediateMode1),
+			class:         makeClass(&immediateMode1, nil),
 			shouldSucceed: true,
 		},
 		"waiting mode": {
-			class:         makeClassWithBinding(&waitingMode),
+			class:         makeClass(&waitingMode, nil),
 			shouldSucceed: true,
 		},
 		"invalid mode": {
-			class:         makeClassWithBinding(&invalidMode),
+			class:         makeClass(&invalidMode, nil),
 			shouldSucceed: false,
 		},
-	}
-
-	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
 	}
 
 	for testName, testCase := range cases {
@@ -518,11 +511,6 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 			t.Errorf("Expected failure for test %q, got success", testName)
 		}
 	}
-
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
 }
 
 type updateTest struct {
@@ -532,10 +520,10 @@ type updateTest struct {
 }
 
 func TestValidateUpdateVolumeBindingMode(t *testing.T) {
-	noBinding := makeClassWithBinding(nil)
-	immediateBinding1 := makeClassWithBinding(&immediateMode1)
-	immediateBinding2 := makeClassWithBinding(&immediateMode2)
-	waitBinding := makeClassWithBinding(&waitingMode)
+	noBinding := makeClass(nil, nil)
+	immediateBinding1 := makeClass(&immediateMode1, nil)
+	immediateBinding2 := makeClass(&immediateMode2, nil)
+	waitBinding := makeClass(&waitingMode, nil)
 
 	cases := map[string]updateTest{
 		"old and new no mode": {
@@ -570,12 +558,6 @@ func TestValidateUpdateVolumeBindingMode(t *testing.T) {
 		},
 	}
 
-	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-
 	for testName, testCase := range cases {
 		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
 		if testCase.shouldSucceed && len(errs) != 0 {
@@ -585,9 +567,306 @@ func TestValidateUpdateVolumeBindingMode(t *testing.T) {
 			t.Errorf("Expected failure for %v, got success", testName)
 		}
 	}
+}
 
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
+func TestValidateAllowedTopologies(t *testing.T) {
+
+	validTopology := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone2"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyInvalidKey := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "/invalidkey",
+					Values: []string{"zone1"},
+				},
+			},
+		},
+	}
+
+	topologyLackOfValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{},
+				},
+			},
+		},
+	}
+
+	topologyDupValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node1"},
+				},
+			},
+		},
+	}
+
+	topologyMultiValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node2"},
+				},
+			},
+		},
+	}
+
+	topologyEmptyMatchLabelExpressions := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: nil,
+		},
+	}
+
+	topologyDupKeys := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyMultiTerm := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsIdentical := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+	}
+
+	topologyExprsOneSameOneDiff := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyValuesOneSameOneDiff := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node2"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node3"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsDiffExprOrder := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsDiffValueOrder := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1", "zone2"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone2", "zone1"},
+				},
+			},
+		},
+	}
+
+	cases := map[string]bindingTest{
+		"no topology": {
+			class:         makeClass(&waitingMode, nil),
+			shouldSucceed: true,
+		},
+		"valid topology": {
+			class:         makeClass(&waitingMode, validTopology),
+			shouldSucceed: true,
+		},
+		"topology invalid key": {
+			class:         makeClass(&waitingMode, topologyInvalidKey),
+			shouldSucceed: false,
+		},
+		"topology lack of values": {
+			class:         makeClass(&waitingMode, topologyLackOfValues),
+			shouldSucceed: false,
+		},
+		"duplicate TopologySelectorRequirement values": {
+			class:         makeClass(&waitingMode, topologyDupValues),
+			shouldSucceed: false,
+		},
+		"multiple TopologySelectorRequirement values": {
+			class:         makeClass(&waitingMode, topologyMultiValues),
+			shouldSucceed: true,
+		},
+		"empty MatchLabelExpressions": {
+			class:         makeClass(&waitingMode, topologyEmptyMatchLabelExpressions),
+			shouldSucceed: false,
+		},
+		"duplicate MatchLabelExpression keys": {
+			class:         makeClass(&waitingMode, topologyDupKeys),
+			shouldSucceed: false,
+		},
+		"duplicate MatchLabelExpression keys but across separate terms": {
+			class:         makeClass(&waitingMode, topologyMultiTerm),
+			shouldSucceed: true,
+		},
+		"duplicate AllowedTopologies terms - identical": {
+			class:         makeClass(&waitingMode, topologyDupTermsIdentical),
+			shouldSucceed: false,
+		},
+		"two AllowedTopologies terms, with a pair of the same MatchLabelExpressions and a pair of different ones": {
+			class:         makeClass(&waitingMode, topologyExprsOneSameOneDiff),
+			shouldSucceed: true,
+		},
+		"two AllowedTopologies terms, with a pair of the same Values and a pair of different ones": {
+			class:         makeClass(&waitingMode, topologyValuesOneSameOneDiff),
+			shouldSucceed: true,
+		},
+		"duplicate AllowedTopologies terms - different MatchLabelExpressions order": {
+			class:         makeClass(&waitingMode, topologyDupTermsDiffExprOrder),
+			shouldSucceed: false,
+		},
+		"duplicate AllowedTopologies terms - different TopologySelectorRequirement values order": {
+			class:         makeClass(&waitingMode, topologyDupTermsDiffValueOrder),
+			shouldSucceed: false,
+		},
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClass(testCase.class)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for test %q, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for test %q, got success", testName)
+		}
 	}
 }

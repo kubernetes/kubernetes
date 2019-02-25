@@ -78,7 +78,7 @@ func (r *EvictionREST) New() runtime.Object {
 }
 
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
-func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
 	obj, err := r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
@@ -86,6 +86,16 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 		return nil, err
 	}
 	pod := obj.(*api.Pod)
+	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
+	// There is no need to check for pdb.
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+		if err != nil {
+			return nil, err
+		}
+		return &metav1.Status{
+			Status: metav1.StatusSuccess}, nil
+	}
 	var rtStatus *metav1.Status
 	var pdbName string
 	err = retry.RetryOnConflict(EvictionsRetry, func() error {
@@ -128,7 +138,12 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	deletionOptions := eviction.DeleteOptions
+	if deletionOptions == nil {
+		// default to non-nil to trigger graceful deletion
+		deletionOptions = &metav1.DeleteOptions{}
+	}
+	_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
 	if err != nil {
 		return nil, err
 	}

@@ -5,8 +5,10 @@ go_library(
     srcs = [
         "enclosing.go",
         "imports.go",
+        "rewrite.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/go/ast/astutil",
     importpath = "golang.org/x/tools/go/ast/astutil",
     visibility = ["//visibility:public"],
 )

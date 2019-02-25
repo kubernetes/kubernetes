@@ -7,42 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cgroups_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "cgroups_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "cgroups_linux.go",
+        "cgroups_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/util",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

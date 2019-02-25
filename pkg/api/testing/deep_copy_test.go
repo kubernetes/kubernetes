@@ -37,7 +37,7 @@ func parseTimeOrDie(ts string) metav1.Time {
 	return metav1.Time{Time: t}
 }
 
-var benchmarkPod api.Pod = api.Pod{
+var benchmarkPod = api.Pod{
 	TypeMeta: metav1.TypeMeta{
 		Kind:       "Pod",
 		APIVersion: "v1",

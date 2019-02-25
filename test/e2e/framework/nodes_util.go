@@ -22,9 +22,12 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -63,7 +66,7 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.2.18-0")
+		"TEST_ETCD_IMAGE=3.3.10-0")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -103,7 +106,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.2.18-0")
+			"TEST_ETCD_IMAGE=3.3.10-0")
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".
@@ -205,16 +208,7 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	if err != nil {
 		return err
 	}
-
-	// Wait for it to complete and validate nodes are healthy.
-	//
-	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
-	// GKE; the operation shouldn't return until they all are.
-	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
-		return err
-	}
-	return nil
+	return waitForNodesReadyAfterUpgrade(f)
 }
 
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
@@ -223,9 +217,20 @@ func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, en
 	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
 		return err
 	}
+	return waitForNodesReadyAfterUpgrade(f)
+}
+
+func waitForNodesReadyAfterUpgrade(f *Framework) error {
 	// Wait for it to complete and validate nodes are healthy.
-	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
+	//
+	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
+	// GKE; the operation shouldn't return until they all are.
+	numNodes, err := NumberOfRegisteredNodes(f.ClientSet)
+	if err != nil {
+		return fmt.Errorf("couldn't detect number of nodes")
+	}
+	Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout, numNodes)
+	if _, err := CheckNodesReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
@@ -328,4 +333,68 @@ func waitForSSHTunnels() {
 		_, err := RunKubectl("logs", "ssh-tunnel-test")
 		return err == nil, nil
 	})
+}
+
+// NodeKiller is a utility to simulate node failures.
+type NodeKiller struct {
+	config   NodeKillerConfig
+	client   clientset.Interface
+	provider string
+}
+
+// NewNodeKiller creates new NodeKiller.
+func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
+	return &NodeKiller{config, client, provider}
+}
+
+// Run starts NodeKiller until stopCh is closed.
+func (k *NodeKiller) Run(stopCh <-chan struct{}) {
+	// wait.JitterUntil starts work immediately, so wait first.
+	time.Sleep(wait.Jitter(k.config.Interval, k.config.JitterFactor))
+	wait.JitterUntil(func() {
+		nodes := k.pickNodes()
+		k.kill(nodes)
+	}, k.config.Interval, k.config.JitterFactor, true, stopCh)
+}
+
+func (k *NodeKiller) pickNodes() []v1.Node {
+	nodes := GetReadySchedulableNodesOrDie(k.client)
+	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
+	shuffledNodes := shuffleNodes(nodes.Items)
+	if len(shuffledNodes) > numNodes {
+		return shuffledNodes[:numNodes]
+	}
+	return shuffledNodes
+}
+
+func (k *NodeKiller) kill(nodes []v1.Node) {
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodes))
+	for _, node := range nodes {
+		node := node
+		go func() {
+			defer wg.Done()
+
+			Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)
+			err := IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
+			if err != nil {
+				Logf("ERROR while stopping node %q: %v", node.Name, err)
+				return
+			}
+
+			time.Sleep(k.config.SimulatedDowntime)
+
+			Logf("Rebooting %q to repair the node", node.Name)
+			err = IssueSSHCommand("sudo reboot", k.provider, &node)
+			if err != nil {
+				Logf("ERROR while rebooting node %q: %v", node.Name, err)
+				return
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func DeleteNodeOnCloudProvider(node *v1.Node) error {
+	return TestContext.CloudConfig.Provider.DeleteNode(node)
 }

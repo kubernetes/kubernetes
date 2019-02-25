@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFeatureGateFlag(t *testing.T) {
@@ -43,13 +44,13 @@ func TestFeatureGateFlag(t *testing.T) {
 			},
 		},
 		{
-			arg: "fooBarBaz=maybeidk",
+			arg: "fooBarBaz=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
-			parseError: "unrecognized key: fooBarBaz",
+			parseError: "unrecognized feature gate: fooBarBaz",
 		},
 		{
 			arg: "AllAlpha=false",
@@ -147,7 +148,7 @@ func TestFeatureGateOverride(t *testing.T) {
 	const testBetaGate Feature = "TestBeta"
 
 	// Don't parse the flag, assert defaults are used.
-	var f FeatureGate = NewFeatureGate()
+	var f *featureGate = NewFeatureGate()
 	f.Add(map[Feature]FeatureSpec{
 		testAlphaGate: {Default: false, PreRelease: Alpha},
 		testBetaGate:  {Default: false, PreRelease: Beta},
@@ -176,7 +177,7 @@ func TestFeatureGateFlagDefaults(t *testing.T) {
 	const testBetaGate Feature = "TestBeta"
 
 	// Don't parse the flag, assert defaults are used.
-	var f FeatureGate = NewFeatureGate()
+	var f *featureGate = NewFeatureGate()
 	f.Add(map[Feature]FeatureSpec{
 		testAlphaGate: {Default: false, PreRelease: Alpha},
 		testBetaGate:  {Default: true, PreRelease: Beta},
@@ -190,10 +191,38 @@ func TestFeatureGateFlagDefaults(t *testing.T) {
 	}
 }
 
+func TestFeatureGateKnownFeatures(t *testing.T) {
+	// gates for testing
+	const (
+		testAlphaGate      Feature = "TestAlpha"
+		testBetaGate       Feature = "TestBeta"
+		testGAGate         Feature = "TestGA"
+		testDeprecatedGate Feature = "TestDeprecated"
+	)
+
+	// Don't parse the flag, assert defaults are used.
+	var f *featureGate = NewFeatureGate()
+	f.Add(map[Feature]FeatureSpec{
+		testAlphaGate:      {Default: false, PreRelease: Alpha},
+		testBetaGate:       {Default: true, PreRelease: Beta},
+		testGAGate:         {Default: true, PreRelease: GA},
+		testDeprecatedGate: {Default: false, PreRelease: Deprecated},
+	})
+
+	known := strings.Join(f.KnownFeatures(), " ")
+
+	assert.Contains(t, known, testAlphaGate)
+	assert.Contains(t, known, testBetaGate)
+	assert.NotContains(t, known, testGAGate)
+	assert.NotContains(t, known, testDeprecatedGate)
+}
+
 func TestFeatureGateSetFromMap(t *testing.T) {
 	// gates for testing
 	const testAlphaGate Feature = "TestAlpha"
 	const testBetaGate Feature = "TestBeta"
+	const testLockedTrueGate Feature = "TestLockedTrue"
+	const testLockedFalseGate Feature = "TestLockedFalse"
 
 	tests := []struct {
 		name        string
@@ -241,19 +270,56 @@ func TestFeatureGateSetFromMap(t *testing.T) {
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
-			setmapError: "unrecognized key:",
+			setmapError: "unrecognized feature gate:",
+		},
+		{
+			name: "set locked gates",
+			setmap: map[string]bool{
+				"TestLockedTrue":  true,
+				"TestLockedFalse": false,
+			},
+			expect: map[Feature]bool{
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			name: "set locked gates",
+			setmap: map[string]bool{
+				"TestLockedTrue": false,
+			},
+			expect: map[Feature]bool{
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+			setmapError: "cannot set feature gate TestLockedTrue to false, feature is locked to true",
+		},
+		{
+			name: "set locked gates",
+			setmap: map[string]bool{
+				"TestLockedFalse": true,
+			},
+			expect: map[Feature]bool{
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+			setmapError: "cannot set feature gate TestLockedFalse to true, feature is locked to false",
 		},
 	}
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("SetFromMap %s", test.name), func(t *testing.T) {
 			f := NewFeatureGate()
 			f.Add(map[Feature]FeatureSpec{
-				testAlphaGate: {Default: false, PreRelease: Alpha},
-				testBetaGate:  {Default: false, PreRelease: Beta},
+				testAlphaGate:       {Default: false, PreRelease: Alpha},
+				testBetaGate:        {Default: false, PreRelease: Beta},
+				testLockedTrueGate:  {Default: true, PreRelease: GA, LockToDefault: true},
+				testLockedFalseGate: {Default: false, PreRelease: GA, LockToDefault: true},
 			})
 			err := f.SetFromMap(test.setmap)
 			if test.setmapError != "" {
-				if !strings.Contains(err.Error(), test.setmapError) {
+				if err == nil {
+					t.Errorf("expected error, got none")
+				} else if !strings.Contains(err.Error(), test.setmapError) {
 					t.Errorf("%d: SetFromMap(%#v) Expected err:%v, Got err:%v", i, test.setmap, test.setmapError, err)
 				}
 			} else if err != nil {

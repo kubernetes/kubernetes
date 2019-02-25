@@ -30,9 +30,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	prometheuspb "github.com/prometheus/client_model/go"
+	"k8s.io/klog"
 )
 
 const scrapeRequestHeader = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text"
@@ -54,7 +54,7 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		return nil, fmt.Errorf("Unable to contact metrics endpoint of master: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
 	}
 
@@ -66,7 +66,7 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal line of metrics response: %v", err)
 		}
-		glog.V(4).Infof("Got metric %q", metric.GetName())
+		klog.V(4).Infof("Got metric %q", metric.GetName())
 		metrics = append(metrics, &metric)
 	}
 	return metrics, nil
@@ -120,7 +120,7 @@ func TestApiserverMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkForExpectedMetrics(t, metrics, []string{
-		"apiserver_request_count",
-		"apiserver_request_latencies",
+		"apiserver_request_total",
+		"apiserver_request_latency_seconds",
 	})
 }

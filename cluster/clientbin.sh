@@ -47,6 +47,9 @@ case "$(uname -m)" in
   arm*)
     host_arch=arm
     ;;
+  aarch64*)
+    host_arch=arm64
+    ;;
   i?86*)
     host_arch=386
     ;;
@@ -79,7 +82,7 @@ function get_bin() {
     echo "Source directory path is required"
     exit 1
   fi
-  
+
   locations=(
     "${KUBE_ROOT}/_output/bin/${bin}"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/${bin}"

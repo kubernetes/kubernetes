@@ -59,7 +59,7 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *core.NamespaceList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.NamespaceList{}
+	list := &core.NamespaceList{ListMeta: obj.(*core.NamespaceList).ListMeta}
 	for _, item := range obj.(*core.NamespaceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -123,7 +123,7 @@ func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched namespace.
 func (c *FakeNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &core.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, pt, data, subresources...), &core.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

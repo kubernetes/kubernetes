@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - ixdy
   - luxas
@@ -6,3 +8,5 @@ approvers:
   - ixdy
   - luxas
   - mikedanese
+labels:
+- sig/release

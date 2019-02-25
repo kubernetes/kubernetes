@@ -17,13 +17,13 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -91,6 +91,7 @@ func SetDefaults_Container(obj *v1.Container) {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
+
 func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -157,8 +158,16 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+	if obj.Spec.EnableServiceLinks == nil {
+		enableServiceLinks := v1.DefaultEnableServiceLinks
+		obj.Spec.EnableServiceLinks = &enableServiceLinks
+	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
+	// New fields added here will break upgrade tests:
+	// https://github.com/kubernetes/kubernetes/issues/69445
+	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
+	// that it only materializes in the Pod object and not all objects with a PodSpec field.
 	if obj.DNSPolicy == "" {
 		obj.DNSPolicy = v1.DNSClusterFirst
 	}
@@ -223,6 +232,12 @@ func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 		obj.DefaultMode = &perm
 	}
 }
+func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {
+	hour := int64(time.Hour.Seconds())
+	if obj.ExpirationSeconds == nil {
+		obj.ExpirationSeconds = &hour
+	}
+}
 func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.VolumePending
@@ -230,7 +245,7 @@ func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Spec.PersistentVolumeReclaimPolicy == "" {
 		obj.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
-	if obj.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+	if obj.Spec.VolumeMode == nil {
 		obj.Spec.VolumeMode = new(v1.PersistentVolumeMode)
 		*obj.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 	}
@@ -239,7 +254,7 @@ func SetDefaults_PersistentVolumeClaim(obj *v1.PersistentVolumeClaim) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.ClaimPending
 	}
-	if obj.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+	if obj.Spec.VolumeMode == nil {
 		obj.Spec.VolumeMode = new(v1.PersistentVolumeMode)
 		*obj.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 	}
@@ -404,5 +419,12 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
+	}
+}
+
+func SetDefaults_SecurityContext(obj *v1.SecurityContext) {
+	if obj.ProcMount == nil {
+		defProcMount := v1.DefaultProcMount
+		obj.ProcMount = &defProcMount
 	}
 }

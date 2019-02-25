@@ -41,20 +41,21 @@ readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
 readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
 readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
 
-readonly master_logfiles="kube-apiserver kube-apiserver-audit kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
-readonly node_logfiles="kube-proxy fluentd node-problem-detector"
+readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log fluentd.log kubelet.cov"
+readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
 readonly node_systemd_services="node-problem-detector"
-readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-hollow-node-*"
-readonly aws_logfiles="cloud-init-output"
-readonly gce_logfiles="startupscript"
-readonly kern_logfile="kern"
-readonly initd_logfiles="docker"
-readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
-readonly systemd_services="kubelet ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
+readonly aws_logfiles="cloud-init-output.log"
+readonly gce_logfiles="startupscript.log"
+readonly kern_logfile="kern.log"
+readonly initd_logfiles="docker/log"
+readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
+readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
-readonly max_scp_processes=25
+readonly max_dump_processes=25
 
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
@@ -100,10 +101,10 @@ function copy-logs-from-node() {
     local -r node="${1}"
     local -r dir="${2}"
     local files=( ${3} )
-    # Append ".log*"
+    # Append "*"
     # The * at the end is needed to also copy rotated logs (which happens
     # in large clusters and long runs).
-    files=( "${files[@]/%/.log*}" )
+    files=( "${files[@]/%/*}" )
     # Prepend "/var/log/"
     files=( "${files[@]/#/\/var\/log\/}" )
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
@@ -164,8 +165,27 @@ function save-logs() {
         for svc in "${services[@]}"; do
             log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
+
+        if [[ "$dump_systemd_journal" == "true" ]]; then
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise" > "${dir}/systemd.log" || true
+        fi
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
+    fi
+
+    # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
+    if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
+      if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
+        if [[ "${on_master}" == "true" ]]; then
+          run-in-docker-container "${node_name}" "kube-apiserver" "cat /tmp/k8s-kube-apiserver.cov" > "${dir}/kube-apiserver.cov" || true
+          run-in-docker-container "${node_name}" "kube-scheduler" "cat /tmp/k8s-kube-scheduler.cov" > "${dir}/kube-scheduler.cov" || true
+          run-in-docker-container "${node_name}" "kube-controller-manager" "cat /tmp/k8s-kube-controller-manager.cov" > "${dir}/kube-controller-manager.cov" || true
+        else
+          run-in-docker-container "${node_name}" "kube-proxy" "cat /tmp/k8s-kube-proxy.cov" > "${dir}/kube-proxy.cov" || true
+        fi
+      else
+        echo "Coverage profiles seem to exist, but cannot be retrieved from inside containers."
+      fi
     fi
 
     echo "Changing logfiles to be world-readable for download"
@@ -173,6 +193,15 @@ function save-logs() {
 
     echo "Copying '${files}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
+}
+
+# Execute a command in container $2 on node $1.
+# Uses docker because the container may not ordinarily permit direct execution.
+function run-in-docker-container() {
+  local node_name="$1"
+  local container="$2"
+  shift 2
+  log-dump-ssh "${node_name}" "docker exec \"\$(docker ps -f label=io.kubernetes.container.name=${container} --format \"{{.ID}}\")\" $@"
 }
 
 function dump_masters() {
@@ -197,23 +226,23 @@ function dump_masters() {
     return
   fi
 
-  proc=${max_scp_processes}
+  proc=${max_dump_processes}
   for master_name in "${master_names[@]}"; do
     master_dir="${report_dir}/${master_name}"
     mkdir -p "${master_dir}"
     save-logs "${master_name}" "${master_dir}" "${master_logfiles}" "" "true" &
 
-    # We don't want to run more than ${max_scp_processes} at a time, so
+    # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
     if [[ proc -eq 0 ]]; then
-      proc=${max_scp_processes}
+      proc=${max_dump_processes}
       wait
     fi
   done
   # Wait for any remaining processes.
-  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
     wait
   fi
 }
@@ -258,7 +287,7 @@ function dump_nodes() {
     nodes_selected_for_logs=( "${node_names[@]}" )
   fi
 
-  proc=${max_scp_processes}
+  proc=${max_dump_processes}
   for node_name in "${nodes_selected_for_logs[@]}"; do
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
@@ -266,24 +295,47 @@ function dump_nodes() {
     # many nodes.
     save-logs "${node_name}" "${node_dir}" "${node_logfiles_all}" "${node_systemd_services}" &
 
-    # We don't want to run more than ${max_scp_processes} at a time, so
+    # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
     if [[ proc -eq 0 ]]; then
-      proc=${max_scp_processes}
+      proc=${max_dump_processes}
       wait
     fi
   done
   # Wait for any remaining processes.
-  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
     wait
   fi
 }
 
+# Collect names of nodes which didn't run logexporter successfully.
+# Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
+# Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
+# Assumes:
+#   NODE_NAMES
+# Sets:
+#   NON_LOGEXPORTED_NODES
+function find_non_logexported_nodes() {
+  succeeded_nodes=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry) || return 1
+  echo "Successfully listed marker files for successful nodes"
+  NON_LOGEXPORTED_NODES=()
+  for node in "${NODE_NAMES[@]}"; do
+    if [[ ! "${succeeded_nodes}" =~ "${node}" ]]; then
+      NON_LOGEXPORTED_NODES+=("${node}")
+    fi
+  done
+}
+
 function dump_nodes_with_logexporter() {
-  echo "Detecting nodes in the cluster"
-  detect-node-names &> /dev/null
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
+    NODE_NAMES=( $(log_dump_custom_get_instances node) )
+  else
+    echo "Detecting nodes in the cluster"
+    detect-node-names &> /dev/null
+  fi
 
   if [[ -z "${NODE_NAMES:-}" ]]; then
     echo "No nodes found!"
@@ -294,7 +346,7 @@ function dump_nodes_with_logexporter() {
   local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
-  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 5 ))"
+  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 3 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
@@ -302,6 +354,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
@@ -312,14 +365,49 @@ function dump_nodes_with_logexporter() {
     return
   fi
 
-  # Give some time for the pods to finish uploading logs.
-  sleep "${logexport_sleep_seconds}"
+  # Periodically fetch list of already logexported nodes to verify
+  # if we aren't already done.
+  start="$(date +%s)"
+  while true; do
+    now="$(date +%s)"
+    if [[ $((now - start)) -gt ${logexport_sleep_seconds} ]]; then
+      echo "Waiting for all nodes to be logexported timed out."
+      break
+    fi
+    if find_non_logexported_nodes; then
+      if [[ -z "${NON_LOGEXPORTED_NODES:-}" ]]; then
+        break
+      fi
+    fi
+    sleep 15
+  done
+
+  # Store logs from logexporter pods to allow debugging log exporting process
+  # itself.
+  proc=${max_dump_processes}
+  "${KUBECTL}" get pods -n "${logexporter_namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}' | while read pod node; do
+    echo "Fetching logs from ${pod} running on ${node}"
+    mkdir -p ${report_dir}/${node}
+    "${KUBECTL}" logs -n "${logexporter_namespace}" ${pod} > ${report_dir}/${node}/${pod}.log &
+
+    # We don't want to run more than ${max_dump_processes} at a time, so
+    # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_dump_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
+    wait
+  fi
 
   # List registry of marker files (of nodes whose logexporter succeeded) from GCS.
   local nodes_succeeded
   for retry in {1..10}; do
-    if nodes_succeeded=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry); then
-      echo "Successfully listed marker files for successful nodes"
+    if find_non_logexported_nodes; then
       break
     else
       echo "Attempt ${retry} failed to list marker files for succeessful nodes"
@@ -333,23 +421,50 @@ function dump_nodes_with_logexporter() {
     fi
   done
 
-  # Collect names of nodes which didn't run logexporter successfully.
-  # Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
-  # Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
   failed_nodes=()
-  for node in "${NODE_NAMES[@]}"; do
-    if [[ ! "${nodes_succeeded}" =~ "${node}" ]]; then
+  # The following if is needed, because defaulting for empty arrays
+  # seems to treat them as non-empty with single empty string.
+  if [[ -n "${NON_LOGEXPORTED_NODES:-}" ]]; then
+    for node in "${NON_LOGEXPORTED_NODES[@]:-}"; do
       echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
       failed_nodes+=("${node}")
-    fi
-  done
+    done
+  fi
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
+  "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
   "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"
     dump_nodes "${failed_nodes[@]}"
   fi
+}
+
+function detect_node_failures() {
+  if ! [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    return
+  fi
+
+  detect-node-names
+  if [ -z "${INSTANCE_GROUPS:-}" ]; then
+    return
+  fi
+  for group in "${INSTANCE_GROUPS[@]}"; do
+    local creation_timestamp=$(gcloud compute instance-groups managed describe \
+                              "${group}" \
+                              --project "${PROJECT}" \
+                              --zone "${ZONE}" \
+                              --format='value(creationTimestamp)')
+    echo "Failures for ${group}"
+    gcloud logging read --order=asc \
+          --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
+          --project "${PROJECT}" \
+          "resource.type=\"gce_instance\"
+           logName=\"projects/${PROJECT}/logs/compute.googleapis.com%2Factivity_log\"
+           (jsonPayload.event_subtype=\"compute.instances.hostError\" OR jsonPayload.event_subtype=\"compute.instances.automaticRestart\")
+           jsonPayload.resource.name:\"${group}\"
+           timestamp >= \"${creation_timestamp}\""
+  done
 }
 
 function main() {
@@ -370,6 +485,8 @@ function main() {
     echo "Dumping logs from nodes locally to '${report_dir}'"
     dump_nodes
   fi
+
+  detect_node_failures
 }
 
 main

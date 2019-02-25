@@ -7,6 +7,7 @@ go_library(
         "signatures.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/certificate-transparency-go",
     importpath = "github.com/google/certificate-transparency-go",
     visibility = ["//visibility:public"],
     deps = [

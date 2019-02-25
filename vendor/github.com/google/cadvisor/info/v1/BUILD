@@ -8,6 +8,7 @@ go_library(
         "machine.go",
         "metric.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/info/v1",
     importpath = "github.com/google/cadvisor/info/v1",
     visibility = ["//visibility:public"],
 )

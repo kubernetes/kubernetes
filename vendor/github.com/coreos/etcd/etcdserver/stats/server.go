@@ -74,10 +74,10 @@ type serverStats struct {
 func (ss *ServerStats) JSON() []byte {
 	ss.Lock()
 	stats := ss.serverStats
-	ss.Unlock()
-	stats.LeaderInfo.Uptime = time.Since(stats.LeaderInfo.StartTime).String()
 	stats.SendingPkgRate, stats.SendingBandwidthRate = stats.sendRateQueue.Rate()
 	stats.RecvingPkgRate, stats.RecvingBandwidthRate = stats.recvRateQueue.Rate()
+	stats.LeaderInfo.Uptime = time.Since(stats.LeaderInfo.StartTime).String()
+	ss.Unlock()
 	b, err := json.Marshal(stats)
 	// TODO(jonboulle): appropriate error handling?
 	if err != nil {

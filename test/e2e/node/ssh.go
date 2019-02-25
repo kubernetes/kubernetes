@@ -59,7 +59,7 @@ var _ = SIGDescribe("SSH", func() {
 			// Keep this test first - this variant runs on all nodes.
 			{`echo "Hello from $(whoami)@$(hostname)"`, false, "", "", 0, nil},
 			{`echo "foo" | grep "bar"`, true, "", "", 1, nil},
-			{`echo "Out" && echo "Error" >&2 && exit 7`, true, "Out", "Error", 7, nil},
+			{`echo "stdout" && echo "stderr" >&2 && exit 7`, true, "stdout", "stderr", 7, nil},
 		}
 
 		for i, testCase := range testCases {

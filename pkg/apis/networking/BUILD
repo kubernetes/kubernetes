@@ -16,10 +16,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/networking",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
 
@@ -37,6 +37,7 @@ filegroup(
         "//pkg/apis/networking/fuzzer:all-srcs",
         "//pkg/apis/networking/install:all-srcs",
         "//pkg/apis/networking/v1:all-srcs",
+        "//pkg/apis/networking/v1beta1:all-srcs",
         "//pkg/apis/networking/validation:all-srcs",
     ],
     tags = ["automanaged"],

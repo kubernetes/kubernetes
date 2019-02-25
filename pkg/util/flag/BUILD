@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -10,8 +11,9 @@ go_library(
     srcs = ["flags.go"],
     importpath = "k8s.io/kubernetes/pkg/util/flag",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -26,4 +28,11 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["flags_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )

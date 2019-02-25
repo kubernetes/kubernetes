@@ -16,6 +16,7 @@ go_library(
         "members.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/client",
     importpath = "github.com/coreos/etcd/client",
     visibility = ["//visibility:public"],
     deps = [
@@ -24,7 +25,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/etcd/version:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

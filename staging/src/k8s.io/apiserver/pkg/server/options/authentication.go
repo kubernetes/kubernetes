@@ -22,24 +22,28 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/server"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 type RequestHeaderAuthenticationOptions struct {
+	// ClientCAFile is the root certificate bundle to verify client certificates on incoming requests
+	// before trusting usernames in headers.
+	ClientCAFile string
+
 	UsernameHeaders     []string
 	GroupHeaders        []string
 	ExtraHeaderPrefixes []string
-	ClientCAFile        string
 	AllowedNames        []string
 }
 
@@ -103,6 +107,9 @@ type DelegatingAuthenticationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
 	// TokenAccessReview.authentication.k8s.io endpoint for checking tokens.
 	RemoteKubeConfigFile string
+	// RemoteKubeConfigFileOptional is specifying whether not specifying the kubeconfig or
+	// a missing in-cluster config will be fatal.
+	RemoteKubeConfigFileOptional bool
 
 	// CacheTTL is the length of time that a token authentication answer will be cached.
 	CacheTTL time.Duration
@@ -110,7 +117,12 @@ type DelegatingAuthenticationOptions struct {
 	ClientCert    ClientCertAuthenticationOptions
 	RequestHeader RequestHeaderAuthenticationOptions
 
+	// SkipInClusterLookup indicates missing authentication configuration should not be retrieved from the cluster configmap
 	SkipInClusterLookup bool
+
+	// TolerateInClusterLookupFailure indicates failures to look up authentication configuration from the cluster configmap should not be fatal.
+	// Setting this can result in an authenticator that will reject all requests.
+	TolerateInClusterLookupFailure bool
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -136,9 +148,13 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	var optionalKubeConfigSentence string
+	if s.RemoteKubeConfigFileOptional {
+		optionalKubeConfigSentence = " This is optional. If empty, all token requests are considered to be anonymous and no client CA is looked up in the cluster."
+	}
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		"tokenaccessreviews.authentication.k8s.io.")
+		"tokenaccessreviews.authentication.k8s.io."+optionalKubeConfigSentence)
 
 	fs.DurationVar(&s.CacheTTL, "authentication-token-webhook-cache-ttl", s.CacheTTL,
 		"The duration to cache responses from the webhook token authenticator.")
@@ -149,7 +165,9 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.SkipInClusterLookup, "authentication-skip-lookup", s.SkipInClusterLookup, ""+
 		"If false, the authentication-kubeconfig will be used to lookup missing authentication "+
 		"configuration from the cluster.")
-
+	fs.BoolVar(&s.TolerateInClusterLookupFailure, "authentication-tolerate-lookup-failure", s.TolerateInClusterLookupFailure, ""+
+		"If true, failures to look up missing authentication configuration from the cluster are not considered fatal. "+
+		"Note that this can result in authentication that treats all requests as anonymous.")
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
@@ -158,31 +176,51 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 		return nil
 	}
 
-	clientCA, err := s.getClientCA()
-	if err != nil {
-		return err
+	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
+		Anonymous: true,
+		CacheTTL:  s.CacheTTL,
 	}
-	if err = c.ApplyClientCert(clientCA.ClientCA, servingInfo); err != nil {
+
+	client, err := s.getClient()
+	if err != nil {
+		return fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
+	}
+
+	// configure token review
+	if client != nil {
+		cfg.TokenAccessReviewClient = client.AuthenticationV1beta1().TokenReviews()
+	}
+
+	// look into configmaps/external-apiserver-authentication for missing authn info
+	if !s.SkipInClusterLookup {
+		err := s.lookupMissingConfigInCluster(client)
+		if err != nil {
+			if s.TolerateInClusterLookupFailure {
+				klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
+				klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
+				klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+			} else {
+				return err
+			}
+		}
+	}
+
+	// configure AuthenticationInfo config
+	cfg.ClientCAFile = s.ClientCert.ClientCA
+	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
-	requestHeader, err := s.getRequestHeader()
-	if err != nil {
-		return err
-	}
-	if err = c.ApplyClientCert(requestHeader.ClientCAFile, servingInfo); err != nil {
+	cfg.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
-	cfg, err := s.ToAuthenticationConfig()
-	if err != nil {
-		return err
-	}
+	// create authenticator
 	authenticator, securityDefinitions, err := cfg.New()
 	if err != nil {
 		return err
 	}
-
 	c.Authenticator = authenticator
 	if openAPIConfig != nil {
 		openAPIConfig.SecurityDefinitions = securityDefinitions
@@ -190,31 +228,6 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	c.SupportsBasicAuth = false
 
 	return nil
-}
-
-func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticatorfactory.DelegatingAuthenticatorConfig, error) {
-	tokenClient, err := s.newTokenAccessReview()
-	if err != nil {
-		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-	}
-
-	clientCA, err := s.getClientCA()
-	if err != nil {
-		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-	}
-	requestHeader, err := s.getRequestHeader()
-	if err != nil {
-		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-	}
-
-	ret := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:               true,
-		TokenAccessReviewClient: tokenClient,
-		CacheTTL:                s.CacheTTL,
-		ClientCAFile:            clientCA.ClientCA,
-		RequestHeaderConfig:     requestHeader.ToAuthenticationRequestHeaderConfig(),
-	}
-	return ret, nil
 }
 
 const (
@@ -227,59 +240,70 @@ const (
 	authenticationRoleName      = "extension-apiserver-authentication-reader"
 )
 
-func (s *DelegatingAuthenticationOptions) getClientCA() (*ClientCertAuthenticationOptions, error) {
-	if len(s.ClientCert.ClientCA) > 0 || s.SkipInClusterLookup {
-		return &s.ClientCert, nil
+func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client kubernetes.Interface) error {
+	if len(s.ClientCert.ClientCA) > 0 && len(s.RequestHeader.ClientCAFile) > 0 {
+		return nil
+	}
+	if client == nil {
+		if len(s.ClientCert.ClientCA) == 0 {
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		}
+		if len(s.RequestHeader.ClientCAFile) == 0 {
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		}
+		return nil
 	}
 
-	incluster, err := s.lookupInClusterClientCA()
-	if err != nil {
-		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
+	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		// ignore, authConfigMap is nil now
+	case errors.IsForbidden(err):
+		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
+			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return nil, err
+		return err
+	case err != nil:
+		return err
 	}
-	if incluster == nil {
-		return nil, fmt.Errorf("cluster doesn't provide client-ca-file")
+
+	if len(s.ClientCert.ClientCA) == 0 {
+		if authConfigMap != nil {
+			opt, err := inClusterClientCA(authConfigMap)
+			if err != nil {
+				return err
+			}
+			if opt != nil {
+				s.ClientCert = *opt
+			}
+		}
+		if len(s.ClientCert.ClientCA) == 0 {
+			klog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		}
 	}
-	return incluster, nil
+
+	if len(s.RequestHeader.ClientCAFile) == 0 {
+		if authConfigMap != nil {
+			opt, err := inClusterRequestHeader(authConfigMap)
+			if err != nil {
+				return err
+			}
+			if opt != nil {
+				s.RequestHeader = *opt
+			}
+		}
+		if len(s.RequestHeader.ClientCAFile) == 0 {
+			klog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		}
+	}
+
+	return nil
 }
 
-func (s *DelegatingAuthenticationOptions) getRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
-	if len(s.RequestHeader.ClientCAFile) > 0 || s.SkipInClusterLookup {
-		return &s.RequestHeader, nil
-	}
-
-	incluster, err := s.lookupInClusterRequestHeader()
-	if err != nil {
-		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
-			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return nil, err
-	}
-	if incluster == nil {
-		return nil, fmt.Errorf("cluster doesn't provide requestheader-client-ca-file")
-	}
-	return incluster, nil
-}
-
-func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCertAuthenticationOptions, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	client, err := coreclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
+func inClusterClientCA(authConfigMap *v1.ConfigMap) (*ClientCertAuthenticationOptions, error) {
 	clientCA, ok := authConfigMap.Data["client-ca-file"]
 	if !ok {
+		// not having a client-ca is fine, return nil
 		return nil, nil
 	}
 
@@ -293,23 +317,10 @@ func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCert
 	return &ClientCertAuthenticationOptions{ClientCA: f.Name()}, nil
 }
 
-func (s *DelegatingAuthenticationOptions) lookupInClusterRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	client, err := coreclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
+func inClusterRequestHeader(authConfigMap *v1.ConfigMap) (*RequestHeaderAuthenticationOptions, error) {
 	requestHeaderCA, ok := authConfigMap.Data["requestheader-client-ca-file"]
 	if !ok {
+		// not having a requestheader-client-ca is fine, return nil
 		return nil, nil
 	}
 
@@ -357,7 +368,9 @@ func deserializeStrings(in string) ([]string, error) {
 	return ret, nil
 }
 
-func (s *DelegatingAuthenticationOptions) getClientConfig() (*rest.Config, error) {
+// getClient returns a Kubernetes clientset. If s.RemoteKubeConfigFileOptional is true, nil will be returned
+// if no kubeconfig is specified by the user and the in-cluster config is not found.
+func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
@@ -365,32 +378,24 @@ func (s *DelegatingAuthenticationOptions) getClientConfig() (*rest.Config, error
 		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
 		clientConfig, err = loader.ClientConfig()
-
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
-		// use this path
+		// use this path. If it is optional, ignore errors.
 		clientConfig, err = rest.InClusterConfig()
+		if err != nil && s.RemoteKubeConfigFileOptional {
+			if err != rest.ErrNotInCluster {
+				klog.Warningf("failed to read in-cluster kubeconfig for delegated authentication: %v", err)
+			}
+			return nil, nil
+		}
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 
-	return clientConfig, nil
-}
-
-func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	client, err := authenticationclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.TokenReviews(), nil
+	return kubernetes.NewForConfig(clientConfig)
 }

@@ -83,7 +83,7 @@ checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions."
+  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions."
   kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
@@ -92,12 +92,6 @@ checkEtcdOnPath
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
-
-# If a test case is specified, just run once with v1 API version and exit
-if [[ -n "${KUBE_TEST_ARGS}" ]]; then
-  runTests v1
-  exit 0
-fi
 
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"

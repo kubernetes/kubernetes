@@ -67,8 +67,6 @@ const (
 	NodeSelectorMismatching              = "NodeSelectorMismatching"
 	InsufficientFreeCPU                  = "InsufficientFreeCPU"
 	InsufficientFreeMemory               = "InsufficientFreeMemory"
-	HostNetworkNotSupported              = "HostNetworkNotSupported"
-	UndefinedShaper                      = "NilShaper"
 	NodeRebooted                         = "Rebooted"
 	ContainerGCFailed                    = "ContainerGCFailed"
 	ImageGCFailed                        = "ImageGCFailed"

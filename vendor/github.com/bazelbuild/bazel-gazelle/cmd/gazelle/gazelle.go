@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -39,11 +40,23 @@ var commandFromName = map[string]command{
 	"update-repos": updateReposCmd,
 }
 
+var nameFromCommand = []string{
+	// keep in sync with definition above
+	"update",
+	"fix",
+	"update-repos",
+	"help",
+}
+
+func (cmd command) String() string {
+	return nameFromCommand[cmd]
+}
+
 func main() {
 	log.SetPrefix("gazelle: ")
 	log.SetFlags(0) // don't print timestamps
 
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:]); err != nil && err != flag.ErrHelp {
 		log.Fatal(err)
 	}
 }
@@ -64,7 +77,7 @@ func run(args []string) error {
 	case fixCmd, updateCmd:
 		return runFixUpdate(cmd, args)
 	case helpCmd:
-		help()
+		return help()
 	case updateReposCmd:
 		return updateRepos(args)
 	default:
@@ -73,7 +86,7 @@ func run(args []string) error {
 	return nil
 }
 
-func help() {
+func help() error {
 	fmt.Fprint(os.Stderr, `usage: gazelle <command> [args...]
 
 Gazelle is a BUILD file generator for Go projects. It can create new BUILD files
@@ -99,8 +112,9 @@ For example:
 
   gazelle update -h
 
-Gazelle is under active delevopment, and its interface may change
+Gazelle is under active development, and its interface may change
 without notice.
 
 `)
+	return flag.ErrHelp
 }

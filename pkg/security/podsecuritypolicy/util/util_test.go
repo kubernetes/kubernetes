@@ -17,10 +17,11 @@ limitations under the License.
 package util
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"reflect"
 	"testing"
+
+	policy "k8s.io/api/policy/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // TestVolumeSourceFSTypeDrift ensures that for every known type of volume source (by the fields on
@@ -105,41 +106,52 @@ func TestPSPAllowsFSType(t *testing.T) {
 
 func TestAllowsHostVolumePath(t *testing.T) {
 	tests := map[string]struct {
-		psp    *policy.PodSecurityPolicy
-		path   string
-		allows bool
+		psp            *policy.PodSecurityPolicy
+		path           string
+		allows         bool
+		mustBeReadOnly bool
 	}{
 		"nil psp": {
-			psp:    nil,
-			path:   "/test",
-			allows: false,
+			psp:            nil,
+			path:           "/test",
+			allows:         false,
+			mustBeReadOnly: false,
 		},
 		"empty allowed paths": {
-			psp:    &policy.PodSecurityPolicy{},
-			path:   "/test",
-			allows: true,
+			psp:            &policy.PodSecurityPolicy{},
+			path:           "/test",
+			allows:         true,
+			mustBeReadOnly: false,
 		},
 		"non-matching": {
 			psp: &policy.PodSecurityPolicy{
 				Spec: policy.PodSecurityPolicySpec{
 					AllowedHostPaths: []policy.AllowedHostPath{
-						{PathPrefix: "/foo"},
+						{
+							PathPrefix: "/foo",
+							ReadOnly:   true,
+						},
 					},
 				},
 			},
-			path:   "/foobar",
-			allows: false,
+			path:           "/foobar",
+			allows:         false,
+			mustBeReadOnly: false,
 		},
 		"match on direct match": {
 			psp: &policy.PodSecurityPolicy{
 				Spec: policy.PodSecurityPolicySpec{
 					AllowedHostPaths: []policy.AllowedHostPath{
-						{PathPrefix: "/foo"},
+						{
+							PathPrefix: "/foo",
+							ReadOnly:   true,
+						},
 					},
 				},
 			},
-			path:   "/foo",
-			allows: true,
+			path:           "/foo",
+			allows:         true,
+			mustBeReadOnly: true,
 		},
 		"match with trailing slash on host path": {
 			psp: &policy.PodSecurityPolicy{
@@ -149,8 +161,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 					},
 				},
 			},
-			path:   "/foo/",
-			allows: true,
+			path:           "/foo/",
+			allows:         true,
+			mustBeReadOnly: false,
 		},
 		"match with trailing slash on allowed path": {
 			psp: &policy.PodSecurityPolicy{
@@ -160,19 +173,24 @@ func TestAllowsHostVolumePath(t *testing.T) {
 					},
 				},
 			},
-			path:   "/foo",
-			allows: true,
+			path:           "/foo",
+			allows:         true,
+			mustBeReadOnly: false,
 		},
 		"match child directory": {
 			psp: &policy.PodSecurityPolicy{
 				Spec: policy.PodSecurityPolicySpec{
 					AllowedHostPaths: []policy.AllowedHostPath{
-						{PathPrefix: "/foo/"},
+						{
+							PathPrefix: "/foo/",
+							ReadOnly:   true,
+						},
 					},
 				},
 			},
-			path:   "/foo/bar",
-			allows: true,
+			path:           "/foo/bar",
+			allows:         true,
+			mustBeReadOnly: true,
 		},
 		"non-matching parent directory": {
 			psp: &policy.PodSecurityPolicy{
@@ -182,15 +200,19 @@ func TestAllowsHostVolumePath(t *testing.T) {
 					},
 				},
 			},
-			path:   "/foo",
-			allows: false,
+			path:           "/foo",
+			allows:         false,
+			mustBeReadOnly: false,
 		},
 	}
 
 	for k, v := range tests {
-		allows := AllowsHostVolumePath(v.psp, v.path)
+		allows, mustBeReadOnly := AllowsHostVolumePath(v.psp, v.path)
 		if v.allows != allows {
-			t.Errorf("%s expected %t but got %t", k, v.allows, allows)
+			t.Errorf("allows: %s expected %t but got %t", k, v.allows, allows)
+		}
+		if v.mustBeReadOnly != mustBeReadOnly {
+			t.Errorf("mustBeReadOnly: %s expected %t but got %t", k, v.mustBeReadOnly, mustBeReadOnly)
 		}
 	}
 }

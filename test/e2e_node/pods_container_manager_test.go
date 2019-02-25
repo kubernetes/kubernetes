@@ -27,9 +27,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 // getResourceList returns a ResourceList with the
@@ -71,7 +71,7 @@ func makePodToVerifyCgroups(cgroupNames []string) *v1.Pod {
 		cgroupName := cm.NewCgroupName(rootCgroupName, cgroupComponents...)
 		cgroupFsNames = append(cgroupFsNames, toCgroupFsName(cgroupName))
 	}
-	glog.Infof("expecting %v cgroups to be found", cgroupFsNames)
+	klog.Infof("expecting %v cgroups to be found", cgroupFsNames)
 	// build the pod command to either verify cgroups exist
 	command := ""
 	for _, cgroupFsName := range cgroupFsNames {
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
-			It("Top level QoS containers should have been created", func() {
+			It("Top level QoS containers should have been created [NodeConformance]", func() {
 				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
@@ -165,7 +165,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 	})
 
-	Describe("Pod containers", func() {
+	Describe("Pod containers [NodeConformance]", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
 				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {

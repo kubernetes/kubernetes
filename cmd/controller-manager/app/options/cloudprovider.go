@@ -18,13 +18,13 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // CloudProviderOptions holds the cloudprovider options.
 type CloudProviderOptions struct {
-	CloudConfigFile string
-	Name            string
+	*kubectrlmgrconfig.CloudProviderConfiguration
 }
 
 // Validate checks validation of cloudprovider options.
@@ -43,7 +43,7 @@ func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up cloudprovider config with options.
-func (s *CloudProviderOptions) ApplyTo(cfg *componentconfig.CloudProviderConfiguration) error {
+func (s *CloudProviderOptions) ApplyTo(cfg *kubectrlmgrconfig.CloudProviderConfiguration) error {
 	if s == nil {
 		return nil
 	}

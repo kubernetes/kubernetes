@@ -67,7 +67,7 @@ func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, in
 	})
 }
 
-func GetEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
+func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: config.CertFile,
 		KeyFile:  config.KeyFile,
@@ -76,7 +76,7 @@ func GetEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
 
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	cfg := clientv3.Config{
@@ -86,8 +86,8 @@ func GetEtcdKVClient(config storagebackend.Config) (clientv3.KV, error) {
 
 	c, err := clientv3.New(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return clientv3.NewKV(c), nil
+	return c, clientv3.NewKV(c), nil
 }

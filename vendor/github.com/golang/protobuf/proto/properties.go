@@ -58,42 +58,6 @@ const (
 	WireFixed32    = 5
 )
 
-const startSize = 10 // initial slice/string sizes
-
-// Encoders are defined in encode.go
-// An encoder outputs the full representation of a field, including its
-// tag and encoder type.
-type encoder func(p *Buffer, prop *Properties, base structPointer) error
-
-// A valueEncoder encodes a single integer in a particular encoding.
-type valueEncoder func(o *Buffer, x uint64) error
-
-// Sizers are defined in encode.go
-// A sizer returns the encoded size of a field, including its tag and encoder
-// type.
-type sizer func(prop *Properties, base structPointer) int
-
-// A valueSizer returns the encoded size of a single integer in a particular
-// encoding.
-type valueSizer func(x uint64) int
-
-// Decoders are defined in decode.go
-// A decoder creates a value from its wire representation.
-// Unrecognized subelements are saved in unrec.
-type decoder func(p *Buffer, prop *Properties, base structPointer) error
-
-// A valueDecoder decodes a single integer in a particular encoding.
-type valueDecoder func(o *Buffer) (x uint64, err error)
-
-// A oneofMarshaler does the marshaling for all oneof fields in a message.
-type oneofMarshaler func(Message, *Buffer) error
-
-// A oneofUnmarshaler does the unmarshaling for a oneof field in a message.
-type oneofUnmarshaler func(Message, int, int, *Buffer) (bool, error)
-
-// A oneofSizer does the sizing for all oneof fields in a message.
-type oneofSizer func(Message) int
-
 // tagMap is an optimization over map[int]int for typical protocol buffer
 // use-cases. Encoded protocol buffers are often in tag order with small tag
 // numbers.
@@ -140,13 +104,6 @@ type StructProperties struct {
 	decoderTags      tagMap         // map from proto tag to struct field number
 	decoderOrigNames map[string]int // map from original name to struct field number
 	order            []int          // list of struct field numbers in tag order
-	unrecField       field          // field id of the XXX_unrecognized []byte field
-	extendable       bool           // is this an extendable proto
-
-	oneofMarshaler   oneofMarshaler
-	oneofUnmarshaler oneofUnmarshaler
-	oneofSizer       oneofSizer
-	stype            reflect.Type
 
 	// OneofTypes contains information about the oneof fields in this message.
 	// It is keyed by the original name of a field.
@@ -187,36 +144,19 @@ type Properties struct {
 
 	Default    string // default value
 	HasDefault bool   // whether an explicit default was provided
-	def_uint64 uint64
 
-	enc           encoder
-	valEnc        valueEncoder // set for bool and numeric types only
-	field         field
-	tagcode       []byte // encoding of EncodeVarint((Tag<<3)|WireType)
-	tagbuf        [8]byte
-	stype         reflect.Type      // set for struct types only
-	sprop         *StructProperties // set for struct types only
-	isMarshaler   bool
-	isUnmarshaler bool
+	stype reflect.Type      // set for struct types only
+	sprop *StructProperties // set for struct types only
 
 	mtype    reflect.Type // set for map types only
 	mkeyprop *Properties  // set for map types only
 	mvalprop *Properties  // set for map types only
-
-	size    sizer
-	valSize valueSizer // set for bool and numeric types only
-
-	dec    decoder
-	valDec valueDecoder // set for bool and numeric types only
-
-	// If this is a packable field, this will be the decoder for the packed version of the field.
-	packedDec decoder
 }
 
 // String formats the properties in the protobuf struct field tag style.
 func (p *Properties) String() string {
 	s := p.Wire
-	s = ","
+	s += ","
 	s += strconv.Itoa(p.Tag)
 	if p.Required {
 		s += ",req"
@@ -262,29 +202,14 @@ func (p *Properties) Parse(s string) {
 	switch p.Wire {
 	case "varint":
 		p.WireType = WireVarint
-		p.valEnc = (*Buffer).EncodeVarint
-		p.valDec = (*Buffer).DecodeVarint
-		p.valSize = sizeVarint
 	case "fixed32":
 		p.WireType = WireFixed32
-		p.valEnc = (*Buffer).EncodeFixed32
-		p.valDec = (*Buffer).DecodeFixed32
-		p.valSize = sizeFixed32
 	case "fixed64":
 		p.WireType = WireFixed64
-		p.valEnc = (*Buffer).EncodeFixed64
-		p.valDec = (*Buffer).DecodeFixed64
-		p.valSize = sizeFixed64
 	case "zigzag32":
 		p.WireType = WireVarint
-		p.valEnc = (*Buffer).EncodeZigzag32
-		p.valDec = (*Buffer).DecodeZigzag32
-		p.valSize = sizeZigzag32
 	case "zigzag64":
 		p.WireType = WireVarint
-		p.valEnc = (*Buffer).EncodeZigzag64
-		p.valDec = (*Buffer).DecodeZigzag64
-		p.valSize = sizeZigzag64
 	case "bytes", "group":
 		p.WireType = WireBytes
 		// no numeric converter for non-numeric types
@@ -299,6 +224,7 @@ func (p *Properties) Parse(s string) {
 		return
 	}
 
+outer:
 	for i := 2; i < len(fields); i++ {
 		f := fields[i]
 		switch {
@@ -326,229 +252,28 @@ func (p *Properties) Parse(s string) {
 			if i+1 < len(fields) {
 				// Commas aren't escaped, and def is always last.
 				p.Default += "," + strings.Join(fields[i+1:], ",")
-				break
+				break outer
 			}
 		}
 	}
 }
 
-func logNoSliceEnc(t1, t2 reflect.Type) {
-	fmt.Fprintf(os.Stderr, "proto: no slice oenc for %T = []%T\n", t1, t2)
-}
-
 var protoMessageType = reflect.TypeOf((*Message)(nil)).Elem()
 
-// Initialize the fields for encoding and decoding.
-func (p *Properties) setEncAndDec(typ reflect.Type, f *reflect.StructField, lockGetProp bool) {
-	p.enc = nil
-	p.dec = nil
-	p.size = nil
-
+// setFieldProps initializes the field properties for submessages and maps.
+func (p *Properties) setFieldProps(typ reflect.Type, f *reflect.StructField, lockGetProp bool) {
 	switch t1 := typ; t1.Kind() {
-	default:
-		fmt.Fprintf(os.Stderr, "proto: no coders for %v\n", t1)
-
-	// proto3 scalar types
-
-	case reflect.Bool:
-		p.enc = (*Buffer).enc_proto3_bool
-		p.dec = (*Buffer).dec_proto3_bool
-		p.size = size_proto3_bool
-	case reflect.Int32:
-		p.enc = (*Buffer).enc_proto3_int32
-		p.dec = (*Buffer).dec_proto3_int32
-		p.size = size_proto3_int32
-	case reflect.Uint32:
-		p.enc = (*Buffer).enc_proto3_uint32
-		p.dec = (*Buffer).dec_proto3_int32 // can reuse
-		p.size = size_proto3_uint32
-	case reflect.Int64, reflect.Uint64:
-		p.enc = (*Buffer).enc_proto3_int64
-		p.dec = (*Buffer).dec_proto3_int64
-		p.size = size_proto3_int64
-	case reflect.Float32:
-		p.enc = (*Buffer).enc_proto3_uint32 // can just treat them as bits
-		p.dec = (*Buffer).dec_proto3_int32
-		p.size = size_proto3_uint32
-	case reflect.Float64:
-		p.enc = (*Buffer).enc_proto3_int64 // can just treat them as bits
-		p.dec = (*Buffer).dec_proto3_int64
-		p.size = size_proto3_int64
-	case reflect.String:
-		p.enc = (*Buffer).enc_proto3_string
-		p.dec = (*Buffer).dec_proto3_string
-		p.size = size_proto3_string
-
 	case reflect.Ptr:
-		switch t2 := t1.Elem(); t2.Kind() {
-		default:
-			fmt.Fprintf(os.Stderr, "proto: no encoder function for %v -> %v\n", t1, t2)
-			break
-		case reflect.Bool:
-			p.enc = (*Buffer).enc_bool
-			p.dec = (*Buffer).dec_bool
-			p.size = size_bool
-		case reflect.Int32:
-			p.enc = (*Buffer).enc_int32
-			p.dec = (*Buffer).dec_int32
-			p.size = size_int32
-		case reflect.Uint32:
-			p.enc = (*Buffer).enc_uint32
-			p.dec = (*Buffer).dec_int32 // can reuse
-			p.size = size_uint32
-		case reflect.Int64, reflect.Uint64:
-			p.enc = (*Buffer).enc_int64
-			p.dec = (*Buffer).dec_int64
-			p.size = size_int64
-		case reflect.Float32:
-			p.enc = (*Buffer).enc_uint32 // can just treat them as bits
-			p.dec = (*Buffer).dec_int32
-			p.size = size_uint32
-		case reflect.Float64:
-			p.enc = (*Buffer).enc_int64 // can just treat them as bits
-			p.dec = (*Buffer).dec_int64
-			p.size = size_int64
-		case reflect.String:
-			p.enc = (*Buffer).enc_string
-			p.dec = (*Buffer).dec_string
-			p.size = size_string
-		case reflect.Struct:
+		if t1.Elem().Kind() == reflect.Struct {
 			p.stype = t1.Elem()
-			p.isMarshaler = isMarshaler(t1)
-			p.isUnmarshaler = isUnmarshaler(t1)
-			if p.Wire == "bytes" {
-				p.enc = (*Buffer).enc_struct_message
-				p.dec = (*Buffer).dec_struct_message
-				p.size = size_struct_message
-			} else {
-				p.enc = (*Buffer).enc_struct_group
-				p.dec = (*Buffer).dec_struct_group
-				p.size = size_struct_group
-			}
 		}
 
 	case reflect.Slice:
-		switch t2 := t1.Elem(); t2.Kind() {
-		default:
-			logNoSliceEnc(t1, t2)
-			break
-		case reflect.Bool:
-			if p.Packed {
-				p.enc = (*Buffer).enc_slice_packed_bool
-				p.size = size_slice_packed_bool
-			} else {
-				p.enc = (*Buffer).enc_slice_bool
-				p.size = size_slice_bool
-			}
-			p.dec = (*Buffer).dec_slice_bool
-			p.packedDec = (*Buffer).dec_slice_packed_bool
-		case reflect.Int32:
-			if p.Packed {
-				p.enc = (*Buffer).enc_slice_packed_int32
-				p.size = size_slice_packed_int32
-			} else {
-				p.enc = (*Buffer).enc_slice_int32
-				p.size = size_slice_int32
-			}
-			p.dec = (*Buffer).dec_slice_int32
-			p.packedDec = (*Buffer).dec_slice_packed_int32
-		case reflect.Uint32:
-			if p.Packed {
-				p.enc = (*Buffer).enc_slice_packed_uint32
-				p.size = size_slice_packed_uint32
-			} else {
-				p.enc = (*Buffer).enc_slice_uint32
-				p.size = size_slice_uint32
-			}
-			p.dec = (*Buffer).dec_slice_int32
-			p.packedDec = (*Buffer).dec_slice_packed_int32
-		case reflect.Int64, reflect.Uint64:
-			if p.Packed {
-				p.enc = (*Buffer).enc_slice_packed_int64
-				p.size = size_slice_packed_int64
-			} else {
-				p.enc = (*Buffer).enc_slice_int64
-				p.size = size_slice_int64
-			}
-			p.dec = (*Buffer).dec_slice_int64
-			p.packedDec = (*Buffer).dec_slice_packed_int64
-		case reflect.Uint8:
-			p.dec = (*Buffer).dec_slice_byte
-			if p.proto3 {
-				p.enc = (*Buffer).enc_proto3_slice_byte
-				p.size = size_proto3_slice_byte
-			} else {
-				p.enc = (*Buffer).enc_slice_byte
-				p.size = size_slice_byte
-			}
-		case reflect.Float32, reflect.Float64:
-			switch t2.Bits() {
-			case 32:
-				// can just treat them as bits
-				if p.Packed {
-					p.enc = (*Buffer).enc_slice_packed_uint32
-					p.size = size_slice_packed_uint32
-				} else {
-					p.enc = (*Buffer).enc_slice_uint32
-					p.size = size_slice_uint32
-				}
-				p.dec = (*Buffer).dec_slice_int32
-				p.packedDec = (*Buffer).dec_slice_packed_int32
-			case 64:
-				// can just treat them as bits
-				if p.Packed {
-					p.enc = (*Buffer).enc_slice_packed_int64
-					p.size = size_slice_packed_int64
-				} else {
-					p.enc = (*Buffer).enc_slice_int64
-					p.size = size_slice_int64
-				}
-				p.dec = (*Buffer).dec_slice_int64
-				p.packedDec = (*Buffer).dec_slice_packed_int64
-			default:
-				logNoSliceEnc(t1, t2)
-				break
-			}
-		case reflect.String:
-			p.enc = (*Buffer).enc_slice_string
-			p.dec = (*Buffer).dec_slice_string
-			p.size = size_slice_string
-		case reflect.Ptr:
-			switch t3 := t2.Elem(); t3.Kind() {
-			default:
-				fmt.Fprintf(os.Stderr, "proto: no ptr oenc for %T -> %T -> %T\n", t1, t2, t3)
-				break
-			case reflect.Struct:
-				p.stype = t2.Elem()
-				p.isMarshaler = isMarshaler(t2)
-				p.isUnmarshaler = isUnmarshaler(t2)
-				if p.Wire == "bytes" {
-					p.enc = (*Buffer).enc_slice_struct_message
-					p.dec = (*Buffer).dec_slice_struct_message
-					p.size = size_slice_struct_message
-				} else {
-					p.enc = (*Buffer).enc_slice_struct_group
-					p.dec = (*Buffer).dec_slice_struct_group
-					p.size = size_slice_struct_group
-				}
-			}
-		case reflect.Slice:
-			switch t2.Elem().Kind() {
-			default:
-				fmt.Fprintf(os.Stderr, "proto: no slice elem oenc for %T -> %T -> %T\n", t1, t2, t2.Elem())
-				break
-			case reflect.Uint8:
-				p.enc = (*Buffer).enc_slice_slice_byte
-				p.dec = (*Buffer).dec_slice_slice_byte
-				p.size = size_slice_slice_byte
-			}
+		if t2 := t1.Elem(); t2.Kind() == reflect.Ptr && t2.Elem().Kind() == reflect.Struct {
+			p.stype = t2.Elem()
 		}
 
 	case reflect.Map:
-		p.enc = (*Buffer).enc_new_map
-		p.dec = (*Buffer).dec_new_map
-		p.size = size_new_map
-
 		p.mtype = t1
 		p.mkeyprop = &Properties{}
 		p.mkeyprop.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
@@ -562,20 +287,6 @@ func (p *Properties) setEncAndDec(typ reflect.Type, f *reflect.StructField, lock
 		p.mvalprop.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
 	}
 
-	// precalculate tag code
-	wire := p.WireType
-	if p.Packed {
-		wire = WireBytes
-	}
-	x := uint32(p.Tag)<<3 | uint32(wire)
-	i := 0
-	for i = 0; x > 127; i++ {
-		p.tagbuf[i] = 0x80 | uint8(x&0x7F)
-		x >>= 7
-	}
-	p.tagbuf[i] = uint8(x)
-	p.tagcode = p.tagbuf[0 : i+1]
-
 	if p.stype != nil {
 		if lockGetProp {
 			p.sprop = GetProperties(p.stype)
@@ -586,31 +297,8 @@ func (p *Properties) setEncAndDec(typ reflect.Type, f *reflect.StructField, lock
 }
 
 var (
-	marshalerType   = reflect.TypeOf((*Marshaler)(nil)).Elem()
-	unmarshalerType = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
+	marshalerType = reflect.TypeOf((*Marshaler)(nil)).Elem()
 )
-
-// isMarshaler reports whether type t implements Marshaler.
-func isMarshaler(t reflect.Type) bool {
-	// We're checking for (likely) pointer-receiver methods
-	// so if t is not a pointer, something is very wrong.
-	// The calls above only invoke isMarshaler on pointer types.
-	if t.Kind() != reflect.Ptr {
-		panic("proto: misuse of isMarshaler")
-	}
-	return t.Implements(marshalerType)
-}
-
-// isUnmarshaler reports whether type t implements Unmarshaler.
-func isUnmarshaler(t reflect.Type) bool {
-	// We're checking for (likely) pointer-receiver methods
-	// so if t is not a pointer, something is very wrong.
-	// The calls above only invoke isUnmarshaler on pointer types.
-	if t.Kind() != reflect.Ptr {
-		panic("proto: misuse of isUnmarshaler")
-	}
-	return t.Implements(unmarshalerType)
-}
 
 // Init populates the properties from a protocol buffer struct tag.
 func (p *Properties) Init(typ reflect.Type, name, tag string, f *reflect.StructField) {
@@ -621,14 +309,11 @@ func (p *Properties) init(typ reflect.Type, name, tag string, f *reflect.StructF
 	// "bytes,49,opt,def=hello!"
 	p.Name = name
 	p.OrigName = name
-	if f != nil {
-		p.field = toField(f)
-	}
 	if tag == "" {
 		return
 	}
 	p.Parse(tag)
-	p.setEncAndDec(typ, f, lockGetProp)
+	p.setFieldProps(typ, f, lockGetProp)
 }
 
 var (
@@ -678,9 +363,6 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	propertiesMap[t] = prop
 
 	// build properties
-	prop.extendable = reflect.PtrTo(t).Implements(extendableProtoType) ||
-		reflect.PtrTo(t).Implements(extendableProtoV1Type)
-	prop.unrecField = invalidField
 	prop.Prop = make([]*Properties, t.NumField())
 	prop.order = make([]int, t.NumField())
 
@@ -690,17 +372,6 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 		name := f.Name
 		p.init(f.Type, name, f.Tag.Get("protobuf"), &f, false)
 
-		if f.Name == "XXX_InternalExtensions" { // special case
-			p.enc = (*Buffer).enc_exts
-			p.dec = nil // not needed
-			p.size = size_exts
-		} else if f.Name == "XXX_extensions" { // special case
-			p.enc = (*Buffer).enc_map
-			p.dec = nil // not needed
-			p.size = size_map
-		} else if f.Name == "XXX_unrecognized" { // special case
-			prop.unrecField = toField(&f)
-		}
 		oneof := f.Tag.Get("protobuf_oneof") // special case
 		if oneof != "" {
 			// Oneof fields don't use the traditional protobuf tag.
@@ -715,9 +386,6 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 			}
 			print("\n")
 		}
-		if p.enc == nil && !strings.HasPrefix(f.Name, "XXX_") && oneof == "" {
-			fmt.Fprintln(os.Stderr, "proto: no encoder for", f.Name, f.Type.String(), "[GetProperties]")
-		}
 	}
 
 	// Re-order prop.order.
@@ -728,8 +396,7 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	}
 	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok {
 		var oots []interface{}
-		prop.oneofMarshaler, prop.oneofUnmarshaler, prop.oneofSizer, oots = om.XXX_OneofFuncs()
-		prop.stype = t
+		_, _, _, oots = om.XXX_OneofFuncs()
 
 		// Interpret oneof metadata.
 		prop.OneofTypes = make(map[string]*OneofProperties)
@@ -779,30 +446,6 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	return prop
 }
 
-// Return the Properties object for the x[0]'th field of the structure.
-func propByIndex(t reflect.Type, x []int) *Properties {
-	if len(x) != 1 {
-		fmt.Fprintf(os.Stderr, "proto: field index dimension %d (not 1) for type %s\n", len(x), t)
-		return nil
-	}
-	prop := GetProperties(t)
-	return prop.Prop[x[0]]
-}
-
-// Get the address and type of a pointer to a struct from an interface.
-func getbase(pb Message) (t reflect.Type, b structPointer, err error) {
-	if pb == nil {
-		err = ErrNil
-		return
-	}
-	// get the reflect type of the pointer to the struct.
-	t = reflect.TypeOf(pb)
-	// get the address of the struct.
-	value := reflect.ValueOf(pb)
-	b = toStructPointer(value)
-	return
-}
-
 // A global registry of enum types.
 // The generated code will register the generated maps by calling RegisterEnum.
 
@@ -826,20 +469,42 @@ func EnumValueMap(enumType string) map[string]int32 {
 // A registry of all linked message types.
 // The string is a fully-qualified proto name ("pkg.Message").
 var (
-	protoTypes    = make(map[string]reflect.Type)
-	revProtoTypes = make(map[reflect.Type]string)
+	protoTypedNils = make(map[string]Message)      // a map from proto names to typed nil pointers
+	protoMapTypes  = make(map[string]reflect.Type) // a map from proto names to map types
+	revProtoTypes  = make(map[reflect.Type]string)
 )
 
 // RegisterType is called from generated code and maps from the fully qualified
 // proto name to the type (pointer to struct) of the protocol buffer.
 func RegisterType(x Message, name string) {
-	if _, ok := protoTypes[name]; ok {
+	if _, ok := protoTypedNils[name]; ok {
 		// TODO: Some day, make this a panic.
 		log.Printf("proto: duplicate proto type registered: %s", name)
 		return
 	}
 	t := reflect.TypeOf(x)
-	protoTypes[name] = t
+	if v := reflect.ValueOf(x); v.Kind() == reflect.Ptr && v.Pointer() == 0 {
+		// Generated code always calls RegisterType with nil x.
+		// This check is just for extra safety.
+		protoTypedNils[name] = x
+	} else {
+		protoTypedNils[name] = reflect.Zero(t).Interface().(Message)
+	}
+	revProtoTypes[t] = name
+}
+
+// RegisterMapType is called from generated code and maps from the fully qualified
+// proto name to the native map type of the proto map definition.
+func RegisterMapType(x interface{}, name string) {
+	if reflect.TypeOf(x).Kind() != reflect.Map {
+		panic(fmt.Sprintf("RegisterMapType(%T, %q); want map", x, name))
+	}
+	if _, ok := protoMapTypes[name]; ok {
+		log.Printf("proto: duplicate proto type registered: %s", name)
+		return
+	}
+	t := reflect.TypeOf(x)
+	protoMapTypes[name] = t
 	revProtoTypes[t] = name
 }
 
@@ -855,7 +520,14 @@ func MessageName(x Message) string {
 }
 
 // MessageType returns the message type (pointer to struct) for a named message.
-func MessageType(name string) reflect.Type { return protoTypes[name] }
+// The type is not guaranteed to implement proto.Message if the name refers to a
+// map entry.
+func MessageType(name string) reflect.Type {
+	if t, ok := protoTypedNils[name]; ok {
+		return reflect.TypeOf(t)
+	}
+	return protoMapTypes[name]
+}
 
 // A registry of all linked proto files.
 var (

@@ -62,7 +62,7 @@ func (c *FakeSecrets) List(opts v1.ListOptions) (result *core.SecretList, err er
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.SecretList{}
+	list := &core.SecretList{ListMeta: obj.(*core.SecretList).ListMeta}
 	for _, item := range obj.(*core.SecretList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 // Patch applies the patch and returns the patched secret.
 func (c *FakeSecrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, data, subresources...), &core.Secret{})
+		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), &core.Secret{})
 
 	if obj == nil {
 		return nil, err

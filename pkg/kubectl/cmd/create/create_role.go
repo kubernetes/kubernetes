@@ -24,15 +24,16 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -53,7 +54,7 @@ var (
 		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
 
 	// Valid resource verb list for validation.
-	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "impersonate"}
+	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "escalate", "impersonate"}
 
 	// Specialized verbs and GroupResources
 	specialVerbs = map[string][]schema.GroupResource{
@@ -64,6 +65,16 @@ var (
 			},
 		},
 		"bind": {
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "roles",
+			},
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "clusterroles",
+			},
+		},
+		"escalate": {
 			{
 				Group:    "rbac.authorization.k8s.io",
 				Resource: "roles",
@@ -94,14 +105,16 @@ var (
 	}
 )
 
+// ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string
 	Resource    string
 	SubResource string
 }
 
+// CreateRoleOptions holds the options for 'create role' sub command
 type CreateRoleOptions struct {
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	Name          string
 	Verbs         []string
@@ -118,24 +131,25 @@ type CreateRoleOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateRoleOptions returns an initialized CreateRoleOptions instance
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
-		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
 }
 
-// Role is a command to ease creating Roles.
+// NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
 func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   roleLong,
-		Long:    roleLong,
-		Example: roleExample,
+		Short:                 roleLong,
+		Long:                  roleLong,
+		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -155,6 +169,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -193,6 +208,11 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		}
 		resource.Resource = parts[0]
 
+		if resource.Resource == "*" && len(parts) == 1 && len(sections) == 1 {
+			o.Resources = []ResourceOptions{*resource}
+			break
+		}
+
 		o.Resources = append(o.Resources, *resource)
 	}
 
@@ -206,7 +226,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	o.ResourceNames = resourceNames
 
 	// Complete other options for Run.
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
@@ -225,7 +245,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -239,6 +259,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return nil
 }
 
+// Validate makes sure there is no discrepency in provided option values
 func (o *CreateRoleOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("name must be specified")
@@ -267,6 +288,9 @@ func (o *CreateRoleOptions) validateResource() error {
 	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
+		}
+		if r.Resource == "*" {
+			return nil
 		}
 
 		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
@@ -298,8 +322,12 @@ func (o *CreateRoleOptions) validateResource() error {
 	return nil
 }
 
+// RunCreateRole performs the execution of 'create role' sub command
 func (o *CreateRoleOptions) RunCreateRole() error {
-	role := &rbacv1.Role{}
+	role := &rbacv1.Role{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "Role"},
+	}
 	role.Name = o.Name
 	rules, err := generateResourcePolicyRules(o.Mapper, o.Verbs, o.Resources, o.ResourceNames, []string{})
 	if err != nil {

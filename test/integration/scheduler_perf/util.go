@@ -20,8 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/util"
 )
 
@@ -32,7 +32,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (scheduler.Configurator, util.ShutdownFunc) {
+func mustSetupScheduler() (factory.Configurator, util.ShutdownFunc) {
 	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
@@ -40,7 +40,7 @@ func mustSetupScheduler() (scheduler.Configurator, util.ShutdownFunc) {
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet, true)
+	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet)
 
 	shutdownFunc := func() {
 		schedulerShutdown()

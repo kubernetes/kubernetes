@@ -73,7 +73,7 @@ process_content () {
 
   # Start search at package root
   case ${package} in
-    github.com/*|golang.org/*|bitbucket.org/*)
+    github.com/*|golang.org/*|bitbucket.org/*|gonum.org/*)
      package_root=$(echo "${package}" |awk -F/ '{ print $1"/"$2"/"$3 }')
      ;;
     go4.org/*)
@@ -140,6 +140,7 @@ if ((${BASH_VERSINFO[0]}<4)); then
     echo "$ brew install md5sha1sum bash jq"
   fi
   echo
+  exit 9
 fi
 
 # This variable can be injected, as in the verify script.

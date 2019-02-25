@@ -17,8 +17,9 @@ limitations under the License.
 package qos
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -41,6 +42,11 @@ const (
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+	if types.IsCriticalPod(pod) {
+		// Critical pods should be the last to get killed.
+		return guaranteedOOMScoreAdj
+	}
+
 	switch v1qos.GetPodQOS(pod) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.

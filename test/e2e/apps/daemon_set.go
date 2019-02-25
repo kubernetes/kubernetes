@@ -24,8 +24,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,8 +35,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -55,6 +53,10 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
+// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
+// node selectors labels to namespaces
+var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+
 // This test must be run in serial because it assumes the Daemon Set pods will
 // always get scheduled.  If we run other tests in parallel, this may not
 // happen.  In the future, running in parallel may work if we have an eviction
@@ -69,11 +71,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "unable to dump DaemonSets")
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
-				By(fmt.Sprintf("Deleting DaemonSet %q with reaper", ds.Name))
-				dsReaper, err := kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), f.InternalClientset, f.ScalesGetter)
-				Expect(err).NotTo(HaveOccurred())
-				err = dsReaper.Stop(f.Namespace.Name, ds.Name, 0, nil)
-				Expect(err).NotTo(HaveOccurred())
+				By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
+				framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
 				err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
 				Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")
 			}
@@ -104,7 +103,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ns = f.Namespace.Name
 
 		c = f.ClientSet
-		err := clearDaemonSetNodeLabels(c)
+
+		updatedNS, err := updateNamespaceAnnotations(c, ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		ns = updatedNS.Name
+
+		err = clearDaemonSetNodeLabels(c)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -369,9 +374,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-
+		if framework.TestContext.CloudConfig.NumNodes < 2 {
+			framework.Logf("Conformance test suite needs a cluster with at least 2 nodes.")
+		}
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
 		ds := newDaemonSet(dsName, image, label)
@@ -409,7 +414,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		Expect(len(existingPods)).NotTo(Equal(0))
+		if framework.TestContext.CloudConfig.NumNodes < 2 {
+			Expect(len(existingPods)).To(Equal(0))
+		} else {
+			Expect(len(existingPods)).NotTo(Equal(0))
+		}
 		Expect(len(newPods)).NotTo(Equal(0))
 
 		framework.Logf("Roll back the DaemonSet before rollout is complete")
@@ -499,6 +508,26 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 	return nil
 }
 
+// updateNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
+func updateNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
+	nsClient := c.CoreV1().Namespaces()
+
+	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if ns.Annotations == nil {
+		ns.Annotations = make(map[string]string)
+	}
+
+	for _, n := range NamespaceNodeSelectors {
+		ns.Annotations[n] = ""
+	}
+
+	return nsClient.Update(ns)
+}
+
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
 	nodeClient := c.CoreV1().Nodes()
 	var newNode *v1.Node
@@ -524,7 +553,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 			newLabels, _ = separateDaemonSetNodeLabels(newNode.Labels)
 			return true, err
 		}
-		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
+		if se, ok := err.(*apierrors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 			framework.Logf("failed to update node due to resource version conflict")
 			return false, nil
 		}
@@ -614,7 +643,7 @@ func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]st
 // canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
 func canScheduleOnNode(node v1.Node, ds *apps.DaemonSet) bool {
 	newPod := daemon.NewPod(ds, node.Name)
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(&node)
 	fit, _, err := daemon.Predicates(newPod, nodeInfo)
 	if err != nil {
@@ -693,7 +722,7 @@ func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]st
 	listHistoryFn := func() (bool, error) {
 		selector := labels.Set(label).AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+		historyList, err := c.AppsV1().ControllerRevisions(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -738,7 +767,7 @@ func curHistory(historyList *apps.ControllerRevisionList, ds *apps.DaemonSet) *a
 func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool, error) {
 	return func() (bool, error) {
 		if _, err := c.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)

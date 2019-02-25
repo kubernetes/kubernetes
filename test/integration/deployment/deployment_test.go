@@ -22,16 +22,16 @@ import (
 	"strings"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewDeployment(t *testing.T) {
@@ -47,7 +47,7 @@ func TestNewDeployment(t *testing.T) {
 
 	tester.deployment.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -109,7 +109,9 @@ func TestNewDeployment(t *testing.T) {
 	}
 }
 
-// Deployments should support roll out, roll back, and roll over
+// Deployments should support roll out, roll back, and roll over.
+// TODO: drop the rollback portions of this test when extensions/v1beta1 is no longer served
+// and rollback endpoint is no longer supported.
 func TestDeploymentRollingUpdate(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
@@ -128,14 +130,14 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
 	tester.deployment.Spec.MinReadySeconds = 4
 	quarter := intstr.FromString("25%")
-	tester.deployment.Spec.Strategy.RollingUpdate = &v1beta1.RollingUpdateDeployment{
+	tester.deployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
 		MaxUnavailable: &quarter,
 		MaxSurge:       &quarter,
 	}
 
 	// Create a deployment.
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -152,7 +154,7 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	if oriImage == image {
 		t.Fatalf("bad test setup, deployment %s roll out with the same image", tester.deployment.Name)
 	}
-	imageFn := func(update *v1beta1.Deployment) {
+	imageFn := func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = image
 	}
 	tester.deployment, err = tester.updateDeployment(imageFn)
@@ -186,7 +188,7 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 
 	// 3. Roll over a deployment before the previous rolling update finishes.
 	image = "dont-finish"
-	imageFn = func(update *v1beta1.Deployment) {
+	imageFn = func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = image
 	}
 	tester.deployment, err = tester.updateDeployment(imageFn)
@@ -199,7 +201,7 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	// We don't mark pods as ready so that rollout won't finish.
 	// Before the rollout finishes, trigger another rollout.
 	image = "rollover"
-	imageFn = func(update *v1beta1.Deployment) {
+	imageFn = func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = image
 	}
 	tester.deployment, err = tester.updateDeployment(imageFn)
@@ -212,7 +214,7 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
-	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -232,13 +234,19 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, int32(20))}
-	deploymentExtensionsV1beta1, err := c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	var err error
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
-		t.Fatalf("failed to create extensions/v1beta1 deployment %s: %v", tester.deployment.Name, err)
+		t.Fatalf("failed to create apps/v1 deployment %s: %v", tester.deployment.Name, err)
 	}
 
 	// test to ensure extensions/v1beta1 selector is mutable
+	// TODO: drop the extensions/v1beta1 portion of this test when extensions/v1beta1 is no longer served
 	newSelectorLabels := map[string]string{"name_extensions_v1beta1": "test_extensions_v1beta1"}
+	deploymentExtensionsV1beta1, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get extensions/v1beta deployment %s: %v", name, err)
+	}
 	deploymentExtensionsV1beta1.Spec.Selector.MatchLabels = newSelectorLabels
 	deploymentExtensionsV1beta1.Spec.Template.Labels = newSelectorLabels
 	updatedDeploymentExtensionsV1beta1, err := c.ExtensionsV1beta1().Deployments(ns.Name).Update(deploymentExtensionsV1beta1)
@@ -283,6 +291,22 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	if !strings.Contains(err.Error(), expectedErrType) || !strings.Contains(err.Error(), expectedErrDetail) {
 		t.Errorf("error message does not match, expected type: %s, expected detail: %s, got: %s", expectedErrType, expectedErrDetail, err.Error())
 	}
+
+	// test to ensure apps/v1 selector is immutable
+	deploymentAppsV1, err := c.AppsV1().Deployments(ns.Name).Get(updatedDeploymentAppsV1beta1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get apps/v1 deployment %s: %v", updatedDeploymentAppsV1beta1.Name, err)
+	}
+	newSelectorLabels = map[string]string{"name_apps_v1": "test_apps_v1"}
+	deploymentAppsV1.Spec.Selector.MatchLabels = newSelectorLabels
+	deploymentAppsV1.Spec.Template.Labels = newSelectorLabels
+	_, err = c.AppsV1().Deployments(ns.Name).Update(deploymentAppsV1)
+	if err == nil {
+		t.Fatalf("failed to provide validation error when changing immutable selector when updating apps/v1 deployment %s", deploymentAppsV1.Name)
+	}
+	if !strings.Contains(err.Error(), expectedErrType) || !strings.Contains(err.Error(), expectedErrDetail) {
+		t.Errorf("error message does not match, expected type: %s, expected detail: %s, got: %s", expectedErrType, expectedErrDetail, err.Error())
+	}
 }
 
 // Paused deployment should not start new rollout
@@ -300,7 +324,7 @@ func TestPausedDeployment(t *testing.T) {
 	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -358,7 +382,7 @@ func TestPausedDeployment(t *testing.T) {
 
 	// Update the deployment template
 	newTGPS := int64(0)
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &newTGPS
 	})
 	if err != nil {
@@ -375,7 +399,7 @@ func TestPausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, allOldRs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	_, allOldRs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -401,7 +425,7 @@ func TestScalePausedDeployment(t *testing.T) {
 	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -442,7 +466,7 @@ func TestScalePausedDeployment(t *testing.T) {
 
 	// Scale the paused deployment.
 	newReplicas := int32(10)
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
 	if err != nil {
@@ -482,7 +506,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
 
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -500,14 +524,14 @@ func TestDeploymentHashCollision(t *testing.T) {
 	}
 
 	// Mock a hash collision
-	newRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	newRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed getting new replicaset of deployment %s: %v", tester.deployment.Name, err)
 	}
 	if newRS == nil {
 		t.Fatalf("unable to find new replicaset of deployment %s", tester.deployment.Name)
 	}
-	_, err = tester.updateReplicaSet(newRS.Name, func(update *v1beta1.ReplicaSet) {
+	_, err = tester.updateReplicaSet(newRS.Name, func(update *apps.ReplicaSet) {
 		*update.Spec.Template.Spec.TerminationGracePeriodSeconds = int64(5)
 	})
 	if err != nil {
@@ -516,7 +540,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 
 	// Expect deployment collision counter to increment
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		d, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(tester.deployment.Name, metav1.GetOptions{})
+		d, err := c.AppsV1().Deployments(ns.Name).Get(tester.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -532,6 +556,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 }
 
 // Deployment supports rollback even when there's old replica set without revision.
+// TODO: drop this test when extensions/v1beta1 is no longer served
 func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
@@ -546,7 +571,7 @@ func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	rs.Annotations = make(map[string]string)
 	rs.Annotations["make"] = "difference"
 	rs.Spec.Template.Spec.Containers[0].Image = "different-image"
-	_, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Create(rs)
+	_, err := c.AppsV1().ReplicaSets(ns.Name).Create(rs)
 	if err != nil {
 		t.Fatalf("failed to create replicaset %s: %v", rsName, err)
 	}
@@ -554,9 +579,13 @@ func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
 	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+	// Set absolute rollout limits (defaults changed to percentages)
+	max := intstr.FromInt(1)
+	tester.deployment.Spec.Strategy.RollingUpdate.MaxUnavailable = &max
+	tester.deployment.Spec.Strategy.RollingUpdate.MaxSurge = &max
 
 	// Create a deployment which have different template than the replica set created above.
-	if tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment); err != nil {
+	if tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment); err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
 
@@ -595,7 +624,7 @@ func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 
 	// 2. Update the deployment to revision 2.
 	updatedImage := "update"
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedImage
 		update.Spec.Template.Spec.Containers[0].Image = updatedImage
 	})
@@ -644,16 +673,20 @@ func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	}
 }
 
-func checkRSHashLabels(rs *v1beta1.ReplicaSet) (string, error) {
-	hash := rs.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
-	selectorHash := rs.Spec.Selector.MatchLabels[v1beta1.DefaultDeploymentUniqueLabelKey]
-	templateLabelHash := rs.Spec.Template.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
+func checkRSHashLabels(rs *apps.ReplicaSet) (string, error) {
+	hash := rs.Labels[apps.DefaultDeploymentUniqueLabelKey]
+	selectorHash := rs.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey]
+	templateLabelHash := rs.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey]
 
 	if hash != selectorHash || selectorHash != templateLabelHash {
 		return "", fmt.Errorf("mismatching hash value found in replicaset %s: %#v", rs.Name, rs)
 	}
 	if len(hash) == 0 {
 		return "", fmt.Errorf("unexpected replicaset %s missing required pod-template-hash labels", rs.Name)
+	}
+
+	if !strings.HasSuffix(rs.Name, hash) {
+		return "", fmt.Errorf("unexpected replicaset %s name suffix doesn't match hash %s", rs.Name, hash)
 	}
 
 	return hash, nil
@@ -665,7 +698,7 @@ func checkPodsHashLabel(pods *v1.PodList) (string, error) {
 	}
 	var hash string
 	for _, pod := range pods.Items {
-		podHash := pod.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
+		podHash := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]
 		if len(podHash) == 0 {
 			return "", fmt.Errorf("found pod %s missing pod-template-hash label: %#v", pod.Name, pods)
 		}
@@ -694,7 +727,7 @@ func TestFailedDeployment(t *testing.T) {
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
 	tester.deployment.Spec.ProgressDeadlineSeconds = &three
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -712,7 +745,7 @@ func TestFailedDeployment(t *testing.T) {
 
 	// Pods are not marked as Ready, therefore the deployment progress will eventually timeout after progressDeadlineSeconds has passed.
 	// Wait for the deployment to have a progress timeout condition.
-	if err = tester.waitForDeploymentWithCondition(deploymentutil.TimedOutReason, v1beta1.DeploymentProgressing); err != nil {
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.TimedOutReason, apps.DeploymentProgressing); err != nil {
 		t.Fatal(err)
 	}
 
@@ -722,7 +755,7 @@ func TestFailedDeployment(t *testing.T) {
 	}
 
 	// Wait for the deployment to have a progress complete condition.
-	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, v1beta1.DeploymentProgressing); err != nil {
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, apps.DeploymentProgressing); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -750,9 +783,9 @@ func TestOverlappingDeployments(t *testing.T) {
 
 	// Create 2 deployments with overlapping selectors
 	var err error
-	var rss []*v1beta1.ReplicaSet
+	var rss []*apps.ReplicaSet
 	for _, tester := range testers {
-		tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+		tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 		dname := tester.deployment.Name
 		if err != nil {
 			t.Fatalf("failed to create deployment %q: %v", dname, err)
@@ -784,7 +817,7 @@ func TestOverlappingDeployments(t *testing.T) {
 
 	// Scale only the first deployment by 1
 	newReplicas := replicas + 1
-	testers[0].deployment, err = testers[0].updateDeployment(func(update *v1beta1.Deployment) {
+	testers[0].deployment, err = testers[0].updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
 	if err != nil {
@@ -798,7 +831,7 @@ func TestOverlappingDeployments(t *testing.T) {
 
 	// Verify replicaset of both deployments has updated number of replicas
 	for i, tester := range testers {
-		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rss[i].Name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(ns.Name).Get(rss[i].Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to get replicaset %q: %v", rss[i].Name, err)
 		}
@@ -828,7 +861,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
 	tester.deployment.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
 	tester.deployment.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", name, err)
 	}
@@ -847,7 +880,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 
 	// Update the deployment with another new image but do not mark the pods as ready to block new replicaset
 	fakeImage2 := "fakeimage2"
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = fakeImage2
 	})
 	if err != nil {
@@ -858,7 +891,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify the deployment has minimum available replicas after 2nd rollout
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get deployment %q: %v", name, err)
 	}
@@ -868,7 +901,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Wait for old replicaset of 1st rollout to have desired replicas
-	firstRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(firstRS.Name, metav1.GetOptions{})
+	firstRS, err = c.AppsV1().ReplicaSets(ns.Name).Get(firstRS.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get replicaset %q: %v", firstRS.Name, err)
 	}
@@ -888,7 +921,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	// Scale up the deployment and update its image to another new image simultaneously (this time marks all pods as ready)
 	newReplicas := int32(20)
 	fakeImage3 := "fakeimage3"
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = &newReplicas
 		update.Spec.Template.Spec.Containers[0].Image = fakeImage3
 	})
@@ -903,13 +936,13 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify every replicaset has correct desiredReplicas annotation after 3rd rollout
-	thirdRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	thirdRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed getting new revision 3 replicaset for deployment %q: %v", name, err)
 	}
-	rss := []*v1beta1.ReplicaSet{firstRS, secondRS, thirdRS}
+	rss := []*apps.ReplicaSet{firstRS, secondRS, thirdRS}
 	for _, curRS := range rss {
-		curRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
+		curRS, err = c.AppsV1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to get replicaset when checking desired replicas annotation: %v", err)
 		}
@@ -924,7 +957,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 
 	// Update the deployment with another new image but do not mark the pods as ready to block new replicaset
 	fakeImage4 := "fakeimage4"
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = fakeImage4
 	})
 	if err != nil {
@@ -935,7 +968,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify the deployment has minimum available replicas after 4th rollout
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get deployment %q: %v", name, err)
 	}
@@ -945,7 +978,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Wait for old replicaset of 3rd rollout to have desired replicas
-	thirdRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(thirdRS.Name, metav1.GetOptions{})
+	thirdRS, err = c.AppsV1().ReplicaSets(ns.Name).Get(thirdRS.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get replicaset %q: %v", thirdRS.Name, err)
 	}
@@ -965,7 +998,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	// Scale down the deployment and update its image to another new image simultaneously (this time marks all pods as ready)
 	newReplicas = int32(5)
 	fakeImage5 := "fakeimage5"
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = &newReplicas
 		update.Spec.Template.Spec.Containers[0].Image = fakeImage5
 	})
@@ -980,13 +1013,13 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify every replicaset has correct desiredReplicas annotation after 5th rollout
-	fifthRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	fifthRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed getting new revision 5 replicaset for deployment %q: %v", name, err)
 	}
-	rss = []*v1beta1.ReplicaSet{thirdRS, fourthRS, fifthRS}
+	rss = []*apps.ReplicaSet{thirdRS, fourthRS, fifthRS}
 	for _, curRS := range rss {
-		curRS, err = c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
+		curRS, err = c.AppsV1().ReplicaSets(ns.Name).Get(curRS.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to get replicaset when checking desired replicas annotation: %v", err)
 		}
@@ -1010,10 +1043,10 @@ func TestSpecReplicasChange(t *testing.T) {
 	deploymentName := "deployment"
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
-	tester.deployment.Spec.Strategy.Type = v1beta1.RecreateDeploymentStrategyType
+	tester.deployment.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
 	tester.deployment.Spec.Strategy.RollingUpdate = nil
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -1039,7 +1072,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	// Add a template annotation change to test deployment's status does update
 	// without .spec.replicas change
 	var oldGeneration int64
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		oldGeneration = update.Generation
 		update.Spec.RevisionHistoryLimit = pointer.Int32Ptr(4)
 	})
@@ -1068,8 +1101,10 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
 	// Assign a high value to the deployment's minReadySeconds
 	tester.deployment.Spec.MinReadySeconds = 3600
+	// progressDeadlineSeconds must be greater than minReadySeconds
+	tester.deployment.Spec.ProgressDeadlineSeconds = pointer.Int32Ptr(7200)
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -1087,7 +1122,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Wait for the deployment to have MinimumReplicasUnavailable reason because the pods are not marked as ready
-	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasUnavailable, v1beta1.DeploymentAvailable); err != nil {
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasUnavailable, apps.DeploymentAvailable); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1107,7 +1142,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Wait for the deployment to still have MinimumReplicasUnavailable reason within minReadySeconds period
-	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasUnavailable, v1beta1.DeploymentAvailable); err != nil {
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasUnavailable, apps.DeploymentAvailable); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1117,7 +1152,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Update the deployment's minReadySeconds to a small value
-	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.MinReadySeconds = 1
 	})
 	if err != nil {
@@ -1130,7 +1165,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Wait for the deployment to have MinimumReplicasAvailable reason after minReadySeconds period
-	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasAvailable, v1beta1.DeploymentAvailable); err != nil {
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.MinimumReplicasAvailable, apps.DeploymentAvailable); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1141,10 +1176,10 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 }
 
 // Wait for deployment to automatically patch incorrect ControllerRef of RS
-func testRSControllerRefPatch(t *testing.T, tester *deploymentTester, rs *v1beta1.ReplicaSet, ownerReference *metav1.OwnerReference, expectedOwnerReferenceNum int) {
+func testRSControllerRefPatch(t *testing.T, tester *deploymentTester, rs *apps.ReplicaSet, ownerReference *metav1.OwnerReference, expectedOwnerReferenceNum int) {
 	ns := rs.Namespace
-	rsClient := tester.c.ExtensionsV1beta1().ReplicaSets(ns)
-	rs, err := tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
+	rsClient := tester.c.AppsV1().ReplicaSets(ns)
+	rs, err := tester.updateReplicaSet(rs.Name, func(update *apps.ReplicaSet) {
 		update.OwnerReferences = []metav1.OwnerReference{*ownerReference}
 	})
 	if err != nil {
@@ -1186,7 +1221,7 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -1209,7 +1244,7 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	}
 
 	// Get replicaset of the deployment
-	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed to get replicaset of deployment %q: %v", deploymentName, err)
 	}
@@ -1221,26 +1256,24 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	// with Controller=false, the deployment should add a second OwnerReference (ControllerRef) pointing to itself
 	// with Controller=true
 	var falseVar = false
-	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1beta1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
+	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 2)
 
 	// When the only OwnerReference of the RS points to the deployment with Controller=false,
 	// the deployment should set Controller=true for the only OwnerReference
-	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "extensions/v1beta1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
+	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "apps/v1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 1)
 }
 
 func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, replicas int32) {
 	ns := tester.deployment.Namespace
 	deploymentName := tester.deployment.Name
-	deploymentClient := tester.c.ExtensionsV1beta1().Deployments(ns)
+	deploymentClient := tester.c.AppsV1().Deployments(ns)
 	deployment, err := deploymentClient.Get(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain deployment %q: %v", deploymentName, err)
 	}
-	kind := "Deployment"
-	scaleClient := tester.c.ExtensionsV1beta1().Scales(ns)
-	scale, err := scaleClient.Get(kind, deploymentName)
+	scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for deployment %q: %v", deploymentName, err)
 	}
@@ -1249,12 +1282,12 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := scaleClient.Get(kind, deploymentName)
+		scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = scaleClient.Update(kind, scale)
+		_, err = tester.c.AppsV1().Deployments(ns).UpdateScale(deploymentName, scale)
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for deployment %q: %v", deploymentName, err)
@@ -1280,7 +1313,7 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 	replicas := int32(2)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -1324,7 +1357,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
 	var err error
-	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
 	}
@@ -1349,7 +1382,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// Orphaning: deployment should remove OwnerReference from a RS when the RS's labels change to not match its labels
 
 	// Get replicaset of the deployment
-	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 	if err != nil {
 		t.Fatalf("failed to get replicaset of deployment %q: %v", deploymentName, err)
 	}
@@ -1368,7 +1401,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 
 	// Change the replicaset's labels to not match the deployment's labels
 	labelMap := map[string]string{"new-name": "new-test"}
-	rs, err = tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
+	rs, err = tester.updateReplicaSet(rs.Name, func(update *apps.ReplicaSet) {
 		update.Labels = labelMap
 	})
 	if err != nil {
@@ -1376,7 +1409,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 
 	// Wait for the controllerRef of the replicaset to become nil
-	rsClient := tester.c.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := tester.c.AppsV1().ReplicaSets(ns.Name)
 	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		rs, err = rsClient.Get(rs.Name, metav1.GetOptions{})
 		if err != nil {
@@ -1390,9 +1423,9 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// Wait for the deployment to create a new replicaset
 	// This will trigger collision avoidance due to deterministic nature of replicaset name
 	// i.e., the new replicaset will have a name with different hash to preserve name uniqueness
-	var newRS *v1beta1.ReplicaSet
+	var newRS *apps.ReplicaSet
 	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newRS, err = deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+		newRS, err = deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
 		if err != nil {
 			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
 		}
@@ -1407,7 +1440,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// Adoption: deployment should add controllerRef to a RS when the RS's labels change to match its labels
 
 	// Change the old replicaset's labels to match the deployment's labels
-	rs, err = tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
+	rs, err = tester.updateReplicaSet(rs.Name, func(update *apps.ReplicaSet) {
 		update.Labels = testLabels()
 	})
 	if err != nil {

@@ -121,7 +121,7 @@ func (b *Blob) modifyRange(blobRange BlobRange, bytes io.Reader, options *PutPag
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
@@ -160,7 +160,7 @@ func (b *Blob) GetPageRanges(options *GetPageRangesOptions) (GetPageRangesRespon
 	if err != nil {
 		return out, err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return out, err

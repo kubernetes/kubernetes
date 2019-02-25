@@ -593,7 +593,7 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 			},
 		},
 	}
-	patch := deleteOwnerRefPatch("100", "2", "3")
+	patch := deleteOwnerRefStrategicMergePatch("100", "2", "3")
 	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
 	if err != nil {
 		t.Fatal(err)
@@ -638,7 +638,7 @@ func TestUnblockOwnerReference(t *testing.T) {
 	n := node{
 		owners: accessor.GetOwnerReferences(),
 	}
-	patch, err := n.patchToUnblockOwnerReferences()
+	patch, err := n.unblockOwnerReferencesStrategicMergePatch()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -800,6 +800,15 @@ func TestGarbageCollectorSync(t *testing.T) {
 			},
 		},
 	}
+	unsyncableServerResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+				{Name: "secrets", Namespaced: true, Kind: "Secret", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+			},
+		},
+	}
 	fakeDiscoveryClient := &fakeServerResources{
 		PreferredResources: serverResources,
 		Error:              nil,
@@ -811,6 +820,10 @@ func TestGarbageCollectorSync(t *testing.T) {
 		response: map[string]FakeResponse{
 			"GET" + "/api/v1/pods": {
 				200,
+				[]byte("{}"),
+			},
+			"GET" + "/api/v1/secrets": {
+				404,
 				[]byte("{}"),
 			},
 		},
@@ -843,13 +856,27 @@ func TestGarbageCollectorSync(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go gc.Run(1, stopCh)
-	go gc.Sync(fakeDiscoveryClient, 10*time.Millisecond, stopCh)
+	// The pseudo-code of GarbageCollector.Sync():
+	// GarbageCollector.Sync(client, period, stopCh):
+	//    wait.Until() loops with `period` until the `stopCh` is closed :
+	//        wait.PollImmediateUntil() loops with 100ms (hardcode) util the `stopCh` is closed:
+	//            GetDeletableResources()
+	//            gc.resyncMonitors()
+	//            controller.WaitForCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
+	//
+	// Setting the period to 200ms allows the WaitForCacheSync() to check
+	// for cache sync ~2 times in every wait.PollImmediateUntil() loop.
+	//
+	// The 1s sleep in the test allows GetDelableResources and
+	// gc.resyncMoitors to run ~5 times to ensure the changes to the
+	// fakeDiscoveryClient are picked up.
+	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, stopCh)
 
 	// Wait until the sync discovers the initial resources
 	fmt.Printf("Test output")
 	time.Sleep(1 * time.Second)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
 	}
@@ -865,13 +892,29 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient.setPreferredResources(serverResources)
 	fakeDiscoveryClient.setError(nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
+
+	// Simulate the discovery client returning a resource the restmapper can resolve, but will not sync caches
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources)
+	fakeDiscoveryClient.setError(nil)
+
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+
+	// Put the resources back to normal and ensure garbage collector sync recovers
+	fakeDiscoveryClient.setPreferredResources(serverResources)
+	fakeDiscoveryClient.setError(nil)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 }
 
-func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *sync.RWMutex) error {
 	before := fakeDiscoveryClient.getInterfaceUsedCount()
 	t := 1 * time.Second
 	time.Sleep(t)
@@ -879,7 +922,19 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
 	if before == after {
 		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
 	}
-	return nil
+
+	workerLockAcquired := make(chan struct{})
+	go func() {
+		workerLock.Lock()
+		workerLock.Unlock()
+		close(workerLockAcquired)
+	}()
+	select {
+	case <-workerLockAcquired:
+		return nil
+	case <-time.After(t):
+		return fmt.Errorf("workerLock blocked for at least %v", t)
+	}
 }
 
 type fakeServerResources struct {
@@ -893,8 +948,13 @@ func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string
 	return nil, nil
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return nil, nil, nil
 }
 
 func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {

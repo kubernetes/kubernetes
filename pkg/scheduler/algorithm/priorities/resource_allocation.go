@@ -19,17 +19,19 @@ package priorities
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // ResourceAllocationPriority contains information to calculate resource allocation priority.
 type ResourceAllocationPriority struct {
 	Name   string
-	scorer func(requested, allocable *schedulercache.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	scorer func(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
 }
 
 // PriorityMap priorities nodes according to the resource allocations on the node.
@@ -37,14 +39,14 @@ type ResourceAllocationPriority struct {
 func (r *ResourceAllocationPriority) PriorityMap(
 	pod *v1.Pod,
 	meta interface{},
-	nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 	allocatable := nodeInfo.AllocatableResource()
 
-	var requested schedulercache.Resource
+	var requested schedulernodeinfo.Resource
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		requested = *priorityMeta.nonZeroRequest
 	} else {
@@ -56,20 +58,31 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
 	var score int64
 	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
-	if len(pod.Spec.Volumes) >= 0 && nodeInfo.TransientInfo != nil {
+	if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
 		score = r.scorer(&requested, &allocatable, true, nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount)
 	} else {
 		score = r.scorer(&requested, &allocatable, false, 0, 0)
 	}
 
-	if glog.V(10) {
-		glog.Infof(
-			"%v -> %v: %v, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
-			pod.Name, node.Name, r.Name,
-			allocatable.MilliCPU, allocatable.Memory,
-			requested.MilliCPU+allocatable.MilliCPU, requested.Memory+allocatable.Memory,
-			score,
-		)
+	if klog.V(10) {
+		if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
+			klog.Infof(
+				"%v -> %v: %v, capacity %d millicores %d memory bytes, %d volumes, total request %d millicores %d memory bytes %d volumes, score %d",
+				pod.Name, node.Name, r.Name,
+				allocatable.MilliCPU, allocatable.Memory, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount,
+				requested.MilliCPU, requested.Memory,
+				nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes,
+				score,
+			)
+		} else {
+			klog.Infof(
+				"%v -> %v: %v, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
+				pod.Name, node.Name, r.Name,
+				allocatable.MilliCPU, allocatable.Memory,
+				requested.MilliCPU, requested.Memory,
+				score,
+			)
+		}
 	}
 
 	return schedulerapi.HostPriority{
@@ -78,8 +91,8 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	}, nil
 }
 
-func getNonZeroRequests(pod *v1.Pod) *schedulercache.Resource {
-	result := &schedulercache.Resource{}
+func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
+	result := &schedulernodeinfo.Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)

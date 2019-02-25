@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- deads2k
+- pwittrock
+- seans3
+- soltysh
+- juanvallejo
+reviewers:
+- deads2k
+- juanvallejo
+- pwittrock
+- seans3
+- soltysh
+labels:
+- sig/cli

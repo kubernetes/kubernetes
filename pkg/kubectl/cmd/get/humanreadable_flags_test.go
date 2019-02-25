@@ -24,8 +24,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
@@ -61,7 +61,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 		{
 			name:           "\"wide\" output format prints",
 			outputFormat:   "wide",
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\n",
+			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\\ +NOMINATED NODE\\ +READINESS GATES\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "no-headers prints output with no headers",
@@ -72,7 +72,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "no-headers and a \"wide\" output format prints output with no headers and additional columns",
 			outputFormat:   "wide",
 			noHeaders:      true,
-			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\n",
+			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "show-kind displays the resource's kind, even when printing a single type of resource",
@@ -119,12 +119,12 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if !printers.IsNoCompatiblePrinterError(err) {
+				if !genericclioptions.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if printers.IsNoCompatiblePrinterError(err) {
+			if genericclioptions.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 

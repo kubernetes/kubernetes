@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - luxas
@@ -8,3 +10,5 @@ reviewers:
 - luxas
 - wlan0
 - andrewsykim
+labels:
+- sig/cloud-provider

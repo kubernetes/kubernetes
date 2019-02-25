@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AggregationRule = map[string]string{
-	"": "AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole",
+	"":                     "AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole",
 	"clusterRoleSelectors": "ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules. If any of the selectors match, then the ClusterRole's permissions will be added",
 }
 

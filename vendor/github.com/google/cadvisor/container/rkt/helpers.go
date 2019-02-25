@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 type parsedName struct {
@@ -128,7 +128,7 @@ func getRootFs(root string, parsed *parsedName) string {
 
 	bytes, err := ioutil.ReadFile(tree)
 	if err != nil {
-		glog.Errorf("ReadFile failed, couldn't read %v to get upper dir: %v", tree, err)
+		klog.Errorf("ReadFile failed, couldn't read %v to get upper dir: %v", tree, err)
 		return ""
 	}
 

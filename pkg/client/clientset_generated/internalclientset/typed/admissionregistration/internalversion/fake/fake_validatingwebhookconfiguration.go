@@ -59,7 +59,7 @@ func (c *FakeValidatingWebhookConfigurations) List(opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &admissionregistration.ValidatingWebhookConfigurationList{}
+	list := &admissionregistration.ValidatingWebhookConfigurationList{ListMeta: obj.(*admissionregistration.ValidatingWebhookConfigurationList).ListMeta}
 	for _, item := range obj.(*admissionregistration.ValidatingWebhookConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -112,7 +112,7 @@ func (c *FakeValidatingWebhookConfigurations) DeleteCollection(options *v1.Delet
 // Patch applies the patch and returns the patched validatingWebhookConfiguration.
 func (c *FakeValidatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, data, subresources...), &admissionregistration.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, pt, data, subresources...), &admissionregistration.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

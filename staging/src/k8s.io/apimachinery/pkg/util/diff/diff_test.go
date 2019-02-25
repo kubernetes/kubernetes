@@ -75,6 +75,11 @@ object.A:
   a: []int(nil)
   b: []int{}`,
 		},
+		"display type differences": {a: []interface{}{int64(1)}, b: []interface{}{uint64(1)}, out: `
+object[0]:
+  a: 1 (int64)
+  b: 0x1 (uint64)`,
+		},
 	}
 	for name, test := range testCases {
 		expect := test.out

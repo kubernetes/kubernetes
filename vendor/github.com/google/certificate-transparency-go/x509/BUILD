@@ -4,76 +4,35 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cert_pool.go",
+        "curves.go",
         "error.go",
         "errors.go",
         "names.go",
+        "nilref_nil_darwin.go",
+        "nilref_zero_darwin.go",
         "pem_decrypt.go",
         "pkcs1.go",
         "pkcs8.go",
+        "ptr_sysptr_windows.go",
+        "ptr_uint_windows.go",
         "revoked.go",
         "root.go",
+        "root_bsd.go",
+        "root_cgo_darwin.go",
+        "root_darwin.go",
+        "root_darwin_armx.go",
+        "root_linux.go",
+        "root_nacl.go",
+        "root_nocgo_darwin.go",
+        "root_plan9.go",
+        "root_solaris.go",
+        "root_unix.go",
+        "root_windows.go",
+        "rpki.go",
         "sec1.go",
         "verify.go",
         "x509.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "root_darwin.go",
-            "root_nocgo_darwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "root_bsd.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "root_bsd.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "root_linux.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "root_nacl.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "root_bsd.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "root_bsd.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "root_plan9.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "root_solaris.go",
-            "root_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "root_windows.go",
-        ],
-        "//conditions:default": [],
-    }) + select({
-        "@io_bazel_rules_go//go/platform:darwin_386": [
-            "nilref_nil_darwin.go",
-            "nilref_zero_darwin.go",
-            "root_cgo_darwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "nilref_nil_darwin.go",
-            "nilref_zero_darwin.go",
-            "root_cgo_darwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin_arm": [
-            "root_darwin_armx.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin_arm64": [
-            "root_darwin_armx.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     cgo = True,
     clinkopts = select({
         "@io_bazel_rules_go//go/platform:darwin_386": [
@@ -93,6 +52,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/certificate-transparency-go/x509",
     importpath = "github.com/google/certificate-transparency-go/x509",
     visibility = ["//visibility:public"],
     deps = [

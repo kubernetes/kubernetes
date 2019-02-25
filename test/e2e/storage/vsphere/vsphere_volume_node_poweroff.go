@@ -26,8 +26,8 @@ import (
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	*/
 	It("verify volume status after node power off", func() {
 		By("Creating a Storage Class")
-		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil)
+		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil)
 		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
@@ -94,10 +94,12 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		By("Creating a Deployment")
 		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
-		defer client.ExtensionsV1beta1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create Deployment with err: %v", err))
+		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
 		podList, err := framework.GetPodsForDeployment(client, deployment)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
 		Expect(podList.Items).NotTo(BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
@@ -140,7 +142,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 })
 
 // Wait until the pod failed over to a different node, or time out after 3 minutes
-func waitForPodToFailover(client clientset.Interface, deployment *extensions.Deployment, oldNode string) (string, error) {
+func waitForPodToFailover(client clientset.Interface, deployment *apps.Deployment, oldNode string) (string, error) {
 	var (
 		err      error
 		newNode  string
@@ -175,7 +177,7 @@ func waitForPodToFailover(client clientset.Interface, deployment *extensions.Dep
 }
 
 // getNodeForDeployment returns node name for the Deployment
-func getNodeForDeployment(client clientset.Interface, deployment *extensions.Deployment) (string, error) {
+func getNodeForDeployment(client clientset.Interface, deployment *apps.Deployment) (string, error) {
 	podList, err := framework.GetPodsForDeployment(client, deployment)
 	if err != nil {
 		return "", err

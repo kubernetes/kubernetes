@@ -24,7 +24,7 @@ import (
 
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
@@ -221,7 +221,6 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 	for _, tc := range testCases {
 		fhost := nettest.NewFakeHost(nil)
 		fhost.Legacy = false
-		fhost.Runtime = nil
 		mockcni := &mock_cni.MockCNI{}
 
 		fexec := &fakeexec.FakeExec{

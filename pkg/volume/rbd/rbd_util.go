@@ -32,28 +32,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	fileutil "k8s.io/kubernetes/pkg/util/file"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
-	volutil "k8s.io/kubernetes/pkg/volume/util"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
 	imageWatcherStr = "watcher="
 	imageSizeStr    = "size "
-	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
 	// The following three values are used for 30 seconds timeout
 	// while waiting for RBD Watcher to expire.
 	rbdImageWatcherInitDelay = 1 * time.Second
 	rbdImageWatcherFactor    = 1.4
 	rbdImageWatcherSteps     = 10
+	rbdImageSizeUnitMiB      = 1024 * 1024
 )
 
 func getDevFromImageAndPool(pool, image string) (string, bool) {
@@ -82,21 +82,21 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 			poolFile := path.Join(sys_path, name, "pool")
 			poolBytes, err := ioutil.ReadFile(poolFile)
 			if err != nil {
-				glog.V(4).Infof("error reading %s: %v", poolFile, err)
+				klog.V(4).Infof("error reading %s: %v", poolFile, err)
 				continue
 			}
 			if strings.TrimSpace(string(poolBytes)) != pool {
-				glog.V(4).Infof("device %s is not %q: %q", name, pool, string(poolBytes))
+				klog.V(4).Infof("device %s is not %q: %q", name, pool, string(poolBytes))
 				continue
 			}
 			imgFile := path.Join(sys_path, name, "name")
 			imgBytes, err := ioutil.ReadFile(imgFile)
 			if err != nil {
-				glog.V(4).Infof("error reading %s: %v", imgFile, err)
+				klog.V(4).Infof("error reading %s: %v", imgFile, err)
 				continue
 			}
 			if strings.TrimSpace(string(imgBytes)) != image {
-				glog.V(4).Infof("device %s is not %q: %q", name, image, string(imgBytes))
+				klog.V(4).Infof("device %s is not %q: %q", name, image, string(imgBytes))
 				continue
 			}
 			// Found a match, check if device exists.
@@ -119,7 +119,7 @@ func getMaxNbds() (int, error) {
 		return 0, fmt.Errorf("rbd-nbd: failed to retrieve max_nbds from %s err: %q", maxNbdsPath, err)
 	}
 
-	glog.V(4).Infof("found nbds max parameters file at %s", maxNbdsPath)
+	klog.V(4).Infof("found nbds max parameters file at %s", maxNbdsPath)
 
 	maxNbdBytes, err := ioutil.ReadFile(maxNbdsPath)
 	if err != nil {
@@ -131,7 +131,7 @@ func getMaxNbds() (int, error) {
 		return 0, fmt.Errorf("rbd-nbd: failed to read max_nbds err: %q", err)
 	}
 
-	glog.V(4).Infof("rbd-nbd: max_nbds: %d", maxNbds)
+	klog.V(4).Infof("rbd-nbd: max_nbds: %d", maxNbds)
 	return maxNbds, nil
 }
 
@@ -148,7 +148,7 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 
 	maxNbds, maxNbdsErr := getMaxNbds()
 	if maxNbdsErr != nil {
-		glog.V(4).Infof("error reading nbds_max %v", maxNbdsErr)
+		klog.V(4).Infof("error reading nbds_max %v", maxNbdsErr)
 		return "", false
 	}
 
@@ -156,18 +156,18 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 		nbdPath := basePath + strconv.Itoa(i)
 		_, err := os.Lstat(nbdPath)
 		if err != nil {
-			glog.V(4).Infof("error reading nbd info directory %s: %v", nbdPath, err)
+			klog.V(4).Infof("error reading nbd info directory %s: %v", nbdPath, err)
 			continue
 		}
 		pidBytes, err := ioutil.ReadFile(path.Join(nbdPath, "pid"))
 		if err != nil {
-			glog.V(5).Infof("did not find valid pid file in dir %s: %v", nbdPath, err)
+			klog.V(5).Infof("did not find valid pid file in dir %s: %v", nbdPath, err)
 			continue
 		}
 		cmdlineFileName := path.Join("/proc", strings.TrimSpace(string(pidBytes)), "cmdline")
 		rawCmdline, err := ioutil.ReadFile(cmdlineFileName)
 		if err != nil {
-			glog.V(4).Infof("failed to read cmdline file %s: %v", cmdlineFileName, err)
+			klog.V(4).Infof("failed to read cmdline file %s: %v", cmdlineFileName, err)
 			continue
 		}
 		cmdlineArgs := strings.FieldsFunc(string(rawCmdline), func(r rune) bool {
@@ -177,17 +177,17 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 		// Only accepted pattern of cmdline is from execRbdMap:
 		// rbd-nbd map pool/image ...
 		if len(cmdlineArgs) < 3 || cmdlineArgs[0] != "rbd-nbd" || cmdlineArgs[1] != "map" {
-			glog.V(4).Infof("nbd device %s is not used by rbd", nbdPath)
+			klog.V(4).Infof("nbd device %s is not used by rbd", nbdPath)
 			continue
 		}
 		if cmdlineArgs[2] != imgPath {
-			glog.V(4).Infof("rbd-nbd device %s did not match expected image path: %s with path found: %s",
+			klog.V(4).Infof("rbd-nbd device %s did not match expected image path: %s with path found: %s",
 				nbdPath, imgPath, cmdlineArgs[2])
 			continue
 		}
 		devicePath := path.Join("/dev", "nbd"+strconv.Itoa(i))
 		if _, err := os.Lstat(devicePath); err != nil {
-			glog.Warningf("Stat device %s for imgpath %s failed %v", devicePath, imgPath, err)
+			klog.Warningf("Stat device %s for imgpath %s failed %v", devicePath, imgPath, err)
 			continue
 		}
 		return devicePath, true
@@ -233,14 +233,14 @@ func execRbdMap(b rbdMounter, rbdCmd string, mon string) ([]byte, error) {
 func checkRbdNbdTools(e mount.Exec) bool {
 	_, err := e.Run("modprobe", "nbd")
 	if err != nil {
-		glog.V(5).Infof("rbd-nbd: nbd modprobe failed with error %v", err)
+		klog.V(5).Infof("rbd-nbd: nbd modprobe failed with error %v", err)
 		return false
 	}
 	if _, err := e.Run("rbd-nbd", "--version"); err != nil {
-		glog.V(5).Infof("rbd-nbd: getting rbd-nbd version failed with error %v", err)
+		klog.V(5).Infof("rbd-nbd: getting rbd-nbd version failed with error %v", err)
 		return false
 	}
-	glog.V(3).Infof("rbd-nbd tools were found.")
+	klog.V(3).Infof("rbd-nbd tools were found.")
 	return true
 }
 
@@ -251,7 +251,7 @@ func makePDNameInternal(host volume.VolumeHost, pool string, image string) strin
 	info, err := os.Stat(deprecatedDir)
 	if err == nil && info.IsDir() {
 		// The device mount path has already been created with the deprecated format, return it.
-		glog.V(5).Infof("Deprecated format path %s found", deprecatedDir)
+		klog.V(5).Infof("Deprecated format path %s found", deprecatedDir)
 		return deprecatedDir
 	}
 	// Return the canonical format path.
@@ -318,7 +318,11 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	}
 
 	// Construct lock id using host name and a magic prefix.
-	lock_id := kubeLockMagic + node.GetHostname("")
+	hostName, err := node.GetHostname("")
+	if err != nil {
+		return err
+	}
+	lock_id := kubeLockMagic + hostName
 
 	mon := util.kernelRBDMonitorsOpt(b.Mon)
 
@@ -327,7 +331,7 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	args = append(args, secret_opt...)
 	cmd, err = b.exec.Run("rbd", args...)
 	output = string(cmd)
-	glog.V(4).Infof("lock list output %q", output)
+	klog.V(4).Infof("lock list output %q", output)
 	if err != nil {
 		return err
 	}
@@ -345,9 +349,9 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 		args = append(args, secret_opt...)
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
-			glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
+			klog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
 		} else {
-			glog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
+			klog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
 		}
 	}
 
@@ -359,7 +363,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	var output []byte
 
 	globalPDPath := util.MakeGlobalPDName(*b.rbd)
-	if pathExists, pathErr := volutil.PathExists(globalPDPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(globalPDPath); pathErr != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -391,45 +395,48 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			Steps:    rbdImageWatcherSteps,
 		}
 		needValidUsed := true
-		// If accessModes contain ReadOnlyMany, we don't need check rbd status of being used.
 		if b.accessModes != nil {
-			for _, v := range b.accessModes {
-				if v != v1.ReadWriteOnce {
-					needValidUsed = false
-					break
+			// If accessModes only contains ReadOnlyMany, we don't need check rbd status of being used.
+			if len(b.accessModes) == 1 && b.accessModes[0] == v1.ReadOnlyMany {
+				needValidUsed = false
+			}
+		}
+		// If accessModes is nil, the volume is referenced by in-line volume.
+		// We can assume the AccessModes to be {"RWO" and "ROX"}, which is what the volume plugin supports.
+		// We do not need to consider ReadOnly here, because it is used for VolumeMounts.
+
+		if needValidUsed {
+			err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+				used, rbdOutput, err := util.rbdStatus(&b)
+				if err != nil {
+					return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
 				}
+				return !used, nil
+			})
+			// Return error if rbd image has not become available for the specified timeout.
+			if err == wait.ErrWaitTimeout {
+				return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
 			}
-		}
-		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			used, rbdOutput, err := util.rbdStatus(&b)
+			// Return error if any other errors were encountered during waiting for the image to become available.
 			if err != nil {
-				return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
+				return "", err
 			}
-			return !needValidUsed || !used, nil
-		})
-		// Return error if rbd image has not become available for the specified timeout.
-		if err == wait.ErrWaitTimeout {
-			return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
-		}
-		// Return error if any other errors were encountered during wating for the image to become available.
-		if err != nil {
-			return "", err
 		}
 
 		mon := util.kernelRBDMonitorsOpt(b.Mon)
-		glog.V(1).Infof("rbd: map mon %s", mon)
+		klog.V(1).Infof("rbd: map mon %s", mon)
 
-		_, err = b.exec.Run("modprobe", "rbd")
+		_, err := b.exec.Run("modprobe", "rbd")
 		if err != nil {
-			glog.Warningf("rbd: failed to load rbd kernel module:%v", err)
+			klog.Warningf("rbd: failed to load rbd kernel module:%v", err)
 		}
 		output, err = execRbdMap(b, "rbd", mon)
 		if err != nil {
 			if !nbdToolsFound {
-				glog.V(1).Infof("rbd: map error %v, rbd output: %s", err, string(output))
+				klog.V(1).Infof("rbd: map error %v, rbd output: %s", err, string(output))
 				return "", fmt.Errorf("rbd: map failed %v, rbd output: %s", err, string(output))
 			}
-			glog.V(3).Infof("rbd: map failed with %v, %s. Retrying with rbd-nbd", err, string(output))
+			klog.V(3).Infof("rbd: map failed with %v, %s. Retrying with rbd-nbd", err, string(output))
 			errList := []error{err}
 			outputList := output
 			output, err = execRbdMap(b, "rbd-nbd", mon)
@@ -474,23 +481,23 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	if err != nil {
 		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %v", device, err, output))
 	}
-	glog.V(3).Infof("rbd: successfully unmap device %s", device)
+	klog.V(3).Infof("rbd: successfully unmap device %s", device)
 
 	// Currently, we don't persist rbd info on the disk, but for backward
 	// compatbility, we need to clean it if found.
 	rbdFile := path.Join(deviceMountPath, "rbd.json")
-	exists, err := fileutil.FileExists(rbdFile)
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, rbdFile)
 	if err != nil {
 		return err
 	}
 	if exists {
-		glog.V(3).Infof("rbd: old rbd.json is found under %s, cleaning it", deviceMountPath)
+		klog.V(3).Infof("rbd: old rbd.json is found under %s, cleaning it", deviceMountPath)
 		err = util.cleanOldRBDFile(plugin, rbdFile)
 		if err != nil {
-			glog.Errorf("rbd: failed to clean %s", rbdFile)
+			klog.Errorf("rbd: failed to clean %s", rbdFile)
 			return err
 		}
-		glog.V(3).Infof("rbd: successfully remove %s", rbdFile)
+		klog.V(3).Infof("rbd: successfully remove %s", rbdFile)
 	}
 	return nil
 }
@@ -498,10 +505,10 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 // DetachBlockDisk detaches the disk from the node.
 func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
 
-	if pathExists, pathErr := volutil.PathExists(mapPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
+		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
 	}
 	// If we arrive here, device is no longer used, see if we need to logout of the target
@@ -522,10 +529,10 @@ func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error
 	// Any nbd device must be unmapped by rbd-nbd
 	if strings.HasPrefix(device, "/dev/nbd") {
 		rbdCmd = "rbd-nbd"
-		glog.V(4).Infof("rbd: using rbd-nbd for unmap function")
+		klog.V(4).Infof("rbd: using rbd-nbd for unmap function")
 	} else {
 		rbdCmd = "rbd"
-		glog.V(4).Infof("rbd: using rbd for unmap function")
+		klog.V(4).Infof("rbd: using rbd for unmap function")
 	}
 
 	// rbd unmap
@@ -533,7 +540,7 @@ func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error
 	if err != nil {
 		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %s", device, err, string(output)))
 	}
-	glog.V(3).Infof("rbd: successfully unmap device %s", device)
+	klog.V(3).Infof("rbd: successfully unmap device %s", device)
 
 	return nil
 }
@@ -557,7 +564,7 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 	}
 
 	if err != nil {
-		glog.Errorf("failed to load rbd info from %s: %v", rbdFile, err)
+		klog.Errorf("failed to load rbd info from %s: %v", rbdFile, err)
 		return err
 	}
 	// Remove rbd lock if found.
@@ -573,15 +580,17 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
 	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	sz, err := volumehelpers.RoundUpToMiBInt(capacity)
+	if err != nil {
+		return nil, 0, err
+	}
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
-		glog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 	} else {
-		glog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 	}
 	args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
@@ -593,7 +602,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	output, err = p.exec.Run("rbd", args...)
 
 	if err != nil {
-		glog.Warningf("failed to create rbd image, output %v", string(output))
+		klog.Warningf("failed to create rbd image, output %v", string(output))
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
 
@@ -611,19 +620,19 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		return fmt.Errorf("error %v, rbd output: %v", err, rbdOutput)
 	}
 	if found {
-		glog.Info("rbd is still being used ", p.rbdMounter.Image)
+		klog.Info("rbd is still being used ", p.rbdMounter.Image)
 		return fmt.Errorf("rbd image %s/%s is still being used, rbd output: %v", p.rbdMounter.Pool, p.rbdMounter.Image, rbdOutput)
 	}
 	// rbd rm.
 	mon := util.kernelRBDMonitorsOpt(p.rbdMounter.Mon)
-	glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 	output, err = p.exec.Run("rbd",
 		"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key="+p.rbdMounter.adminSecret)
 	if err == nil {
 		return nil
 	}
 
-	glog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
+	klog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
 	return fmt.Errorf("error %v, rbd output: %v", err, string(output))
 }
 
@@ -631,9 +640,9 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	var output []byte
 	var err error
-	volSizeBytes := newSize.Value()
+
 	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	sz := int(volumehelpers.RoundUpToMiB(newSize))
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 
@@ -648,22 +657,21 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 
 	// rbd resize.
 	mon := util.kernelRBDMonitorsOpt(rbdExpander.rbdMounter.Mon)
-	glog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId, rbdExpander.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId, rbdExpander.rbdMounter.adminSecret)
 	output, err = rbdExpander.exec.Run("rbd",
 		"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminId, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret)
 	if err == nil {
 		return newSizeQuant, nil
 	}
 
-	glog.Errorf("failed to resize rbd image: %v, command output: %s", err, string(output))
+	klog.Errorf("failed to resize rbd image: %v, command output: %s", err, string(output))
 	return oldSize, err
 }
 
 // rbdInfo runs `rbd info` command to get the current image size in MB.
 func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	var err error
-	var output string
-	var cmd []byte
+	var output []byte
 
 	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
 	id := b.adminId
@@ -691,14 +699,13 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image 1234: (2) No such file or directory
 	//
-	glog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
-	cmd, err = b.exec.Run("rbd",
-		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
-	output = string(cmd)
+	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	output, err = b.exec.Run("rbd",
+		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "--format=json")
 
 	if err, ok := err.(*exec.Error); ok {
 		if err.Err == exec.ErrNotFound {
-			glog.Errorf("rbd cmd not found")
+			klog.Errorf("rbd cmd not found")
 			// fail fast if rbd command is not found.
 			return 0, err
 		}
@@ -710,22 +717,20 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	}
 
 	if len(output) == 0 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
+		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, string(output))
 	}
 
-	// Get the size value string, just between `size ` and ` MB in`, such as `size 1024 MB in 256 objects`.
-	sizeIndex := strings.Index(output, imageSizeStr)
-	divIndex := strings.Index(output, sizeDivStr)
-	if sizeIndex == -1 || divIndex == -1 || divIndex <= sizeIndex+5 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
-	}
-	rbdSizeStr := output[sizeIndex+5 : divIndex]
-	rbdSize, err := strconv.Atoi(rbdSizeStr)
-	if err != nil {
-		return 0, fmt.Errorf("can not convert size str: %s to int", rbdSizeStr)
-	}
+	return getRbdImageSize(output)
+}
 
-	return rbdSize, nil
+func getRbdImageSize(output []byte) (int, error) {
+	info := struct {
+		Size int64 `json:"size"`
+	}{}
+	if err := json.Unmarshal(output, &info); err != nil {
+		return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(output), err)
+	}
+	return int(info.Size / rbdImageSizeUnitMiB), nil
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.
@@ -757,14 +762,14 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
 	//
-	glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	klog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
 	cmd, err = b.exec.Run("rbd",
 		"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
 	output = string(cmd)
 
 	if err, ok := err.(*exec.Error); ok {
 		if err.Err == exec.ErrNotFound {
-			glog.Errorf("rbd cmd not found")
+			klog.Errorf("rbd cmd not found")
 			// fail fast if command not found
 			return false, output, err
 		}
@@ -776,10 +781,10 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	}
 
 	if strings.Contains(output, imageWatcherStr) {
-		glog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
+		klog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
 		return true, output, nil
 	} else {
-		glog.Warningf("rbd: no watchers on %s", b.Image)
+		klog.Warningf("rbd: no watchers on %s", b.Image)
 		return false, output, nil
 	}
 }

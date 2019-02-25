@@ -26,8 +26,10 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.6.0"
 DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
-DEFAULT_NPD_VERSION="v0.4.1"
-DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+DEFAULT_NPD_VERSION="v0.6.0"
+DEFAULT_NPD_SHA1="a28e960a21bb74bc0ae09c267b6a340f30e5b3a6"
+DEFAULT_CRICTL_VERSION="v1.12.0"
+DEFAULT_CRICTL_SHA1="82ef8b44849f9da0589c87e9865d4716573eec7f"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -121,6 +123,12 @@ function validate-hash {
   fi
 }
 
+# Get default service account credentials of the VM.
+function get-credentials {
+  curl "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+}
+
 # Retry a download until we get it. Takes a hash and a set of URLs.
 #
 # $1 is the sha1 of the URL. Can be "" if the sha1 is unknown.
@@ -134,7 +142,12 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
+      # if the url belongs to GCS API we should use oauth2_token in the headers
+      local curl_headers=""
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]]; then
+        curl_headers="Authorization: Bearer $(get-credentials)"
+      fi
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -234,6 +247,55 @@ function install-cni-binaries {
   rm -f "${KUBE_HOME}/${cni_tar}"
 }
 
+# Install crictl binary.
+function install-crictl {
+  if [[ -n "${CRICTL_VERSION:-}" ]]; then
+    local -r crictl_version="${CRICTL_VERSION}"
+    local -r crictl_sha1="${CRICTL_TAR_HASH}"
+  else
+    local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
+    local -r crictl_sha1="${DEFAULT_CRICTL_SHA1}"
+  fi
+  local -r crictl="crictl-${crictl_version}-linux-amd64"
+
+  # Create crictl config file.
+  cat > /etc/crictl.yaml <<EOF
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+EOF
+
+  if is-preloaded "${crictl}" "${crictl_sha1}"; then
+    echo "crictl is preloaded"
+    return
+  fi
+
+  echo "Downloading crictl"
+  local -r crictl_path="https://storage.googleapis.com/kubernetes-release/crictl"
+  download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
+  mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
+  chmod a+x "${KUBE_BIN}/crictl"
+}
+
+function install-exec-auth-plugin {
+  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
+      return
+  fi
+  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
+  local -r plugin_sha1="${EXEC_AUTH_PLUGIN_SHA1}"
+
+  echo "Downloading gke-exec-auth-plugin binary"
+  download-or-bust "${plugin_sha1}" "${plugin_url}"
+  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
+  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
+
+  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
+      return
+  fi
+  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
+  echo "Downloading gke-exec-auth-plugin license"
+  download-or-bust "" "${license_url}"
+  mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
+}
+
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -264,6 +326,10 @@ function install-kube-manifests {
       xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
+    cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
+  fi
+
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
 
   rm -f "${KUBE_HOME}/${manifests_tar}"
@@ -368,6 +434,14 @@ function install-kube-binary-config {
   # Remount the Flexvolume directory with the "exec" option, if needed.
   if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+  fi
+
+  # Install crictl on each node.
+  install-crictl
+
+  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
+    # TODO(awly): include the binary and license in the OS image.
+    install-exec-auth-plugin
   fi
 
   # Clean up.

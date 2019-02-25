@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: netexec
-        image: k8s.gcr.io/netexec:1.4
+        image: gcr.io/kubernetes-e2e-test-images/netexec:1.0
         ports:
         - containerPort: 8080
           # This is to force these pods to land on different hosts.

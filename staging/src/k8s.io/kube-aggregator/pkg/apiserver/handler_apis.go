@@ -92,10 +92,6 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *m
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		if !apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available) {
-			continue
-		}
-
 		// the first APIService which is valid becomes the default
 		if discoveryGroup == nil {
 			discoveryGroup = &metav1.APIGroup{

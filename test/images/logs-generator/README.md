@@ -3,7 +3,7 @@
 ## Overview
 
 Logs generator is a tool to create predictable load on the logs delivery system.
-Is generates random lines with predictable format and predictable average length.
+It generates random lines with predictable format and predictable average length.
 Each line can be later uniquely identified to ensure logs delivery.
 
 ## Usage
@@ -12,7 +12,7 @@ Tool is parametrized with the total number of number that should be generated an
 the generation process. For example, if you want to create a throughput of 100 lines per second
 for a minute, you set total number of lines to 6000 and duration to 1 minute.
 
-Parameters are passed through environment variables. There are no defaults, you should always 
+Parameters are passed through environment variables. There are no defaults, you should always
 set up container parameters. Total number of line is parametrized through env variable
 `LOGS_GENERATOR_LINES_TOTAL` and duration in go format is parametrized through env variable
 `LOGS_GENERATOR_DURATION`.

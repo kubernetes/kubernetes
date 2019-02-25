@@ -30,14 +30,15 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -54,12 +55,11 @@ type DeploymentStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
 	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
-	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
 		Status:     deploymentStatusRest,
-		Scale:      &ScaleREST{registry: deploymentRegistry},
+		Scale:      &ScaleREST{store: deploymentRest.Store},
 		Rollback:   deploymentRollbackRest,
 	}
 }
@@ -72,9 +72,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &extensions.Deployment{} },
-		NewListFunc:              func() runtime.Object { return &extensions.DeploymentList{} },
-		DefaultQualifiedResource: extensions.Resource("deployments"),
+		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
+		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
+		DefaultQualifiedResource: apps.Resource("deployments"),
 
 		CreateStrategy: deployment.Strategy,
 		UpdateStrategy: deployment.Strategy,
@@ -119,7 +119,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.Deployment{}
+	return &apps.Deployment{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -128,8 +128,10 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
@@ -137,25 +139,45 @@ type RollbackREST struct {
 	store *genericregistry.Store
 }
 
+// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+// PATCH) can respond with.
+func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
+	return nil
+}
+
+// ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
+// it is not nil. Only the type of the return object matters, the value will be ignored.
+func (r *RollbackREST) ProducesObject(verb string) interface{} {
+	return metav1.Status{}
+}
+
+var _ = rest.StorageMetadata(&RollbackREST{})
+
 // New creates a rollback
 func (r *RollbackREST) New() runtime.Object {
-	return &extensions.DeploymentRollback{}
+	return &apps.DeploymentRollback{}
 }
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
-	rollback, ok := obj.(*extensions.DeploymentRollback)
+func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	rollback, ok := obj.(*apps.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
 	}
 
-	if errs := extvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
-		return nil, errors.NewInvalid(extensions.Kind("DeploymentRollback"), rollback.Name, errs)
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
+	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
+		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
-	err := r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations)
+	err := r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations, dryrun.IsDryRun(options.DryRun))
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +188,10 @@ func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createVal
 	}, nil
 }
 
-func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) error {
-	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
-		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
-		err = storeerr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
+func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *apps.RollbackConfig, annotations map[string]string, dryRun bool) error {
+	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations, dryRun); err != nil {
+		err = storeerr.InterpretGetError(err, apps.Resource("deployments"), deploymentID)
+		err = storeerr.InterpretUpdateError(err, apps.Resource("deployments"), deploymentID)
 		if _, ok := err.(*errors.StatusError); !ok {
 			err = errors.NewInternalError(err)
 		}
@@ -178,14 +200,14 @@ func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID stri
 	return nil
 }
 
-func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (*extensions.Deployment, error) {
+func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *apps.RollbackConfig, annotations map[string]string, dryRun bool) (*apps.Deployment, error) {
 	dKey, err := r.store.KeyFunc(ctx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	var finalDeployment *extensions.Deployment
-	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-		d, ok := obj.(*extensions.Deployment)
+	var finalDeployment *apps.Deployment
+	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &apps.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+		d, ok := obj.(*apps.Deployment)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
@@ -198,12 +220,12 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 		d.Spec.RollbackTo = config
 		finalDeployment = d
 		return d, nil
-	}))
+	}), dryRun)
 	return finalDeployment, err
 }
 
 type ScaleREST struct {
-	registry deployment.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -229,10 +251,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+		return nil, errors.NewNotFound(apps.Resource("deployments/scale"), name)
 	}
+	deployment := obj.(*apps.Deployment)
 	scale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -240,18 +263,19 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, nil
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name, &metav1.GetOptions{})
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
-		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+		return nil, false, errors.NewNotFound(apps.Resource("deployments/scale"), name)
 	}
+	deployment := obj.(*apps.Deployment)
 
 	oldScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -264,15 +288,16 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), name, errs)
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), name, errs)
 	}
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
-	deployment, err = r.registry.UpdateDeployment(ctx, deployment, createValidation, updateValidation)
+	obj, _, err = r.store.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	deployment = obj.(*apps.Deployment)
 	newScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -281,7 +306,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.
-func scaleFromDeployment(deployment *extensions.Deployment) (*autoscaling.Scale, error) {
+func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error) {
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err

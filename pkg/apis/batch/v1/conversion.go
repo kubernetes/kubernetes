@@ -37,7 +37,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	return scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Job"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -54,6 +54,7 @@ func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	out.BackoffLimit = in.BackoffLimit
+	out.TTLSecondsAfterFinished = in.TTLSecondsAfterFinished
 	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)
@@ -73,6 +74,7 @@ func Convert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.JobSpec
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	out.BackoffLimit = in.BackoffLimit
+	out.TTLSecondsAfterFinished = in.TTLSecondsAfterFinished
 	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)

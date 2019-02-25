@@ -1,9 +1,13 @@
 # Azure Storage SDK for Go (Preview)
 
 :exclamation: IMPORTANT: This package is in maintenance only and will be deprecated in the
-future. Consider using the new package for blobs currently in preview at
-[github.com/Azure/azure-storage-blob-go](https://github.com/Azure/azure-storage-blob-go).
-New Table, Queue and File packages are also in development.
+future. Please use one of the following packages instead.
+
+| Service | Import Path/Repo |
+|---------|------------------|
+| Storage - Blobs | [github.com/Azure/azure-storage-blob-go](https://github.com/Azure/azure-storage-blob-go) |
+| Storage - Files | [github.com/Azure/azure-storage-file-go](https://github.com/Azure/azure-storage-file-go) |
+| Storage - Queues | [github.com/Azure/azure-storage-queue-go](https://github.com/Azure/azure-storage-queue-go) |
 
 The `github.com/Azure/azure-sdk-for-go/storage` package is used to manage
 [Azure Storage](https://docs.microsoft.com/en-us/azure/storage/) data plane

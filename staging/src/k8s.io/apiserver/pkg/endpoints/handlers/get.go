@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -33,10 +33,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -58,23 +59,22 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
 		result, err := getter(ctx, name, req, trace)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
-		}
 
 		trace.Step("About to write a response")
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		scope.Trace = trace
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+		trace.Step("Transformed response object")
 	}
 }
 
@@ -185,6 +185,12 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
 			err = errors.NewBadRequest(err.Error())
@@ -196,7 +202,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// TODO: DecodeParametersInto should do this.
 		if opts.FieldSelector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
-				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
 			}
 			if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
@@ -208,19 +214,25 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		if hasName {
 			// metadata.name is the canonical internal name.
-			// SelectionPredicate will notice that this is
-			// a request for a single object and optimize the
-			// storage query accordingly.
+			// SelectionPredicate will notice that this is a request for
+			// a single object and optimize the storage query accordingly.
 			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
+
+			// Note that fieldSelector setting explicitly the "metadata.name"
+			// will result in reaching this branch (as the value of that field
+			// is propagated to requestInfo as the name parameter.
+			// That said, the allowed field selectors in this branch are:
+			// nil, fields.Everything and field selector matching metadata.name
+			// for our name.
 			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
-				// It doesn't make sense to ask for both a name
-				// and a field selector, since just the name is
-				// sufficient to narrow down the request to a
-				// single object.
-				scope.err(errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."), w, req)
-				return
+				selectedName, ok := opts.FieldSelector.RequiresExactMatch("metadata.name")
+				if !ok || name != selectedName {
+					scope.err(errors.NewBadRequest("fieldSelector metadata.name doesn't match requested name"), w, req)
+					return
+				}
+			} else {
+				opts.FieldSelector = nameSelector
 			}
-			opts.FieldSelector = nameSelector
 		}
 
 		if opts.Watch || forceWatch {
@@ -236,7 +248,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+			klog.V(3).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
 
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
@@ -244,7 +256,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
-			metrics.RecordLongRunning(req, requestInfo, func() {
+			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 				serveWatch(watcher, scope, req, w, timeout)
 			})
 			return
@@ -259,21 +271,9 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Listing from storage done")
-		numberOfItems, err := setListSelfLink(result, ctx, req, scope.Namer)
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-linking done")
-		// Ensure empty lists return a non-nil items slice
-		if numberOfItems == 0 && meta.IsListType(result) {
-			if err := meta.SetList(result, []runtime.Object{}); err != nil {
-				scope.err(err, w, req)
-				return
-			}
-		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
-		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
+		scope.Trace = trace
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+		trace.Step(fmt.Sprintf("Writing http response done (%d items)", meta.LenList(result)))
 	}
 }

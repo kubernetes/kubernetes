@@ -337,7 +337,7 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 
 	var certTBS = safeTemplate
 
-	if len(profile.CTLogServers) > 0 {
+	if len(profile.CTLogServers) > 0 || req.ReturnPrecert {
 		// Add a poison extension which prevents validation
 		var poisonExtension = pkix.Extension{Id: signer.CTPoisonOID, Critical: true, Value: []byte{0x05, 0x00}}
 		var poisonedPreCert = certTBS
@@ -345,6 +345,10 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 		cert, err = s.sign(&poisonedPreCert)
 		if err != nil {
 			return
+		}
+
+		if req.ReturnPrecert {
+			return cert, nil
 		}
 
 		derCert, _ := pem.Decode(cert)
@@ -412,6 +416,85 @@ func (s *Signer) Sign(req signer.SignRequest) (cert []byte, err error) {
 	}
 
 	return signedCert, nil
+}
+
+// SignFromPrecert creates and signs a certificate from an existing precertificate
+// that was previously signed by Signer.ca and inserts the provided SCTs into the
+// new certificate. The resulting certificate will be a exact copy of the precert
+// except for the removal of the poison extension and the addition of the SCT list
+// extension. SignFromPrecert does not verify that the contents of the certificate
+// still match the signing profile of the signer, it only requires that the precert
+// was previously signed by the Signers CA.
+func (s *Signer) SignFromPrecert(precert *x509.Certificate, scts []ct.SignedCertificateTimestamp) ([]byte, error) {
+	// Verify certificate was signed by s.ca
+	if err := precert.CheckSignatureFrom(s.ca); err != nil {
+		return nil, err
+	}
+
+	// Verify certificate is a precert
+	isPrecert := false
+	poisonIndex := 0
+	for i, ext := range precert.Extensions {
+		if ext.Id.Equal(signer.CTPoisonOID) {
+			if !ext.Critical {
+				return nil, cferr.New(cferr.CTError, cferr.PrecertInvalidPoison)
+			}
+			// Check extension contains ASN.1 NULL
+			if bytes.Compare(ext.Value, []byte{0x05, 0x00}) != 0 {
+				return nil, cferr.New(cferr.CTError, cferr.PrecertInvalidPoison)
+			}
+			isPrecert = true
+			poisonIndex = i
+			break
+		}
+	}
+	if !isPrecert {
+		return nil, cferr.New(cferr.CTError, cferr.PrecertMissingPoison)
+	}
+
+	// Serialize SCTs into list format and create extension
+	serializedList, err := helpers.SerializeSCTList(scts)
+	if err != nil {
+		return nil, err
+	}
+	// Serialize again as an octet string before embedding
+	serializedList, err = asn1.Marshal(serializedList)
+	if err != nil {
+		return nil, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+	}
+	sctExt := pkix.Extension{Id: signer.SCTListOID, Critical: false, Value: serializedList}
+
+	// Create the new tbsCert from precert. Do explicit copies of any slices so that we don't
+	// use memory that may be altered by us or the caller at a later stage.
+	tbsCert := x509.Certificate{
+		SignatureAlgorithm:    precert.SignatureAlgorithm,
+		PublicKeyAlgorithm:    precert.PublicKeyAlgorithm,
+		PublicKey:             precert.PublicKey,
+		Version:               precert.Version,
+		SerialNumber:          precert.SerialNumber,
+		Issuer:                precert.Issuer,
+		Subject:               precert.Subject,
+		NotBefore:             precert.NotBefore,
+		NotAfter:              precert.NotAfter,
+		KeyUsage:              precert.KeyUsage,
+		BasicConstraintsValid: precert.BasicConstraintsValid,
+		IsCA:                        precert.IsCA,
+		MaxPathLen:                  precert.MaxPathLen,
+		MaxPathLenZero:              precert.MaxPathLenZero,
+		PermittedDNSDomainsCritical: precert.PermittedDNSDomainsCritical,
+	}
+	if len(precert.Extensions) > 0 {
+		tbsCert.ExtraExtensions = make([]pkix.Extension, len(precert.Extensions))
+		copy(tbsCert.ExtraExtensions, precert.Extensions)
+	}
+
+	// Remove the poison extension from ExtraExtensions
+	tbsCert.ExtraExtensions = append(tbsCert.ExtraExtensions[:poisonIndex], tbsCert.ExtraExtensions[poisonIndex+1:]...)
+	// Insert the SCT list extension
+	tbsCert.ExtraExtensions = append(tbsCert.ExtraExtensions, sctExt)
+
+	// Sign the tbsCert
+	return s.sign(&tbsCert)
 }
 
 // Info return a populated info.Resp struct or an error.

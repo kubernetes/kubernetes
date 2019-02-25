@@ -6,6 +6,7 @@ go_library(
         "size.go",
         "sizetest.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/size",
     importpath = "github.com/gogo/protobuf/plugin/size",
     visibility = ["//visibility:public"],
     deps = [

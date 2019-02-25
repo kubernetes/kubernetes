@@ -19,9 +19,12 @@ package podsecuritypolicy
 import (
 	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+
+	corev1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/errors"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
@@ -45,6 +48,14 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 	userStrat, err := createUserStrategy(&psp.Spec.RunAsUser)
 	if err != nil {
 		errs = append(errs, err)
+	}
+
+	var groupStrat group.GroupStrategy
+	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	seLinuxStrat, err := createSELinuxStrategy(&psp.Spec.SELinux)
@@ -77,15 +88,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 		errs = append(errs, err)
 	}
 
-	var unsafeSysctls []string
-	if ann, found := psp.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey]; found {
-		var err error
-		unsafeSysctls, err = policy.SysctlsFromPodSecurityPolicyAnnotation(ann)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	sysctlsStrat := createSysctlsStrategy(unsafeSysctls)
+	sysctlsStrat := createSysctlsStrategy(sysctl.SafeSysctlWhitelist(), psp.Spec.AllowedUnsafeSysctls, psp.Spec.ForbiddenSysctls)
 
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
@@ -93,6 +96,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 
 	strategies := &ProviderStrategies{
 		RunAsUserStrategy:         userStrat,
+		RunAsGroupStrategy:        groupStrat,
 		SELinuxStrategy:           seLinuxStrat,
 		AppArmorStrategy:          appArmorStrat,
 		FSGroupStrategy:           fsGroupStrat,
@@ -116,6 +120,23 @@ func createUserStrategy(opts *policy.RunAsUserStrategyOptions) (user.RunAsUserSt
 		return user.NewRunAsAny(opts)
 	default:
 		return nil, fmt.Errorf("Unrecognized RunAsUser strategy type %s", opts.Rule)
+	}
+}
+
+// createRunAsGroupStrategy creates a new group strategy.
+func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.GroupStrategy, error) {
+	if opts == nil {
+		return group.NewRunAsAny()
+	}
+	switch opts.Rule {
+	case policy.RunAsGroupStrategyMustRunAs:
+		return group.NewMustRunAs(opts.Ranges)
+	case policy.RunAsGroupStrategyRunAsAny:
+		return group.NewRunAsAny()
+	case policy.RunAsGroupStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
+	default:
+		return nil, fmt.Errorf("Unrecognized RunAsGroup strategy type %s", opts.Rule)
 	}
 }
 
@@ -146,8 +167,10 @@ func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStra
 	switch opts.Rule {
 	case policy.FSGroupStrategyRunAsAny:
 		return group.NewRunAsAny()
+	case policy.FSGroupStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
 	case policy.FSGroupStrategyMustRunAs:
-		return group.NewMustRunAs(opts.Ranges, fsGroupField)
+		return group.NewMustRunAs(opts.Ranges)
 	default:
 		return nil, fmt.Errorf("Unrecognized FSGroup strategy type %s", opts.Rule)
 	}
@@ -158,19 +181,21 @@ func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOpti
 	switch opts.Rule {
 	case policy.SupplementalGroupsStrategyRunAsAny:
 		return group.NewRunAsAny()
+	case policy.SupplementalGroupsStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
 	case policy.SupplementalGroupsStrategyMustRunAs:
-		return group.NewMustRunAs(opts.Ranges, supplementalGroupsField)
+		return group.NewMustRunAs(opts.Ranges)
 	default:
 		return nil, fmt.Errorf("Unrecognized SupplementalGroups strategy type %s", opts.Rule)
 	}
 }
 
 // createCapabilitiesStrategy creates a new capabilities strategy.
-func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []api.Capability) (capabilities.Strategy, error) {
+func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []corev1.Capability) (capabilities.Strategy, error) {
 	return capabilities.NewDefaultCapabilities(defaultAddCaps, requiredDropCaps, allowedCaps)
 }
 
-// createSysctlsStrategy creates a new unsafe sysctls strategy.
-func createSysctlsStrategy(sysctlsPatterns []string) sysctl.SysctlsStrategy {
-	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
+// createSysctlsStrategy creates a new sysctls strategy.
+func createSysctlsStrategy(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls []string) sysctl.SysctlsStrategy {
+	return sysctl.NewMustMatchPatterns(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls)
 }

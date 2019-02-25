@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	batch_v1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredCronJobInformer(client kubernetes.Interface, namespace string, r
 				return client.BatchV1beta1().CronJobs(namespace).Watch(options)
 			},
 		},
-		&batch_v1beta1.CronJob{},
+		&batchv1beta1.CronJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *cronJobInformer) defaultInformer(client kubernetes.Interface, resyncPer
 }
 
 func (f *cronJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&batch_v1beta1.CronJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&batchv1beta1.CronJob{}, f.defaultInformer)
 }
 
 func (f *cronJobInformer) Lister() v1beta1.CronJobLister {

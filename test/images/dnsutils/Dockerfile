@@ -16,4 +16,4 @@ FROM BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN apk add --no-cache bind-tools
+RUN apk add --no-cache bind-tools dnsmasq

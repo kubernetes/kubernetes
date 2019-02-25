@@ -51,7 +51,7 @@ func TestCanSupport(t *testing.T) {
 		t.Errorf("Expected true")
 	}
 
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{Cinder: &v1.CinderVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{Cinder: &v1.CinderPersistentVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -116,8 +116,10 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 	return nil
 }
 
-func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
-	return "test-volume-name", 1, nil, "", nil
+func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
+	labels = make(map[string]string)
+	labels[v1.LabelZoneFailureDomain] = "nova"
+	return "test-volume-name", 1, labels, "", nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {
@@ -192,11 +194,11 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}
@@ -208,6 +210,39 @@ func TestPlugin(t *testing.T) {
 	size := cap.Value()
 	if size != 1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
+	}
+
+	// check nodeaffinity members
+	if persistentSpec.Spec.NodeAffinity == nil {
+		t.Errorf("Provision() returned unexpected nil NodeAffinity")
+	}
+
+	if persistentSpec.Spec.NodeAffinity.Required == nil {
+		t.Errorf("Provision() returned unexpected nil NodeAffinity.Required")
+	}
+
+	n := len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms)
+	if n != 1 {
+		t.Errorf("Provision() returned unexpected number of NodeSelectorTerms %d. Expected %d", n, 1)
+	}
+
+	n = len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions)
+	if n != 1 {
+		t.Errorf("Provision() returned unexpected number of MatchExpressions %d. Expected %d", n, 1)
+	}
+
+	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
+
+	if req.Key != v1.LabelZoneFailureDomain {
+		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
+	}
+
+	if req.Operator != v1.NodeSelectorOpIn {
+		t.Errorf("Provision() returned unexpected requirement operator in NodeAffinity %v", req.Operator)
+	}
+
+	if len(req.Values) != 1 || req.Values[0] != "nova" {
+		t.Errorf("Provision() returned unexpected requirement value in NodeAffinity %v", req.Values)
 	}
 
 	// Test Deleter

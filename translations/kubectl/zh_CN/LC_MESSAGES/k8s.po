@@ -1,6 +1,6 @@
 # Test translations for unit tests.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR shiywang@redhat.com, 2017.
 # FIRST AUTHOR zhengjiajin@caicloud.io, 2017.
 #
@@ -2390,7 +2390,7 @@ msgstr "显示一个或更多 resources"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
 #: pkg/kubectl/cmd/config/current_context.go:49
 msgid "Displays the current-context"
-msgstr "显示 current_context"
+msgstr "显示当前的 context"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
 #: pkg/kubectl/cmd/explain.go:51

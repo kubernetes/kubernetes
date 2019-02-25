@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["volume_manager.go"],
+    srcs = [
+        "volume_manager.go",
+        "volume_manager_fake.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager",
     deps = [
         "//pkg/kubelet/config:go_default_library",
@@ -17,6 +20,7 @@ go_library(
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
+        "//pkg/kubelet/volumemanager/metrics:go_default_library",
         "//pkg/kubelet/volumemanager/populator:go_default_library",
         "//pkg/kubelet/volumemanager/reconciler:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -25,14 +29,14 @@ go_library(
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -54,13 +58,13 @@ go_test(
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/client-go/util/testing:go_default_library",
     ],
 )
 
@@ -76,6 +80,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/volumemanager/cache:all-srcs",
+        "//pkg/kubelet/volumemanager/metrics:all-srcs",
         "//pkg/kubelet/volumemanager/populator:all-srcs",
         "//pkg/kubelet/volumemanager/reconciler:all-srcs",
     ],

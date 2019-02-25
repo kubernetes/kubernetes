@@ -61,12 +61,8 @@ func (in *AdmissionPluginConfiguration) DeepCopyInto(out *AdmissionPluginConfigu
 	*out = *in
 	if in.Configuration != nil {
 		in, out := &in.Configuration, &out.Configuration
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(runtime.Unknown)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(runtime.Unknown)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

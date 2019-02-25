@@ -40,6 +40,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
+		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
@@ -109,7 +110,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
-			found := adc.actualStateOfWorld.VolumeNodeExists(attachedVolume.Name, nodeName)
+			found := adc.actualStateOfWorld.IsVolumeAttachedToNode(attachedVolume.Name, nodeName)
 			if !found {
 				t.Fatalf("Run failed with error. Node %s, volume %s not found", nodeName, attachedVolume.Name)
 			}
@@ -214,6 +215,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
+		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),

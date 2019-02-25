@@ -46,9 +46,9 @@ var _ = rest.Connecter(&ProxyREST{})
 
 var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
-// New returns an empty pod resource
+// New returns an empty podProxyOptions object.
 func (r *ProxyREST) New() runtime.Object {
-	return &api.Pod{}
+	return &api.PodProxyOptions{}
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied
@@ -88,9 +88,9 @@ type AttachREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&AttachREST{})
 
-// New creates a new Pod object
+// New creates a new podAttachOptions object.
 func (r *AttachREST) New() runtime.Object {
-	return &api.Pod{}
+	return &api.PodAttachOptions{}
 }
 
 // Connect returns a handler for the pod exec proxy
@@ -125,9 +125,9 @@ type ExecREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&ExecREST{})
 
-// New creates a new Pod object
+// New creates a new podExecOptions object.
 func (r *ExecREST) New() runtime.Object {
-	return &api.Pod{}
+	return &api.PodExecOptions{}
 }
 
 // Connect returns a handler for the pod exec proxy
@@ -162,9 +162,9 @@ type PortForwardREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&PortForwardREST{})
 
-// New returns an empty pod object
+// New returns an empty podPortForwardOptions object
 func (r *PortForwardREST) New() runtime.Object {
-	return &api.Pod{}
+	return &api.PodPortForwardOptions{}
 }
 
 // NewConnectOptions returns the versioned object that represents the
@@ -194,6 +194,7 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.InterceptRedirects = interceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
+	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }

@@ -26,10 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -110,41 +108,25 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.ClientSet)
+	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
+	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames.List())).To(Equal(true))
 }
 
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == kubeletapis.LabelZoneFailureDomain {
+		if key == v1.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, kubeletapis.LabelZoneFailureDomain)
-}
-
-// TODO (verult) Merge with framework.GetClusterZones()
-// Find the names of all zones in which we have nodes in this cluster.
-func getZoneNames(c clientset.Interface) ([]string, error) {
-	zoneNames := sets.NewString()
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	for _, node := range nodes.Items {
-		zoneName, err := getZoneNameForNode(node)
-		Expect(err).NotTo(HaveOccurred())
-		zoneNames.Insert(zoneName)
-	}
-	return zoneNames.List(), nil
+		node.Name, v1.LabelZoneFailureDomain)
 }
 
 // Return the number of zones in which we have nodes in this cluster.
 func getZoneCount(c clientset.Interface) (int, error) {
-	zoneNames, err := getZoneNames(c)
+	zoneNames, err := framework.GetClusterZones(c)
 	if err != nil {
 		return -1, err
 	}
@@ -224,7 +206,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()
@@ -239,7 +221,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.ClientSet)
+	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
+	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames.List())).To(Equal(true))
 }

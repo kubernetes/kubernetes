@@ -17,14 +17,20 @@ limitations under the License.
 package secret
 
 import (
-	"sync"
+	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 type Manager interface {
@@ -40,11 +46,6 @@ type Manager interface {
 	// UnregisterPod unregisters secrets from a given pod that are not
 	// used by any other registered pod.
 	UnregisterPod(pod *v1.Pod)
-}
-
-type objectKey struct {
-	namespace string
-	name      string
 }
 
 // simpleSecretManager implements SecretManager interfaces with
@@ -67,42 +68,31 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 }
 
-// store is the interface for a secrets cache that
-// can be used by cacheBasedSecretManager.
-type store interface {
-	// AddReference adds a reference to the secret to the store.
-	// Note that multiple additions to the store has to be allowed
-	// in the implementations and effectively treated as refcounted.
-	AddReference(namespace, name string)
-	// DeleteReference deletes reference to the secret from the store.
-	// Note that secret should be deleted only when there was a
-	// corresponding Delete call for each of Add calls (effectively
-	// when refcount was reduced to zero).
-	DeleteReference(namespace, name string)
-	// Get a secret from a store.
-	Get(namespace, name string) (*v1.Secret, error)
-}
-
-// cachingBasedSecretManager keeps a store with secrets necessary
+// secretManager keeps a store with secrets necessary
 // for registered pods. Different implementations of the store
 // may result in different semantics for freshness of secrets
 // (e.g. ttl-based implementation vs watch-based implementation).
-type cacheBasedSecretManager struct {
-	secretStore store
-
-	lock           sync.Mutex
-	registeredPods map[objectKey]*v1.Pod
+type secretManager struct {
+	manager manager.Manager
 }
 
-func newCacheBasedSecretManager(secretStore store) Manager {
-	return &cacheBasedSecretManager{
-		secretStore:    secretStore,
-		registeredPods: make(map[objectKey]*v1.Pod),
+func (s *secretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+	object, err := s.manager.GetObject(namespace, name)
+	if err != nil {
+		return nil, err
 	}
+	if secret, ok := object.(*v1.Secret); ok {
+		return secret, nil
+	}
+	return nil, fmt.Errorf("unexpected object type: %v", object)
 }
 
-func (c *cacheBasedSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return c.secretStore.Get(namespace, name)
+func (s *secretManager) RegisterPod(pod *v1.Pod) {
+	s.manager.RegisterPod(pod)
+}
+
+func (s *secretManager) UnregisterPod(pod *v1.Pod) {
+	s.manager.UnregisterPod(pod)
 }
 
 func getSecretNames(pod *v1.Pod) sets.String {
@@ -114,39 +104,46 @@ func getSecretNames(pod *v1.Pod) sets.String {
 	return result
 }
 
-func (c *cacheBasedSecretManager) RegisterPod(pod *v1.Pod) {
-	names := getSecretNames(pod)
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	for name := range names {
-		c.secretStore.AddReference(pod.Namespace, name)
+const (
+	defaultTTL = time.Minute
+)
+
+// NewCachingSecretManager creates a manager that keeps a cache of all secrets
+// necessary for registered pods.
+// It implements the following logic:
+// - whenever a pod is created or updated, the cached versions of all secrets
+//   are invalidated
+// - every GetObject() call tries to fetch the value from local cache; if it is
+//   not there, invalidated or too old, we fetch it from apiserver and refresh the
+//   value in cache; otherwise it is just fetched from cache
+func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
+	getSecret := func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
+		return kubeClient.CoreV1().Secrets(namespace).Get(name, opts)
 	}
-	var prev *v1.Pod
-	key := objectKey{namespace: pod.Namespace, name: pod.Name}
-	prev = c.registeredPods[key]
-	c.registeredPods[key] = pod
-	if prev != nil {
-		for name := range getSecretNames(prev) {
-			// On an update, the .Add() call above will have re-incremented the
-			// ref count of any existing secrets, so any secrets that are in both
-			// names and prev need to have their ref counts decremented. Any that
-			// are only in prev need to be completely removed. This unconditional
-			// call takes care of both cases.
-			c.secretStore.DeleteReference(prev.Namespace, name)
-		}
+	secretStore := manager.NewObjectStore(getSecret, clock.RealClock{}, getTTL, defaultTTL)
+	return &secretManager{
+		manager: manager.NewCacheBasedManager(secretStore, getSecretNames),
 	}
 }
 
-func (c *cacheBasedSecretManager) UnregisterPod(pod *v1.Pod) {
-	var prev *v1.Pod
-	key := objectKey{namespace: pod.Namespace, name: pod.Name}
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	prev = c.registeredPods[key]
-	delete(c.registeredPods, key)
-	if prev != nil {
-		for name := range getSecretNames(prev) {
-			c.secretStore.DeleteReference(prev.Namespace, name)
-		}
+// NewWatchingSecretManager creates a manager that keeps a cache of all secrets
+// necessary for registered pods.
+// It implements the following logic:
+// - whenever a pod is created or updated, we start inidvidual watches for all
+//   referenced objects that aren't referenced from other registered pods
+// - every GetObject() returns a value from local cache propagated via watches
+func NewWatchingSecretManager(kubeClient clientset.Interface) Manager {
+	listSecret := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
+		return kubeClient.CoreV1().Secrets(namespace).List(opts)
+	}
+	watchSecret := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return kubeClient.CoreV1().Secrets(namespace).Watch(opts)
+	}
+	newSecret := func() runtime.Object {
+		return &v1.Secret{}
+	}
+	gr := corev1.Resource("secret")
+	return &secretManager{
+		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, gr, getSecretNames),
 	}
 }

@@ -18,6 +18,7 @@ package auth
 // JWT based mechanism will be added in the near future.
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -25,8 +26,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 const (
@@ -118,6 +117,11 @@ func (t *tokenSimple) genTokenPrefix() (string, error) {
 
 func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 	t.simpleTokensMu.Lock()
+	defer t.simpleTokensMu.Unlock()
+	if t.simpleTokenKeeper == nil {
+		return
+	}
+
 	_, ok := t.simpleTokens[token]
 	if ok {
 		plog.Panicf("token %s is alredy used", token)
@@ -125,7 +129,6 @@ func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 
 	t.simpleTokens[token] = username
 	t.simpleTokenKeeper.addSimpleToken(token)
-	t.simpleTokensMu.Unlock()
 }
 
 func (t *tokenSimple) invalidateUser(username string) {
@@ -185,9 +188,9 @@ func (t *tokenSimple) info(ctx context.Context, token string, revision uint64) (
 
 func (t *tokenSimple) assign(ctx context.Context, username string, rev uint64) (string, error) {
 	// rev isn't used in simple token, it is only used in JWT
-	index := ctx.Value("index").(uint64)
-	simpleToken := ctx.Value("simpleToken").(string)
-	token := fmt.Sprintf("%s.%d", simpleToken, index)
+	index := ctx.Value(AuthenticateParamIndex{}).(uint64)
+	simpleTokenPrefix := ctx.Value(AuthenticateParamSimpleTokenPrefix{}).(string)
+	token := fmt.Sprintf("%s.%d", simpleTokenPrefix, index)
 	t.assignSimpleTokenToUser(username, token)
 
 	return token, nil

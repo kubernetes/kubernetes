@@ -36,15 +36,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_Event_To_core_Event,
-		Convert_core_Event_To_v1beta1_Event,
-		Convert_v1beta1_EventList_To_core_EventList,
-		Convert_core_EventList_To_v1beta1_EventList,
-		Convert_v1beta1_EventSeries_To_core_EventSeries,
-		Convert_core_EventSeries_To_v1beta1_EventSeries,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Event_To_core_Event(a.(*v1beta1.Event), b.(*core.Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.Event)(nil), (*v1beta1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_Event_To_v1beta1_Event(a.(*core.Event), b.(*v1beta1.Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.EventList)(nil), (*core.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_EventList_To_core_EventList(a.(*v1beta1.EventList), b.(*core.EventList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.EventList)(nil), (*v1beta1.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EventList_To_v1beta1_EventList(a.(*core.EventList), b.(*v1beta1.EventList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.EventSeries)(nil), (*core.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_EventSeries_To_core_EventSeries(a.(*v1beta1.EventSeries), b.(*core.EventSeries), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.EventSeries)(nil), (*v1beta1.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EventSeries_To_v1beta1_EventSeries(a.(*core.EventSeries), b.(*v1beta1.EventSeries), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*core.Event)(nil), (*v1beta1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_Event_To_v1beta1_Event(a.(*core.Event), b.(*v1beta1.Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Event_To_core_Event(a.(*v1beta1.Event), b.(*core.Event), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_Event_To_core_Event(in *v1beta1.Event, out *core.Event, s conversion.Scope) error {

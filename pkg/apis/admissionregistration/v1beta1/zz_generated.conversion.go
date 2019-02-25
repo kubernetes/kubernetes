@@ -36,27 +36,98 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWebhookConfiguration,
-		Convert_admissionregistration_MutatingWebhookConfiguration_To_v1beta1_MutatingWebhookConfiguration,
-		Convert_v1beta1_MutatingWebhookConfigurationList_To_admissionregistration_MutatingWebhookConfigurationList,
-		Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList,
-		Convert_v1beta1_Rule_To_admissionregistration_Rule,
-		Convert_admissionregistration_Rule_To_v1beta1_Rule,
-		Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations,
-		Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations,
-		Convert_v1beta1_ServiceReference_To_admissionregistration_ServiceReference,
-		Convert_admissionregistration_ServiceReference_To_v1beta1_ServiceReference,
-		Convert_v1beta1_ValidatingWebhookConfiguration_To_admissionregistration_ValidatingWebhookConfiguration,
-		Convert_admissionregistration_ValidatingWebhookConfiguration_To_v1beta1_ValidatingWebhookConfiguration,
-		Convert_v1beta1_ValidatingWebhookConfigurationList_To_admissionregistration_ValidatingWebhookConfigurationList,
-		Convert_admissionregistration_ValidatingWebhookConfigurationList_To_v1beta1_ValidatingWebhookConfigurationList,
-		Convert_v1beta1_Webhook_To_admissionregistration_Webhook,
-		Convert_admissionregistration_Webhook_To_v1beta1_Webhook,
-		Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig,
-		Convert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookClientConfig,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.MutatingWebhookConfiguration)(nil), (*admissionregistration.MutatingWebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWebhookConfiguration(a.(*v1beta1.MutatingWebhookConfiguration), b.(*admissionregistration.MutatingWebhookConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingWebhookConfiguration)(nil), (*v1beta1.MutatingWebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingWebhookConfiguration_To_v1beta1_MutatingWebhookConfiguration(a.(*admissionregistration.MutatingWebhookConfiguration), b.(*v1beta1.MutatingWebhookConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.MutatingWebhookConfigurationList)(nil), (*admissionregistration.MutatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingWebhookConfigurationList_To_admissionregistration_MutatingWebhookConfigurationList(a.(*v1beta1.MutatingWebhookConfigurationList), b.(*admissionregistration.MutatingWebhookConfigurationList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingWebhookConfigurationList)(nil), (*v1beta1.MutatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(a.(*admissionregistration.MutatingWebhookConfigurationList), b.(*v1beta1.MutatingWebhookConfigurationList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Rule)(nil), (*admissionregistration.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Rule_To_admissionregistration_Rule(a.(*v1beta1.Rule), b.(*admissionregistration.Rule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.Rule)(nil), (*v1beta1.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_Rule_To_v1beta1_Rule(a.(*admissionregistration.Rule), b.(*v1beta1.Rule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.RuleWithOperations)(nil), (*admissionregistration.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(a.(*v1beta1.RuleWithOperations), b.(*admissionregistration.RuleWithOperations), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.RuleWithOperations)(nil), (*v1beta1.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(a.(*admissionregistration.RuleWithOperations), b.(*v1beta1.RuleWithOperations), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ServiceReference)(nil), (*admissionregistration.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ServiceReference_To_admissionregistration_ServiceReference(a.(*v1beta1.ServiceReference), b.(*admissionregistration.ServiceReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.ServiceReference)(nil), (*v1beta1.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_ServiceReference_To_v1beta1_ServiceReference(a.(*admissionregistration.ServiceReference), b.(*v1beta1.ServiceReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ValidatingWebhookConfiguration)(nil), (*admissionregistration.ValidatingWebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ValidatingWebhookConfiguration_To_admissionregistration_ValidatingWebhookConfiguration(a.(*v1beta1.ValidatingWebhookConfiguration), b.(*admissionregistration.ValidatingWebhookConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.ValidatingWebhookConfiguration)(nil), (*v1beta1.ValidatingWebhookConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_ValidatingWebhookConfiguration_To_v1beta1_ValidatingWebhookConfiguration(a.(*admissionregistration.ValidatingWebhookConfiguration), b.(*v1beta1.ValidatingWebhookConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ValidatingWebhookConfigurationList)(nil), (*admissionregistration.ValidatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ValidatingWebhookConfigurationList_To_admissionregistration_ValidatingWebhookConfigurationList(a.(*v1beta1.ValidatingWebhookConfigurationList), b.(*admissionregistration.ValidatingWebhookConfigurationList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.ValidatingWebhookConfigurationList)(nil), (*v1beta1.ValidatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_ValidatingWebhookConfigurationList_To_v1beta1_ValidatingWebhookConfigurationList(a.(*admissionregistration.ValidatingWebhookConfigurationList), b.(*v1beta1.ValidatingWebhookConfigurationList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Webhook)(nil), (*admissionregistration.Webhook)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Webhook_To_admissionregistration_Webhook(a.(*v1beta1.Webhook), b.(*admissionregistration.Webhook), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.Webhook)(nil), (*v1beta1.Webhook)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_Webhook_To_v1beta1_Webhook(a.(*admissionregistration.Webhook), b.(*v1beta1.Webhook), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.WebhookClientConfig)(nil), (*admissionregistration.WebhookClientConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(a.(*v1beta1.WebhookClientConfig), b.(*admissionregistration.WebhookClientConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.WebhookClientConfig)(nil), (*v1beta1.WebhookClientConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookClientConfig(a.(*admissionregistration.WebhookClientConfig), b.(*v1beta1.WebhookClientConfig), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookConfiguration, out *admissionregistration.MutatingWebhookConfiguration, s conversion.Scope) error {
@@ -229,6 +300,7 @@ func autoConvert_v1beta1_Webhook_To_admissionregistration_Webhook(in *v1beta1.We
 	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.SideEffects = (*admissionregistration.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	return nil
 }
 
@@ -245,6 +317,7 @@ func autoConvert_admissionregistration_Webhook_To_v1beta1_Webhook(in *admissionr
 	out.Rules = *(*[]v1beta1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
 	out.FailurePolicy = (*v1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.SideEffects = (*v1beta1.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	return nil
 }
 

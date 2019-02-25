@@ -3,61 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "numcpu.go",
+        "numcpu_linux.go",
+        "numcpu_windows.go",
         "sysinfo.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "numcpu_linux.go",
-            "sysinfo_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "numcpu.go",
-            "sysinfo_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "numcpu.go",
-            "sysinfo_solaris.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "numcpu_windows.go",
-            "sysinfo_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
-    cgo = True,
-    clinkopts = select({
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "-llgrp",
-        ],
-        "//conditions:default": [],
-    }),
+        "sysinfo_linux.go",
+        "sysinfo_unix.go",
+        "sysinfo_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/sysinfo",
     importpath = "github.com/docker/docker/pkg/sysinfo",
     visibility = ["//visibility:public"],
     deps = [

@@ -17,11 +17,13 @@ limitations under the License.
 package simulator
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -63,7 +65,7 @@ func NewVirtualMachine(parent types.ManagedObjectReference, spec *types.VirtualM
 		MemoryAllocation: &rspec.MemoryAllocation,
 		CpuAllocation:    &rspec.CpuAllocation,
 	}
-	vm.Snapshot = &types.VirtualMachineSnapshotInfo{}
+	vm.Snapshot = nil // intentionally set to nil until a snapshot is created
 	vm.Storage = &types.VirtualMachineStorageInfo{
 		Timestamp: time.Now(),
 	}
@@ -420,6 +422,35 @@ func (vm *VirtualMachine) generateMAC() string {
 	return mac.String()
 }
 
+func numberToString(n int64, sep rune) string {
+	buf := &bytes.Buffer{}
+	if n < 0 {
+		n = -n
+		buf.WriteRune('-')
+	}
+	s := strconv.FormatInt(n, 10)
+	pos := 3 - (len(s) % 3)
+	for i := 0; i < len(s); i++ {
+		if pos == 3 {
+			if i != 0 {
+				buf.WriteRune(sep)
+			}
+			pos = 0
+		}
+		pos++
+		buf.WriteByte(s[i])
+	}
+
+	return buf.String()
+}
+
+func getDiskSize(disk *types.VirtualDisk) int64 {
+	if disk.CapacityInBytes == 0 {
+		return disk.CapacityInKB * 1024
+	}
+	return disk.CapacityInBytes
+}
+
 func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec *types.VirtualDeviceConfigSpec) types.BaseMethodFault {
 	device := spec.Device
 	d := device.GetVirtualDevice()
@@ -469,6 +500,7 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 			c.MacAddress = vm.generateMAC()
 		}
 	case *types.VirtualDisk:
+		summary = fmt.Sprintf("%s KB", numberToString(x.CapacityInKB, ','))
 		switch b := d.Backing.(type) {
 		case types.BaseVirtualDeviceFileBackingInfo:
 			info := b.GetVirtualDeviceFileBackingInfo()
@@ -493,9 +525,16 @@ func (vm *VirtualMachine) configureDevice(devices object.VirtualDeviceList, spec
 			p, _ := parseDatastorePath(info.FileName)
 
 			host := Map.Get(*vm.Runtime.Host).(*HostSystem)
-			ds := Map.FindByName(p.Datastore, host.Datastore).Reference()
 
-			info.Datastore = &ds
+			entity := Map.FindByName(p.Datastore, host.Datastore)
+			ref := entity.Reference()
+			info.Datastore = &ref
+
+			ds := entity.(*Datastore)
+
+			// XXX: compare disk size and free space until windows stat is supported
+			ds.Summary.FreeSpace -= getDiskSize(x)
+			ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
 		}
 	}
 
@@ -531,6 +570,15 @@ func (vm *VirtualMachine) removeDevice(devices object.VirtualDeviceList, spec *t
 				switch b := device.Backing.(type) {
 				case types.BaseVirtualDeviceFileBackingInfo:
 					file = b.GetVirtualDeviceFileBackingInfo().FileName
+
+					p, _ := parseDatastorePath(file)
+
+					host := Map.Get(*vm.Runtime.Host).(*HostSystem)
+
+					ds := Map.FindByName(p.Datastore, host.Datastore).(*Datastore)
+
+					ds.Summary.FreeSpace += getDiskSize(device)
+					ds.Info.GetDatastoreInfo().FreeSpace = ds.Summary.FreeSpace
 				}
 
 				if file != "" {
@@ -661,15 +709,9 @@ func (c *powerVMTask) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 		}
 	}
 
-	c.VirtualMachine.Runtime.PowerState = c.state
-	c.VirtualMachine.Summary.Runtime.PowerState = c.state
-
-	bt := &c.VirtualMachine.Summary.Runtime.BootTime
+	var boot types.AnyType
 	if c.state == types.VirtualMachinePowerStatePoweredOn {
-		now := time.Now()
-		*bt = &now
-	} else {
-		*bt = nil
+		boot = time.Now()
 	}
 
 	event := c.event()
@@ -680,8 +722,22 @@ func (c *powerVMTask) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 			&types.VmPoweredOnEvent{VmEvent: event},
 		)
 	case types.VirtualMachinePowerStatePoweredOff:
-		c.ctx.postEvent(&types.VmPoweredOffEvent{VmEvent: event})
+		c.ctx.postEvent(
+			&types.VmStoppingEvent{VmEvent: event},
+			&types.VmPoweredOffEvent{VmEvent: event},
+		)
+	case types.VirtualMachinePowerStateSuspended:
+		c.ctx.postEvent(
+			&types.VmSuspendingEvent{VmEvent: event},
+			&types.VmSuspendedEvent{VmEvent: event},
+		)
 	}
+
+	Map.Update(c.VirtualMachine, []types.PropertyChange{
+		{Name: "runtime.powerState", Val: c.state},
+		{Name: "summary.runtime.powerState", Val: c.state},
+		{Name: "summary.runtime.bootTime", Val: boot},
+	})
 
 	return nil, nil
 }
@@ -709,6 +765,37 @@ func (vm *VirtualMachine) PowerOffVMTask(ctx *Context, c *types.PowerOffVM_Task)
 
 	return &methods.PowerOffVM_TaskBody{
 		Res: &types.PowerOffVM_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
+}
+
+func (vm *VirtualMachine) SuspendVMTask(ctx *Context, req *types.SuspendVM_Task) soap.HasFault {
+	runner := &powerVMTask{vm, types.VirtualMachinePowerStateSuspended, ctx}
+	task := CreateTask(runner.Reference(), "suspend", runner.Run)
+
+	return &methods.SuspendVM_TaskBody{
+		Res: &types.SuspendVM_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
+}
+
+func (vm *VirtualMachine) ResetVMTask(ctx *Context, req *types.ResetVM_Task) soap.HasFault {
+	task := CreateTask(vm, "reset", func(task *Task) (types.AnyType, types.BaseMethodFault) {
+		res := vm.PowerOffVMTask(ctx, &types.PowerOffVM_Task{This: vm.Self})
+		ctask := Map.Get(res.(*methods.PowerOffVM_TaskBody).Res.Returnval).(*Task)
+		if ctask.Info.Error != nil {
+			return nil, ctask.Info.Error.Fault
+		}
+
+		_ = vm.PowerOnVMTask(ctx, &types.PowerOnVM_Task{This: vm.Self})
+
+		return nil, nil
+	})
+
+	return &methods.ResetVM_TaskBody{
+		Res: &types.ResetVM_TaskResponse{
 			Returnval: task.Run(),
 		},
 	}
@@ -745,6 +832,11 @@ func (vm *VirtualMachine) DestroyTask(ctx *Context, req *types.Destroy_Task) soa
 		if r.Fault() != nil {
 			return nil, r.Fault().VimFault().(types.BaseMethodFault)
 		}
+
+		// Remove all devices
+		devices := object.VirtualDeviceList(vm.Config.Hardware.Device)
+		spec, _ := devices.ConfigSpec(types.VirtualDeviceConfigSpecOperationRemove)
+		vm.configureDevices(&types.VirtualMachineConfigSpec{DeviceChange: spec})
 
 		// Delete VM files from the datastore (ignoring result for now)
 		m := Map.FileManager()
@@ -882,28 +974,35 @@ func (vm *VirtualMachine) CloneVMTask(ctx *Context, req *types.CloneVM_Task) soa
 
 func (vm *VirtualMachine) RelocateVMTask(req *types.RelocateVM_Task) soap.HasFault {
 	task := CreateTask(vm, "relocateVm", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		var changes []types.PropertyChange
+
 		if ref := req.Spec.Datastore; ref != nil {
 			ds := Map.Get(*ref).(*Datastore)
 			Map.RemoveReference(ds, &ds.Vm, *ref)
 
-			vm.Datastore = []types.ManagedObjectReference{*ref}
-
 			// TODO: migrate vm.Config.Files (and vm.Summary.Config.VmPathName)
+
+			changes = append(changes, types.PropertyChange{Name: "datastore", Val: []types.ManagedObjectReference{*ref}})
 		}
 
 		if ref := req.Spec.Pool; ref != nil {
 			pool := Map.Get(*ref).(*ResourcePool)
 			Map.RemoveReference(pool, &pool.Vm, *ref)
 
-			vm.ResourcePool = ref
+			changes = append(changes, types.PropertyChange{Name: "resourcePool", Val: *ref})
 		}
 
 		if ref := req.Spec.Host; ref != nil {
 			host := Map.Get(*ref).(*HostSystem)
 			Map.RemoveReference(host, &host.Vm, *ref)
 
-			vm.Runtime.Host = ref
+			changes = append(changes,
+				types.PropertyChange{Name: "runtime.host", Val: *ref},
+				types.PropertyChange{Name: "summary.runtime.host", Val: *ref},
+			)
 		}
+
+		Map.Update(vm, changes)
 
 		return nil, nil
 	})
@@ -991,8 +1090,7 @@ func (vm *VirtualMachine) RemoveAllSnapshotsTask(req *types.RemoveAllSnapshots_T
 
 		refs := allSnapshotsInTree(vm.Snapshot.RootSnapshotList)
 
-		vm.Snapshot.CurrentSnapshot = nil
-		vm.Snapshot.RootSnapshotList = nil
+		vm.Snapshot = nil
 
 		for _, ref := range refs {
 			Map.Remove(ref)
@@ -1008,7 +1106,7 @@ func (vm *VirtualMachine) RemoveAllSnapshotsTask(req *types.RemoveAllSnapshots_T
 	}
 }
 
-func (vm *VirtualMachine) ShutdownGuest(c *types.ShutdownGuest) soap.HasFault {
+func (vm *VirtualMachine) ShutdownGuest(ctx *Context, c *types.ShutdownGuest) soap.HasFault {
 	r := &methods.ShutdownGuestBody{}
 	// should be poweron
 	if vm.Runtime.PowerState == types.VirtualMachinePowerStatePoweredOff {
@@ -1022,6 +1120,17 @@ func (vm *VirtualMachine) ShutdownGuest(c *types.ShutdownGuest) soap.HasFault {
 	// change state
 	vm.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOff
 	vm.Summary.Runtime.PowerState = types.VirtualMachinePowerStatePoweredOff
+
+	event := vm.event()
+	ctx.postEvent(
+		&types.VmGuestShutdownEvent{VmEvent: event},
+		&types.VmPoweredOffEvent{VmEvent: event},
+	)
+
+	Map.Update(vm, []types.PropertyChange{
+		{Name: "runtime.powerState", Val: types.VirtualMachinePowerStatePoweredOff},
+		{Name: "summary.runtime.powerState", Val: types.VirtualMachinePowerStatePoweredOff},
+	})
 
 	r.Res = new(types.ShutdownGuestResponse)
 

@@ -23,11 +23,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
@@ -37,16 +37,16 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	}
 
 	cmd := &cobra.Command{
-		Use: "config SUBCOMMAND",
+		Use:                   "config SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Modify kubeconfig files"),
+		Short:                 i18n.T("Modify kubeconfig files"),
 		Long: templates.LongDesc(`
 			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
 			The loading order follows these rules:
 
-			1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
-			2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
+			1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded. The flag may only be set once and no merging takes place.
+			2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used as a list of paths (normal path delimiting rules for your system). These paths are merged. When a value is modified, it is modified in the file that defines the stanza. When a value is created, it is created in the first file that exists. If no files in the chain exist, then it creates the last file in the list.
 			3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used and no merging takes place.`),
 		Run: cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
@@ -88,5 +88,5 @@ func toBool(propertyValue string) (bool, error) {
 func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	cmd.Help()
 	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s\n", msg)
+	return fmt.Errorf("%s", msg)
 }

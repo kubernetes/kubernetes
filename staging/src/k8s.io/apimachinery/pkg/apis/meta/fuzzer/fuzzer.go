@@ -25,9 +25,9 @@ import (
 
 	"github.com/google/gofuzz"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/resource"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -181,16 +181,42 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Kind = ""
 		},
 		func(j *metav1.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
+			c.FuzzNoCustom(j)
+
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
 			j.UID = types.UID(c.RandString())
-			j.GenerateName = c.RandString()
 
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
 			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+
+			if j.DeletionTimestamp != nil {
+				c.Fuzz(&sec)
+				c.Fuzz(&nsec)
+				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				j.DeletionTimestamp = &t
+			}
+
+			if len(j.Labels) == 0 {
+				j.Labels = nil
+			} else {
+				delete(j.Labels, "")
+			}
+			if len(j.Annotations) == 0 {
+				j.Annotations = nil
+			} else {
+				delete(j.Annotations, "")
+			}
+			if len(j.OwnerReferences) == 0 {
+				j.OwnerReferences = nil
+			}
+			if len(j.Finalizers) == 0 {
+				j.Finalizers = nil
+			}
+		},
+		func(j *metav1.Initializers, c fuzz.Continue) {
+			j = nil
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -245,6 +271,12 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
+			}
+		},
+		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			if j.Fields != nil && len(j.Fields.Map) == 0 {
+				j.Fields = nil
 			}
 		},
 	}

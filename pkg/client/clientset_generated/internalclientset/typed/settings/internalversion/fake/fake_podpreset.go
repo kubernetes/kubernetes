@@ -62,7 +62,7 @@ func (c *FakePodPresets) List(opts v1.ListOptions) (result *settings.PodPresetLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &settings.PodPresetList{}
+	list := &settings.PodPresetList{ListMeta: obj.(*settings.PodPresetList).ListMeta}
 	for _, item := range obj.(*settings.PodPresetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakePodPresets) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched podPreset.
 func (c *FakePodPresets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *settings.PodPreset, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podpresetsResource, c.ns, name, data, subresources...), &settings.PodPreset{})
+		Invokes(testing.NewPatchSubresourceAction(podpresetsResource, c.ns, name, pt, data, subresources...), &settings.PodPreset{})
 
 	if obj == nil {
 		return nil, err

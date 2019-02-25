@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nvidia-gpu-device-plugin
@@ -7,6 +7,9 @@ metadata:
     k8s-app: nvidia-gpu-device-plugin
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: nvidia-gpu-device-plugin
   template:
     metadata:
       labels:
@@ -52,3 +55,5 @@ spec:
           mountPath: /device-plugin
         - name: dev
           mountPath: /dev
+  updateStrategy:
+    type: RollingUpdate

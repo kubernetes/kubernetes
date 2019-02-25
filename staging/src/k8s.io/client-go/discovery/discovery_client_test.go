@@ -23,12 +23,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -131,25 +130,11 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 		}
 	}
 }
-func TestGetServerGroupsWithTimeout(t *testing.T) {
-	done := make(chan bool)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// first we need to write headers, otherwise http client will complain about
-		// exceeding timeout awaiting headers, only after we can block the call
-		w.WriteHeader(http.StatusOK)
-		<-done
-	}))
-	defer server.Close()
-	defer close(done)
-	tmp := defaultTimeout
-	defaultTimeout = 2 * time.Second
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	_, err := client.ServerGroups()
-	if err == nil || !strings.Contains(err.Error(), "deadline") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	done <- true
-	defaultTimeout = tmp
+
+func TestTimeoutIsSet(t *testing.T) {
+	cfg := &restclient.Config{}
+	setDiscoveryDefaults(cfg)
+	assert.Equal(t, defaultTimeout, cfg.Timeout)
 }
 
 func TestGetServerResourcesWithV1Server(t *testing.T) {

@@ -22,7 +22,7 @@ const (
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: kube-proxy
+  name: {{ .ProxyConfigMap }}
   namespace: kube-system
   labels:
     app: kube-proxy
@@ -46,7 +46,7 @@ data:
     - name: default
       user:
         tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-  config.conf: |-
+  {{ .ProxyConfigMapKey }}: |-
 {{ .ProxyConfig}}
 `
 
@@ -70,13 +70,15 @@ spec:
       labels:
         k8s-app: kube-proxy
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
-        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
-        - --config=/var/lib/kube-proxy/config.conf
+        - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
+        - --hostname-override=$(NODE_NAME)
         securityContext:
           privileged: true
         volumeMounts:
@@ -88,14 +90,17 @@ spec:
         - mountPath: /lib/modules
           name: lib-modules
           readOnly: true
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
       hostNetwork: true
       serviceAccountName: kube-proxy
-      tolerations:
-      - operator: Exists
       volumes:
       - name: kube-proxy
         configMap:
-          name: kube-proxy
+          name: {{ .ProxyConfigMap }}
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
@@ -103,5 +108,9 @@ spec:
       - name: lib-modules
         hostPath:
           path: /lib/modules
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - operator: Exists
 `
 )

@@ -18,6 +18,7 @@ package get
 
 import (
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -42,13 +43,14 @@ type HumanPrintFlags struct {
 	WithNamespace      bool
 }
 
-// EnsureWithKind sets the provided GroupKind humanreadable value.
-// If the kind received is non-empty, the "showKind" humanreadable
-// printer option is set to true.
-func (f *HumanPrintFlags) EnsureWithKind(kind schema.GroupKind) error {
-	showKind := !kind.Empty()
-
+// SetKind sets the Kind option
+func (f *HumanPrintFlags) SetKind(kind schema.GroupKind) {
 	f.Kind = kind
+}
+
+// EnsureWithKind sets the "Showkind" humanreadable option to true.
+func (f *HumanPrintFlags) EnsureWithKind() error {
+	showKind := true
 	f.ShowKind = &showKind
 	return nil
 }
@@ -59,11 +61,16 @@ func (f *HumanPrintFlags) EnsureWithNamespace() error {
 	return nil
 }
 
+// AllowedFormats returns more customized formating options
+func (f *HumanPrintFlags) AllowedFormats() []string {
+	return []string{"wide"}
+}
+
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
-		return nil, printers.NoCompatiblePrinterError{Options: f}
+		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
 	}
 
 	decoder := scheme.Codecs.UniversalDecoder()

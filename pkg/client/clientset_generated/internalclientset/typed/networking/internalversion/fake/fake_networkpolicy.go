@@ -62,7 +62,7 @@ func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *networking.Netw
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &networking.NetworkPolicyList{}
+	list := &networking.NetworkPolicyList{ListMeta: obj.(*networking.NetworkPolicyList).ListMeta}
 	for _, item := range obj.(*networking.NetworkPolicyList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched networkPolicy.
 func (c *FakeNetworkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, data, subresources...), &networking.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), &networking.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err

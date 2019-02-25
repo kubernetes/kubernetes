@@ -17,7 +17,9 @@ limitations under the License.
 package common
 
 import (
+	"bytes"
 	"fmt"
+	"text/template"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -26,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -40,11 +41,6 @@ const (
 	NodeE2E Suite = "node e2e"
 )
 
-var (
-	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
-	busyboxImage = "busybox"
-)
-
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
@@ -52,21 +48,66 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
-	"busybox",
+	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Liveness),
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Netexec),
-	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.Hostexec),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
-	imageutils.GetE2EImage(imageutils.E2ENet),
+	imageutils.GetE2EImage(imageutils.Net),
 )
+
+type testImagesStruct struct {
+	BusyBoxImage      string
+	GBFrontendImage   string
+	GBRedisSlaveImage string
+	KittenImage       string
+	LivenessImage     string
+	MounttestImage    string
+	NautilusImage     string
+	NginxImage        string
+	NginxNewImage     string
+	PauseImage        string
+	RedisImage        string
+}
+
+var testImages testImagesStruct
+
+func init() {
+	testImages = testImagesStruct{
+		imageutils.GetE2EImage(imageutils.BusyBox),
+		imageutils.GetE2EImage(imageutils.GBFrontend),
+		imageutils.GetE2EImage(imageutils.GBRedisSlave),
+		imageutils.GetE2EImage(imageutils.Kitten),
+		imageutils.GetE2EImage(imageutils.Liveness),
+		imageutils.GetE2EImage(imageutils.Mounttest),
+		imageutils.GetE2EImage(imageutils.Nautilus),
+		imageutils.GetE2EImage(imageutils.Nginx),
+		imageutils.GetE2EImage(imageutils.NginxNew),
+		imageutils.GetE2EImage(imageutils.Pause),
+		imageutils.GetE2EImage(imageutils.Redis),
+	}
+}
+
+func SubstituteImageName(content string) string {
+	contentWithImageName := new(bytes.Buffer)
+	tmpl, err := template.New("imagemanifest").Parse(content)
+	if err != nil {
+		framework.Failf("Failed Parse the template: %v", err)
+	}
+	err = tmpl.Execute(contentWithImageName, testImages)
+	if err != nil {
+		framework.Failf("Failed executing template: %v", err)
+	}
+	return contentWithImageName.String()
+}
 
 func svcByName(name string, port int) *v1.Service {
 	return &v1.Service{
@@ -105,7 +146,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)

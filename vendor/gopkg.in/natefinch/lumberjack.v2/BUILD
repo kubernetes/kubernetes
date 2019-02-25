@@ -3,43 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "chown.go",
+        "chown_linux.go",
         "lumberjack.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "chown_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "chown.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "chown.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack.v2",
     importpath = "gopkg.in/natefinch/lumberjack.v2",
     visibility = ["//visibility:public"],
 )

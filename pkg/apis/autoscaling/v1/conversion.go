@@ -21,10 +21,12 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -36,11 +38,256 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
 		Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus,
 		Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus,
+		Convert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource,
+		Convert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource,
+		Convert_autoscaling_ObjectMetricSource_To_v1_ObjectMetricSource,
+		Convert_v1_ObjectMetricSource_To_autoscaling_ObjectMetricSource,
+		Convert_autoscaling_PodsMetricSource_To_v1_PodsMetricSource,
+		Convert_v1_PodsMetricSource_To_autoscaling_PodsMetricSource,
+		Convert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus,
+		Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus,
+		Convert_autoscaling_ObjectMetricStatus_To_v1_ObjectMetricStatus,
+		Convert_v1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus,
+		Convert_autoscaling_PodsMetricStatus_To_v1_PodsMetricStatus,
+		Convert_v1_PodsMetricStatus_To_autoscaling_PodsMetricStatus,
+		Convert_autoscaling_MetricTarget_To_v1_CrossVersionObjectReference,
+		Convert_v1_CrossVersionObjectReference_To_autoscaling_MetricTarget,
+		Convert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus,
+		Convert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus,
 	)
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func Convert_autoscaling_MetricTarget_To_v1_CrossVersionObjectReference(in *autoscaling.MetricTarget, out *autoscalingv1.CrossVersionObjectReference, s conversion.Scope) error {
+	return nil
+}
+
+func Convert_v1_CrossVersionObjectReference_To_autoscaling_MetricTarget(in *autoscalingv1.CrossVersionObjectReference, out *autoscaling.MetricTarget, s conversion.Scope) error {
+	return nil
+}
+
+func Convert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *autoscalingv1.ExternalMetricSource, s conversion.Scope) error {
+	out.MetricName = in.Metric.Name
+	out.TargetValue = in.Target.Value
+	out.TargetAverageValue = in.Target.AverageValue
+	out.MetricSelector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *autoscalingv1.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
+	value := in.TargetValue
+	averageValue := in.TargetAverageValue
+	var metricType autoscaling.MetricTargetType
+	if value == nil {
+		metricType = autoscaling.AverageValueMetricType
+	} else {
+		metricType = autoscaling.ValueMetricType
+	}
+	out.Target = autoscaling.MetricTarget{
+		Type:         metricType,
+		Value:        value,
+		AverageValue: averageValue,
+	}
+
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.MetricSelector,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ObjectMetricSource_To_v1_ObjectMetricSource(in *autoscaling.ObjectMetricSource, out *autoscalingv1.ObjectMetricSource, s conversion.Scope) error {
+	if in.Target.Value != nil {
+		out.TargetValue = *in.Target.Value
+	}
+	out.AverageValue = in.Target.AverageValue
+	out.Target = autoscalingv1.CrossVersionObjectReference{
+		Kind:       in.DescribedObject.Kind,
+		Name:       in.DescribedObject.Name,
+		APIVersion: in.DescribedObject.APIVersion,
+	}
+	out.MetricName = in.Metric.Name
+	out.Selector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *autoscalingv1.ObjectMetricSource, out *autoscaling.ObjectMetricSource, s conversion.Scope) error {
+	var metricType autoscaling.MetricTargetType
+	if in.AverageValue == nil {
+		metricType = autoscaling.ValueMetricType
+	} else {
+		metricType = autoscaling.AverageValueMetricType
+	}
+
+	out.Target = autoscaling.MetricTarget{
+		Type:         metricType,
+		Value:        &in.TargetValue,
+		AverageValue: in.AverageValue,
+	}
+	out.DescribedObject = autoscaling.CrossVersionObjectReference{
+		Kind:       in.Target.Kind,
+		Name:       in.Target.Name,
+		APIVersion: in.Target.APIVersion,
+	}
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.Selector,
+	}
+	return nil
+}
+
+func Convert_autoscaling_PodsMetricSource_To_v1_PodsMetricSource(in *autoscaling.PodsMetricSource, out *autoscalingv1.PodsMetricSource, s conversion.Scope) error {
+	if in.Target.AverageValue != nil {
+		out.TargetAverageValue = *in.Target.AverageValue
+	}
+
+	out.MetricName = in.Metric.Name
+	out.Selector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscalingv1.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
+	var metricType autoscaling.MetricTargetType
+	metricType = autoscaling.AverageValueMetricType
+
+	out.Target = autoscaling.MetricTarget{
+		Type:         metricType,
+		AverageValue: &in.TargetAverageValue,
+	}
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.Selector,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *autoscalingv1.ExternalMetricStatus, s conversion.Scope) error {
+	out.MetricName = in.Metric.Name
+	if in.Current.Value != nil {
+		out.CurrentValue = *in.Current.Value
+	}
+	if in.Current.AverageValue != nil {
+		out.CurrentAverageValue = in.Current.AverageValue
+	}
+	out.MetricSelector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *autoscalingv1.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
+	value := in.CurrentValue
+	averageValue := in.CurrentAverageValue
+	out.Current = autoscaling.MetricValueStatus{
+		Value:        &value,
+		AverageValue: averageValue,
+	}
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.MetricSelector,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ObjectMetricStatus_To_v1_ObjectMetricStatus(in *autoscaling.ObjectMetricStatus, out *autoscalingv1.ObjectMetricStatus, s conversion.Scope) error {
+	if in.Current.Value != nil {
+		out.CurrentValue = *in.Current.Value
+	}
+	if in.Current.AverageValue != nil {
+		currentAverageValue := *in.Current.AverageValue
+		out.AverageValue = &currentAverageValue
+	}
+	out.Target = autoscalingv1.CrossVersionObjectReference{
+		Kind:       in.DescribedObject.Kind,
+		Name:       in.DescribedObject.Name,
+		APIVersion: in.DescribedObject.APIVersion,
+	}
+	out.MetricName = in.Metric.Name
+	out.Selector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *autoscalingv1.ObjectMetricStatus, out *autoscaling.ObjectMetricStatus, s conversion.Scope) error {
+	out.Current = autoscaling.MetricValueStatus{
+		Value:        &in.CurrentValue,
+		AverageValue: in.AverageValue,
+	}
+	out.DescribedObject = autoscaling.CrossVersionObjectReference{
+		Kind:       in.Target.Kind,
+		Name:       in.Target.Name,
+		APIVersion: in.Target.APIVersion,
+	}
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.Selector,
+	}
+	return nil
+}
+
+func Convert_autoscaling_PodsMetricStatus_To_v1_PodsMetricStatus(in *autoscaling.PodsMetricStatus, out *autoscalingv1.PodsMetricStatus, s conversion.Scope) error {
+	if in.Current.AverageValue != nil {
+		out.CurrentAverageValue = *in.Current.AverageValue
+	}
+	out.MetricName = in.Metric.Name
+	out.Selector = in.Metric.Selector
+	return nil
+}
+
+func Convert_v1_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *autoscalingv1.PodsMetricStatus, out *autoscaling.PodsMetricStatus, s conversion.Scope) error {
+	out.Current = autoscaling.MetricValueStatus{
+		AverageValue: &in.CurrentAverageValue,
+	}
+	out.Metric = autoscaling.MetricIdentifier{
+		Name:     in.MetricName,
+		Selector: in.Selector,
+	}
+	return nil
+}
+
+func Convert_v1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *autoscalingv1.ResourceMetricSource, out *autoscaling.ResourceMetricSource, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	utilization := in.TargetAverageUtilization
+	averageValue := in.TargetAverageValue
+	var metricType autoscaling.MetricTargetType
+	if utilization == nil {
+		metricType = autoscaling.AverageValueMetricType
+	} else {
+		metricType = autoscaling.UtilizationMetricType
+	}
+	out.Target = autoscaling.MetricTarget{
+		Type:               metricType,
+		AverageValue:       averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ResourceMetricSource_To_v1_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *autoscalingv1.ResourceMetricSource, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.TargetAverageUtilization = in.Target.AverageUtilization
+	out.TargetAverageValue = in.Target.AverageValue
+	return nil
+}
+
+func Convert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *autoscalingv1.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	utilization := in.CurrentAverageUtilization
+	averageValue := &in.CurrentAverageValue
+	out.Current = autoscaling.MetricValueStatus{
+		AverageValue:       averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *autoscalingv1.ResourceMetricStatus, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.CurrentAverageUtilization = in.Current.AverageUtilization
+	if in.Current.AverageValue != nil {
+		out.CurrentAverageValue = *in.Current.AverageValue
+	}
 	return nil
 }
 
@@ -51,7 +298,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 
 	otherMetrics := make([]autoscalingv1.MetricSpec, 0, len(in.Spec.Metrics))
 	for _, metric := range in.Spec.Metrics {
-		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU && metric.Resource.TargetAverageUtilization != nil {
+		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU && metric.Resource.Target.AverageUtilization != nil {
 			continue
 		}
 
@@ -165,11 +412,14 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 				Type: autoscaling.ResourceMetricSourceType,
 				Resource: &autoscaling.ResourceMetricSource{
 					Name: api.ResourceCPU,
+					Target: autoscaling.MetricTarget{
+						Type: autoscaling.UtilizationMetricType,
+					},
 				},
 			},
 		}
-		out.Spec.Metrics[0].Resource.TargetAverageUtilization = new(int32)
-		*out.Spec.Metrics[0].Resource.TargetAverageUtilization = autoscaling.DefaultCPUUtilization
+		out.Spec.Metrics[0].Resource.Target.AverageUtilization = new(int32)
+		*out.Spec.Metrics[0].Resource.Target.AverageUtilization = autoscaling.DefaultCPUUtilization
 	}
 
 	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
@@ -200,9 +450,9 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 
 	for _, metric := range in.Metrics {
 		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU {
-			if metric.Resource.TargetAverageUtilization != nil {
+			if metric.Resource.Target.AverageUtilization != nil {
 				out.TargetCPUUtilizationPercentage = new(int32)
-				*out.TargetCPUUtilizationPercentage = *metric.Resource.TargetAverageUtilization
+				*out.TargetCPUUtilizationPercentage = *metric.Resource.Target.AverageUtilization
 			}
 			break
 		}
@@ -225,11 +475,14 @@ func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscal
 				Type: autoscaling.ResourceMetricSourceType,
 				Resource: &autoscaling.ResourceMetricSource{
 					Name: api.ResourceCPU,
+					Target: autoscaling.MetricTarget{
+						Type: autoscaling.UtilizationMetricType,
+					},
 				},
 			},
 		}
-		out.Metrics[0].Resource.TargetAverageUtilization = new(int32)
-		*out.Metrics[0].Resource.TargetAverageUtilization = *in.TargetCPUUtilizationPercentage
+		out.Metrics[0].Resource.Target.AverageUtilization = new(int32)
+		*out.Metrics[0].Resource.Target.AverageUtilization = *in.TargetCPUUtilizationPercentage
 	}
 
 	return nil
@@ -244,10 +497,10 @@ func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutosc
 
 	for _, metric := range in.CurrentMetrics {
 		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU {
-			if metric.Resource.CurrentAverageUtilization != nil {
+			if metric.Resource.Current.AverageUtilization != nil {
 
 				out.CurrentCPUUtilizationPercentage = new(int32)
-				*out.CurrentCPUUtilizationPercentage = *metric.Resource.CurrentAverageUtilization
+				*out.CurrentCPUUtilizationPercentage = *metric.Resource.Current.AverageUtilization
 			}
 		}
 	}
@@ -270,8 +523,8 @@ func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutosc
 				},
 			},
 		}
-		out.CurrentMetrics[0].Resource.CurrentAverageUtilization = new(int32)
-		*out.CurrentMetrics[0].Resource.CurrentAverageUtilization = *in.CurrentCPUUtilizationPercentage
+		out.CurrentMetrics[0].Resource.Current.AverageUtilization = new(int32)
+		*out.CurrentMetrics[0].Resource.Current.AverageUtilization = *in.CurrentCPUUtilizationPercentage
 	}
 	return nil
 }

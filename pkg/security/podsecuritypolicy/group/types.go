@@ -31,5 +31,5 @@ type GroupStrategy interface {
 	// value to return if configured with multiple ranges.  This is used for FSGroup.
 	GenerateSingle(pod *api.Pod) (*int64, error)
 	// Validate ensures that the specified values fall within the range of the strategy.
-	Validate(pod *api.Pod, groups []int64) field.ErrorList
+	Validate(fldPath *field.Path, pod *api.Pod, groups []int64) field.ErrorList
 }

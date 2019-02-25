@@ -16,7 +16,7 @@ limitations under the License.
 package main
 
 import (
-	"errors"
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -26,33 +26,105 @@ import (
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/internal/config"
+	gzflag "github.com/bazelbuild/bazel-gazelle/internal/flag"
 	"github.com/bazelbuild/bazel-gazelle/internal/label"
 	"github.com/bazelbuild/bazel-gazelle/internal/merger"
-	"github.com/bazelbuild/bazel-gazelle/internal/packages"
 	"github.com/bazelbuild/bazel-gazelle/internal/repos"
 	"github.com/bazelbuild/bazel-gazelle/internal/resolve"
-	"github.com/bazelbuild/bazel-gazelle/internal/rules"
-	"github.com/bazelbuild/bazel-gazelle/internal/wspace"
-	bf "github.com/bazelbuild/buildtools/build"
+	"github.com/bazelbuild/bazel-gazelle/internal/rule"
+	"github.com/bazelbuild/bazel-gazelle/internal/walk"
 )
 
 // updateConfig holds configuration information needed to run the fix and
 // update commands. This includes everything in config.Config, but it also
 // includes some additional fields that aren't relevant to other packages.
 type updateConfig struct {
-	c                 *config.Config
-	emit              emitFunc
-	outDir, outSuffix string
-	repos             []repos.Repo
+	dirs        []string
+	emit        emitFunc
+	repos       []repos.Repo
+	useIndex    bool
+	walkMode    walk.Mode
+	patchPath   string
+	patchBuffer bytes.Buffer
 }
 
-type emitFunc func(*config.Config, *bf.File, string) error
+type emitFunc func(c *config.Config, f *rule.File) error
 
 var modeFromName = map[string]emitFunc{
 	"print": printFile,
 	"fix":   fixFile,
 	"diff":  diffFile,
 }
+
+const updateName = "_update"
+
+func getUpdateConfig(c *config.Config) *updateConfig {
+	return c.Exts[updateName].(*updateConfig)
+}
+
+type updateConfigurer struct {
+	mode      string
+	recursive bool
+}
+
+func (ucr *updateConfigurer) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
+	uc := &updateConfig{}
+	c.Exts[updateName] = uc
+
+	c.ShouldFix = cmd == "fix"
+
+	fs.StringVar(&ucr.mode, "mode", "fix", "print: prints all of the updated BUILD files\n\tfix: rewrites all of the BUILD files in place\n\tdiff: computes the rewrite but then just does a diff")
+	fs.BoolVar(&uc.useIndex, "index", true, "when true, gazelle will build an index of libraries in the workspace for dependency resolution")
+	fs.BoolVar(&ucr.recursive, "r", true, "when true, gazelle will update subdirectories recursively")
+	fs.StringVar(&uc.patchPath, "patch", "", "when set with -mode=diff, gazelle will write to a file instead of stdout")
+}
+
+func (ucr *updateConfigurer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
+	uc := getUpdateConfig(c)
+
+	var ok bool
+	uc.emit, ok = modeFromName[ucr.mode]
+	if !ok {
+		return fmt.Errorf("unrecognized emit mode: %q", ucr.mode)
+	}
+	if uc.patchPath != "" && ucr.mode != "diff" {
+		return fmt.Errorf("-patch set but -mode is %s, not diff", ucr.mode)
+	}
+
+	dirs := fs.Args()
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
+	uc.dirs = make([]string, len(dirs))
+	for i := range dirs {
+		dir, err := filepath.Abs(dirs[i])
+		if err != nil {
+			return fmt.Errorf("%s: failed to find absolute path: %v", dirs[i], err)
+		}
+		dir, err = filepath.EvalSymlinks(dir)
+		if err != nil {
+			return fmt.Errorf("%s: failed to resolve symlinks: %v", dirs[i], err)
+		}
+		if !isDescendingDir(dir, c.RepoRoot) {
+			return fmt.Errorf("dir %q is not a subdirectory of repo root %q", dir, c.RepoRoot)
+		}
+		uc.dirs[i] = dir
+	}
+
+	if ucr.recursive {
+		uc.walkMode = walk.VisitAllUpdateSubdirsMode
+	} else if uc.useIndex {
+		uc.walkMode = walk.VisitAllUpdateDirsMode
+	} else {
+		uc.walkMode = walk.UpdateDirsMode
+	}
+
+	return nil
+}
+
+func (ucr *updateConfigurer) KnownDirectives() []string { return nil }
+
+func (ucr *updateConfigurer) Configure(c *config.Config, rel string, f *rule.File) {}
 
 // visitRecord stores information about about a directory visited with
 // packages.Walk.
@@ -62,13 +134,13 @@ type visitRecord struct {
 	pkgRel string
 
 	// rules is a list of generated Go rules.
-	rules []bf.Expr
+	rules []*rule.Rule
 
 	// empty is a list of empty Go rules that may be deleted.
-	empty []bf.Expr
+	empty []*rule.Rule
 
 	// file is the build file being processed.
-	file *bf.File
+	file *rule.File
 }
 
 type byPkgRel []visitRecord
@@ -77,78 +149,97 @@ func (vs byPkgRel) Len() int           { return len(vs) }
 func (vs byPkgRel) Less(i, j int) bool { return vs[i].pkgRel < vs[j].pkgRel }
 func (vs byPkgRel) Swap(i, j int)      { vs[i], vs[j] = vs[j], vs[i] }
 
+var genericLoads = []rule.LoadInfo{
+	{
+		Name:    "@bazel_gazelle//:def.bzl",
+		Symbols: []string{"gazelle"},
+	},
+}
+
 func runFixUpdate(cmd command, args []string) error {
-	uc, err := newFixUpdateConfiguration(cmd, args)
+	cexts := make([]config.Configurer, 0, len(languages)+3)
+	cexts = append(cexts,
+		&config.CommonConfigurer{},
+		&updateConfigurer{},
+		&walk.Configurer{},
+		&resolve.Configurer{})
+	kindToResolver := make(map[string]resolve.Resolver)
+	kinds := make(map[string]rule.KindInfo)
+	loads := genericLoads
+	for _, lang := range languages {
+		cexts = append(cexts, lang)
+		for kind, info := range lang.Kinds() {
+			kindToResolver[kind] = lang
+			kinds[kind] = info
+		}
+		loads = append(loads, lang.Loads()...)
+	}
+	ruleIndex := resolve.NewRuleIndex(kindToResolver)
+
+	c, err := newFixUpdateConfiguration(cmd, args, cexts, loads)
 	if err != nil {
 		return err
 	}
+
 	if cmd == fixCmd {
 		// Only check the version when "fix" is run. Generated build files
 		// frequently work with older version of rules_go, and we don't want to
 		// nag too much since there's no way to disable this warning.
-		checkRulesGoVersion(uc.c.RepoRoot)
+		checkRulesGoVersion(c.RepoRoot)
 	}
 
-	l := label.NewLabeler(uc.c)
-	ruleIndex := resolve.NewRuleIndex()
-
-	var visits []visitRecord
-
 	// Visit all directories in the repository.
-	packages.Walk(uc.c, uc.c.RepoRoot, func(dir, rel string, c *config.Config, pkg *packages.Package, file *bf.File, isUpdateDir bool) {
+	var visits []visitRecord
+	uc := getUpdateConfig(c)
+	walk.Walk(c, cexts, uc.dirs, uc.walkMode, func(dir, rel string, c *config.Config, update bool, f *rule.File, subdirs, regularFiles, genFiles []string) {
 		// If this file is ignored or if Gazelle was not asked to update this
 		// directory, just index the build file and move on.
-		if !isUpdateDir {
-			if file != nil {
-				ruleIndex.AddRulesFromFile(c, file)
+		if !update {
+			if uc.useIndex && f != nil {
+				for _, r := range f.Rules {
+					ruleIndex.AddRule(c, r, f)
+				}
 			}
 			return
 		}
 
 		// Fix any problems in the file.
-		if file != nil {
-			file = merger.FixFileMinor(c, file)
-			fixedFile := merger.FixFile(c, file)
-			if cmd == fixCmd {
-				file = fixedFile
-			} else if fixedFile != file {
-				log.Printf("%s: warning: file contains rules whose structure is out of date. Consider running 'gazelle fix'.", file.Path)
+		if f != nil {
+			for _, l := range languages {
+				l.Fix(c, f)
 			}
 		}
 
-		// If the file exists, but no Go code is present, create an empty package.
-		// This lets us delete existing rules.
-		if pkg == nil && file != nil {
-			pkg = packages.EmptyPackage(c, dir, rel)
+		// Generate rules.
+		var empty, gen []*rule.Rule
+		for _, l := range languages {
+			lempty, lgen := l.GenerateRules(c, dir, rel, f, subdirs, regularFiles, genFiles, empty, gen)
+			empty = append(empty, lempty...)
+			gen = append(gen, lgen...)
+		}
+		if f == nil && len(gen) == 0 {
+			return
 		}
 
-		// Generate new rules and merge them into the existing file (if present).
-		if pkg != nil {
-			g := rules.NewGenerator(c, l, file)
-			rules, empty, err := g.GenerateRules(pkg)
-			if err != nil {
-				log.Print(err)
-				return
+		// Insert or merge rules into the build file.
+		if f == nil {
+			f = rule.EmptyFile(filepath.Join(dir, c.DefaultBuildFileName()), rel)
+			for _, r := range gen {
+				r.Insert(f)
 			}
-			if file == nil {
-				file = &bf.File{
-					Path: filepath.Join(c.RepoRoot, filepath.FromSlash(rel), c.DefaultBuildFileName()),
-					Stmt: rules,
-				}
-			} else {
-				file, rules = merger.MergeFile(rules, empty, file, merger.PreResolveAttrs)
-			}
-			visits = append(visits, visitRecord{
-				pkgRel: rel,
-				rules:  rules,
-				empty:  empty,
-				file:   file,
-			})
+		} else {
+			merger.MergeFile(f, empty, gen, merger.PreResolve, kinds)
 		}
+		visits = append(visits, visitRecord{
+			pkgRel: rel,
+			rules:  gen,
+			empty:  empty,
+			file:   f,
+		})
 
 		// Add library rules to the dependency resolution table.
-		if file != nil {
-			ruleIndex.AddRulesFromFile(c, file)
+		for _, r := range f.Rules {
+			ruleIndex.AddRule(c, r, f)
 		}
 	})
 
@@ -157,154 +248,73 @@ func runFixUpdate(cmd command, args []string) error {
 
 	// Resolve dependencies.
 	rc := repos.NewRemoteCache(uc.repos)
-	resolver := resolve.NewResolver(uc.c, l, ruleIndex, rc)
-	for i := range visits {
-		for j := range visits[i].rules {
-			visits[i].rules[j] = resolver.ResolveRule(visits[i].rules[j], visits[i].pkgRel)
+	for _, v := range visits {
+		for _, r := range v.rules {
+			from := label.New(c.RepoName, v.pkgRel, r.Name())
+			kindToResolver[r.Kind()].Resolve(c, ruleIndex, rc, r, from)
 		}
-		visits[i].file, _ = merger.MergeFile(visits[i].rules, visits[i].empty, visits[i].file, merger.PostResolveAttrs)
+		merger.MergeFile(v.file, v.empty, v.rules, merger.PostResolve, kinds)
 	}
 
 	// Emit merged files.
 	for _, v := range visits {
-		rules.SortLabels(v.file)
-		v.file = merger.FixLoads(v.file)
-		bf.Rewrite(v.file, nil) // have buildifier 'format' our rules.
-
-		path := v.file.Path
-		if uc.outDir != "" {
-			stem := filepath.Base(v.file.Path) + uc.outSuffix
-			path = filepath.Join(uc.outDir, v.pkgRel, stem)
-		}
-		if err := uc.emit(uc.c, v.file, path); err != nil {
+		merger.FixLoads(v.file, loads)
+		if err := uc.emit(c, v.file); err != nil {
 			log.Print(err)
 		}
 	}
+	if uc.patchPath != "" {
+		if err := ioutil.WriteFile(uc.patchPath, uc.patchBuffer.Bytes(), 0666); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func newFixUpdateConfiguration(cmd command, args []string) (*updateConfig, error) {
-	uc := &updateConfig{c: &config.Config{}}
-	var err error
+func newFixUpdateConfiguration(cmd command, args []string, cexts []config.Configurer, loads []rule.LoadInfo) (*config.Config, error) {
+	c := config.New()
 
 	fs := flag.NewFlagSet("gazelle", flag.ContinueOnError)
 	// Flag will call this on any parse error. Don't print usage unless
 	// -h or -help were passed explicitly.
 	fs.Usage = func() {}
 
-	knownImports := multiFlag{}
-	buildFileName := fs.String("build_file_name", "BUILD.bazel,BUILD", "comma-separated list of valid build file names.\nThe first element of the list is the name of output build files to generate.")
-	buildTags := fs.String("build_tags", "", "comma-separated list of build tags. If not specified, Gazelle will not\n\tfilter sources with build constraints.")
-	external := fs.String("external", "external", "external: resolve external packages with go_repository\n\tvendored: resolve external packages as packages in vendor/")
-	var goPrefix explicitFlag
-	fs.Var(&goPrefix, "go_prefix", "prefix of import paths in the current workspace")
-	repoRoot := fs.String("repo_root", "", "path to a directory which corresponds to go_prefix, otherwise gazelle searches for it.")
-	fs.Var(&knownImports, "known_import", "import path for which external resolution is skipped (can specify multiple times)")
-	mode := fs.String("mode", "fix", "print: prints all of the updated BUILD files\n\tfix: rewrites all of the BUILD files in place\n\tdiff: computes the rewrite but then just does a diff")
-	outDir := fs.String("experimental_out_dir", "", "write build files to an alternate directory tree")
-	outSuffix := fs.String("experimental_out_suffix", "", "extra suffix appended to build file names. Only used if -experimental_out_dir is also set.")
-	var proto explicitFlag
-	fs.Var(&proto, "proto", "default: generates new proto rules\n\tdisable: does not touch proto rules\n\tlegacy (deprecated): generates old proto rules")
+	var knownImports []string
+	fs.Var(&gzflag.MultiFlag{Values: &knownImports}, "known_import", "import path for which external resolution is skipped (can specify multiple times)")
+
+	for _, cext := range cexts {
+		cext.RegisterFlags(fs, cmd.String(), c)
+	}
+
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			fixUpdateUsage(fs)
-			os.Exit(0)
+			return nil, err
 		}
 		// flag already prints the error; don't print it again.
 		log.Fatal("Try -help for more information.")
 	}
 
-	uc.c.Dirs = fs.Args()
-	if len(uc.c.Dirs) == 0 {
-		uc.c.Dirs = []string{"."}
-	}
-	for i := range uc.c.Dirs {
-		uc.c.Dirs[i], err = filepath.Abs(uc.c.Dirs[i])
-		if err != nil {
+	for _, cext := range cexts {
+		if err := cext.CheckFlags(fs, c); err != nil {
 			return nil, err
 		}
 	}
 
-	if *repoRoot != "" {
-		uc.c.RepoRoot = *repoRoot
-	} else if len(uc.c.Dirs) == 1 {
-		uc.c.RepoRoot, err = wspace.Find(uc.c.Dirs[0])
-		if err != nil {
-			return nil, fmt.Errorf("-repo_root not specified, and WORKSPACE cannot be found: %v", err)
+	uc := getUpdateConfig(c)
+	workspacePath := filepath.Join(c.RepoRoot, "WORKSPACE")
+	if workspace, err := rule.LoadFile(workspacePath, ""); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
 		}
 	} else {
-		uc.c.RepoRoot, err = wspace.Find(".")
-		if err != nil {
-			return nil, fmt.Errorf("-repo_root not specified, and WORKSPACE cannot be found: %v", err)
-		}
-	}
-	uc.c.RepoRoot, err = filepath.EvalSymlinks(uc.c.RepoRoot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate symlinks for repo root: %v", err)
-	}
-
-	for _, dir := range uc.c.Dirs {
-		if !isDescendingDir(dir, uc.c.RepoRoot) {
-			return nil, fmt.Errorf("dir %q is not a subdirectory of repo root %q", dir, uc.c.RepoRoot)
-		}
-	}
-
-	uc.c.ValidBuildFileNames = strings.Split(*buildFileName, ",")
-	if len(uc.c.ValidBuildFileNames) == 0 {
-		return nil, fmt.Errorf("no valid build file names specified")
-	}
-
-	uc.c.SetBuildTags(*buildTags)
-	uc.c.PreprocessTags()
-
-	if goPrefix.set {
-		uc.c.GoPrefix = goPrefix.value
-	} else {
-		uc.c.GoPrefix, err = loadGoPrefix(uc.c)
-		if err != nil {
+		if err := fixWorkspace(c, workspace, loads); err != nil {
 			return nil, err
 		}
+		c.RepoName = findWorkspaceName(workspace)
+		uc.repos = repos.ListRepositories(workspace)
 	}
-	if err := config.CheckPrefix(uc.c.GoPrefix); err != nil {
-		return nil, err
-	}
-
-	uc.c.ShouldFix = cmd == fixCmd
-
-	uc.c.DepMode, err = config.DependencyModeFromString(*external)
-	if err != nil {
-		return nil, err
-	}
-
-	if proto.set {
-		uc.c.ProtoMode, err = config.ProtoModeFromString(proto.value)
-		if err != nil {
-			return nil, err
-		}
-		uc.c.ProtoModeExplicit = true
-	}
-
-	emit, ok := modeFromName[*mode]
-	if !ok {
-		return nil, fmt.Errorf("unrecognized emit mode: %q", *mode)
-	}
-	uc.emit = emit
-
-	uc.outDir = *outDir
-	uc.outSuffix = *outSuffix
-
-	workspacePath := filepath.Join(uc.c.RepoRoot, "WORKSPACE")
-	workspaceContent, err := ioutil.ReadFile(workspacePath)
-	if os.IsNotExist(err) {
-		workspaceContent = nil
-	} else if err != nil {
-		return nil, err
-	}
-	workspace, err := bf.Parse(workspacePath, workspaceContent)
-	if err != nil {
-		return nil, err
-	}
-	uc.repos = repos.ListRepositories(workspace)
 	repoPrefixes := make(map[string]bool)
 	for _, r := range uc.repos {
 		repoPrefixes[r.GoPrefix] = true
@@ -320,11 +330,11 @@ func newFixUpdateConfiguration(cmd command, args []string) (*updateConfig, error
 		uc.repos = append(uc.repos, repo)
 	}
 
-	return uc, nil
+	return c, nil
 }
 
 func fixUpdateUsage(fs *flag.FlagSet) {
-	fmt.Fprintln(os.Stderr, `usage: gazelle [fix|update] [flags...] [package-dirs...]
+	fmt.Fprint(os.Stderr, `usage: gazelle [fix|update] [flags...] [package-dirs...]
 
 The update command creates new build files and update existing BUILD files
 when needed.
@@ -347,69 +357,41 @@ subdirectories. All directories must be under the directory specified by
 WORKSPACE file.
 
 FLAGS:
+
 `)
 	fs.PrintDefaults()
 }
 
-func loadBuildFile(c *config.Config, dir string) (*bf.File, error) {
-	var buildPath string
-	for _, base := range c.ValidBuildFileNames {
-		p := filepath.Join(dir, base)
-		fi, err := os.Stat(p)
-		if err == nil {
-			if fi.Mode().IsRegular() {
-				buildPath = p
-				break
-			}
-			continue
-		}
-		if !os.IsNotExist(err) {
-			return nil, err
+func fixWorkspace(c *config.Config, workspace *rule.File, loads []rule.LoadInfo) error {
+	uc := getUpdateConfig(c)
+	if !c.ShouldFix {
+		return nil
+	}
+	shouldFix := false
+	for _, d := range uc.dirs {
+		if d == c.RepoRoot {
+			shouldFix = true
 		}
 	}
-	if buildPath == "" {
-		return nil, os.ErrNotExist
+	if !shouldFix {
+		return nil
 	}
 
-	data, err := ioutil.ReadFile(buildPath)
-	if err != nil {
-		return nil, err
+	merger.FixWorkspace(workspace)
+	merger.FixLoads(workspace, loads)
+	if err := merger.CheckGazelleLoaded(workspace); err != nil {
+		return err
 	}
-	return bf.Parse(buildPath, data)
+	return uc.emit(c, workspace)
 }
 
-func loadGoPrefix(c *config.Config) (string, error) {
-	f, err := loadBuildFile(c, c.RepoRoot)
-	if err != nil {
-		return "", errors.New("-go_prefix not set")
-	}
-	for _, d := range config.ParseDirectives(f) {
-		if d.Key == "prefix" {
-			return d.Value, nil
+func findWorkspaceName(f *rule.File) string {
+	for _, r := range f.Rules {
+		if r.Kind() == "workspace" {
+			return r.Name()
 		}
 	}
-	for _, s := range f.Stmt {
-		c, ok := s.(*bf.CallExpr)
-		if !ok {
-			continue
-		}
-		l, ok := c.X.(*bf.LiteralExpr)
-		if !ok {
-			continue
-		}
-		if l.Token != "go_prefix" {
-			continue
-		}
-		if len(c.List) != 1 {
-			return "", fmt.Errorf("-go_prefix not set, and %s has go_prefix(%v) with too many args", f.Path, c.List)
-		}
-		v, ok := c.List[0].(*bf.StringExpr)
-		if !ok {
-			return "", fmt.Errorf("-go_prefix not set, and %s has go_prefix(%v) which is not a string", f.Path, bf.FormatString(c.List[0]))
-		}
-		return v.Value, nil
-	}
-	return "", fmt.Errorf("-go_prefix not set, and no # gazelle:prefix directive found in %s", f.Path)
+	return ""
 }
 
 func isDescendingDir(dir, root string) bool {
@@ -421,4 +403,26 @@ func isDescendingDir(dir, root string) bool {
 		return true
 	}
 	return !strings.HasPrefix(rel, "..")
+}
+
+func findOutputPath(c *config.Config, f *rule.File) string {
+	if c.ReadBuildFilesDir == "" && c.WriteBuildFilesDir == "" {
+		return f.Path
+	}
+	baseDir := c.WriteBuildFilesDir
+	if c.WriteBuildFilesDir == "" {
+		baseDir = c.RepoRoot
+	}
+	outputDir := filepath.Join(baseDir, filepath.FromSlash(f.Pkg))
+	defaultOutputPath := filepath.Join(outputDir, c.DefaultBuildFileName())
+	files, err := ioutil.ReadDir(outputDir)
+	if err != nil {
+		// Ignore error. Directory probably doesn't exist.
+		return defaultOutputPath
+	}
+	outputPath := rule.MatchBuildFileName(outputDir, c.ValidBuildFileNames, files)
+	if outputPath == "" {
+		return defaultOutputPath
+	}
+	return outputPath
 }

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,7 +50,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
@@ -74,10 +75,11 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		pod.Spec.SecurityContext.RunAsUser = &userID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", userID),
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 
@@ -102,10 +104,11 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", overrideUserID),
+			fmt.Sprintf("uid=%v", overrideUserID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 

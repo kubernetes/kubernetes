@@ -17,121 +17,176 @@ limitations under the License.
 package create
 
 import (
+	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	fake "k8s.io/client-go/kubernetes/fake"
-	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
-func TestCreateJobFromCronJob(t *testing.T) {
-	var submittedJob *batchv1.Job
-	testNamespaceName := "test"
-	testCronJobName := "test-cronjob"
-	testJobName := "test-job"
-	testImageName := "fake"
-
-	expectedLabels := make(map[string]string)
-	expectedAnnotations := make(map[string]string)
-	expectedLabels["test-label"] = "test-value"
-
-	expectJob := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   testNamespaceName,
-			Labels:      expectedLabels,
-			Annotations: expectedAnnotations,
+func TestCreateJobValidation(t *testing.T) {
+	tests := map[string]struct {
+		image    string
+		command  []string
+		from     string
+		expected string
+	}{
+		"empty flags": {
+			expected: "--image or --from must be specified",
 		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Image: testImageName},
+		"both image and from specified": {
+			image:    "my-image",
+			from:     "cronjob/xyz",
+			expected: "--image or --from must be specified",
+		},
+		"from and command specified": {
+			from:     "cronjob/xyz",
+			command:  []string{"test", "command"},
+			expected: "cannot specify --from and command",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &CreateJobOptions{
+				Image:   tc.image,
+				From:    tc.from,
+				Command: tc.command,
+			}
+
+			err := o.Validate()
+			if err != nil && !strings.Contains(err.Error(), tc.expected) {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestCreateJob(t *testing.T) {
+	jobName := "test-job"
+	tests := map[string]struct {
+		image    string
+		command  []string
+		expected *batchv1.Job
+	}{
+		"just image": {
+			image: "busybox",
+			expected: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: jobName,
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  jobName,
+									Image: "busybox",
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+			},
+		},
+		"image and command": {
+			image:   "busybox",
+			command: []string{"date"},
+			expected: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: jobName,
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    jobName,
+									Image:   "busybox",
+									Command: []string{"date"},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
 					},
 				},
 			},
 		},
 	}
 
-	cronJob := &batchv1beta1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testCronJobName,
-			Namespace: testNamespaceName,
-		},
-		Spec: batchv1beta1.CronJobSpec{
-			Schedule: "* * * * *",
-			JobTemplate: batchv1beta1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testNamespaceName,
-					Labels:    expectedLabels,
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &CreateJobOptions{
+				Name:    jobName,
+				Image:   tc.image,
+				Command: tc.command,
+			}
+			job := o.createJob()
+			if !apiequality.Semantic.DeepEqual(job, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, job)
+			}
+		})
+	}
+}
+
+func TestCreateJobFromCronJob(t *testing.T) {
+	jobName := "test-job"
+	tests := map[string]struct {
+		from     *batchv1beta1.CronJob
+		expected *batchv1.Job
+	}{
+		"from CronJob": {
+			from: &batchv1beta1.CronJob{
+				Spec: batchv1beta1.CronJobSpec{
+					JobTemplate: batchv1beta1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{Image: "test-image"},
+									},
+									RestartPolicy: corev1.RestartPolicyNever,
+								},
+							},
+						},
+					},
 				},
-				Spec: expectJob.Spec,
+			},
+			expected: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        jobName,
+					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Image: "test-image"},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
 			},
 		},
 	}
 
-	clientset := fake.Clientset{}
-	clientset.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		ca := action.(clienttesting.CreateAction)
-		submittedJob = ca.GetObject().(*batchv1.Job)
-		return true, expectJob, nil
-	})
-	f := cmdtesting.NewTestFactory()
-	defer f.Cleanup()
-
-	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
-
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmdOptions := &CreateJobOptions{
-		PrintFlags: printFlags,
-		Name:       testJobName,
-		Namespace:  testNamespaceName,
-		Client:     clientset.BatchV1(),
-		Cmd:        NewCmdCreateJob(f, ioStreams),
-		PrintObj: func(obj runtime.Object) error {
-			p, err := printFlags.ToPrinter()
-			if err != nil {
-				return err
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &CreateJobOptions{
+				Name: jobName,
 			}
-
-			return p.PrintObj(obj, buf)
-		},
-		IOStreams: ioStreams,
-	}
-
-	err := cmdOptions.createJob(cronJob)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if submittedJob.ObjectMeta.Name != testJobName {
-		t.Errorf("expected '%s', got '%s'", testJobName, submittedJob.ObjectMeta.Name)
-	}
-
-	if l := len(submittedJob.Annotations); l != 1 {
-		t.Errorf("expected length of annotations array to be 1, got %d", l)
-	}
-	if v, ok := submittedJob.Annotations["cronjob.kubernetes.io/instantiate"]; !ok || v != "manual" {
-		t.Errorf("expected annotation cronjob.kubernetes.io/instantiate=manual to exist, got '%s'", v)
-	}
-
-	if l := len(submittedJob.Labels); l != 1 {
-		t.Errorf("expected length of labels array to be 1, got %d", l)
-	}
-	if v, ok := submittedJob.Labels["test-label"]; !ok || v != "test-value" {
-		t.Errorf("expected label test-label=test-value to to exist, got '%s'", v)
-	}
-
-	if l := len(submittedJob.Spec.Template.Spec.Containers); l != 1 {
-		t.Errorf("expected length of container array to be 1, got %d", l)
-	}
-	if submittedJob.Spec.Template.Spec.Containers[0].Image != testImageName {
-		t.Errorf("expected '%s', got '%s'", testImageName, submittedJob.Spec.Template.Spec.Containers[0].Image)
+			job := o.createJobFromCronJob(tc.from)
+			if !apiequality.Semantic.DeepEqual(job, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, job)
+			}
+		})
 	}
 }

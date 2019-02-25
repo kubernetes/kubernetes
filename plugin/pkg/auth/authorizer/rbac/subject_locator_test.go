@@ -20,24 +20,24 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 func TestSubjectLocator(t *testing.T) {
 	type actionToSubjects struct {
 		action   authorizer.Attributes
-		subjects []rbac.Subject
+		subjects []rbacv1.Subject
 	}
 
 	tests := []struct {
 		name                string
-		roles               []*rbac.Role
-		roleBindings        []*rbac.RoleBinding
-		clusterRoles        []*rbac.ClusterRole
-		clusterRoleBindings []*rbac.ClusterRoleBinding
+		roles               []*rbacv1.Role
+		roleBindings        []*rbacv1.RoleBinding
+		clusterRoles        []*rbacv1.ClusterRole
+		clusterRoleBindings []*rbacv1.ClusterRoleBinding
 
 		superUser string
 
@@ -45,42 +45,42 @@ func TestSubjectLocator(t *testing.T) {
 	}{
 		{
 			name: "no super user, star matches star",
-			clusterRoles: []*rbac.ClusterRole{
+			clusterRoles: []*rbacv1.ClusterRole{
 				newClusterRole("admin", newRule("*", "*", "*", "*")),
 			},
-			clusterRoleBindings: []*rbac.ClusterRoleBinding{
+			clusterRoleBindings: []*rbacv1.ClusterRoleBinding{
 				newClusterRoleBinding("admin", "User:super-admin", "Group:super-admins"),
 			},
-			roleBindings: []*rbac.RoleBinding{
+			roleBindings: []*rbacv1.RoleBinding{
 				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
 			},
 			actionsToSubjects: []actionToSubjects{
 				{
 					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "admins"},
 					},
 				},
 				{
 					// cluster role matches star in namespace
 					&defaultAttributes{"", "", "*", "Pods", "", "*", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
 					},
 				},
 				{
 					// empty ns
 					&defaultAttributes{"", "", "*", "Pods", "", "", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
 					},
 				},
 			},
@@ -88,48 +88,48 @@ func TestSubjectLocator(t *testing.T) {
 		{
 			name:      "super user, local roles work",
 			superUser: "foo",
-			clusterRoles: []*rbac.ClusterRole{
+			clusterRoles: []*rbacv1.ClusterRole{
 				newClusterRole("admin", newRule("*", "*", "*", "*")),
 			},
-			clusterRoleBindings: []*rbac.ClusterRoleBinding{
+			clusterRoleBindings: []*rbacv1.ClusterRoleBinding{
 				newClusterRoleBinding("admin", "User:super-admin", "Group:super-admins"),
 			},
-			roles: []*rbac.Role{
+			roles: []*rbacv1.Role{
 				newRole("admin", "ns1", newRule("get", "*", "Pods", "*")),
 			},
-			roleBindings: []*rbac.RoleBinding{
+			roleBindings: []*rbacv1.RoleBinding{
 				newRoleBinding("ns1", "admin", bindToRole, "User:admin", "Group:admins"),
 			},
 			actionsToSubjects: []actionToSubjects{
 				{
 					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "foo"},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "admins"},
 					},
 				},
 				{
 					// verb matchies correctly
 					&defaultAttributes{"", "", "create", "Pods", "", "ns1", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "foo"},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
 					},
 				},
 				{
 					// binding only works in correct ns
 					&defaultAttributes{"", "", "get", "Pods", "", "ns2", ""},
-					[]rbac.Subject{
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
-						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
-						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "foo"},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "super-admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "super-admins"},
 					},
 				},
 			},

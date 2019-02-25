@@ -29,7 +29,7 @@ type fakeWatcher struct {
 
 var _ utilfs.FSWatcher = &fakeWatcher{}
 
-func NewFakeWatcher() *fakeWatcher {
+func newFakeWatcher() *fakeWatcher {
 	return &fakeWatcher{
 		watches: nil,
 	}

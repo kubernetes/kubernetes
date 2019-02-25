@@ -1,6 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - cheftako
+- stewart-yu
 - sttts
 reviewers:
 - caesarxuchao
@@ -9,3 +12,6 @@ reviewers:
 - lavalamp
 - liggitt
 - sttts
+- stewart-yu
+labels:
+- sig/api-machinery

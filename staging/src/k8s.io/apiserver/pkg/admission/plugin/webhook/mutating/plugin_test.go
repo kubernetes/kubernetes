@@ -18,22 +18,20 @@ package mutating
 
 import (
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/api/admission/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 // TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
-	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
 	defer testServer.Close()
@@ -42,10 +40,15 @@ func TestAdmit(t *testing.T) {
 		t.Fatalf("this should never happen? %v", err)
 	}
 
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	for _, tt := range webhooktesting.NewTestCases(serverURL) {
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
+		webhooktesting.NewNonMutatingTestCases(serverURL)...)
+
+	for _, tt := range testCases {
 		wh, err := NewMutatingWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create mutating webhook: %v", tt.Name, err)
@@ -57,7 +60,6 @@ func TestAdmit(t *testing.T) {
 
 		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
 		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
-		wh.SetScheme(scheme)
 		wh.SetExternalKubeClientSet(client)
 		wh.SetExternalKubeInformerFactory(informer)
 
@@ -69,9 +71,21 @@ func TestAdmit(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns))
+		var attr admission.Attributes
+		if tt.IsCRD {
+			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
+		} else {
+			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
+		}
+
+		err = wh.Admit(attr, objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
+		}
+		if tt.ExpectLabels != nil {
+			if !reflect.DeepEqual(tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels()) {
+				t.Errorf("%s: expected labels '%v', but got '%v'", tt.Name, tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels())
+			}
 		}
 		// ErrWebhookRejected is not an error for our purposes
 		if tt.ErrorContains != "" {
@@ -82,15 +96,21 @@ func TestAdmit(t *testing.T) {
 		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
 			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
 		}
+		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
+		if !ok {
+			t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
+			continue
+		}
+		if len(tt.ExpectAnnotations) == 0 {
+			assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+		} else {
+			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+		}
 	}
 }
 
 // TestAdmitCachedClient tests that MutatingWebhook#Admit should cache restClient
 func TestAdmitCachedClient(t *testing.T) {
-	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
 	defer testServer.Close()
@@ -98,6 +118,8 @@ func TestAdmitCachedClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -107,7 +129,6 @@ func TestAdmitCachedClient(t *testing.T) {
 		t.Fatalf("Failed to create mutating webhook: %v", err)
 	}
 	wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
-	wh.SetScheme(scheme)
 
 	for _, tt := range webhooktesting.NewCachedClientTestcases(serverURL) {
 		ns := "webhook-test"
@@ -127,7 +148,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns))
+		err = wh.Admit(webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

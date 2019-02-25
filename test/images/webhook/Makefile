@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64
-TAG = 1.10v2
+SRCS=webhook
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-build:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webhook .
-	docker build --no-cache -t $(IMAGE):$(TAG) .
-	rm -rf webhook
-push:
-	docker push $(IMAGE):$(TAG)
+bin:
+	../image-util.sh bin $(SRCS)
+
+.PHONY: bin

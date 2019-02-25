@@ -71,9 +71,10 @@ func GetCluster(service, name, dns string, apurls types.URLs) ([]string, error) 
 			// SRV records have a trailing dot but URL shouldn't.
 			shortHost := strings.TrimSuffix(srv.Target, ".")
 			urlHost := net.JoinHostPort(shortHost, port)
-			stringParts = append(stringParts, fmt.Sprintf("%s=%s://%s", n, scheme, urlHost))
 			if ok && url.Scheme != scheme {
 				err = fmt.Errorf("bootstrap at %s from DNS for %s has scheme mismatch with expected peer %s", scheme+"://"+urlHost, service, url.String())
+			} else {
+				stringParts = append(stringParts, fmt.Sprintf("%s=%s://%s", n, scheme, urlHost))
 			}
 		}
 		if len(stringParts) == 0 {

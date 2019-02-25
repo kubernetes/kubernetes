@@ -91,7 +91,7 @@ var _ = instrumentation.SIGDescribe("[Feature:PrometheusMonitoring] Prometheus",
 })
 
 func prometheusCPUQuery(namespace, podNamePrefix string, rate time.Duration) string {
-	return fmt.Sprintf(`sum(irate(container_cpu_usage_seconds_total{namespace="%v",pod_name=~"%v.*"}[%vm]))`,
+	return fmt.Sprintf(`sum(irate(container_cpu_usage_seconds_total{namespace="%v",pod_name=~"%v.*",image!=""}[%vm]))`,
 		namespace, podNamePrefix, int64(rate.Minutes()))
 }
 
@@ -111,7 +111,7 @@ func consumeCPUResources(f *framework.Framework, consumerName string, cpuUsage i
 func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
 	podAnnotations := map[string]string{
 		"prometheus.io/scrape": "true",
-		"prometheus.io/path":   "/Metrics",
+		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
 	return common.NewMetricExporter(consumerName, f.Namespace.Name, podAnnotations, nil, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
@@ -120,7 +120,7 @@ func exportCustomMetricFromPod(f *framework.Framework, consumerName string, metr
 func exportCustomMetricFromService(f *framework.Framework, consumerName string, metricValue int) *common.ResourceConsumer {
 	serviceAnnotations := map[string]string{
 		"prometheus.io/scrape": "true",
-		"prometheus.io/path":   "/Metrics",
+		"prometheus.io/path":   "/metrics",
 		"prometheus.io/port":   "8080",
 	}
 	return common.NewMetricExporter(consumerName, f.Namespace.Name, nil, serviceAnnotations, metricValue, f.ClientSet, f.InternalClientset, f.ScalesGetter)
@@ -238,7 +238,7 @@ func fetchPrometheusTargetDiscovery(c clientset.Interface) (TargetDiscovery, err
 		Raw()
 	var qres promTargetsResponse
 	if err != nil {
-		fmt.Printf(string(response))
+		framework.Logf(string(response))
 		return qres.Data, err
 	}
 	err = json.Unmarshal(response, &qres)
@@ -297,7 +297,7 @@ func queryPrometheus(c clientset.Interface, query string, start, end time.Time, 
 		Do().
 		Raw()
 	if err != nil {
-		fmt.Printf(string(response))
+		framework.Logf(string(response))
 		return nil, err
 	}
 	var qres promQueryResponse

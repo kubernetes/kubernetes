@@ -23,12 +23,13 @@ import (
 	"regexp"
 	"strings"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -64,13 +65,13 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	}
 
 	if spec.MinAvailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
 	}
 
 	if spec.MaxUnavailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
 	}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
@@ -91,7 +92,7 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 // pod security policy name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidatePodSecurityPolicyName = apivalidation.NameIsDNSSubdomain
+var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -105,6 +106,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
+	allErrs = append(allErrs, validatePSPRunAsGroup(fldPath.Child("runAsGroup"), spec.RunAsGroup)...)
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
@@ -116,8 +118,12 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
+	allErrs = append(allErrs, validatePSPAllowedProcMountTypes(fldPath.Child("allowedProcMountTypes"), spec.AllowedProcMountTypes)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
 
 	return allErrs
 }
@@ -136,15 +142,6 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
 		}
-	}
-
-	sysctlAnnotation := annotations[policy.SysctlsPodSecurityPolicyAnnotationKey]
-	sysctlFldPath := fldPath.Key(policy.SysctlsPodSecurityPolicyAnnotationKey)
-	sysctls, err := policy.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnnotation)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(sysctlFldPath, sysctlAnnotation, err.Error()))
-	} else {
-		allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
 	}
 
 	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
@@ -235,12 +232,45 @@ func validatePSPRunAsUser(fldPath *field.Path, runAsUser *policy.RunAsUserStrate
 	return allErrs
 }
 
+// validatePSPRunAsGroup validates the RunAsGroup fields of PodSecurityPolicy.
+func validatePSPRunAsGroup(fldPath *field.Path, runAsGroup *policy.RunAsGroupStrategyOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if runAsGroup == nil {
+		return allErrs
+	}
+
+	switch runAsGroup.Rule {
+	case policy.RunAsGroupStrategyRunAsAny:
+		if len(runAsGroup.Ranges) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "Ranges must be empty"))
+		}
+	case policy.RunAsGroupStrategyMustRunAs, policy.RunAsGroupStrategyMayRunAs:
+		if len(runAsGroup.Ranges) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "must provide at least one range"))
+		}
+		// validate range settings
+		for idx, rng := range runAsGroup.Ranges {
+			allErrs = append(allErrs, validateGroupIDRange(fldPath.Child("ranges").Index(idx), rng)...)
+		}
+	default:
+		supportedRunAsGroupRules := []string{
+			string(policy.RunAsGroupStrategyMustRunAs),
+			string(policy.RunAsGroupStrategyRunAsAny),
+			string(policy.RunAsGroupStrategyMayRunAs),
+		}
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), runAsGroup.Rule, supportedRunAsGroupRules))
+	}
+	return allErrs
+}
+
 // validatePSPFSGroup validates the FSGroupStrategyOptions fields of the PodSecurityPolicy.
 func validatePSPFSGroup(fldPath *field.Path, groupOptions *policy.FSGroupStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	supportedRules := sets.NewString(
 		string(policy.FSGroupStrategyMustRunAs),
+		string(policy.FSGroupStrategyMayRunAs),
 		string(policy.FSGroupStrategyRunAsAny),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -259,6 +289,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 
 	supportedRules := sets.NewString(
 		string(policy.SupplementalGroupsStrategyRunAsAny),
+		string(policy.SupplementalGroupsStrategyMayRunAs),
 		string(policy.SupplementalGroupsStrategyMustRunAs),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -295,6 +326,17 @@ func validatePSPDefaultAllowPrivilegeEscalation(fldPath *field.Path, defaultAllo
 	return allErrs
 }
 
+// validatePSPAllowedProcMountTypes validates the DefaultAllowPrivilegeEscalation field against the AllowPrivilegeEscalation field of a PodSecurityPolicy.
+func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes []core.ProcMountType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, procMountType := range allowedProcMountTypes {
+		if err := apivalidation.ValidateProcMountType(fldPath.Index(i), procMountType); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+	return allErrs
+}
+
 const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
@@ -307,11 +349,60 @@ func IsValidSysctlPattern(name string) bool {
 	return sysctlPatternRegexp.MatchString(name)
 }
 
+func validatePodSecurityPolicySysctlListsDoNotOverlap(allowedSysctlsFldPath, forbiddenSysctlsFldPath *field.Path, allowedUnsafeSysctls, forbiddenSysctls []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, allowedSysctl := range allowedUnsafeSysctls {
+		isAllowedSysctlPattern := false
+		allowedSysctlPrefix := ""
+		if strings.HasSuffix(allowedSysctl, "*") {
+			isAllowedSysctlPattern = true
+			allowedSysctlPrefix = strings.TrimSuffix(allowedSysctl, "*")
+		}
+		for j, forbiddenSysctl := range forbiddenSysctls {
+			isForbiddenSysctlPattern := false
+			forbiddenSysctlPrefix := ""
+			if strings.HasSuffix(forbiddenSysctl, "*") {
+				isForbiddenSysctlPattern = true
+				forbiddenSysctlPrefix = strings.TrimSuffix(forbiddenSysctl, "*")
+			}
+			switch {
+			case isAllowedSysctlPattern && isForbiddenSysctlPattern:
+				if strings.HasPrefix(allowedSysctlPrefix, forbiddenSysctlPrefix) {
+					allErrs = append(allErrs, field.Invalid(allowedSysctlsFldPath.Index(i), allowedUnsafeSysctls[i], fmt.Sprintf("sysctl overlaps with %v", forbiddenSysctl)))
+				} else if strings.HasPrefix(forbiddenSysctlPrefix, allowedSysctlPrefix) {
+					allErrs = append(allErrs, field.Invalid(forbiddenSysctlsFldPath.Index(j), forbiddenSysctls[j], fmt.Sprintf("sysctl overlaps with %v", allowedSysctl)))
+				}
+			case isAllowedSysctlPattern:
+				if strings.HasPrefix(forbiddenSysctl, allowedSysctlPrefix) {
+					allErrs = append(allErrs, field.Invalid(forbiddenSysctlsFldPath.Index(j), forbiddenSysctls[j], fmt.Sprintf("sysctl overlaps with %v", allowedSysctl)))
+				}
+			case isForbiddenSysctlPattern:
+				if strings.HasPrefix(allowedSysctl, forbiddenSysctlPrefix) {
+					allErrs = append(allErrs, field.Invalid(allowedSysctlsFldPath.Index(i), allowedUnsafeSysctls[i], fmt.Sprintf("sysctl overlaps with %v", forbiddenSysctl)))
+				}
+			default:
+				if allowedSysctl == forbiddenSysctl {
+					allErrs = append(allErrs, field.Invalid(allowedSysctlsFldPath.Index(i), allowedUnsafeSysctls[i], fmt.Sprintf("sysctl overlaps with %v", forbiddenSysctl)))
+				}
+			}
+		}
+	}
+	return allErrs
+}
+
 // validatePodSecurityPolicySysctls validates the sysctls fields of PodSecurityPolicy.
 func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if len(sysctls) == 0 {
+		return allErrs
+	}
+
+	coversAll := false
 	for i, s := range sysctls {
-		if !IsValidSysctlPattern(string(s)) {
+		if len(s) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("empty sysctl not allowed")))
+		} else if !IsValidSysctlPattern(string(s)) {
 			allErrs = append(
 				allErrs,
 				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
@@ -319,7 +410,13 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 					SysctlPatternFmt,
 				)),
 			)
+		} else if s[0] == '*' {
+			coversAll = true
 		}
+	}
+
+	if coversAll && len(sysctls) > 1 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), fmt.Sprintf("if '*' is present, must not specify other sysctls")))
 	}
 
 	return allErrs

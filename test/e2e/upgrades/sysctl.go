@@ -22,14 +22,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // SecretUpgradeTest tests that a pod with sysctls runs before and after an upgrade. During
@@ -52,7 +52,7 @@ func (t *SysctlUpgradeTest) Setup(f *framework.Framework) {
 func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
 	switch upgrade {
-	case MasterUpgrade:
+	case MasterUpgrade, ClusterUpgrade:
 		By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -123,19 +123,19 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			Annotations: map[string]string{
-				v1.SysctlsPodAnnotationKey: v1helper.PodAnnotationsFromSysctls(sysctlList),
-			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			SecurityContext: &v1.PodSecurityContext{
+				Sysctls: sysctlList,
+			},
 		},
 	}
 }

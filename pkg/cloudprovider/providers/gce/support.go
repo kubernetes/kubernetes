@@ -19,13 +19,13 @@ package gce
 import (
 	"context"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 )
 
 // gceProjectRouter sends requests to the appropriate project ID.
 type gceProjectRouter struct {
-	gce *GCECloud
+	gce *Cloud
 }
 
 // ProjectID returns the project ID to be used for the given operation.
@@ -40,7 +40,7 @@ func (r *gceProjectRouter) ProjectID(ctx context.Context, version meta.Version, 
 
 // gceRateLimiter implements cloud.RateLimiter.
 type gceRateLimiter struct {
-	gce *GCECloud
+	gce *Cloud
 }
 
 // Accept blocks until the operation can be performed.
@@ -50,25 +50,23 @@ type gceRateLimiter struct {
 // operations.
 func (l *gceRateLimiter) Accept(ctx context.Context, key *cloud.RateLimitKey) error {
 	if key.Operation == "Get" && key.Service == "Operations" {
-		ch := make(chan struct{})
-		go func() {
-			l.gce.operationPollRateLimiter.Accept()
-			close(ch)
-		}()
-		select {
-		case <-ch:
-			break
-		case <-ctx.Done():
-			return ctx.Err()
+		// Wait a minimum amount of time regardless of rate limiter.
+		rl := &cloud.MinimumRateLimiter{
+			// Convert flowcontrol.RateLimiter into cloud.RateLimiter
+			RateLimiter: &cloud.AcceptRateLimiter{
+				Acceptor: l.gce.operationPollRateLimiter,
+			},
+			Minimum: operationPollInterval,
 		}
+		return rl.Accept(ctx, key)
 	}
 	return nil
 }
 
-// CreateGCECloudWithCloud is a helper function to create an instance of GCECloud with the
+// CreateGCECloudWithCloud is a helper function to create an instance of Cloud with the
 // given Cloud interface implementation. Typical usage is to use cloud.NewMockGCE to get a
 // handle to a mock Cloud instance and then use that for testing.
-func CreateGCECloudWithCloud(config *CloudConfig, c cloud.Cloud) (*GCECloud, error) {
+func CreateGCECloudWithCloud(config *CloudConfig, c cloud.Cloud) (*Cloud, error) {
 	gceCloud, err := CreateGCECloud(config)
 	if err == nil {
 		gceCloud.c = c

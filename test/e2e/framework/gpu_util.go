@@ -20,8 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-
-	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 const (
@@ -50,13 +49,13 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 }
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
-func NVIDIADevicePlugin(ns string) *v1.Pod {
+func NVIDIADevicePlugin() *v1.Pod {
 	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
-			Namespace: ns,
+			Namespace: metav1.NamespaceSystem,
 		},
 
 		Spec: ds.Spec.Template.Spec,
@@ -69,7 +68,16 @@ func NVIDIADevicePlugin(ns string) *v1.Pod {
 
 func GetGPUDevicePluginImage() string {
 	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	if err != nil || ds == nil || len(ds.Spec.Template.Spec.Containers) < 1 {
+	if err != nil {
+		klog.Errorf("Failed to parse the device plugin image: %v", err)
+		return ""
+	}
+	if ds == nil {
+		klog.Errorf("Failed to parse the device plugin image: the extracted DaemonSet is nil")
+		return ""
+	}
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		klog.Errorf("Failed to parse the device plugin image: cannot extract the container from YAML")
 		return ""
 	}
 	return ds.Spec.Template.Spec.Containers[0].Image

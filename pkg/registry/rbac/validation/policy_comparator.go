@@ -19,23 +19,23 @@ package validation
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 // Covers determines whether or not the ownerRules cover the servantRules in terms of allowed actions.
 // It returns whether or not the ownerRules cover and a list of the rules that the ownerRules do not cover.
-func Covers(ownerRules, servantRules []rbac.PolicyRule) (bool, []rbac.PolicyRule) {
+func Covers(ownerRules, servantRules []rbacv1.PolicyRule) (bool, []rbacv1.PolicyRule) {
 	// 1.  Break every servantRule into individual rule tuples: group, verb, resource, resourceName
 	// 2.  Compare the mini-rules against each owner rule.  Because the breakdown is down to the most atomic level, we're guaranteed that each mini-servant rule will be either fully covered or not covered by a single owner rule
 	// 3.  Any left over mini-rules means that we are not covered and we have a nice list of them.
 	// TODO: it might be nice to collapse the list down into something more human readable
 
-	subrules := []rbac.PolicyRule{}
+	subrules := []rbacv1.PolicyRule{}
 	for _, servantRule := range servantRules {
 		subrules = append(subrules, BreakdownRule(servantRule)...)
 	}
 
-	uncoveredRules := []rbac.PolicyRule{}
+	uncoveredRules := []rbacv1.PolicyRule{}
 	for _, subrule := range subrules {
 		covered := false
 		for _, ownerRule := range ownerRules {
@@ -55,18 +55,18 @@ func Covers(ownerRules, servantRules []rbac.PolicyRule) (bool, []rbac.PolicyRule
 
 // BreadownRule takes a rule and builds an equivalent list of rules that each have at most one verb, one
 // resource, and one resource name
-func BreakdownRule(rule rbac.PolicyRule) []rbac.PolicyRule {
-	subrules := []rbac.PolicyRule{}
+func BreakdownRule(rule rbacv1.PolicyRule) []rbacv1.PolicyRule {
+	subrules := []rbacv1.PolicyRule{}
 	for _, group := range rule.APIGroups {
 		for _, resource := range rule.Resources {
 			for _, verb := range rule.Verbs {
 				if len(rule.ResourceNames) > 0 {
 					for _, resourceName := range rule.ResourceNames {
-						subrules = append(subrules, rbac.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}, ResourceNames: []string{resourceName}})
+						subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}, ResourceNames: []string{resourceName}})
 					}
 
 				} else {
-					subrules = append(subrules, rbac.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}})
+					subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}})
 				}
 
 			}
@@ -76,7 +76,7 @@ func BreakdownRule(rule rbac.PolicyRule) []rbac.PolicyRule {
 	// Non-resource URLs are unique because they only combine with verbs.
 	for _, nonResourceURL := range rule.NonResourceURLs {
 		for _, verb := range rule.Verbs {
-			subrules = append(subrules, rbac.PolicyRule{NonResourceURLs: []string{nonResourceURL}, Verbs: []string{verb}})
+			subrules = append(subrules, rbacv1.PolicyRule{NonResourceURLs: []string{nonResourceURL}, Verbs: []string{verb}})
 		}
 	}
 
@@ -107,7 +107,7 @@ func hasAll(set, contains []string) bool {
 
 func resourceCoversAll(setResources, coversResources []string) bool {
 	// if we have a star or an exact match on all resources, then we match
-	if has(setResources, rbac.ResourceAll) || hasAll(setResources, coversResources) {
+	if has(setResources, rbacv1.ResourceAll) || hasAll(setResources, coversResources) {
 		return true
 	}
 
@@ -155,9 +155,9 @@ func nonResourceURLCovers(ownerPath, subPath string) bool {
 
 // ruleCovers determines whether the ownerRule (which may have multiple verbs, resources, and resourceNames) covers
 // the subrule (which may only contain at most one verb, resource, and resourceName)
-func ruleCovers(ownerRule, subRule rbac.PolicyRule) bool {
-	verbMatches := has(ownerRule.Verbs, rbac.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
-	groupMatches := has(ownerRule.APIGroups, rbac.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
+func ruleCovers(ownerRule, subRule rbacv1.PolicyRule) bool {
+	verbMatches := has(ownerRule.Verbs, rbacv1.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
+	groupMatches := has(ownerRule.APIGroups, rbacv1.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
 	resourceMatches := resourceCoversAll(ownerRule.Resources, subRule.Resources)
 	nonResourceURLMatches := nonResourceURLsCoversAll(ownerRule.NonResourceURLs, subRule.NonResourceURLs)
 

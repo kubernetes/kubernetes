@@ -1,6 +1,6 @@
 # German translation.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR steffenschmitz@hotmail.de, 2017.
 #
 #, fuzzy

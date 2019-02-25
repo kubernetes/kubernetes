@@ -155,6 +155,8 @@ func (t *typeInfo) build(typ reflect.Type, fn string, fi []int) {
 	}
 }
 
+var nilValue reflect.Value
+
 // assignValue assignes a value 'pv' to the struct pointed to by 'val', given a
 // slice of field indices. It recurses into the struct until it finds the field
 // specified by the indices. It creates new values for pointer types where
@@ -172,6 +174,11 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 	rv := val.Field(fi[0])
 	fi = fi[1:]
 	if len(fi) == 0 {
+		if pv == nilValue {
+			pv = reflect.Zero(rv.Type())
+			rv.Set(pv)
+			return
+		}
 		rt := rv.Type()
 		pt := pv.Type()
 
@@ -180,6 +187,24 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 			rv.Set(reflect.New(rt.Elem()))
 			rv = rv.Elem()
 			rt = rv.Type()
+		}
+
+		// If the target type is a slice, but the source is not, deference any ArrayOfXYZ type
+		if rt.Kind() == reflect.Slice && pt.Kind() != reflect.Slice {
+			if pt.Kind() == reflect.Ptr {
+				pv = pv.Elem()
+				pt = pt.Elem()
+			}
+
+			m := arrayOfRegexp.FindStringSubmatch(pt.Name())
+			if len(m) > 0 {
+				pv = pv.FieldByName(m[1]) // ArrayOfXYZ type has single field named XYZ
+				pt = pv.Type()
+
+				if !pv.IsValid() {
+					panic(fmt.Sprintf("expected %s type to have field %s", m[0], m[1]))
+				}
+			}
 		}
 
 		// If type is an interface, check if pv implements it.
@@ -200,7 +225,7 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 		} else if rt.ConvertibleTo(pt) {
 			rv.Set(pv.Convert(rt))
 		} else {
-			panic(fmt.Sprintf("cannot assign %s (%s) to %s (%s)", rt.Name(), rt.Kind(), pt.Name(), pt.Kind()))
+			panic(fmt.Sprintf("cannot assign %q (%s) to %q (%s)", rt.Name(), rt.Kind(), pt.Name(), pt.Kind()))
 		}
 
 		return
@@ -210,23 +235,6 @@ func assignValue(val reflect.Value, fi []int, pv reflect.Value) {
 }
 
 var arrayOfRegexp = regexp.MustCompile("ArrayOf(.*)$")
-
-func anyTypeToValue(t interface{}) reflect.Value {
-	rt := reflect.TypeOf(t)
-	rv := reflect.ValueOf(t)
-
-	// Dereference if ArrayOfXYZ type
-	m := arrayOfRegexp.FindStringSubmatch(rt.Name())
-	if len(m) > 0 {
-		// ArrayOfXYZ type has single field named XYZ
-		rv = rv.FieldByName(m[1])
-		if !rv.IsValid() {
-			panic(fmt.Sprintf("expected %s type to have field %s", m[0], m[1]))
-		}
-	}
-
-	return rv
-}
 
 // LoadObjectFromContent loads properties from the 'PropSet' field in the
 // specified ObjectContent value into the value it represents, which is
@@ -240,7 +248,7 @@ func (t *typeInfo) LoadFromObjectContent(o types.ObjectContent) (reflect.Value, 
 		if !ok {
 			continue
 		}
-		assignValue(v, rv, anyTypeToValue(p.Val))
+		assignValue(v, rv, reflect.ValueOf(p.Val))
 	}
 
 	return v, nil

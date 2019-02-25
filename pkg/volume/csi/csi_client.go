@@ -19,16 +19,29 @@ package csi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
+	"strings"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	"github.com/golang/glog"
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
+	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
 
 type csiClient interface {
+	NodeGetInfo(ctx context.Context) (
+		nodeID string,
+		maxVolumePerNode int64,
+		accessibleTopology map[string]string,
+		err error)
 	NodePublishVolume(
 		ctx context.Context,
 		volumeid string,
@@ -36,10 +49,11 @@ type csiClient interface {
 		stagingTargetPath string,
 		targetPath string,
 		accessMode api.PersistentVolumeAccessMode,
-		volumeInfo map[string]string,
-		volumeAttribs map[string]string,
-		nodePublishSecrets map[string]string,
+		publishContext map[string]string,
+		volumeContext map[string]string,
+		secrets map[string]string,
 		fsType string,
+		mountOptions []string,
 	) error
 	NodeUnpublishVolume(
 		ctx context.Context,
@@ -52,54 +66,188 @@ type csiClient interface {
 		stagingTargetPath string,
 		fsType string,
 		accessMode api.PersistentVolumeAccessMode,
-		nodeStageSecrets map[string]string,
-		volumeAttribs map[string]string,
+		secrets map[string]string,
+		volumeContext map[string]string,
 	) error
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
-	NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error)
+	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 }
+
+// Strongly typed address
+type csiAddr string
+
+// Strongly typed driver name
+type csiDriverName string
 
 // csiClient encapsulates all csi-plugin methods
 type csiDriverClient struct {
-	network          string
-	addr             string
-	conn             *grpc.ClientConn
-	idClient         csipb.IdentityClient
-	nodeClient       csipb.NodeClient
-	ctrlClient       csipb.ControllerClient
-	versionAsserted  bool
-	versionSupported bool
-	publishAsserted  bool
-	publishCapable   bool
+	driverName          csiDriverName
+	addr                csiAddr
+	nodeV1ClientCreator nodeV1ClientCreator
+	nodeV0ClientCreator nodeV0ClientCreator
 }
 
-func newCsiDriverClient(network, addr string) *csiDriverClient {
-	return &csiDriverClient{network: network, addr: addr}
-}
+var _ csiClient = &csiDriverClient{}
 
-// assertConnection ensures a valid connection has been established
-// if not, it creates a new connection and associated clients
-func (c *csiDriverClient) assertConnection() error {
-	if c.conn == nil {
-		conn, err := grpc.Dial(
-			c.addr,
-			grpc.WithInsecure(),
-			grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
-				return net.Dial(c.network, target)
-			}),
-		)
-		if err != nil {
-			return err
-		}
-		c.conn = conn
-		c.idClient = csipb.NewIdentityClient(conn)
-		c.nodeClient = csipb.NewNodeClient(conn)
-		c.ctrlClient = csipb.NewControllerClient(conn)
+type nodeV1ClientCreator func(addr csiAddr) (
+	nodeClient csipbv1.NodeClient,
+	closer io.Closer,
+	err error,
+)
 
-		// set supported version
+type nodeV0ClientCreator func(addr csiAddr) (
+	nodeClient csipbv0.NodeClient,
+	closer io.Closer,
+	err error,
+)
+
+const (
+	initialDuration = 1 * time.Second
+	factor          = 2.0
+	steps           = 5
+)
+
+// newV1NodeClient creates a new NodeClient with the internally used gRPC
+// connection set up. It also returns a closer which must to be called to close
+// the gRPC connection when the NodeClient is not used anymore.
+// This is the default implementation for the nodeV1ClientCreator, used in
+// newCsiDriverClient.
+func newV1NodeClient(addr csiAddr) (nodeClient csipbv1.NodeClient, closer io.Closer, err error) {
+	var conn *grpc.ClientConn
+	conn, err = newGrpcConn(addr)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return nil
+	nodeClient = csipbv1.NewNodeClient(conn)
+	return nodeClient, conn, nil
+}
+
+// newV0NodeClient creates a new NodeClient with the internally used gRPC
+// connection set up. It also returns a closer which must to be called to close
+// the gRPC connection when the NodeClient is not used anymore.
+// This is the default implementation for the nodeV1ClientCreator, used in
+// newCsiDriverClient.
+func newV0NodeClient(addr csiAddr) (nodeClient csipbv0.NodeClient, closer io.Closer, err error) {
+	var conn *grpc.ClientConn
+	conn, err = newGrpcConn(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeClient = csipbv0.NewNodeClient(conn)
+	return nodeClient, conn, nil
+}
+
+func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
+	if driverName == "" {
+		return nil, fmt.Errorf("driver name is empty")
+	}
+
+	addr := fmt.Sprintf(csiAddrTemplate, driverName)
+	requiresV0Client := true
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+		existingDriver, driverExists := csiDrivers.Get(string(driverName))
+		if !driverExists {
+			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
+		}
+
+		addr = existingDriver.endpoint
+		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
+	}
+
+	nodeV1ClientCreator := newV1NodeClient
+	nodeV0ClientCreator := newV0NodeClient
+	if requiresV0Client {
+		nodeV1ClientCreator = nil
+	} else {
+		nodeV0ClientCreator = nil
+	}
+
+	return &csiDriverClient{
+		driverName:          driverName,
+		addr:                csiAddr(addr),
+		nodeV1ClientCreator: nodeV1ClientCreator,
+		nodeV0ClientCreator: nodeV0ClientCreator,
+	}, nil
+}
+
+func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology map[string]string,
+	err error) {
+	klog.V(4).Info(log("calling NodeGetInfo rpc"))
+
+	// TODO retries should happen at a lower layer (issue #73371)
+	backoff := wait.Backoff{Duration: initialDuration, Factor: factor, Steps: steps}
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		var getNodeInfoError error
+		if c.nodeV1ClientCreator != nil {
+			nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
+		} else if c.nodeV0ClientCreator != nil {
+			nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV0(ctx)
+		}
+		if nodeID != "" {
+			return true, nil
+		}
+		// kubelet plugin registration service not implemented is a terminal error, no need to retry
+		if strings.Contains(getNodeInfoError.Error(), "no handler registered for plugin type") {
+			return false, getNodeInfoError
+		}
+		// Continue with exponential backoff
+		return false, nil
+	})
+
+	return nodeID, maxVolumePerNode, accessibleTopology, err
+}
+
+func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology map[string]string,
+	err error) {
+
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer closer.Close()
+
+	res, err := nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{})
+	if err != nil {
+		return "", 0, nil, err
+	}
+
+	topology := res.GetAccessibleTopology()
+	if topology != nil {
+		accessibleTopology = topology.Segments
+	}
+	return res.GetNodeId(), res.GetMaxVolumesPerNode(), accessibleTopology, nil
+}
+
+func (c *csiDriverClient) nodeGetInfoV0(ctx context.Context) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology map[string]string,
+	err error) {
+
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer closer.Close()
+
+	res, err := nodeClient.NodeGetInfo(ctx, &csipbv0.NodeGetInfoRequest{})
+	if err != nil {
+		return "", 0, nil, err
+	}
+
+	topology := res.GetAccessibleTopology()
+	if topology != nil {
+		accessibleTopology = topology.Segments
+	}
+	return res.GetNodeId(), res.GetMaxVolumesPerNode(), accessibleTopology, nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -109,38 +257,82 @@ func (c *csiDriverClient) NodePublishVolume(
 	stagingTargetPath string,
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
-	volumeInfo map[string]string,
-	volumeAttribs map[string]string,
-	nodePublishSecrets map[string]string,
+	publishContext map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
 	fsType string,
+	mountOptions []string,
 ) error {
-	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
+	klog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
-		return err
+	if c.nodeV1ClientCreator != nil {
+		return c.nodePublishVolumeV1(
+			ctx,
+			volID,
+			readOnly,
+			stagingTargetPath,
+			targetPath,
+			accessMode,
+			publishContext,
+			volumeContext,
+			secrets,
+			fsType,
+			mountOptions,
+		)
+	} else if c.nodeV0ClientCreator != nil {
+		return c.nodePublishVolumeV0(
+			ctx,
+			volID,
+			readOnly,
+			stagingTargetPath,
+			targetPath,
+			accessMode,
+			publishContext,
+			volumeContext,
+			secrets,
+			fsType,
+			mountOptions,
+		)
 	}
 
-	req := &csipb.NodePublishVolumeRequest{
-		VolumeId:           volID,
-		TargetPath:         targetPath,
-		Readonly:           readOnly,
-		PublishInfo:        volumeInfo,
-		VolumeAttributes:   volumeAttribs,
-		NodePublishSecrets: nodePublishSecrets,
-		VolumeCapability: &csipb.VolumeCapability{
-			AccessMode: &csipb.VolumeCapability_AccessMode{
-				Mode: asCSIAccessMode(accessMode),
-			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
+	return fmt.Errorf("failed to call NodePublishVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+
+}
+
+func (c *csiDriverClient) nodePublishVolumeV1(
+	ctx context.Context,
+	volID string,
+	readOnly bool,
+	stagingTargetPath string,
+	targetPath string,
+	accessMode api.PersistentVolumeAccessMode,
+	publishContext map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
+	fsType string,
+	mountOptions []string,
+) error {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodePublishVolumeRequest{
+		VolumeId:       volID,
+		TargetPath:     targetPath,
+		Readonly:       readOnly,
+		PublishContext: publishContext,
+		VolumeContext:  volumeContext,
+		Secrets:        secrets,
+		VolumeCapability: &csipbv1.VolumeCapability{
+			AccessMode: &csipbv1.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV1(accessMode),
 			},
 		},
 	}
@@ -148,118 +340,397 @@ func (c *csiDriverClient) NodePublishVolume(
 		req.StagingTargetPath = stagingTargetPath
 	}
 
-	_, err := c.nodeClient.NodePublishVolume(ctx, req)
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
+			Block: &csipbv1.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
+			Mount: &csipbv1.VolumeCapability_MountVolume{
+				FsType:     fsType,
+				MountFlags: mountOptions,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodePublishVolume(ctx, req)
+	return err
+}
+
+func (c *csiDriverClient) nodePublishVolumeV0(
+	ctx context.Context,
+	volID string,
+	readOnly bool,
+	stagingTargetPath string,
+	targetPath string,
+	accessMode api.PersistentVolumeAccessMode,
+	publishContext map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
+	fsType string,
+	mountOptions []string,
+) error {
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv0.NodePublishVolumeRequest{
+		VolumeId:           volID,
+		TargetPath:         targetPath,
+		Readonly:           readOnly,
+		PublishInfo:        publishContext,
+		VolumeAttributes:   volumeContext,
+		NodePublishSecrets: secrets,
+		VolumeCapability: &csipbv0.VolumeCapability{
+			AccessMode: &csipbv0.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV0(accessMode),
+			},
+		},
+	}
+	if stagingTargetPath != "" {
+		req.StagingTargetPath = stagingTargetPath
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Block{
+			Block: &csipbv0.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Mount{
+			Mount: &csipbv0.VolumeCapability_MountVolume{
+				FsType:     fsType,
+				MountFlags: mountOptions,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodePublishVolume(ctx, req)
 	return err
 }
 
 func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string, targetPath string) error {
-	glog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
+	klog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Error(log("failed to assert a connection: %v", err))
-		return err
+
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeUnpublishVolumeV1(ctx, volID, targetPath)
+	} else if c.nodeV0ClientCreator != nil {
+		return c.nodeUnpublishVolumeV0(ctx, volID, targetPath)
 	}
 
-	req := &csipb.NodeUnpublishVolumeRequest{
+	return fmt.Errorf("failed to call NodeUnpublishVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+}
+
+func (c *csiDriverClient) nodeUnpublishVolumeV1(ctx context.Context, volID string, targetPath string) error {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeUnpublishVolumeRequest{
 		VolumeId:   volID,
 		TargetPath: targetPath,
 	}
 
-	_, err := c.nodeClient.NodeUnpublishVolume(ctx, req)
+	_, err = nodeClient.NodeUnpublishVolume(ctx, req)
+	return err
+}
+
+func (c *csiDriverClient) nodeUnpublishVolumeV0(ctx context.Context, volID string, targetPath string) error {
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv0.NodeUnpublishVolumeRequest{
+		VolumeId:   volID,
+		TargetPath: targetPath,
+	}
+
+	_, err = nodeClient.NodeUnpublishVolume(ctx, req)
 	return err
 }
 
 func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	volID string,
-	publishInfo map[string]string,
+	publishContext map[string]string,
 	stagingTargetPath string,
 	fsType string,
 	accessMode api.PersistentVolumeAccessMode,
-	nodeStageSecrets map[string]string,
-	volumeAttribs map[string]string,
+	secrets map[string]string,
+	volumeContext map[string]string,
 ) error {
-	glog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeStageVolumeV1(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+	} else if c.nodeV0ClientCreator != nil {
+		return c.nodeStageVolumeV0(ctx, volID, publishContext, stagingTargetPath, fsType, accessMode, secrets, volumeContext)
+	}
+
+	return fmt.Errorf("failed to call NodeStageVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+}
+
+func (c *csiDriverClient) nodeStageVolumeV1(
+	ctx context.Context,
+	volID string,
+	publishContext map[string]string,
+	stagingTargetPath string,
+	fsType string,
+	accessMode api.PersistentVolumeAccessMode,
+	secrets map[string]string,
+	volumeContext map[string]string,
+) error {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
 		return err
 	}
+	defer closer.Close()
 
-	req := &csipb.NodeStageVolumeRequest{
+	req := &csipbv1.NodeStageVolumeRequest{
 		VolumeId:          volID,
-		PublishInfo:       publishInfo,
+		PublishContext:    publishContext,
 		StagingTargetPath: stagingTargetPath,
-		VolumeCapability: &csipb.VolumeCapability{
-			AccessMode: &csipb.VolumeCapability_AccessMode{
-				Mode: asCSIAccessMode(accessMode),
-			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
+		VolumeCapability: &csipbv1.VolumeCapability{
+			AccessMode: &csipbv1.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV1(accessMode),
 			},
 		},
-		NodeStageSecrets: nodeStageSecrets,
-		VolumeAttributes: volumeAttribs,
+		Secrets:       secrets,
+		VolumeContext: volumeContext,
 	}
 
-	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
+			Block: &csipbv1.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
+			Mount: &csipbv1.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodeStageVolume(ctx, req)
+	return err
+}
+
+func (c *csiDriverClient) nodeStageVolumeV0(
+	ctx context.Context,
+	volID string,
+	publishContext map[string]string,
+	stagingTargetPath string,
+	fsType string,
+	accessMode api.PersistentVolumeAccessMode,
+	secrets map[string]string,
+	volumeContext map[string]string,
+) error {
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv0.NodeStageVolumeRequest{
+		VolumeId:          volID,
+		PublishInfo:       publishContext,
+		StagingTargetPath: stagingTargetPath,
+		VolumeCapability: &csipbv0.VolumeCapability{
+			AccessMode: &csipbv0.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV0(accessMode),
+			},
+		},
+		NodeStageSecrets: secrets,
+		VolumeAttributes: volumeContext,
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Block{
+			Block: &csipbv0.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv0.VolumeCapability_Mount{
+			Mount: &csipbv0.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodeStageVolume(ctx, req)
 	return err
 }
 
 func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error {
-	glog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
-		return err
+
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeUnstageVolumeV1(ctx, volID, stagingTargetPath)
+	} else if c.nodeV0ClientCreator != nil {
+		return c.nodeUnstageVolumeV0(ctx, volID, stagingTargetPath)
 	}
 
-	req := &csipb.NodeUnstageVolumeRequest{
+	return fmt.Errorf("failed to call NodeUnstageVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+}
+
+func (c *csiDriverClient) nodeUnstageVolumeV1(ctx context.Context, volID, stagingTargetPath string) error {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeUnstageVolumeRequest{
 		VolumeId:          volID,
 		StagingTargetPath: stagingTargetPath,
 	}
-	_, err := c.nodeClient.NodeUnstageVolume(ctx, req)
+	_, err = nodeClient.NodeUnstageVolume(ctx, req)
 	return err
 }
 
-func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
-	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
-		return nil, err
-	}
-	req := &csipb.NodeGetCapabilitiesRequest{}
-	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+func (c *csiDriverClient) nodeUnstageVolumeV0(ctx context.Context, volID, stagingTargetPath string) error {
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp.GetCapabilities(), nil
+	defer closer.Close()
+
+	req := &csipbv0.NodeUnstageVolumeRequest{
+		VolumeId:          volID,
+		StagingTargetPath: stagingTargetPath,
+	}
+	_, err = nodeClient.NodeUnstageVolume(ctx, req)
+	return err
 }
 
-func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_AccessMode_Mode {
+func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsStageUnstage"))
+
+	if c.nodeV1ClientCreator != nil {
+		return c.nodeSupportsStageUnstageV1(ctx)
+	} else if c.nodeV0ClientCreator != nil {
+		return c.nodeSupportsStageUnstageV0(ctx)
+	}
+
+	return false, fmt.Errorf("failed to call NodeSupportsStageUnstage. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+}
+
+func (c *csiDriverClient) nodeSupportsStageUnstageV1(ctx context.Context) (bool, error) {
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return false, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	stageUnstageSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
+			stageUnstageSet = true
+		}
+	}
+	return stageUnstageSet, nil
+}
+
+func (c *csiDriverClient) nodeSupportsStageUnstageV0(ctx context.Context) (bool, error) {
+	nodeClient, closer, err := c.nodeV0ClientCreator(c.addr)
+	if err != nil {
+		return false, err
+	}
+	defer closer.Close()
+
+	req := &csipbv0.NodeGetCapabilitiesRequest{}
+	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	stageUnstageSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv0.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
+			stageUnstageSet = true
+		}
+	}
+	return stageUnstageSet, nil
+}
+
+func asCSIAccessModeV1(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode {
 	switch am {
 	case api.ReadWriteOnce:
-		return csipb.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+		return csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
 	case api.ReadOnlyMany:
-		return csipb.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	case api.ReadWriteMany:
-		return csipb.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 	}
-	return csipb.VolumeCapability_AccessMode_UNKNOWN
+	return csipbv1.VolumeCapability_AccessMode_UNKNOWN
+}
+
+func asCSIAccessModeV0(am api.PersistentVolumeAccessMode) csipbv0.VolumeCapability_AccessMode_Mode {
+	switch am {
+	case api.ReadWriteOnce:
+		return csipbv0.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	case api.ReadOnlyMany:
+		return csipbv0.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	case api.ReadWriteMany:
+		return csipbv0.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+	}
+	return csipbv0.VolumeCapability_AccessMode_UNKNOWN
+}
+
+func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
+	network := "unix"
+	klog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
+
+	return grpc.Dial(
+		string(addr),
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
+			return net.Dial(network, target)
+		}),
+	)
+}
+
+func versionRequiresV0Client(version *utilversion.Version) bool {
+	if version != nil && version.Major() == 0 {
+		return true
+	}
+
+	return false
 }

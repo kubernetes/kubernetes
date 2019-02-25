@@ -76,13 +76,15 @@ message HardState {
 }
 
 message ConfState {
-	repeated uint64 nodes = 1;
+	repeated uint64 nodes    = 1;
+	repeated uint64 learners = 2;
 }
 
 enum ConfChangeType {
-	ConfChangeAddNode    = 0;
-	ConfChangeRemoveNode = 1;
-	ConfChangeUpdateNode = 2;
+	ConfChangeAddNode        = 0;
+	ConfChangeRemoveNode     = 1;
+	ConfChangeUpdateNode     = 2;
+	ConfChangeAddLearnerNode = 3;
 }
 
 message ConfChange {

@@ -496,7 +496,6 @@ func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
 
 func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	set := newStatefulSet(5)
-	ssc, spc := newFakeStatefulSetController(set)
 	pod1 := newStatefulSetPod(set, 1)
 	// pod2 is an orphan with matching labels and name.
 	pod2 := newStatefulSetPod(set, 2)
@@ -509,6 +508,8 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	pod4 := newStatefulSetPod(set, 4)
 	pod4.OwnerReferences = nil
 	pod4.Name = "x" + pod4.Name
+
+	ssc, spc := newFakeStatefulSetController(set, pod1, pod2, pod3, pod4)
 
 	spc.podsIndexer.Add(pod1)
 	spc.podsIndexer.Add(pod2)

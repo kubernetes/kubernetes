@@ -35,7 +35,7 @@ type RateLimiter interface {
 }
 
 // DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
-// both overall and per-item rate limitting.  The overall is a token bucket and the per-item is exponential
+// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
 func DefaultControllerRateLimiter() RateLimiter {
 	return NewMaxOfRateLimiter(
 		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
@@ -62,7 +62,7 @@ func (r *BucketRateLimiter) NumRequeues(item interface{}) int {
 func (r *BucketRateLimiter) Forget(item interface{}) {
 }
 
-// ItemExponentialFailureRateLimiter does a simple baseDelay*10^<num-failures> limit
+// ItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
 // dealing with max failures and expiration are up to the caller
 type ItemExponentialFailureRateLimiter struct {
 	failuresLock sync.Mutex

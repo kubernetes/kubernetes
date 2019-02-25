@@ -23,8 +23,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
+// IPPermissionSet maps IP strings of strings to EC2 IpPermissions
 type IPPermissionSet map[string]*ec2.IpPermission
 
+// NewIPPermissionSet creates a new IPPermissionSet
 func NewIPPermissionSet(items ...*ec2.IpPermission) IPPermissionSet {
 	s := make(IPPermissionSet)
 	s.Insert(items...)
@@ -97,10 +99,10 @@ func (s IPPermissionSet) List() []*ec2.IpPermission {
 	return res
 }
 
-// IsSuperset returns true if and only if s1 is a superset of s2.
-func (s1 IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
+// IsSuperset returns true if and only if s is a superset of s2.
+func (s IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
 	for k := range s2 {
-		_, found := s1[k]
+		_, found := s[k]
 		if !found {
 			return false
 		}
@@ -108,11 +110,11 @@ func (s1 IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
 	return true
 }
 
-// Equal returns true if and only if s1 is equal (as a set) to s2.
+// Equal returns true if and only if s is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
-func (s1 IPPermissionSet) Equal(s2 IPPermissionSet) bool {
-	return len(s1) == len(s2) && s1.IsSuperset(s2)
+func (s IPPermissionSet) Equal(s2 IPPermissionSet) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
 }
 
 // Difference returns a set of objects that are not in s2

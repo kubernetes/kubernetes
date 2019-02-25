@@ -2,13 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "intelrdt.go",
-            "stats.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "intelrdt.go",
+        "stats.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/intelrdt",
     importpath = "github.com/opencontainers/runc/libcontainer/intelrdt",
     visibility = ["//visibility:public"],
     deps = select({

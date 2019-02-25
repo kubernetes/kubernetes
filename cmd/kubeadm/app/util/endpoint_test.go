@@ -22,154 +22,196 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestGetMasterEndpoint(t *testing.T) {
+func TestGetControlPlaneEndpoint(t *testing.T) {
 	var tests = []struct {
 		name             string
-		api              *kubeadmapi.API
+		cfg              *kubeadmapi.InitConfiguration
 		expectedEndpoint string
 		expectedError    bool
 	}{
 		{
 			name: "use ControlPlaneEndpoint (dns) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "cp.k8s.io:1234",
+				},
 			},
 			expectedEndpoint: "https://cp.k8s.io:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv4) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1.2.3.4:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1.2.3.4:1234",
+				},
 			},
 			expectedEndpoint: "https://1.2.3.4:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv6) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "[2001:db8::1]:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "[2001:db8::1]:1234",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (dns) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+
+					ControlPlaneEndpoint: "cp.k8s.io",
+				},
 			},
 			expectedEndpoint: "https://cp.k8s.io:4567",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv4) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1.2.3.4",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1.2.3.4",
+				},
 			},
 			expectedEndpoint: "https://1.2.3.4:4567",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv6) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "2001:db8::1",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+
+					ControlPlaneEndpoint: "2001:db8::1",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
 			name: "use AdvertiseAddress (ipv4) + BindPort if ControlPlaneEndpoint is not defined",
-			api: &kubeadmapi.API{
-				BindPort:         4567,
-				AdvertiseAddress: "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
 			},
 			expectedEndpoint: "https://4.5.6.7:4567",
 		},
 		{
 			name: "use AdvertiseAddress (ipv6) + BindPort if ControlPlaneEndpoint is not defined",
-			api: &kubeadmapi.API{
-				BindPort:         4567,
-				AdvertiseAddress: "2001:db8::1",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "2001:db8::1",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
 			name: "fail if invalid BindPort",
-			api: &kubeadmapi.API{
-				BindPort: 0,
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort: 0,
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (dns)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "bad!!.cp.k8s.io",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "bad!!.cp.k8s.io",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (ip4)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1..0",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1..0",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (ip6)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (port)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io:0",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "cp.k8s.io:0",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid AdvertiseAddress (ip4)",
-			api: &kubeadmapi.API{
-				AdvertiseAddress: "1..0",
-				BindPort:         4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1..0",
+					BindPort:         4567,
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid AdvertiseAddress (ip6)",
-			api: &kubeadmapi.API{
-				AdvertiseAddress: "1200::AB00:1234::2552:7777:1313",
-				BindPort:         4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1200::AB00:1234::2552:7777:1313",
+					BindPort:         4567,
+				},
 			},
 			expectedError: true,
 		},
 	}
 
 	for _, rt := range tests {
-		actualEndpoint, actualError := GetMasterEndpoint(rt.api)
+		t.Run(rt.name, func(t *testing.T) {
+			actualEndpoint, actualError := GetControlPlaneEndpoint(rt.cfg.ControlPlaneEndpoint, &rt.cfg.LocalAPIEndpoint)
 
-		if (actualError != nil) && !rt.expectedError {
-			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
-			continue
-		} else if (actualError == nil) && rt.expectedError {
-			t.Errorf("%s passed when expected to fail", rt.name)
-			continue
-		}
+			if (actualError != nil) && !rt.expectedError {
+				t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+				return
+			} else if (actualError == nil) && rt.expectedError {
+				t.Errorf("%s passed when expected to fail", rt.name)
+				return
+			}
 
-		if actualEndpoint != rt.expectedEndpoint {
-			t.Errorf("%s returned invalid endpoint %s, expected %s", rt.name, actualEndpoint, rt.expectedEndpoint)
-		}
+			if actualEndpoint != rt.expectedEndpoint {
+				t.Errorf("%s returned invalid endpoint %s, expected %s", rt.name, actualEndpoint, rt.expectedEndpoint)
+			}
+		})
 	}
 }
 
@@ -276,24 +318,26 @@ func TestParseHostPort(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualHost, actualPort, actualError := ParseHostPort(rt.hostport)
+		t.Run(rt.name, func(t *testing.T) {
+			actualHost, actualPort, actualError := ParseHostPort(rt.hostport)
 
-		if (actualError != nil) && !rt.expectedError {
-			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
-			continue
-		} else if (actualError == nil) && rt.expectedError {
-			t.Errorf("%s passed when expected to fail", rt.name)
-			continue
-		}
+			if (actualError != nil) && !rt.expectedError {
+				t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+				return
+			} else if (actualError == nil) && rt.expectedError {
+				t.Errorf("%s passed when expected to fail", rt.name)
+				return
+			}
 
-		if actualHost != rt.expectedHost {
-			t.Errorf("%s returned invalid host %s, expected %s", rt.name, actualHost, rt.expectedHost)
-			continue
-		}
+			if actualHost != rt.expectedHost {
+				t.Errorf("%s returned invalid host %s, expected %s", rt.name, actualHost, rt.expectedHost)
+				return
+			}
 
-		if actualPort != rt.expectedPort {
-			t.Errorf("%s returned invalid port %s, expected %s", rt.name, actualPort, rt.expectedPort)
-		}
+			if actualPort != rt.expectedPort {
+				t.Errorf("%s returned invalid port %s, expected %s", rt.name, actualPort, rt.expectedPort)
+			}
+		})
 	}
 }
 
@@ -328,18 +372,20 @@ func TestParsePort(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualPort, actualError := parsePort(rt.port)
+		t.Run(rt.name, func(t *testing.T) {
+			actualPort, actualError := ParsePort(rt.port)
 
-		if (actualError != nil) && !rt.expectedError {
-			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
-			continue
-		} else if (actualError == nil) && rt.expectedError {
-			t.Errorf("%s passed when expected to fail", rt.name)
-			continue
-		}
+			if (actualError != nil) && !rt.expectedError {
+				t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+				return
+			} else if (actualError == nil) && rt.expectedError {
+				t.Errorf("%s passed when expected to fail", rt.name)
+				return
+			}
 
-		if actualPort != rt.expectedPort {
-			t.Errorf("%s returned invalid port %d, expected %d", rt.name, actualPort, rt.expectedPort)
-		}
+			if actualPort != rt.expectedPort {
+				t.Errorf("%s returned invalid port %d, expected %d", rt.name, actualPort, rt.expectedPort)
+			}
+		})
 	}
 }

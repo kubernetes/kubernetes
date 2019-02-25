@@ -116,5 +116,5 @@ func (v *ElementBuildingVisitor) getItem(s proto.Schema, name string, data apply
 			},
 		}, nil
 	}
-	return nil, fmt.Errorf("unsupported type type %v", kind)
+	return nil, fmt.Errorf("unsupported type %v", kind)
 }

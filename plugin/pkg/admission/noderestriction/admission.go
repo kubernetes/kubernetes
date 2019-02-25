@@ -19,21 +19,29 @@ package noderestriction
 import (
 	"fmt"
 	"io"
+	"strings"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	corev1lister "k8s.io/client-go/listers/core/v1"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -61,18 +69,18 @@ func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *nodePlugin {
 type nodePlugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
-	podsGetter     internalversion.PodLister
+	podsGetter     corev1lister.PodLister
 	// allows overriding for testing
 	features utilfeature.FeatureGate
 }
 
 var (
 	_ = admission.Interface(&nodePlugin{})
-	_ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&nodePlugin{})
+	_ = apiserveradmission.WantsExternalKubeInformerFactory(&nodePlugin{})
 )
 
-func (p *nodePlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	p.podsGetter = f.Core().InternalVersion().Pods().Lister()
+func (p *nodePlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	p.podsGetter = f.Core().V1().Pods().Lister()
 }
 
 func (p *nodePlugin) ValidateInitialization() error {
@@ -86,13 +94,15 @@ func (p *nodePlugin) ValidateInitialization() error {
 }
 
 var (
-	podResource     = api.Resource("pods")
-	nodeResource    = api.Resource("nodes")
-	pvcResource     = api.Resource("persistentvolumeclaims")
-	svcacctResource = api.Resource("serviceaccounts")
+	podResource         = api.Resource("pods")
+	nodeResource        = api.Resource("nodes")
+	pvcResource         = api.Resource("persistentvolumeclaims")
+	svcacctResource     = api.Resource("serviceaccounts")
+	leaseResource       = coordapi.Resource("leases")
+	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
 )
 
-func (c *nodePlugin) Admit(a admission.Attributes) error {
+func (c *nodePlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	nodeName, isNode := c.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
 	// Our job is just to restrict nodes
@@ -115,7 +125,7 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 		case "eviction":
 			return c.admitPodEviction(nodeName, a)
 		default:
-			return admission.NewForbidden(a, fmt.Errorf("unexpected pod subresource %q", a.GetSubresource()))
+			return admission.NewForbidden(a, fmt.Errorf("unexpected pod subresource %q, only 'status' and 'eviction' are allowed", a.GetSubresource()))
 		}
 
 	case nodeResource:
@@ -134,6 +144,18 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 			return c.admitServiceAccount(nodeName, a)
 		}
 		return nil
+
+	case leaseResource:
+		if c.features.Enabled(features.NodeLease) {
+			return c.admitLease(nodeName, a)
+		}
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.NodeLease))
+
+	case csiNodeInfoResource:
+		if c.features.Enabled(features.KubeletPluginsWatcher) && c.features.Enabled(features.CSINodeInfo) {
+			return c.admitCSINodeInfo(nodeName, a)
+		}
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo))
 
 	default:
 		return nil
@@ -197,7 +219,7 @@ func (c *nodePlugin) admitPod(nodeName string, a admission.Attributes) error {
 		return nil
 
 	default:
-		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q, node %q can only create and delete mirror pods", a.GetOperation(), nodeName))
 	}
 }
 
@@ -259,7 +281,7 @@ func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) err
 	switch a.GetOperation() {
 	case admission.Update:
 		if !c.features.Enabled(features.ExpandPersistentVolumes) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q may not update persistentvolumeclaim metadata", nodeName))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update persistentvolumeclaim metadata", nodeName))
 		}
 
 		oldPVC, ok := a.GetOldObject().(*api.PersistentVolumeClaim)
@@ -289,7 +311,7 @@ func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) err
 
 		// ensure no metadata changed. nodes should not be able to relabel, add finalizers/owners, etc
 		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q may not update fields other than status.capacity and status.conditions: %v", nodeName, diff.ObjectReflectDiff(oldPVC, newPVC)))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.capacity and status.conditions: %v", nodeName, diff.ObjectReflectDiff(oldPVC, newPVC)))
 		}
 
 		return nil
@@ -310,7 +332,19 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		// Don't allow a node to create its Node API object with the config source set.
 		// We scope node access to things listed in the Node.Spec, so allowing this would allow a view escalation.
 		if node.Spec.ConfigSource != nil {
-			return admission.NewForbidden(a, fmt.Errorf("cannot create with non-nil configSource"))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to create pods with a non-nil configSource", nodeName))
+		}
+
+		// Don't allow a node to register with labels outside the allowed set.
+		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
+		modifiedLabels := getModifiedLabels(node.Labels, nil)
+		if forbiddenLabels := c.getForbiddenCreateLabels(modifiedLabels); len(forbiddenLabels) > 0 {
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
+		}
+		// check and warn if nodes set labels on create that would have been forbidden on update
+		// TODO(liggitt): in 1.17, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
+		if forbiddenUpdateLabels := c.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
+			klog.Warningf("node %q added disallowed labels on node creation: %s", nodeName, strings.Join(forbiddenUpdateLabels.List(), ", "))
 		}
 
 		// On create, get name from new object if unset in admission
@@ -319,7 +353,7 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		}
 	}
 	if requestedName != nodeName {
-		return admission.NewForbidden(a, fmt.Errorf("node %q cannot modify node %q", nodeName, requestedName))
+		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
 	}
 
 	if a.GetOperation() == admission.Update {
@@ -336,11 +370,98 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		// We scope node access to things listed in the Node.Spec, so allowing this would allow a view escalation.
 		// We only do the check if the new node's configSource is non-nil; old kubelets might drop the field during a status update.
 		if node.Spec.ConfigSource != nil && !apiequality.Semantic.DeepEqual(node.Spec.ConfigSource, oldNode.Spec.ConfigSource) {
-			return admission.NewForbidden(a, fmt.Errorf("cannot update configSource to a new non-nil configSource"))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update configSource to a new non-nil configSource", nodeName))
+		}
+
+		// Don't allow a node to update its own taints. This would allow a node to remove or modify its
+		// taints in a way that would let it steer disallowed workloads to itself.
+		if !apiequality.Semantic.DeepEqual(node.Spec.Taints, oldNode.Spec.Taints) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify taints", nodeName))
+		}
+
+		// Don't allow a node to update labels outside the allowed set.
+		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
+		modifiedLabels := getModifiedLabels(node.Labels, oldNode.Labels)
+		if forbiddenUpdateLabels := c.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
+			return admission.NewForbidden(a, fmt.Errorf("is not allowed to modify labels: %s", strings.Join(forbiddenUpdateLabels.List(), ", ")))
 		}
 	}
 
 	return nil
+}
+
+// getModifiedLabels returns the set of label keys that are different between the two maps
+func getModifiedLabels(a, b map[string]string) sets.String {
+	modified := sets.NewString()
+	for k, v1 := range a {
+		if v2, ok := b[k]; !ok || v1 != v2 {
+			modified.Insert(k)
+		}
+	}
+	for k, v1 := range b {
+		if v2, ok := a[k]; !ok || v1 != v2 {
+			modified.Insert(k)
+		}
+	}
+	return modified
+}
+
+func isKubernetesLabel(key string) bool {
+	namespace := getLabelNamespace(key)
+	if namespace == "kubernetes.io" || strings.HasSuffix(namespace, ".kubernetes.io") {
+		return true
+	}
+	if namespace == "k8s.io" || strings.HasSuffix(namespace, ".k8s.io") {
+		return true
+	}
+	return false
+}
+
+func getLabelNamespace(key string) string {
+	if parts := strings.SplitN(key, "/", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
+// getForbiddenCreateLabels returns the set of labels that may not be set by the node.
+// TODO(liggitt): in 1.17, expand to match getForbiddenUpdateLabels()
+func (c *nodePlugin) getForbiddenCreateLabels(modifiedLabels sets.String) sets.String {
+	if len(modifiedLabels) == 0 {
+		return nil
+	}
+
+	forbiddenLabels := sets.NewString()
+	for label := range modifiedLabels {
+		namespace := getLabelNamespace(label)
+		// forbid kubelets from setting node-restriction labels
+		if namespace == v1.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+v1.LabelNamespaceNodeRestriction) {
+			forbiddenLabels.Insert(label)
+		}
+	}
+	return forbiddenLabels
+}
+
+// getForbiddenLabels returns the set of labels that may not be set by the node on update.
+func (c *nodePlugin) getForbiddenUpdateLabels(modifiedLabels sets.String) sets.String {
+	if len(modifiedLabels) == 0 {
+		return nil
+	}
+
+	forbiddenLabels := sets.NewString()
+	for label := range modifiedLabels {
+		namespace := getLabelNamespace(label)
+		// forbid kubelets from setting node-restriction labels
+		if namespace == v1.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+v1.LabelNamespaceNodeRestriction) {
+			forbiddenLabels.Insert(label)
+		}
+		// forbid kubelets from setting unknown kubernetes.io and k8s.io labels on update
+		if isKubernetesLabel(label) && !kubeletapis.IsKubeletLabel(label) {
+			// TODO: defer to label policy once available
+			forbiddenLabels.Insert(label)
+		}
+	}
+	return forbiddenLabels
 }
 
 func (c *nodePlugin) admitServiceAccount(nodeName string, a admission.Attributes) error {
@@ -379,6 +500,51 @@ func (c *nodePlugin) admitServiceAccount(nodeName string, a admission.Attributes
 	}
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
+	}
+
+	return nil
+}
+
+func (r *nodePlugin) admitLease(nodeName string, a admission.Attributes) error {
+	// the request must be against the system namespace reserved for node leases
+	if a.GetNamespace() != api.NamespaceNodeLease {
+		return admission.NewForbidden(a, fmt.Errorf("can only access leases in the %q system namespace", api.NamespaceNodeLease))
+	}
+
+	// the request must come from a node with the same name as the lease
+	if a.GetOperation() == admission.Create {
+		// a.GetName() won't return the name on create, so we drill down to the proposed object
+		lease, ok := a.GetObject().(*coordapi.Lease)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if lease.Name != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access node lease with the same name as the requesting node"))
+		}
+	} else {
+		if a.GetName() != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access node lease with the same name as the requesting node"))
+		}
+	}
+
+	return nil
+}
+
+func (c *nodePlugin) admitCSINodeInfo(nodeName string, a admission.Attributes) error {
+	// the request must come from a node with the same name as the CSINodeInfo object
+	if a.GetOperation() == admission.Create {
+		// a.GetName() won't return the name on create, so we drill down to the proposed object
+		accessor, err := meta.Accessor(a.GetObject())
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("unable to access the object name"))
+		}
+		if accessor.GetName() != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access CSINodeInfo with the same name as the requesting node"))
+		}
+	} else {
+		if a.GetName() != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access CSINodeInfo with the same name as the requesting node"))
+		}
 	}
 
 	return nil

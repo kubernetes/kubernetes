@@ -26,18 +26,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/set/env"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -61,7 +62,7 @@ var (
 		` + envResources)
 
 	envExample = templates.Examples(`
-		# Update deployment 'registry' with a new environment variable
+          # Update deployment 'registry' with a new environment variable
 	  kubectl set env deployment/registry STORAGE_DIR=/local
 
 	  # List the environment variables defined on a deployments 'sample-build'
@@ -82,6 +83,9 @@ var (
 	  # Import environment from a config map with a prefix
 	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
+          # Import specific keys from a config map
+          kubectl set env --keys=my-example-key --from=configmap/myconfigmap deployment/myapp
+
 	  # Remove the environment variable ENV from container 'c1' in all deployment configs
 	  kubectl set env deployments --all --containers="c1" ENV-
 
@@ -93,8 +97,9 @@ var (
 	  env | grep RAILS_ | kubectl set env -e - deployment/registry`)
 )
 
+// EnvOptions holds values for 'set env' command-lone options
 type EnvOptions struct {
-	PrintFlags *printers.PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	resource.FilenameOptions
 
 	EnvParams         []string
@@ -107,6 +112,7 @@ type EnvOptions struct {
 	Selector          string
 	From              string
 	Prefix            string
+	Keys              []string
 
 	PrintObj printers.ResourcePrinterFunc
 
@@ -115,7 +121,7 @@ type EnvOptions struct {
 	output                 string
 	dryRun                 bool
 	builder                func() *resource.Builder
-	updatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
 	enforceNamespace       bool
 	clientset              *kubernetes.Clientset
@@ -127,7 +133,7 @@ type EnvOptions struct {
 // pod templates are selected by default and allowing environment to be overwritten
 func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 	return &EnvOptions{
-		PrintFlags: printers.NewPrintFlags("env updated", legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("env updated").WithTypeSetter(scheme.Scheme),
 
 		ContainerSelector: "*",
 		Overwrite:         true,
@@ -140,11 +146,11 @@ func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEnvOptions(streams)
 	cmd := &cobra.Command{
-		Use: "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
-		Short:   "Update environment variables on a pod template",
-		Long:    envLong,
-		Example: fmt.Sprintf(envExample),
+		Short:                 "Update environment variables on a pod template",
+		Long:                  envLong,
+		Example:               fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -157,6 +163,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd.Flags().StringVarP(&o.From, "from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringVarP(&o.Prefix, "prefix", "", "", "Prefix to append to variable names")
 	cmd.Flags().StringArrayVarP(&o.EnvParams, "env", "e", o.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
+	cmd.Flags().StringSliceVarP(&o.Keys, "keys", "", o.Keys, "Comma-separated list of keys to import from specified resource")
 	cmd.Flags().BoolVar(&o.List, "list", o.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&o.Resolve, "resolve", o.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
@@ -183,6 +190,20 @@ func keyToEnvName(key string) string {
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
+func contains(key string, keyList []string) bool {
+	if len(keyList) == 0 {
+		return true
+	}
+
+	for _, k := range keyList {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+// Complete completes all required options
 func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if o.All && len(o.Selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
@@ -193,7 +214,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return fmt.Errorf("all resources must be specified before environment changes: %s", strings.Join(args, " "))
 	}
 
-	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -214,7 +235,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -223,12 +244,16 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	return nil
 }
 
+// Validate makes sure provided values for EnvOptions are valid
 func (o *EnvOptions) Validate() error {
 	if len(o.Filenames) == 0 && len(o.resources) < 1 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if o.List && len(o.output) > 0 {
 		return fmt.Errorf("--list and --output may not be specified together")
+	}
+	if len(o.Keys) > 0 && len(o.From) == 0 {
+		return fmt.Errorf("when specifying --keys, a configmap or secret must be provided with --from")
 	}
 	return nil
 }
@@ -265,33 +290,37 @@ func (o *EnvOptions) RunEnv() error {
 			switch from := info.Object.(type) {
 			case *v1.Secret:
 				for key := range from.Data {
-					envVar := v1.EnvVar{
-						Name: keyToEnvName(key),
-						ValueFrom: &v1.EnvVarSource{
-							SecretKeyRef: &v1.SecretKeySelector{
-								LocalObjectReference: v1.LocalObjectReference{
-									Name: from.Name,
+					if contains(key, o.Keys) {
+						envVar := v1.EnvVar{
+							Name: keyToEnvName(key),
+							ValueFrom: &v1.EnvVarSource{
+								SecretKeyRef: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: from.Name,
+									},
+									Key: key,
 								},
-								Key: key,
 							},
-						},
+						}
+						env = append(env, envVar)
 					}
-					env = append(env, envVar)
 				}
 			case *v1.ConfigMap:
 				for key := range from.Data {
-					envVar := v1.EnvVar{
-						Name: keyToEnvName(key),
-						ValueFrom: &v1.EnvVarSource{
-							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
-								LocalObjectReference: v1.LocalObjectReference{
-									Name: from.Name,
+					if contains(key, o.Keys) {
+						envVar := v1.EnvVar{
+							Name: keyToEnvName(key),
+							ValueFrom: &v1.EnvVarSource{
+								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: from.Name,
+									},
+									Key: key,
 								},
-								Key: key,
 							},
-						},
+						}
+						env = append(env, envVar)
 					}
-					env = append(env, envVar)
 				}
 			default:
 				return fmt.Errorf("unsupported resource specified in --from")
@@ -323,12 +352,53 @@ func (o *EnvOptions) RunEnv() error {
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		_, err := o.updatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+		_, err := o.updatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
+			objName, err := meta.NewAccessor().Name(obj)
+			if err != nil {
+				return err
+			}
+
+			gvks, _, err := scheme.Scheme.ObjectKinds(obj)
+			if err != nil {
+				return err
+			}
+			objKind := obj.GetObjectKind().GroupVersionKind().Kind
+			if len(objKind) == 0 {
+				for _, gvk := range gvks {
+					if len(gvk.Kind) == 0 {
+						continue
+					}
+					if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+						continue
+					}
+
+					objKind = gvk.Kind
+					break
+				}
+			}
+
 			if len(containers) == 0 {
-				fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.ContainerSelector)
+				if gvks, _, err := scheme.Scheme.ObjectKinds(obj); err == nil {
+					objKind := obj.GetObjectKind().GroupVersionKind().Kind
+					if len(objKind) == 0 {
+						for _, gvk := range gvks {
+							if len(gvk.Kind) == 0 {
+								continue
+							}
+							if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+								continue
+							}
+
+							objKind = gvk.Kind
+							break
+						}
+					}
+
+					fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", objKind, objName, o.ContainerSelector)
+				}
 				return nil
 			}
 			for _, c := range containers {
@@ -343,7 +413,7 @@ func (o *EnvOptions) RunEnv() error {
 					resolveErrors := map[string][]string{}
 					store := envutil.NewResourceStore()
 
-					fmt.Fprintf(o.Out, "# %s %s, container %s\n", info.Mapping.Resource, info.Name, c.Name)
+					fmt.Fprintf(o.Out, "# %s %s, container %s\n", objKind, objName, c.Name)
 					for _, env := range c.Env {
 						// Print the simple value
 						if env.ValueFrom == nil {
@@ -357,7 +427,7 @@ func (o *EnvOptions) RunEnv() error {
 							continue
 						}
 
-						value, err := envutil.GetEnvVarRefValue(o.clientset, o.namespace, store, env.ValueFrom, info.Object, c)
+						value, err := envutil.GetEnvVarRefValue(o.clientset, o.namespace, store, env.ValueFrom, obj, c)
 						// Print the resolved value
 						if err == nil {
 							fmt.Fprintf(o.Out, "%s=%s\n", env.Name, value)
@@ -390,7 +460,7 @@ func (o *EnvOptions) RunEnv() error {
 		})
 
 		if err == nil {
-			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 		}
 		return nil, err
 	})
@@ -404,7 +474,8 @@ func (o *EnvOptions) RunEnv() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			name := info.ObjectName()
+			allErrs = append(allErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 
@@ -414,18 +485,17 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		if o.Local || o.dryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
-				return err
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
 		// make sure arguments to set or replace environment variables are set
 		// before returning a successful message
@@ -433,8 +503,8 @@ func (o *EnvOptions) RunEnv() error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
-			return err
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

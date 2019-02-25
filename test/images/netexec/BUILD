@@ -15,7 +15,7 @@ go_library(
     name = "go_default_library",
     srcs = ["netexec.go"],
     importpath = "k8s.io/kubernetes/test/images/netexec",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 
 filegroup(

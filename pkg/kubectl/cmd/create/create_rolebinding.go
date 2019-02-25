@@ -19,11 +19,12 @@ package create
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -35,33 +36,34 @@ var (
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
+// RoleBindingOpts holds the options for 'create rolebinding' sub command
 type RoleBindingOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
 
-// RoleBinding is a command to ease creating RoleBindings.
+// NewCmdCreateRoleBinding returns an initialized Command instance for 'create rolebinding' sub command
 func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &RoleBindingOpts{
+	o := &RoleBindingOpts{
 		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
-		Long:    roleBindingLong,
-		Example: roleBindingExample,
+		Short:                 i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
+		Long:                  roleBindingLong,
+		Example:               roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.RoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
 	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
 	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
@@ -70,16 +72,17 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.RoleBindingV1GeneratorName:
-		generator = &kubectl.RoleBindingGeneratorV1{
+	case generateversioned.RoleBindingV1GeneratorName:
+		generator = &generateversioned.RoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Role:            cmdutil.GetFlagString(cmd, "role"),
@@ -94,6 +97,7 @@ func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
+// Run calls the CreateSubcommandOptions.Run in RoleBindingOpts instance
 func (o *RoleBindingOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

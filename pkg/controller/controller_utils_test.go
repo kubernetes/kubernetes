@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +82,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Image: "foo/bar",
+							Image:                  "foo/bar",
 							TerminationMessagePath: v1.TerminationMessagePathDefault,
 							ImagePullPolicy:        v1.PullIfNotPresent,
 							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
@@ -122,8 +122,8 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	}
 }
 
-func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
@@ -131,7 +131,7 @@ func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
 			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
@@ -144,7 +144,7 @@ func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Image: "foo/bar",
+							Image:                  "foo/bar",
 							TerminationMessagePath: v1.TerminationMessagePathDefault,
 							ImagePullPolicy:        v1.PullIfNotPresent,
 							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
@@ -314,6 +314,19 @@ func TestCreatePods(t *testing.T) {
 		"Body: %s", fakeHandler.RequestBody)
 }
 
+func TestDeletePodsAllowsMissing(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	podControl := RealPodControl{
+		KubeClient: fakeClient,
+		Recorder:   &record.FakeRecorder{},
+	}
+
+	controllerSpec := newReplicationController(1)
+
+	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	assert.NoError(t, err, "unexpected error: %v", err)
+}
+
 func TestActivePodFiltering(t *testing.T) {
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
@@ -417,7 +430,7 @@ func TestSortingActivePods(t *testing.T) {
 }
 
 func TestActiveReplicaSetsFiltering(t *testing.T) {
-	var replicaSets []*extensions.ReplicaSet
+	var replicaSets []*apps.ReplicaSet
 	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
 	replicaSets = append(replicaSets, nil)
 	replicaSets = append(replicaSets, newReplicaSet("foo", 1))

@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -110,30 +111,25 @@ func setEquivalent(set1, set2 []string) bool {
 
 // this func must run in admin mode, otherwise it will fail
 func TestGetMountRefs(t *testing.T) {
-	fm := &FakeMounter{MountPoints: []MountPoint{}}
-	mountPath := `c:\secondmountpath`
-	expectedRefs := []string{`c:\`, `c:\firstmountpath`, mountPath}
-
-	// remove symbolic links first
-	for i := 1; i < len(expectedRefs); i++ {
-		removeLink(expectedRefs[i])
+	tests := []struct {
+		mountPath    string
+		expectedRefs []string
+	}{
+		{
+			mountPath:    `c:\windows`,
+			expectedRefs: []string{`c:\windows`},
+		},
+		{
+			mountPath:    `c:\doesnotexist`,
+			expectedRefs: []string{},
+		},
 	}
 
-	// create symbolic links
-	for i := 1; i < len(expectedRefs); i++ {
-		if err := makeLink(expectedRefs[i], expectedRefs[i-1]); err != nil {
-			t.Errorf("makeLink failed: %v", err)
-		}
-	}
+	mounter := Mounter{"fake/path"}
 
-	if refs, err := GetMountRefs(fm, mountPath); err != nil || !setEquivalent(expectedRefs, refs) {
-		t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", mountPath, refs, err, expectedRefs)
-	}
-
-	// remove symbolic links
-	for i := 1; i < len(expectedRefs); i++ {
-		if err := removeLink(expectedRefs[i]); err != nil {
-			t.Errorf("removeLink failed: %v", err)
+	for _, test := range tests {
+		if refs, err := mounter.GetMountRefs(test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
+			t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", test.mountPath, refs, err, test.expectedRefs)
 		}
 	}
 }
@@ -575,8 +571,8 @@ func TestPathWithinBase(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := pathWithinBase(test.fullPath, test.basePath)
-		assert.Equal(t, result, test.expectedResult, "Expect result not equal with pathWithinBase(%s, %s) return: %q, expected: %q",
+		result := PathWithinBase(test.fullPath, test.basePath)
+		assert.Equal(t, result, test.expectedResult, "Expect result not equal with PathWithinBase(%s, %s) return: %q, expected: %q",
 			test.fullPath, test.basePath, result, test.expectedResult)
 	}
 }
@@ -626,6 +622,206 @@ func TestGetFileType(t *testing.T) {
 		}
 		if fileType != tc.expectedType {
 			t.Fatalf("[%d-%s] expected %s, but got %s", idx, tc.name, tc.expectedType, fileType)
+		}
+	}
+}
+
+func TestIsLikelyNotMountPoint(t *testing.T) {
+	mounter := Mounter{"fake/path"}
+
+	tests := []struct {
+		fileName       string
+		targetLinkName string
+		setUp          func(base, fileName, targetLinkName string) error
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			"Dir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return os.Mkdir(filepath.Join(base, fileName), 0750)
+			},
+			true,
+			false,
+		},
+		{
+			"InvalidDir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return nil
+			},
+			true,
+			true,
+		},
+		{
+			"ValidSymLink",
+			"targetSymLink",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return nil
+			},
+			false,
+			false,
+		},
+		{
+			"InvalidSymLink",
+			"targetSymLink2",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return removeLink(targeLinkPath)
+			},
+			true,
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		base, err := ioutil.TempDir("", test.fileName)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		defer os.RemoveAll(base)
+
+		if err := test.setUp(base, test.fileName, test.targetLinkName); err != nil {
+			t.Fatalf("unexpected error in setUp(%s, %s): %v", test.fileName, test.targetLinkName, err)
+		}
+
+		filePath := filepath.Join(base, test.fileName)
+		result, err := mounter.IsLikelyNotMountPoint(filePath)
+		assert.Equal(t, result, test.expectedResult, "Expect result not equal with IsLikelyNotMountPoint(%s) return: %q, expected: %q",
+			filePath, result, test.expectedResult)
+
+		if test.expectError {
+			assert.NotNil(t, err, "Expect error during IsLikelyNotMountPoint(%s)", filePath)
+		} else {
+			assert.Nil(t, err, "Expect error is nil during IsLikelyNotMountPoint(%s)", filePath)
+		}
+	}
+}
+
+func TestFormatAndMount(t *testing.T) {
+	fakeMounter := ErrorMounter{&FakeMounter{}, 0, nil}
+	execCallback := func(cmd string, args ...string) ([]byte, error) {
+		for j := range args {
+			if strings.Contains(args[j], "Get-Disk -Number") {
+				return []byte("0"), nil
+			}
+
+			if strings.Contains(args[j], "Get-Partition -DiskNumber") {
+				return []byte("0"), nil
+			}
+
+			if strings.Contains(args[j], "mklink") {
+				return nil, nil
+			}
+		}
+		return nil, fmt.Errorf("Unexpected cmd %s, args %v", cmd, args)
+	}
+	fakeExec := NewFakeExec(execCallback)
+
+	mounter := SafeFormatAndMount{
+		Interface: &fakeMounter,
+		Exec:      fakeExec,
+	}
+
+	tests := []struct {
+		device       string
+		target       string
+		fstype       string
+		mountOptions []string
+		expectError  bool
+	}{
+		{
+			"0",
+			"disk",
+			"NTFS",
+			[]string{},
+			false,
+		},
+		{
+			"0",
+			"disk",
+			"",
+			[]string{},
+			false,
+		},
+		{
+			"invalidDevice",
+			"disk",
+			"NTFS",
+			[]string{},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		base, err := ioutil.TempDir("", test.device)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		defer os.RemoveAll(base)
+
+		target := filepath.Join(base, test.target)
+		err = mounter.FormatAndMount(test.device, target, test.fstype, test.mountOptions)
+		if test.expectError {
+			assert.NotNil(t, err, "Expect error during FormatAndMount(%s, %s, %s, %v)", test.device, test.target, test.fstype, test.mountOptions)
+		} else {
+			assert.Nil(t, err, "Expect error is nil during FormatAndMount(%s, %s, %s, %v)", test.device, test.target, test.fstype, test.mountOptions)
+		}
+	}
+}
+
+func TestNewSMBMapping(t *testing.T) {
+	tests := []struct {
+		username    string
+		password    string
+		remotepath  string
+		expectError bool
+	}{
+		{
+			"",
+			"password",
+			`\\remotepath`,
+			true,
+		},
+		{
+			"username",
+			"",
+			`\\remotepath`,
+			true,
+		},
+		{
+			"username",
+			"password",
+			"",
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		_, err := newSMBMapping(test.username, test.password, test.remotepath)
+		if test.expectError {
+			assert.NotNil(t, err, "Expect error during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
+		} else {
+			assert.Nil(t, err, "Expect error is nil during newSMBMapping(%s, %s, %s, %v)", test.username, test.password, test.remotepath)
 		}
 	}
 }

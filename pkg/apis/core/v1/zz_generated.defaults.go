@@ -213,6 +213,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -260,6 +263,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Containers {
 		a := &in.Spec.Containers[i]
@@ -301,6 +307,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -356,6 +365,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -403,6 +415,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Template.Spec.Containers {
 		a := &in.Template.Spec.Containers[i]
@@ -444,6 +459,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -501,6 +519,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 							}
 						}
 					}
+					if b.ServiceAccountToken != nil {
+						SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					}
 				}
 			}
 			if a.VolumeSource.ScaleIO != nil {
@@ -548,6 +569,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 					}
 				}
 			}
+			if a.SecurityContext != nil {
+				SetDefaults_SecurityContext(a.SecurityContext)
+			}
 		}
 		for i := range in.Spec.Template.Spec.Containers {
 			a := &in.Spec.Template.Spec.Containers[i]
@@ -589,6 +613,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 					}
 				}
+			}
+			if a.SecurityContext != nil {
+				SetDefaults_SecurityContext(a.SecurityContext)
 			}
 		}
 	}

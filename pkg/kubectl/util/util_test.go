@@ -19,7 +19,7 @@ package util
 import "testing"
 
 func TestParseFileSource(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name     string
 		input    string
 		key      string
@@ -88,35 +88,37 @@ func TestParseFileSource(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		key, filepath, err := ParseFileSource(tc.input)
-		if err != nil {
-			if tc.err {
-				continue
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, filepath, err := ParseFileSource(tt.input)
+			if err != nil {
+				if tt.err {
+					return
+				}
+
+				t.Errorf("%v: unexpected error: %v", tt.name, err)
+				return
 			}
 
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
+			if tt.err {
+				t.Errorf("%v: unexpected success", tt.name)
+				return
+			}
 
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
+			if e, a := tt.key, key; e != a {
+				t.Errorf("%v: expected key %v; got %v", tt.name, e, a)
+				return
+			}
 
-		if e, a := tc.key, key; e != a {
-			t.Errorf("%v: expected key %v; got %v", tc.name, e, a)
-			continue
-		}
-
-		if e, a := tc.filepath, filepath; e != a {
-			t.Errorf("%v: expected filepath %v; got %v", tc.name, e, a)
-		}
+			if e, a := tt.filepath, filepath; e != a {
+				t.Errorf("%v: expected filepath %v; got %v", tt.name, e, a)
+			}
+		})
 	}
 }
 
 func TestParseLiteralSource(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name  string
 		input string
 		key   string
@@ -170,29 +172,31 @@ func TestParseLiteralSource(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		key, value, err := ParseLiteralSource(tc.input)
-		if err != nil {
-			if tc.err {
-				continue
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, value, err := ParseLiteralSource(tt.input)
+			if err != nil {
+				if tt.err {
+					return
+				}
+
+				t.Errorf("%v: unexpected error: %v", tt.name, err)
+				return
 			}
 
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
+			if tt.err {
+				t.Errorf("%v: unexpected success", tt.name)
+				return
+			}
 
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
+			if e, a := tt.key, key; e != a {
+				t.Errorf("%v: expected key %v; got %v", tt.name, e, a)
+				return
+			}
 
-		if e, a := tc.key, key; e != a {
-			t.Errorf("%v: expected key %v; got %v", tc.name, e, a)
-			continue
-		}
-
-		if e, a := tc.value, value; e != a {
-			t.Errorf("%v: expected value %v; got %v", tc.name, e, a)
-		}
+			if e, a := tt.value, value; e != a {
+				t.Errorf("%v: expected value %v; got %v", tt.name, e, a)
+			}
+		})
 	}
 }

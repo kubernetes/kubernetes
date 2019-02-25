@@ -1,10 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - luxas
 - wlan0
 - andrewsykim
+- sttts
 reviewers:
 - thockin
 - luxas
 - wlan0
 - andrewsykim
+- cheftako
+- stewart-yu
+- sttts
+labels:
+- sig/api-machinery
+- sig/cloud-provider

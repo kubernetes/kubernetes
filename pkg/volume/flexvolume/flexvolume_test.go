@@ -28,6 +28,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/utils/exec"
 )
 
 const execScriptTempl1 = `#!/usr/bin/env bash
@@ -173,8 +174,9 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
+	runner := exec.New()
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir), volumetest.NewFakeVolumeHost("fake", nil, nil))
+	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost("fake", nil, nil))
 	plugin, err := plugMgr.FindPluginByName("flexvolume-kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
@@ -201,8 +203,9 @@ func TestGetAccessModes(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
+	runner := exec.New()
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plugin, err := plugMgr.FindPersistentPluginByName("flexvolume-kubernetes.io/fakeAttacher")
 	if err != nil {

@@ -1,7 +1,13 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load(":code_generation_test.bzl", "code_generation_test_suite")
+load(":platforms.bzl", "for_platforms")
+
+code_generation_test_suite(
+    name = "code_generation_tests",
+)
 
 filegroup(
     name = "package-srcs",
@@ -25,34 +31,51 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": "@official_busybox//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@official_busybox//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@official_busybox//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@official_busybox//image",
+        "base": select(for_platforms(
+            for_node = "@debian-base-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": "@debian-iptables-amd64//image",
+        "base": select(for_platforms(
+            for_node = "@debian-iptables-{ARCH}//image",
+            only_os = "linux",
+        )),
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
 
-[docker_build(
+[container_image(
     name = binary + "-internal",
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = [
-        "//build/debs:%s.deb" % binary,
-    ],
+    debs = select(for_platforms(
+        for_node = ["//build/debs:%s-{ARCH}.deb" % binary],
+        only_os = "linux",
+    )),
+    stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
         # but the debs install the binaries into /usr/bin.
@@ -60,14 +83,11 @@ DOCKERIZED_BINARIES = {
     },
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
-[docker_bundle(
+[container_bundle(
     name = binary,
-    # TODO(thockin): remove the google_containers name after release 1.11.
     images = {
         "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
-        "gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
     },
-    stamp = True,
 ) for binary in DOCKERIZED_BINARIES.keys()]
 
 [genrule(
@@ -90,12 +110,6 @@ grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
     stamp = 1,
 )
 
-genrule(
-    name = "cni_package_version",
-    outs = ["cni_version"],
-    cmd = "echo 0.5.1 >$@",
-)
-
 release_filegroup(
     name = "docker-artifacts",
     srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
@@ -105,19 +119,19 @@ release_filegroup(
 # KUBE_CLIENT_TARGETS
 release_filegroup(
     name = "client-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_client = [
         "//cmd/kubectl",
-    ],
+    ]),
 )
 
 # KUBE_NODE_TARGETS
 release_filegroup(
     name = "node-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_node = [
         "//cmd/kube-proxy",
         "//cmd/kubeadm",
         "//cmd/kubelet",
-    ],
+    ]),
 )
 
 # KUBE_SERVER_TARGETS
@@ -125,32 +139,35 @@ release_filegroup(
 # since we include them in the actual build rule.
 release_filegroup(
     name = "server-targets",
-    srcs = [
+    conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
-        "//vendor/k8s.io/kube-aggregator",
-    ],
+    ]),
 )
 
 # kube::golang::test_targets
 filegroup(
     name = "test-targets",
-    srcs = [
-        "//cmd/gendocs",
-        "//cmd/genkubedocs",
-        "//cmd/genman",
-        "//cmd/genswaggertypedocs",
-        "//cmd/genyaml",
-        "//cmd/kubemark",  # TODO: server platforms only
-        "//cmd/linkcheck",
-        "//test/e2e:e2e.test",
-        "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
-        "//vendor/github.com/onsi/ginkgo/ginkgo",
-    ],
+    srcs = select(for_platforms(
+        for_server = [
+            "//cmd/kubemark",
+            "//test/e2e_node:e2e_node.test_binary",
+        ],
+        for_test = [
+            "//cmd/gendocs",
+            "//cmd/genkubedocs",
+            "//cmd/genman",
+            "//cmd/genswaggertypedocs",
+            "//cmd/genyaml",
+            "//cmd/linkcheck",
+            "//test/e2e:e2e.test_binary",
+            "//vendor/github.com/onsi/ginkgo/ginkgo",
+        ],
+    )),
 )
 
 # KUBE_TEST_PORTABLE

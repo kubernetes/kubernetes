@@ -59,7 +59,7 @@ func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *core.Componen
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.ComponentStatusList{}
+	list := &core.ComponentStatusList{ListMeta: obj.(*core.ComponentStatusList).ListMeta}
 	for _, item := range obj.(*core.ComponentStatusList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -112,7 +112,7 @@ func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, list
 // Patch applies the patch and returns the patched componentStatus.
 func (c *FakeComponentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, data, subresources...), &core.ComponentStatus{})
+		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, pt, data, subresources...), &core.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}

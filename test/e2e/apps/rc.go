@@ -38,6 +38,12 @@ import (
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
 
+	/*
+		Release : v1.9
+		Testname: Replication Controller, run basic image
+		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
+	*/
+
 	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
@@ -54,11 +60,21 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testReplicationControllerConditionCheck(f)
 	})
 
-	It("should adopt matching pods on creation", func() {
+	/*
+		Release : v1.13
+		Testname: Replication Controller, adopt matching pods
+		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
+	*/
+	framework.ConformanceIt("should adopt matching pods on creation", func() {
 		testRCAdoptMatchingOrphans(f)
 	})
 
-	It("should release no longer matching pods", func() {
+	/*
+		Release : v1.13
+		Testname: Replication Controller, release pods
+		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
+	*/
+	framework.ConformanceIt("should release no longer matching pods", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 })
@@ -248,7 +264,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImageName,
+					Image: NginxImage,
 				},
 			},
 		},
@@ -256,7 +272,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
@@ -285,7 +301,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/install"
-	resourcequotav1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1"
+	resourcequotav1beta1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1"
 )
 
 var (
@@ -41,7 +41,7 @@ func init() {
 func LoadConfiguration(config io.Reader) (*resourcequotaapi.Configuration, error) {
 	// if no config is provided, return a default configuration
 	if config == nil {
-		externalConfig := &resourcequotav1alpha1.Configuration{}
+		externalConfig := &resourcequotav1beta1.Configuration{}
 		scheme.Default(externalConfig)
 		internalConfig := &resourcequotaapi.Configuration{}
 		if err := scheme.Convert(externalConfig, internalConfig, nil); err != nil {

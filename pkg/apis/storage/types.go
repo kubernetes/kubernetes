@@ -68,10 +68,16 @@ type StorageClass struct {
 
 	// VolumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
-	// This field is alpha-level and is only honored by servers that enable
-	// the VolumeScheduling feature.
+	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
 	VolumeBindingMode *VolumeBindingMode
+
+	// Restrict the node topologies where volumes can be dynamically provisioned.
+	// Each volume plugin defines its own supported topology specifications.
+	// An empty TopologySelectorTerm list means there is no topology restriction.
+	// This field is only honored by servers that enable the VolumeScheduling feature.
+	// +optional
+	AllowedTopologies []api.TopologySelectorTerm
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -189,7 +195,7 @@ type VolumeError struct {
 	Time metav1.Time
 
 	// String detailing the error encountered during Attach or Detach operation.
-	// This string maybe logged, so it should not contain sensitive
+	// This string may be logged, so it should not contain sensitive
 	// information.
 	// +optional
 	Message string

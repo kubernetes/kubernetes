@@ -27,18 +27,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog"
 )
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
-		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
+		klog.Fatalf("Failed to register gcp auth plugin: %v", err)
 	}
 }
 
@@ -174,7 +174,13 @@ func parseScopes(gcpConfig map[string]string) []string {
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister}
+	var resetCache map[string]string
+	if cts, ok := g.tokenSource.(*cachedTokenSource); ok {
+		resetCache = cts.baseCache()
+	} else {
+		resetCache = make(map[string]string)
+	}
+	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister, resetCache}
 }
 
 func (g *gcpAuthProvider) Login() error { return nil }
@@ -217,7 +223,7 @@ func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
 	cache := t.update(tok)
 	if t.persister != nil {
 		if err := t.persister.Persist(cache); err != nil {
-			glog.V(4).Infof("Failed to persist token: %v", err)
+			klog.V(4).Infof("Failed to persist token: %v", err)
 		}
 	}
 	return tok, nil
@@ -244,6 +250,19 @@ func (t *cachedTokenSource) update(tok *oauth2.Token) map[string]string {
 	}
 	ret["access-token"] = t.accessToken
 	ret["expiry"] = t.expiry.Format(time.RFC3339Nano)
+	return ret
+}
+
+// baseCache is the base configuration value for this TokenSource, without any cached ephemeral tokens.
+func (t *cachedTokenSource) baseCache() map[string]string {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+	ret := map[string]string{}
+	for k, v := range t.cache {
+		ret[k] = v
+	}
+	delete(ret, "access-token")
+	delete(ret, "expiry")
 	return ret
 }
 
@@ -310,7 +329,7 @@ func (c *commandTokenSource) parseTokenCmdOutput(output []byte) (*oauth2.Token, 
 	}
 	var expiry time.Time
 	if t, err := time.Parse(c.timeFmt, expiryStr); err != nil {
-		glog.V(4).Infof("Failed to parse token expiry from %s (fmt=%s): %v", expiryStr, c.timeFmt, err)
+		klog.V(4).Infof("Failed to parse token expiry from %s (fmt=%s): %v", expiryStr, c.timeFmt, err)
 	} else {
 		expiry = t
 	}
@@ -337,6 +356,7 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 type conditionalTransport struct {
 	oauthTransport *oauth2.Transport
 	persister      restclient.AuthProviderConfigPersister
+	resetCache     map[string]string
 }
 
 var _ net.RoundTripperWrapper = &conditionalTransport{}
@@ -353,9 +373,8 @@ func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 
 	if res.StatusCode == 401 {
-		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
-		emptyCache := make(map[string]string)
-		t.persister.Persist(emptyCache)
+		klog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
+		t.persister.Persist(t.resetCache)
 	}
 
 	return res, nil

@@ -17,7 +17,6 @@ limitations under the License.
 package host_path
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -28,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	utilpath "k8s.io/utils/path"
 )
 
 func newHostPathType(pathType string) *v1.HostPathType {
@@ -123,7 +122,7 @@ func TestDeleter(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-	if exists, _ := utilfile.FileExists(tempPath); exists {
+	if exists, _ := utilpath.Exists(utilpath.CheckFollowSymlink, tempPath); exists {
 		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
 	}
 }
@@ -171,14 +170,14 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	creater, err := plug.NewProvisioner(options)
 	if err != nil {
 		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creater.Provision()
+	pv, err := creater.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}
@@ -319,84 +318,6 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-type fakeFileTypeChecker struct {
-	desiredType string
-}
-
-func (fftc *fakeFileTypeChecker) Mount(source string, target string, fstype string, options []string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) Unmount(target string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) List() ([]utilmount.MountPoint, error) {
-	return nil, nil
-}
-func (fftc *fakeFileTypeChecker) IsMountPointMatch(mp utilmount.MountPoint, dir string) bool {
-	return false
-}
-
-func (fftc *fakeFileTypeChecker) IsNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) IsLikelyNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-func (fftc *fakeFileTypeChecker) PathIsDevice(pathname string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "fake", nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeRShared(path string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeFile(pathname string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) bool {
-	return true
-}
-
-func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {
-	return utilmount.FileType(fftc.desiredType), nil
-}
-
-func (fftc *fakeFileTypeChecker) PrepareSafeSubpath(subPath utilmount.Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return "", nil, nil
-}
-
-func (fftc *fakeFileTypeChecker) CleanSubPaths(_, _ string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (fftc *fakeFileTypeChecker) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {
@@ -465,7 +386,11 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fakeFTC := &fakeFileTypeChecker{desiredType: tc.desiredType}
+		fakeFTC := &utilmount.FakeMounter{
+			Filesystem: map[string]utilmount.FileType{
+				tc.path: utilmount.FileType(tc.desiredType),
+			},
+		}
 		oftc := newFileTypeChecker(tc.path, fakeFTC)
 
 		path := oftc.GetPath()

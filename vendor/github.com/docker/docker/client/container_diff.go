@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 
 	"github.com/docker/docker/api/types/container"
-	"golang.org/x/net/context"
 )
 
 // ContainerDiff shows differences in a container filesystem since it was started.

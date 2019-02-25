@@ -10,12 +10,12 @@
 [[projects]]
   name = "github.com/modern-go/reflect2"
   packages = ["."]
-  revision = "1df9eeb2bb81f327b96228865c5687bc2194af3f"
-  version = "1.0.0"
+  revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
+  version = "1.0.1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ac7003b5a981716353a43055ab7d4c5357403cb30a60de2dbdeb446c1544beaa"
+  inputs-digest = "ea54a775e5a354cb015502d2e7aa4b74230fc77e894f34a838b268c25ec8eeb8"
   solver-name = "gps-cdcl"
   solver-version = 1

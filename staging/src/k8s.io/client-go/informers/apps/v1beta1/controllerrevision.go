@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	apps_v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespac
 				return client.AppsV1beta1().ControllerRevisions(namespace).Watch(options)
 			},
 		},
-		&apps_v1beta1.ControllerRevision{},
+		&appsv1beta1.ControllerRevision{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *controllerRevisionInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1beta1.ControllerRevision{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1beta1.ControllerRevision{}, f.defaultInformer)
 }
 
 func (f *controllerRevisionInformer) Lister() v1beta1.ControllerRevisionLister {

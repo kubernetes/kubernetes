@@ -9,6 +9,7 @@ go_library(
         "unixtime.go",
         "utility.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/date",
     importpath = "github.com/Azure/go-autorest/autorest/date",
     visibility = ["//visibility:public"],
 )

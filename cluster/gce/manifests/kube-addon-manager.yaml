@@ -5,6 +5,7 @@ metadata:
   namespace: kube-system
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ''
+    seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     component: kube-addon-manager
 spec:
@@ -13,7 +14,7 @@ spec:
   - name: kube-addon-manager
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: k8s.gcr.io/kube-addon-manager:v8.6
+    image: k8s.gcr.io/kube-addon-manager:v9.0
     command:
     - /bin/bash
     - -c
@@ -29,6 +30,9 @@ spec:
     - mountPath: /var/log
       name: varlog
       readOnly: false
+    env:
+    - name: KUBECTL_EXTRA_PRUNE_WHITELIST
+      value: {{kubectl_extra_prune_whitelist}}
   volumes:
   - hostPath:
       path: /etc/kubernetes/

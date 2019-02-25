@@ -23,7 +23,7 @@ import (
 	"text/tabwriter"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,12 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
@@ -102,12 +100,12 @@ type DeploymentHistoryViewer struct {
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	versionedExtensionsClient := h.c.ExtensionsV1beta1()
-	deployment, err := versionedExtensionsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
+	versionedAppsClient := h.c.AppsV1()
+	deployment, err := versionedAppsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedExtensionsClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedAppsClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
@@ -116,7 +114,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		allRSs = append(allRSs, newRS)
 	}
 
-	historyInfo := make(map[int64]*v1.PodTemplateSpec)
+	historyInfo := make(map[int64]*corev1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -166,14 +164,10 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	})
 }
 
-func printTemplate(template *v1.PodTemplateSpec) (string, error) {
+func printTemplate(template *corev1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
+	w := describe.NewPrefixWriter(buf)
+	describe.DescribePodTemplate(template, w)
 	return buf.String(), nil
 }
 

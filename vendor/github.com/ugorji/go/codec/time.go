@@ -5,23 +5,10 @@ package codec
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 )
 
-var (
-	timeDigits   = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-	timeExtEncFn = func(rv reflect.Value) (bs []byte, err error) {
-		defer panicToErr(&err)
-		bs = timeExt{}.WriteExt(rv.Interface())
-		return
-	}
-	timeExtDecFn = func(rv reflect.Value, bs []byte) (err error) {
-		defer panicToErr(&err)
-		timeExt{}.ReadExt(rv.Interface(), bs)
-		return
-	}
-)
+var timeDigits = [...]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 
 type timeExt struct{}
 
@@ -210,24 +197,24 @@ func decodeTime(bs []byte) (tt time.Time, err error) {
 	return
 }
 
-func timeLocUTCName(tzint int16) string {
-	if tzint == 0 {
-		return "UTC"
-	}
-	var tzname = []byte("UTC+00:00")
-	//tzname := fmt.Sprintf("UTC%s%02d:%02d", tzsign, tz/60, tz%60) //perf issue using Sprintf. inline below.
-	//tzhr, tzmin := tz/60, tz%60 //faster if u convert to int first
-	var tzhr, tzmin int16
-	if tzint < 0 {
-		tzname[3] = '-' // (TODO: verify. this works here)
-		tzhr, tzmin = -tzint/60, (-tzint)%60
-	} else {
-		tzhr, tzmin = tzint/60, tzint%60
-	}
-	tzname[4] = timeDigits[tzhr/10]
-	tzname[5] = timeDigits[tzhr%10]
-	tzname[7] = timeDigits[tzmin/10]
-	tzname[8] = timeDigits[tzmin%10]
-	return string(tzname)
-	//return time.FixedZone(string(tzname), int(tzint)*60)
-}
+// func timeLocUTCName(tzint int16) string {
+// 	if tzint == 0 {
+// 		return "UTC"
+// 	}
+// 	var tzname = []byte("UTC+00:00")
+// 	//tzname := fmt.Sprintf("UTC%s%02d:%02d", tzsign, tz/60, tz%60) //perf issue using Sprintf. inline below.
+// 	//tzhr, tzmin := tz/60, tz%60 //faster if u convert to int first
+// 	var tzhr, tzmin int16
+// 	if tzint < 0 {
+// 		tzname[3] = '-' // (TODO: verify. this works here)
+// 		tzhr, tzmin = -tzint/60, (-tzint)%60
+// 	} else {
+// 		tzhr, tzmin = tzint/60, tzint%60
+// 	}
+// 	tzname[4] = timeDigits[tzhr/10]
+// 	tzname[5] = timeDigits[tzhr%10]
+// 	tzname[7] = timeDigits[tzmin/10]
+// 	tzname[8] = timeDigits[tzmin%10]
+// 	return string(tzname)
+// 	//return time.FixedZone(string(tzname), int(tzint)*60)
+// }

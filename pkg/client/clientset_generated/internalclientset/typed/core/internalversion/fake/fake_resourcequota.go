@@ -62,7 +62,7 @@ func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *core.ResourceQuo
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.ResourceQuotaList{}
+	list := &core.ResourceQuotaList{ListMeta: obj.(*core.ResourceQuotaList).ListMeta}
 	for _, item := range obj.(*core.ResourceQuotaList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOpt
 // Patch applies the patch and returns the patched resourceQuota.
 func (c *FakeResourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &core.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, pt, data, subresources...), &core.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err

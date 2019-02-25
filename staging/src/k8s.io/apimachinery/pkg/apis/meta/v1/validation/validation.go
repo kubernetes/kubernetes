@@ -18,6 +18,8 @@ package validation
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -83,6 +85,34 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 		*options.PropagationPolicy != metav1.DeletePropagationBackground &&
 		*options.PropagationPolicy != metav1.DeletePropagationOrphan {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("propagationPolicy"), options.PropagationPolicy, []string{string(metav1.DeletePropagationForeground), string(metav1.DeletePropagationBackground), string(metav1.DeletePropagationOrphan), "nil"}))
+	}
+	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	return allErrs
+}
+
+func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
+	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+}
+
+func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
+	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+}
+
+func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if patchType != types.ApplyPatchType && options.Force != nil {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+	}
+	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	return allErrs
+}
+
+var allowedDryRunValues = sets.NewString(metav1.DryRunAll)
+
+func validateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !allowedDryRunValues.HasAll(dryRun...) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, dryRun, allowedDryRunValues.List()))
 	}
 	return allErrs
 }

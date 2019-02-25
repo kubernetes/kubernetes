@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["image_history.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/image",
     importpath = "github.com/docker/docker/api/types/image",
     visibility = ["//visibility:public"],
 )

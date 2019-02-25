@@ -27,7 +27,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -199,7 +199,7 @@ func portForward(client libdocker.Interface, podSandboxID string, port int32, st
 	}
 
 	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
-	glog.V(4).Infof("executing port forwarding command: %s", commandString)
+	klog.V(4).Infof("executing port forwarding command: %s", commandString)
 
 	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream

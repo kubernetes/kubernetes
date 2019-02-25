@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"io"
 	osexec "os/exec"
 	"syscall"
@@ -32,6 +33,13 @@ type Interface interface {
 	// Command returns a Cmd instance which can be used to run a single command.
 	// This follows the pattern of package os/exec.
 	Command(cmd string, args ...string) Cmd
+
+	// CommandContext returns a Cmd instance which can be used to run a single command.
+	//
+	// The provided context is used to kill the process if the context becomes done
+	// before the command completes on its own. For example, a timeout can be set in
+	// the context.
+	CommandContext(ctx context.Context, cmd string, args ...string) Cmd
 
 	// LookPath wraps os/exec.LookPath
 	LookPath(file string) (string, error)
@@ -52,6 +60,17 @@ type Cmd interface {
 	SetStdin(in io.Reader)
 	SetStdout(out io.Writer)
 	SetStderr(out io.Writer)
+	SetEnv(env []string)
+
+	// StdoutPipe and StderrPipe for getting the process' Stdout and Stderr as
+	// Readers
+	StdoutPipe() (io.ReadCloser, error)
+	StderrPipe() (io.ReadCloser, error)
+
+	// Start and Wait are for running a process non-blocking
+	Start() error
+	Wait() error
+
 	// Stops the command by sending SIGTERM. It is not guaranteed the
 	// process will stop before this function returns. If the process is not
 	// responding, an internal timer function will send a SIGKILL to force
@@ -82,6 +101,11 @@ func (executor *executor) Command(cmd string, args ...string) Cmd {
 	return (*cmdWrapper)(osexec.Command(cmd, args...))
 }
 
+// CommandContext is part of the Interface interface.
+func (executor *executor) CommandContext(ctx context.Context, cmd string, args ...string) Cmd {
+	return (*cmdWrapper)(osexec.CommandContext(ctx, cmd, args...))
+}
+
 // LookPath is part of the Interface interface
 func (executor *executor) LookPath(file string) (string, error) {
 	return osexec.LookPath(file)
@@ -108,54 +132,78 @@ func (cmd *cmdWrapper) SetStderr(out io.Writer) {
 	cmd.Stderr = out
 }
 
+func (cmd *cmdWrapper) SetEnv(env []string) {
+	cmd.Env = env
+}
+
+func (cmd *cmdWrapper) StdoutPipe() (io.ReadCloser, error) {
+	r, err := (*osexec.Cmd)(cmd).StdoutPipe()
+	return r, handleError(err)
+}
+
+func (cmd *cmdWrapper) StderrPipe() (io.ReadCloser, error) {
+	r, err := (*osexec.Cmd)(cmd).StderrPipe()
+	return r, handleError(err)
+}
+
+func (cmd *cmdWrapper) Start() error {
+	err := (*osexec.Cmd)(cmd).Start()
+	return handleError(err)
+}
+
+func (cmd *cmdWrapper) Wait() error {
+	err := (*osexec.Cmd)(cmd).Wait()
+	return handleError(err)
+}
+
 // Run is part of the Cmd interface.
 func (cmd *cmdWrapper) Run() error {
-	return (*osexec.Cmd)(cmd).Run()
+	err := (*osexec.Cmd)(cmd).Run()
+	return handleError(err)
 }
 
 // CombinedOutput is part of the Cmd interface.
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
-	if err != nil {
-		return out, handleError(err)
-	}
-	return out, nil
+	return out, handleError(err)
 }
 
 func (cmd *cmdWrapper) Output() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).Output()
-	if err != nil {
-		return out, handleError(err)
-	}
-	return out, nil
+	return out, handleError(err)
 }
 
 // Stop is part of the Cmd interface.
 func (cmd *cmdWrapper) Stop() {
 	c := (*osexec.Cmd)(cmd)
-	if c.ProcessState.Exited() {
+
+	if c.Process == nil {
 		return
 	}
+
 	c.Process.Signal(syscall.SIGTERM)
+
 	time.AfterFunc(10*time.Second, func() {
-		if c.ProcessState.Exited() {
-			return
+		if !c.ProcessState.Exited() {
+			c.Process.Signal(syscall.SIGKILL)
 		}
-		c.Process.Signal(syscall.SIGKILL)
 	})
 }
 
 func handleError(err error) error {
-	if ee, ok := err.(*osexec.ExitError); ok {
-		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &ExitErrorWrapper{ee}
-		return x
+	if err == nil {
+		return nil
 	}
-	if ee, ok := err.(*osexec.Error); ok {
-		if ee.Err == osexec.ErrNotFound {
+
+	switch e := err.(type) {
+	case *osexec.ExitError:
+		return &ExitErrorWrapper{e}
+	case *osexec.Error:
+		if e.Err == osexec.ErrNotFound {
 			return ErrExecutableNotFound
 		}
 	}
+
 	return err
 }
 
@@ -165,7 +213,7 @@ type ExitErrorWrapper struct {
 	*osexec.ExitError
 }
 
-var _ ExitError = ExitErrorWrapper{}
+var _ ExitError = &ExitErrorWrapper{}
 
 // ExitStatus is part of the ExitError interface.
 func (eew ExitErrorWrapper) ExitStatus() int {
@@ -193,10 +241,12 @@ func (e CodeExitError) String() string {
 	return e.Err.Error()
 }
 
+// Exited is to check if the process has finished
 func (e CodeExitError) Exited() bool {
 	return true
 }
 
+// ExitStatus is for checking the error code
 func (e CodeExitError) ExitStatus() int {
 	return e.Code
 }

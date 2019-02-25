@@ -1,7 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- liggitt
-- deads2k
+- sig-auth-serviceaccounts-approvers
 reviewers:
-- liggitt
-- deads2k
-- enj
+- sig-auth-serviceaccounts-reviewers
+labels:
+- sig/auth
+

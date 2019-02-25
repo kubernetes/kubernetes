@@ -8,6 +8,7 @@ go_library(
         "errors.go",
         "service.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/service/ecr",
     importpath = "github.com/aws/aws-sdk-go/service/ecr",
     visibility = ["//visibility:public"],
     deps = [
@@ -17,6 +18,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/client/metadata:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/signer/v4:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/jsonrpc:go_default_library",
     ],
 )

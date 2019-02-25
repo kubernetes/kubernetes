@@ -22,7 +22,7 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
@@ -47,12 +47,15 @@ var NodeImageWhiteList = sets.NewString(
 	busyboxImage,
 	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 	"k8s.gcr.io/node-problem-detector:v0.4.1",
-	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
 	framework.GetGPUDevicePluginImage(),
+	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is-amd64:1.0",
+	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep-amd64:1.0",
+	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
 )
 
 func init() {
@@ -93,7 +96,7 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 	if err == nil && imageStatus != nil {
 		return nil, nil
 	}
-	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
+	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
 	return nil, err
 }
 
@@ -125,7 +128,7 @@ func PrePullAllImages() error {
 		return err
 	}
 	images := framework.ImageWhiteList.List()
-	glog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
+	klog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
 	for _, image := range images {
 		var (
 			err    error
@@ -138,11 +141,11 @@ func PrePullAllImages() error {
 			if output, err = puller.Pull(image); err == nil {
 				break
 			}
-			glog.Warningf("Failed to pull %s as user %q, retrying in %s (%d of %d): %v",
+			klog.Warningf("Failed to pull %s as user %q, retrying in %s (%d of %d): %v",
 				image, usr.Username, imagePullRetryDelay.String(), i+1, maxImagePullRetries, err)
 		}
 		if err != nil {
-			glog.Warningf("Could not pre-pull image %s %v output: %s", image, err, output)
+			klog.Warningf("Could not pre-pull image %s %v output: %s", image, err, output)
 			return err
 		}
 	}

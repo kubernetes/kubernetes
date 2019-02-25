@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -201,7 +202,7 @@ func TestListWatchUntil(t *testing.T) {
 		watch: fw,
 	}
 
-	conditions := []watch.ConditionFunc{
+	conditions := []watchtools.ConditionFunc{
 		func(event watch.Event) (bool, error) {
 			t.Logf("got %#v", event)
 			return event.Type == watch.Added, nil
@@ -213,7 +214,7 @@ func TestListWatchUntil(t *testing.T) {
 	}
 
 	timeout := 10 * time.Second
-	lastEvent, err := ListWatchUntil(timeout, listwatch, conditions...)
+	lastEvent, err := watchtools.ListWatchUntil(timeout, listwatch, conditions...)
 	if err != nil {
 		t.Fatalf("expected nil error, got %#v", err)
 	}

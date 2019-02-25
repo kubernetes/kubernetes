@@ -346,7 +346,7 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
-apiVersion: audit.k8s.io/v1beta1
+apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
@@ -487,13 +487,12 @@ function compute-etcd-events-params {
 
 # Computes command line arguments to be passed to apiserver.
 function compute-kube-apiserver-params {
-	local params="${APISERVER_TEST_ARGS:-}"
-	params+=" --insecure-bind-address=0.0.0.0"
+	local params="--insecure-bind-address=0.0.0.0"
+	params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
 	if [[ -z "${ETCD_SERVERS:-}" ]]; then
-		params+=" --etcd-servers=http://127.0.0.1:2379"
-		params+=" --etcd-servers-overrides=/events#${EVENT_STORE_URL}"
-	else
-		params+=" --etcd-servers=${ETCD_SERVERS}"
+		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#${EVENT_STORE_URL}}"
+	elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
 	fi
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
@@ -519,9 +518,6 @@ function compute-kube-apiserver-params {
 	fi
 	if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
 		params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
-	fi
-	if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
-		params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
 	fi
   if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
     params+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
@@ -552,6 +548,9 @@ function compute-kube-apiserver-params {
 		params+=" --audit-log-maxbackup=0"
 		params+=" --audit-log-maxsize=2000000000"
 	fi
+        # Append APISERVER_TEST_ARGS to the end, which will allow for
+        # the above defaults to be overridden.
+	params+=" ${APISERVER_TEST_ARGS:-}"
 	echo "${params}"
 }
 
@@ -707,9 +706,11 @@ readonly audit_policy_file="/etc/audit_policy.config"
 
 # Start kubelet as a supervisord process and master components as pods.
 start-kubelet
-start-kubemaster-component "etcd"
-if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
-	start-kubemaster-component "etcd-events"
+if [[ -z "${ETCD_SERVERS:-}" ]]; then
+	start-kubemaster-component "etcd"
+	if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
+		start-kubemaster-component "etcd-events"
+	fi
 fi
 start-kubemaster-component "kube-apiserver"
 start-kubemaster-component "kube-controller-manager"

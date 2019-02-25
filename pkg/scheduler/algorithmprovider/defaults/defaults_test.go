@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 )
 
 func TestCopyAndReplace(t *testing.T) {
@@ -53,13 +54,15 @@ func TestCopyAndReplace(t *testing.T) {
 
 func TestDefaultPriorities(t *testing.T) {
 	result := sets.NewString(
-		"SelectorSpreadPriority",
-		"InterPodAffinityPriority",
-		"LeastRequestedPriority",
-		"BalancedResourceAllocation",
-		"NodePreferAvoidPodsPriority",
-		"NodeAffinityPriority",
-		"TaintTolerationPriority")
+		priorities.SelectorSpreadPriority,
+		priorities.InterPodAffinityPriority,
+		priorities.LeastRequestedPriority,
+		priorities.BalancedResourceAllocation,
+		priorities.NodePreferAvoidPodsPriority,
+		priorities.NodeAffinityPriority,
+		priorities.TaintTolerationPriority,
+		priorities.ImageLocalityPriority,
+	)
 	if expected := defaultPriorities(); !result.Equal(expected) {
 		t.Errorf("expected %v got %v", expected, result)
 	}
@@ -67,18 +70,19 @@ func TestDefaultPriorities(t *testing.T) {
 
 func TestDefaultPredicates(t *testing.T) {
 	result := sets.NewString(
-		"NoVolumeZoneConflict",
-		"MaxEBSVolumeCount",
-		"MaxGCEPDVolumeCount",
-		"MaxAzureDiskVolumeCount",
-		"MatchInterPodAffinity",
-		"NoDiskConflict",
-		"GeneralPredicates",
-		"CheckNodeMemoryPressure",
-		"CheckNodeDiskPressure",
-		"CheckNodePIDPressure",
-		"CheckNodeCondition",
-		"PodToleratesNodeTaints",
+		predicates.NoVolumeZoneConflictPred,
+		predicates.MaxEBSVolumeCountPred,
+		predicates.MaxGCEPDVolumeCountPred,
+		predicates.MaxAzureDiskVolumeCountPred,
+		predicates.MaxCSIVolumeCountPred,
+		predicates.MatchInterPodAffinityPred,
+		predicates.NoDiskConflictPred,
+		predicates.GeneralPred,
+		predicates.CheckNodeMemoryPressurePred,
+		predicates.CheckNodeDiskPressurePred,
+		predicates.CheckNodePIDPressurePred,
+		predicates.CheckNodeConditionPred,
+		predicates.PodToleratesNodeTaintsPred,
 		predicates.CheckVolumeBindingPred,
 	)
 

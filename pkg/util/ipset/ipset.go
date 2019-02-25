@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -52,7 +52,7 @@ type Interface interface {
 	GetVersion() (string, error)
 }
 
-// IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
+// IPSetCmd represents the ipset util. We use ipset command for ipset execute.
 const IPSetCmd = "ipset"
 
 // EntryMemberPattern is the regular expression pattern of ipset member list.
@@ -72,7 +72,7 @@ var EntryMemberPattern = "(?m)^(.*\n)*Members:\n"
 // ipset version output is similar to "v6.10".
 var VersionPattern = "v[0-9]+\\.[0-9]+"
 
-// IPSet implements an Interface to an set.
+// IPSet implements an Interface to a set.
 type IPSet struct {
 	// Name is the set name.
 	Name string
@@ -87,7 +87,8 @@ type IPSet struct {
 	MaxElem int
 	// PortRange specifies the port range of bitmap:port type ipset.
 	PortRange string
-	// TODO: add comment message for ipset
+	// comment message for ipset
+	Comment string
 }
 
 // Validate checks if a given ipset is valid or not.
@@ -110,16 +111,38 @@ func (set *IPSet) Validate() bool {
 	}
 	// check hash size value of ipset
 	if set.HashSize <= 0 {
-
+		klog.Errorf("Invalid hashsize value %d, should be >0", set.HashSize)
 		return false
 	}
 	// check max elem value of ipset
 	if set.MaxElem <= 0 {
-		glog.Errorf("Invalid maxelem value %d, should be >0", set.MaxElem)
+		klog.Errorf("Invalid maxelem value %d, should be >0", set.MaxElem)
 		return false
 	}
 
 	return true
+}
+
+//setIPSetDefaults sets some IPSet fields if not present to their default values.
+func (set *IPSet) setIPSetDefaults() {
+	// Setting default values if not present
+	if set.HashSize == 0 {
+		set.HashSize = 1024
+	}
+	if set.MaxElem == 0 {
+		set.MaxElem = 65536
+	}
+	// Default protocol is IPv4
+	if set.HashFamily == "" {
+		set.HashFamily = ProtocolFamilyIPV4
+	}
+	// Default ipset type is "hash:ip,port"
+	if len(set.SetType) == 0 {
+		set.SetType = HashIPPort
+	}
+	if len(set.PortRange) == 0 {
+		set.PortRange = DefaultPortRange
+	}
 }
 
 // Entry represents a ipset entry.
@@ -130,7 +153,7 @@ type Entry struct {
 	// Port is the entry's Port.
 	Port int
 	// Protocol is the entry's Protocol.  The protocols of entries in the same ip set are all
-	// the same.  The accepted protocols are TCP and UDP.
+	// the same.  The accepted protocols are TCP, UDP and SCTP.
 	Protocol string
 	// Net is the entry's IP network address.  Network address with zero prefix size can NOT
 	// be stored.
@@ -144,77 +167,50 @@ type Entry struct {
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
 func (e *Entry) Validate(set *IPSet) bool {
 	if e.Port < 0 {
-		glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
+		klog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
 		return false
 	}
 	switch e.SetType {
 	case HashIPPort:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 	case HashIPPortIP:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 
 		// IP2 can not be empty for `hash:ip,port,ip` type ip set
 		if net.ParseIP(e.IP2) == nil {
-			glog.Errorf("Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
+			klog.Errorf("Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
 			return false
 		}
 	case HashIPPortNet:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 
 		// Net can not be empty for `hash:ip,port,net` type ip set
-		if _, ipNet, _ := net.ParseCIDR(e.Net); ipNet == nil {
-			glog.Errorf("Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
+		if _, ipNet, err := net.ParseCIDR(e.Net); ipNet == nil {
+			klog.Errorf("Error parsing entry %v ip net %v for ipset %v, error: %v", e, e.Net, set, err)
 			return false
 		}
 	case BitmapPort:
 		// check if port number satisfies its ipset's requirement of port range
 		if set == nil {
-			glog.Errorf("Unable to reference ip set where the entry %v exists", e)
+			klog.Errorf("Unable to reference ip set where the entry %v exists", e)
 			return false
 		}
 		begin, end, err := parsePortRange(set.PortRange)
 		if err != nil {
-			glog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.PortRange, set, err)
+			klog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.PortRange, set, err)
 			return false
 		}
 		if e.Port < begin || e.Port > end {
-			glog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
+			klog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
 			return false
 		}
 	}
@@ -245,6 +241,23 @@ func (e *Entry) String() string {
 	return ""
 }
 
+// checkIPandProtocol checks if IP and Protocol of Entry is valid.
+func (e *Entry) checkIPandProtocol(set *IPSet) bool {
+	// set default protocol to tcp if empty
+	if len(e.Protocol) == 0 {
+		e.Protocol = ProtocolTCP
+	} else if !validateProtocol(e.Protocol) {
+		return false
+	}
+
+	if net.ParseIP(e.IP) == nil {
+		klog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
+		return false
+	}
+
+	return true
+}
+
 type runner struct {
 	exec utilexec.Interface
 }
@@ -256,26 +269,10 @@ func New(exec utilexec.Interface) Interface {
 	}
 }
 
-// CreateSet creates a new set,  it will ignore error when the set already exists if ignoreExistErr=true.
+// CreateSet creates a new set, it will ignore error when the set already exists if ignoreExistErr=true.
 func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
-	// Setting default values if not present
-	if set.HashSize == 0 {
-		set.HashSize = 1024
-	}
-	if set.MaxElem == 0 {
-		set.MaxElem = 65536
-	}
-	// Default protocol is IPv4
-	if set.HashFamily == "" {
-		set.HashFamily = ProtocolFamilyIPV4
-	}
-	// Default ipset type is "hash:ip,port"
-	if len(set.SetType) == 0 {
-		set.SetType = HashIPPort
-	}
-	if len(set.PortRange) == 0 {
-		set.PortRange = DefaultPortRange
-	}
+	// sets some IPSet fields if not present to their default values.
+	set.setIPSetDefaults()
 
 	// Validate ipset before creating
 	valid := set.Validate()
@@ -289,7 +286,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	args := []string{"create", set.Name, string(set.SetType)}
-	if set.SetType == HashIPPortIP || set.SetType == HashIPPort {
+	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet {
 		args = append(args,
 			"family", set.HashFamily,
 			"hashsize", strconv.Itoa(set.HashSize),
@@ -333,7 +330,7 @@ func (runner *runner) DelEntry(entry string, set string) error {
 // TestEntry is used to check whether the specified entry is in the set or not.
 func (runner *runner) TestEntry(entry string, set string) (bool, error) {
 	if out, err := runner.exec.Command(IPSetCmd, "test", set, entry).CombinedOutput(); err == nil {
-		reg, e := regexp.Compile("NOT")
+		reg, e := regexp.Compile("is NOT in set " + set)
 		if e == nil && reg.MatchString(string(out)) {
 			return false, nil
 		} else if e == nil {
@@ -427,17 +424,17 @@ func getIPSetVersionString(exec utilexec.Interface) (string, error) {
 func validatePortRange(portRange string) bool {
 	strs := strings.Split(portRange, "-")
 	if len(strs) != 2 {
-		glog.Errorf("port range should be in the format of `a-b`")
+		klog.Errorf("port range should be in the format of `a-b`")
 		return false
 	}
 	for i := range strs {
 		num, err := strconv.Atoi(strs[i])
 		if err != nil {
-			glog.Errorf("Failed to parse %s, error: %v", strs[i], err)
+			klog.Errorf("Failed to parse %s, error: %v", strs[i], err)
 			return false
 		}
 		if num < 0 {
-			glog.Errorf("port number %d should be >=0", num)
+			klog.Errorf("port number %d should be >=0", num)
 			return false
 		}
 	}
@@ -451,7 +448,7 @@ func validateIPSetType(set Type) bool {
 			return true
 		}
 	}
-	glog.Errorf("Currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set)
+	klog.Errorf("Currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set)
 	return false
 }
 
@@ -460,7 +457,7 @@ func validateHashFamily(family string) bool {
 	if family == ProtocolFamilyIPV4 || family == ProtocolFamilyIPV6 {
 		return true
 	}
-	glog.Errorf("Currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4, ProtocolFamilyIPV6, family)
+	klog.Errorf("Currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4, ProtocolFamilyIPV6, family)
 	return false
 }
 
@@ -485,10 +482,10 @@ func IsNotFoundError(err error) bool {
 
 // checks if given protocol is supported in entry
 func validateProtocol(protocol string) bool {
-	if protocol == ProtocolTCP || protocol == ProtocolUDP {
+	if protocol == ProtocolTCP || protocol == ProtocolUDP || protocol == ProtocolSCTP {
 		return true
 	}
-	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
+	klog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s, %s]", protocol, ProtocolTCP, ProtocolUDP, ProtocolSCTP)
 	return false
 }
 

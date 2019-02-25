@@ -17,25 +17,25 @@ limitations under the License.
 package flexvolume
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/volume"
-
-	"os"
-
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
-	"strings"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type flexVolumeProber struct {
 	mutex          sync.Mutex
-	pluginDir      string // Flexvolume driver directory
+	pluginDir      string         // Flexvolume driver directory
+	runner         exec.Interface // Interface to use for execing flex calls
 	watcher        utilfs.FSWatcher
 	factory        PluginFactory
 	fs             utilfs.Filesystem
@@ -43,11 +43,13 @@ type flexVolumeProber struct {
 	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the coresponding operation
 }
 
-func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
+// GetDynamicPluginProber creates dynamic plugin prober
+func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
 	return &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   utilfs.NewFsnotifyWatcher(),
 		factory:   pluginFactory{},
+		runner:    runner,
 		fs:        &utilfs.DefaultFs{},
 	}
 }
@@ -127,7 +129,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		Op: op,
 	}
 	if op == volume.ProbeAddOrUpdate {
-		plugin, pluginErr := prober.factory.NewFlexVolumePlugin(prober.pluginDir, driverDirName)
+		plugin, pluginErr := prober.factory.NewFlexVolumePlugin(prober.pluginDir, driverDirName, prober.runner)
 		if pluginErr != nil {
 			pluginErr = fmt.Errorf(
 				"Error creating Flexvolume plugin from directory %s, skipping. Error: %s",
@@ -137,7 +139,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		probeEvent.Plugin = plugin
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
-		driverName := utilstrings.UnescapePluginName(driverDirName)
+		driverName := utilstrings.UnescapeQualifiedName(driverDirName)
 		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
 
 	} else {
@@ -229,7 +231,7 @@ func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 	addWatch := func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			if err := prober.watcher.AddWatch(path); err != nil {
-				glog.Errorf("Error recursively adding watch: %v", err)
+				klog.Errorf("Error recursively adding watch: %v", err)
 			}
 		}
 		return nil
@@ -242,10 +244,10 @@ func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 func (prober *flexVolumeProber) initWatcher() error {
 	err := prober.watcher.Init(func(event fsnotify.Event) {
 		if err := prober.handleWatchEvent(event); err != nil {
-			glog.Errorf("Flexvolume prober watch: %s", err)
+			klog.Errorf("Flexvolume prober watch: %s", err)
 		}
 	}, func(err error) {
-		glog.Errorf("Received an error from watcher: %s", err)
+		klog.Errorf("Received an error from watcher: %s", err)
 	})
 	if err != nil {
 		return fmt.Errorf("Error initializing watcher: %s", err)
@@ -263,7 +265,7 @@ func (prober *flexVolumeProber) initWatcher() error {
 // Creates the plugin directory, if it doesn't already exist.
 func (prober *flexVolumeProber) createPluginDir() error {
 	if _, err := prober.fs.Stat(prober.pluginDir); os.IsNotExist(err) {
-		glog.Warningf("Flexvolume plugin directory at %s does not exist. Recreating.", prober.pluginDir)
+		klog.Warningf("Flexvolume plugin directory at %s does not exist. Recreating.", prober.pluginDir)
 		err := prober.fs.MkdirAll(prober.pluginDir, 0755)
 		if err != nil {
 			return fmt.Errorf("Error (re-)creating driver directory: %s", err)

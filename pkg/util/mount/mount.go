@@ -84,16 +84,21 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
-	// SafeMakeDir makes sure that the created directory does not escape given
-	// base directory mis-using symlinks. The directory is created in the same
-	// mount namespace as where kubelet is running. Note that the function makes
-	// sure that it creates the directory somewhere under the base, nothing
-	// else. E.g. if the directory already exists, it may exists outside of the
-	// base due to symlinks.
-	SafeMakeDir(pathname string, base string, perm os.FileMode) error
-	// ExistsPath checks whether the path exists.
-	// Will operate in the host mount namespace if kubelet is running in a container
-	ExistsPath(pathname string) bool
+	// SafeMakeDir creates subdir within given base. It makes sure that the
+	// created directory does not escape given base directory mis-using
+	// symlinks. Note that the function makes sure that it creates the directory
+	// somewhere under the base, nothing else. E.g. if the directory already
+	// exists, it may exist outside of the base due to symlinks.
+	// This method should be used if the directory to create is inside volume
+	// that's under user control. User must not be able to use symlinks to
+	// escape the volume to create directories somewhere else.
+	SafeMakeDir(subdir string, base string, perm os.FileMode) error
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	// Error is returned on any other error than "file not found".
+	ExistsPath(pathname string) (bool, error)
+	// EvalHostSymlinks returns the path name after evaluating symlinks.
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	EvalHostSymlinks(pathname string) (string, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error
@@ -114,6 +119,11 @@ type Interface interface {
 	GetMountRefs(pathname string) ([]string, error)
 	// GetFSGroup returns FSGroup of the path.
 	GetFSGroup(pathname string) (int64, error)
+	// GetSELinuxSupport returns true if given path is on a mount that supports
+	// SELinux.
+	GetSELinuxSupport(pathname string) (bool, error)
+	// GetMode returns permissions of the path.
+	GetMode(pathname string) (os.FileMode, error)
 }
 
 type Subpath struct {
@@ -129,13 +139,11 @@ type Subpath struct {
 	PodDir string
 	// Name of the container
 	ContainerName string
-	// True if the mount needs to be readonly
-	ReadOnly bool
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
 // container where kubelet runs or even a remote pod with mount utilities.
-// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// Usual k8s.io/utils/exec interface is not used because kubelet.RunInContainer does
 // not provide stdin/stdout/stderr streams.
 type Exec interface {
 	// Run executes a command and returns its stdout + stderr combined in one
@@ -237,12 +245,9 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-// IsNotMountPoint determines if a directory is a mountpoint.
-// It should return ErrNotExist when the directory does not exist.
-// This method uses the List() of all mountpoints
-// It is more extensive than IsLikelyNotMountPoint
-// and it detects bind mounts in linux
-func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+// isNotMountPoint implements Mounter.IsNotMountPoint and is shared by mounter
+// implementations.
+func isNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
@@ -259,6 +264,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	if notMnt == false {
 		return notMnt, nil
 	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
 	// check all mountpoints since IsLikelyNotMountPoint
 	// is not reliable for some mountpoint types
 	mountPoints, mountPointsErr := mounter.List()
@@ -266,7 +278,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		return notMnt, mountPointsErr
 	}
 	for _, mp := range mountPoints {
-		if mounter.IsMountPointMatch(mp, file) {
+		if mounter.IsMountPointMatch(mp, resolvedFile) {
 			notMnt = false
 			break
 		}
@@ -278,7 +290,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func isBind(options []string) (bool, []string) {
+func isBind(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.
@@ -287,22 +299,36 @@ func isBind(options []string) (bool, []string) {
 	// volume mount to be read only.
 	bindRemountOpts := []string{"bind", "remount"}
 	bind := false
+	bindOpts := []string{"bind"}
 
-	if len(options) != 0 {
-		for _, option := range options {
-			switch option {
-			case "bind":
-				bind = true
-				break
-			case "remount":
-				break
-			default:
-				bindRemountOpts = append(bindRemountOpts, option)
-			}
+	// _netdev is a userspace mount option and does not automatically get added when
+	// bind mount is created and hence we must carry it over.
+	if checkForNetDev(options) {
+		bindOpts = append(bindOpts, "_netdev")
+	}
+
+	for _, option := range options {
+		switch option {
+		case "bind":
+			bind = true
+			break
+		case "remount":
+			break
+		default:
+			bindRemountOpts = append(bindRemountOpts, option)
 		}
 	}
 
-	return bind, bindRemountOpts
+	return bind, bindOpts, bindRemountOpts
+}
+
+func checkForNetDev(options []string) bool {
+	for _, option := range options {
+		if option == "_netdev" {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.
@@ -323,8 +349,8 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return count > 0
 }
 
-// pathWithinBase checks if give path is within given base directory.
-func pathWithinBase(fullPath, basePath string) bool {
+// PathWithinBase checks if give path is within given base directory.
+func PathWithinBase(fullPath, basePath string) bool {
 	rel, err := filepath.Rel(basePath, fullPath)
 	if err != nil {
 		return false
