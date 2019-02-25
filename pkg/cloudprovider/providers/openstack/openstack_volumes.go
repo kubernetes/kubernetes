@@ -695,6 +695,11 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 	return os.bsOpts.TrustDevicePath
 }
 
+// NodeVolumeAttachLimit specifies number of cinder volumes that can be attached to this node.
+func (os *OpenStack) NodeVolumeAttachLimit() int {
+	return os.bsOpts.NodeVolumeAttachLimit
+}
+
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
 func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore if not Cinder.

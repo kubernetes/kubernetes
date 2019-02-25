@@ -110,9 +110,10 @@ type LoadBalancerOpts struct {
 
 // BlockStorageOpts is used to talk to Cinder service
 type BlockStorageOpts struct {
-	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
-	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
-	IgnoreVolumeAZ  bool   `gcfg:"ignore-volume-az"`
+	BSVersion             string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath       bool   `gcfg:"trust-device-path"` // See Issue #33128
+	IgnoreVolumeAZ        bool   `gcfg:"ignore-volume-az"`
+	NodeVolumeAttachLimit int    `gcfg:"node-volume-attach-limit"` // override volume attach limit for Cinder. Default is : 256
 }
 
 // RouterOpts is used for Neutron routes
@@ -364,6 +365,32 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	err = checkOpenStackOpts(&os)
 	if err != nil {
 		return nil, err
+	}
+
+	return &os, nil
+}
+
+// NewFakeOpenStackCloud creates and returns an instance of Openstack cloudprovider.
+// Mainly for use in tests that require instantiating Openstack without having
+// to go through cloudprovider interface.
+func NewFakeOpenStackCloud(cfg Config) (*OpenStack, error) {
+	provider, err := openstack.NewClient(cfg.Global.AuthURL)
+	if err != nil {
+		return nil, err
+	}
+	emptyDuration := MyDuration{}
+	if cfg.Metadata.RequestTimeout == emptyDuration {
+		cfg.Metadata.RequestTimeout.Duration = time.Duration(defaultTimeOut)
+	}
+	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
+
+	os := OpenStack{
+		provider:     provider,
+		region:       cfg.Global.Region,
+		lbOpts:       cfg.LoadBalancer,
+		bsOpts:       cfg.BlockStorage,
+		routeOpts:    cfg.Route,
+		metadataOpts: cfg.Metadata,
 	}
 
 	return &os, nil
