@@ -81,7 +81,7 @@ func (accept accept_slice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-// Parse an Accept Header string returning a sorted list
+// ParseAccept parse an accept header string returning a sorted list
 // of clauses
 func ParseAccept(header string) (accept []Accept) {
 	parts := strings.Split(header, ",")
