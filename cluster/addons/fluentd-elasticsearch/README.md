@@ -73,7 +73,7 @@ on masters won't work, because masters have no kube-proxy. Don't mark masters
 with the label mentioned in the previous paragraph or add a taint on them to
 avoid Fluentd pods scheduling there.
 
-[fluentd]: http://www.fluentd.org/
+[fluentd]: https://www.fluentd.org/
 [elasticsearch]: https://www.elastic.co/products/elasticsearch
 [kibana]: https://www.elastic.co/products/kibana
 [xPack]: https://www.elastic.co/products/x-pack

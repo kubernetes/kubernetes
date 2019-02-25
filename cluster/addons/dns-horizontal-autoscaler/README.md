@@ -7,7 +7,7 @@ on demand. Autoscaling parameters could be tuned by modifying the `kube-dns-auto
 ConfigMap in `kube-system` namespace.
 
 Learn more about:
-- Usage: http://kubernetes.io/docs/tasks/administer-cluster/dns-horizontal-autoscaling/
+- Usage: https://kubernetes.io/docs/tasks/administer-cluster/dns-horizontal-autoscaling/
 - Implementation: https://github.com/kubernetes-incubator/cluster-proportional-autoscaler/
 
 
