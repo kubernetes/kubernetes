@@ -54,7 +54,7 @@ type bootstrapTokenData interface {
 	Tokens() []string
 }
 
-// NewBootstrapTokenPhase returns the phase to boostrapToken
+// NewBootstrapTokenPhase returns the phase to bootstrapToken
 func NewBootstrapTokenPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "bootstrap-token",
@@ -67,11 +67,11 @@ func NewBootstrapTokenPhase() workflow.Phase {
 			options.KubeconfigPath,
 			options.SkipTokenPrint,
 		},
-		Run: runBoostrapToken,
+		Run: runBootstrapToken,
 	}
 }
 
-func runBoostrapToken(c workflow.RunData) error {
+func runBootstrapToken(c workflow.RunData) error {
 	data, ok := c.(bootstrapTokenData)
 	if !ok {
 		return errors.New("bootstrap-token phase invoked with an invalid data struct")
