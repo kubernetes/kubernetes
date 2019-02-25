@@ -141,6 +141,42 @@ func TestMatchPod(t *testing.T) {
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node2"),
 			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{{UID: "owner"}},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.ownerReferences.uid=owner"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{{UID: "owner"}},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.ownerReferences.uid=nonowner"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{{UID: "owner"}},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.ownerReferences.uid="),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.ownerReferences.uid="),
+			expectMatch:   true,
 		}}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)
