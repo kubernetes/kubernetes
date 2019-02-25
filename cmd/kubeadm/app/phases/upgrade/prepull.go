@@ -42,7 +42,7 @@ type Prepuller interface {
 	DeleteFunc(string) error
 }
 
-// DaemonSetPrepuller makes sure the control-plane images are available on all masters
+// DaemonSetPrepuller makes sure the control-plane images are available on all control-planes
 type DaemonSetPrepuller struct {
 	client clientset.Interface
 	cfg    *kubeadmapi.ClusterConfiguration

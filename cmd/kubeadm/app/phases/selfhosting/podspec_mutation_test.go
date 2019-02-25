@@ -157,7 +157,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 	}
 }
 
-func TestSetMasterTolerationOnPodSpec(t *testing.T) {
+func TestSetControlPlaneTolerationOnPodSpec(t *testing.T) {
 	var tests = []struct {
 		name     string
 		podSpec  *v1.PodSpec
@@ -190,10 +190,10 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			setMasterTolerationOnPodSpec(rt.podSpec)
+			setControlPlaneTolerationOnPodSpec(rt.podSpec)
 
 			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-				t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+				t.Errorf("failed setControlPlaneTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
 			}
 		})
 	}

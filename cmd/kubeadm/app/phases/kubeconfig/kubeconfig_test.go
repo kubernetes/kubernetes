@@ -162,11 +162,11 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts InitConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+			controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 			if err != nil {
 				t.Error(err)
 			}
-			if spec.APIServer != masterEndpoint {
+			if spec.APIServer != controlPlaneEndpoint {
 				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
 			}
 
