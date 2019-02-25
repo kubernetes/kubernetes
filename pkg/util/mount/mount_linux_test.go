@@ -633,36 +633,43 @@ func TestSafeMakeDir(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		klog.V(4).Infof("test %q", test.name)
-		base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		test.prepare(base)
-		pathToCreate := filepath.Join(base, test.path)
-		err = doSafeMakeDir(pathToCreate, base, test.perm)
-		if err != nil && !test.expectError {
-			t.Errorf("test %q: %s", test.name, err)
-		}
-		if err != nil {
-			klog.Infof("got error: %s", err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("test %q: expected error, got none", test.name)
-		}
-
-		if test.checkPath != "" {
-			st, err := os.Stat(filepath.Join(base, test.checkPath))
+	for i := range tests {
+		test := tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
 			if err != nil {
-				t.Errorf("test %q: cannot read path %s", test.name, test.checkPath)
+				t.Fatalf(err.Error())
 			}
-			if st.Mode() != test.perm {
-				t.Errorf("test %q: expected permissions %o, got %o", test.name, test.perm, st.Mode())
+			defer os.RemoveAll(base)
+			test.prepare(base)
+			pathToCreate := filepath.Join(base, test.path)
+			err = doSafeMakeDir(pathToCreate, base, test.perm)
+			if err != nil && !test.expectError {
+				t.Fatal(err)
 			}
-		}
+			if err != nil {
+				t.Logf("got error: %s", err)
+			}
+			if err == nil && test.expectError {
+				t.Fatalf("expected error, got none")
+			}
 
-		os.RemoveAll(base)
+			if test.checkPath != "" {
+				st, err := os.Stat(filepath.Join(base, test.checkPath))
+				if err != nil {
+					t.Fatalf("cannot read path %s", test.checkPath)
+				}
+				actualMode := st.Mode()
+				if actualMode != test.perm {
+					if actualMode^test.perm == os.ModeSetgid && test.perm&os.ModeSetgid == 0 {
+						// when TMPDIR is a kubernetes emptydir, the sticky gid bit is set due to fsgroup
+						t.Logf("masking bit from %o", actualMode)
+					} else {
+						t.Errorf("expected permissions %o, got %o (%b)", test.perm, actualMode, test.perm^actualMode)
+					}
+				}
+			}
+		})
 	}
 }
 
