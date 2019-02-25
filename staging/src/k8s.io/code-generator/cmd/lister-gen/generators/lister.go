@@ -236,25 +236,25 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 	}
 
 	if tags.NonNamespaced {
-		sw.Do(typeListerInterface_NonNamespaced, m)
+		sw.Do(typeListerInterfaceNonNamespaced, m)
 	} else {
 		sw.Do(typeListerInterface, m)
 	}
 
 	sw.Do(typeListerStruct, m)
 	sw.Do(typeListerConstructor, m)
-	sw.Do(typeLister_List, m)
+	sw.Do(typeListerList, m)
 
 	if tags.NonNamespaced {
-		sw.Do(typeLister_NonNamespacedGet, m)
+		sw.Do(typeListerNonNamespacedGet, m)
 		return sw.Error()
 	}
 
-	sw.Do(typeLister_NamespaceLister, m)
+	sw.Do(typeListerNamespaceLister, m)
 	sw.Do(namespaceListerInterface, m)
 	sw.Do(namespaceListerStruct, m)
-	sw.Do(namespaceLister_List, m)
-	sw.Do(namespaceLister_Get, m)
+	sw.Do(namespaceListerList, m)
+	sw.Do(namespaceListerGet, m)
 
 	return sw.Error()
 }
@@ -270,7 +270,7 @@ type $.type|public$Lister interface {
 }
 `
 
-var typeListerInterface_NonNamespaced = `
+var typeListerInterfaceNonNamespaced = `
 // $.type|public$Lister helps list $.type|publicPlural$.
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
@@ -295,7 +295,7 @@ func New$.type|public$Lister(indexer cache.Indexer) $.type|public$Lister {
 }
 `
 
-var typeLister_List = `
+var typeListerList = `
 // List lists all $.type|publicPlural$ in the indexer.
 func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
@@ -305,14 +305,14 @@ func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|ra
 }
 `
 
-var typeLister_NamespaceLister = `
+var typeListerNamespaceLister = `
 // $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|public$NamespaceLister {
 	return $.type|private$NamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 `
 
-var typeLister_NonNamespacedGet = `
+var typeListerNonNamespacedGet = `
 // Get retrieves the $.type|public$ from the index for a given name.
 func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
   obj, exists, err := s.indexer.GetByKey(name)
@@ -346,7 +346,7 @@ type $.type|private$NamespaceLister struct {
 }
 `
 
-var namespaceLister_List = `
+var namespaceListerList = `
 // List lists all $.type|publicPlural$ in the indexer for a given namespace.
 func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
@@ -356,7 +356,7 @@ func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$
 }
 `
 
-var namespaceLister_Get = `
+var namespaceListerGet = `
 // Get retrieves the $.type|public$ from the indexer for a given namespace and name.
 func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
