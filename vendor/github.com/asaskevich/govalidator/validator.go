@@ -154,8 +154,8 @@ func IsAlpha(str string) bool {
 	return rxAlpha.MatchString(str)
 }
 
-//IsUTFLetter check if the string contains only unicode letter characters.
-//Similar to IsAlpha but for all languages. Empty string is valid.
+// IsUTFLetter check if the string contains only unicode letter characters.
+// Similar to IsAlpha but for all languages. Empty string is valid.
 func IsUTFLetter(str string) bool {
 	if IsNull(str) {
 		return true
