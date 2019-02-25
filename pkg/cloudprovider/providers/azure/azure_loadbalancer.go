@@ -1538,7 +1538,7 @@ func requiresInternalLoadBalancer(service *v1.Service) bool {
 
 func subnet(service *v1.Service) *string {
 	if requiresInternalLoadBalancer(service) {
-		if l, found := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; found {
+		if l, found := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; found && strings.TrimSpace(l) != "" {
 			return &l
 		}
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestFindProbe(t *testing.T) {
@@ -241,5 +242,69 @@ func TestGetIdleTimeout(t *testing.T) {
 				t.Fatalf("expected error=%v, got %v", c.err, err)
 			}
 		})
+	}
+}
+
+func TestSubnet(t *testing.T) {
+	for i, c := range []struct {
+		desc     string
+		service  *v1.Service
+		expected *string
+	}{
+		{
+			desc:     "No annotation should return nil",
+			service:  &v1.Service{},
+			expected: nil,
+		},
+		{
+			desc: "annotation with subnet but no ILB should return nil",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			desc: "annotation with subnet but ILB=false should return nil",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+						ServiceAnnotationLoadBalancerInternal:       "false",
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			desc: "annotation with empty subnet should return nil",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerInternalSubnet: "",
+						ServiceAnnotationLoadBalancerInternal:       "true",
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			desc: "annotation with subnet and ILB should return subnet",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+						ServiceAnnotationLoadBalancerInternal:       "true",
+					},
+				},
+			},
+			expected: to.StringPtr("subnet"),
+		},
+	} {
+		real := subnet(c.service)
+		assert.Equal(t, c.expected, real, fmt.Sprintf("TestCase[%d]: %s", i, c.desc))
 	}
 }
