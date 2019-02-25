@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"strconv"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 
@@ -297,8 +298,12 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	}
 
 	otherMetrics := make([]autoscalingv1.MetricSpec, 0, len(in.Spec.Metrics))
-	for _, metric := range in.Spec.Metrics {
+	for index, metric := range in.Spec.Metrics {
 		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU && metric.Resource.Target.AverageUtilization != nil {
+			if out.Annotations == nil {
+				out.Annotations = make(map[string]string, 1)
+			}
+			out.Annotations[autoscaling.CPUMetricIndexAnnotation] = strconv.Itoa(index)
 			continue
 		}
 
@@ -367,6 +372,16 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		return err
 	}
 
+	cpuMetricIndex := 0
+	if cpuMetricIndexEnc, hasCpuMetricIndex := out.Annotations[autoscaling.CPUMetricIndexAnnotation]; hasCpuMetricIndex {
+		var err error
+		cpuMetricIndex, err = strconv.Atoi(cpuMetricIndexEnc)
+		if err != nil {
+			return err
+		}
+		delete(out.Annotations, autoscaling.CPUMetricIndexAnnotation)
+	}
+
 	if otherMetricsEnc, hasOtherMetrics := out.Annotations[autoscaling.MetricSpecsAnnotation]; hasOtherMetrics {
 		var otherMetrics []autoscalingv1.MetricSpec
 		if err := json.Unmarshal([]byte(otherMetricsEnc), &otherMetrics); err != nil {
@@ -375,13 +390,16 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 
 		// the normal Spec conversion could have populated out.Spec.Metrics with a single element, so deal with that
 		outMetrics := make([]autoscaling.MetricSpec, len(otherMetrics)+len(out.Spec.Metrics))
+		if out.Spec.Metrics != nil && cpuMetricIndex < len(outMetrics){
+			outMetrics[cpuMetricIndex] = out.Spec.Metrics[0]
+		}
 		for i, metric := range otherMetrics {
+			if out.Spec.Metrics != nil && i >= cpuMetricIndex {
+				i = i + 1
+			}
 			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &outMetrics[i], s); err != nil {
 				return err
 			}
-		}
-		if out.Spec.Metrics != nil {
-			outMetrics[len(otherMetrics)] = out.Spec.Metrics[0]
 		}
 		out.Spec.Metrics = outMetrics
 		delete(out.Annotations, autoscaling.MetricSpecsAnnotation)
