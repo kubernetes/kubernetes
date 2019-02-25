@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	linuxOS   = "linux"
-	windowsOS = "windows"
+	LinuxOS    = "linux"
+	WindowsOS  = "windows"
+	Iterations = 5
 )
 
 var (
@@ -48,35 +49,67 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 	Context("for all supported CNIs", func() {
 
-		It("should have stable external networking for linux and windows pods", func() {
+		It("should have stable networking for linux and windows pods", func() {
+			By("creating linux and windows pods")
+			linuxPod := CreateTestPod(f, linuxBusyBoxImage, LinuxOS)
+			windowsPod := CreateTestPod(f, windowsBusyBoximage, WindowsOS)
 
-			By("creating a linux pod with external requests")
-			linuxPod := CreateTestPod(f, linuxBusyBoxImage, linuxOS)
-			cmd := []string{"/bin/sh", "-c", "nc -vz 8.8.8.8 53", "||", "nc -vz 8.8.4.4 53"}
-			checkExternal(f, linuxPod, linuxOS, cmd)
+			By("checking connectivity to 8.8.8.8 53 (google.com) from linux")
+			CheckLinuxConnectivity(f, linuxPod.ObjectMeta.Name, "8.8.8.8", "53")
 
-			By("creating a windows pod with external requests")
-			windowsPod := CreateTestPod(f, windowsBusyBoximage, windowsOS)
-			cmd = []string{"powershell", "-command", "$r=invoke-webrequest www.google.com -usebasicparsing; echo $r.StatusCode"}
-			out, msg := checkExternal(f, windowsPod, windowsOS, cmd)
-			Expect(out).To(Equal("200"), msg)
+			By("checkin connectivity to www.google.com from windows")
+			CheckWindowsConnectivity(f, windowsPod.ObjectMeta.Name, "www.google.com")
+
+			By("checking connectivity from linux to windows")
+			CheckLinuxConnectivity(f, linuxPod.ObjectMeta.Name, windowsPod.Status.PodIP, "80")
+
+			By("checking connectivity from windows to linux")
+			CheckWindowsConnectivity(f, windowsPod.ObjectMeta.Name, linuxPod.Status.PodIP)
+
 		})
 
 	})
 })
 
-func checkExternal(f *framework.Framework, podName string, os string, cmd []string]) (string, string) {
-	By(fmt.Sprintf("checking external connectivity of %s-container in %s pod", os, podName))
-	out, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, os + "-container", cmd...)
+func CheckContainerOutput(f *framework.Framework, podName string, os string, cmd []string) (string, string, error) {
+	By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
+	out, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
 	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, out, stderr)
 	Expect(err).NotTo(HaveOccurred(), msg)
-	return out, msg
+	return out, msg, err
 }
 
-func CreateTestPod(f *framework.Framework, image string, os string) string {
-	ns := f.Namespace.Name
-	cs := f.ClientSet
+func CheckLinuxConnectivity(f *framework.Framework, podName string, address string, port string) {
+	successes := 0
+	for i := 0; i < Iterations; i++ {
+		nc := fmt.Sprintf("nc -vz %s %s", address, port)
+		cmd := []string{"/bin/sh", "-c", nc}
+		_, _, err := CheckContainerOutput(f, podName, LinuxOS, cmd)
+		if err != nil {
+			break
+		}
+		successes++
+	}
+	Expect(successes).To(Equal(Iterations))
+}
 
+func CheckWindowsConnectivity(f *framework.Framework, podName string, address string) {
+	successes := 0
+	for i := 0; i < Iterations; i++ {
+		ps := fmt.Sprintf("$r=invoke-webrequest %s -usebasicparsing; echo $r.StatusCode", address)
+		cmd := []string{"powershell", "-command", ps}
+		out, msg, err := CheckContainerOutput(f, podName, WindowsOS, cmd)
+		if err != nil || out != "200" {
+			framework.Logf(msg)
+			break
+		}
+		successes++
+	}
+	Expect(successes).To(Equal(Iterations))
+}
+
+func CreateTestPod(f *framework.Framework, image string, os string) *v1.Pod {
+	containerName := fmt.Sprintf("%s-container", os)
 	podName := "pod-" + string(uuid.NewUUID())
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -89,8 +122,9 @@ func CreateTestPod(f *framework.Framework, image string, os string) string {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  os + "-container",
+					Name:  containerName,
 					Image: image,
+					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 				},
 			},
 			NodeSelector: map[string]string{
@@ -98,7 +132,7 @@ func CreateTestPod(f *framework.Framework, image string, os string) string {
 			},
 		},
 	}
-	if os == linuxOS {
+	if os == LinuxOS {
 		pod.Spec.Tolerations = []v1.Toleration{
 			{
 				Key:      "key",
@@ -107,8 +141,5 @@ func CreateTestPod(f *framework.Framework, image string, os string) string {
 			},
 		}
 	}
-	_, err := cs.CoreV1().Pods(ns).Create(pod)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(f.WaitForPodRunning(podName))
-	return podName
+	return f.PodClient().CreateSync(pod)
 }
