@@ -146,5 +146,20 @@ function MustDownload-File {
   }
 }
 
+# Returns true if this node is part of a test cluster (see
+# cluster/gce/config-test.sh). $KubeEnv is a hash table containing the kube-env
+# metadata keys+values.
+function Test-IsTestCluster {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  if ($KubeEnv.Contains('TEST_CLUSTER') -and `
+      ($KubeEnv['TEST_CLUSTER'] -eq 'true')) {
+    return $true
+  }
+  return $false
+}
+
 # Export all public functions:
 Export-ModuleMember -Function *-*
