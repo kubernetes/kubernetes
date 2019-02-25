@@ -17,7 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +35,7 @@ type DaemonSetUpgradeTest struct {
 	daemonSet *apps.DaemonSet
 }
 
+// Name returns the tracking name of the test.
 func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade" }
 
 // Setup creates a DaemonSet and verifies that it's running
@@ -74,29 +75,29 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 		},
 	}
 
-	By("Creating a DaemonSet")
+	ginkgo.By("Creating a DaemonSet")
 	var err error
 	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
-	By("Waiting for DaemonSet pods to become ready")
+	ginkgo.By("Waiting for DaemonSet pods to become ready")
 	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
 		return checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	})
 	framework.ExpectNoError(err)
 
-	By("Validating the DaemonSet after creation")
+	ginkgo.By("Validating the DaemonSet after creation")
 	t.validateRunningDaemonSet(f)
 }
 
 // Test waits until the upgrade has completed and then verifies that the DaemonSet
 // is still running
 func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
-	By("Waiting for upgradet to complete before re-validating DaemonSet")
+	ginkgo.By("Waiting for upgradet to complete before re-validating DaemonSet")
 	<-done
 
-	By("validating the DaemonSet is still running after upgrade")
+	ginkgo.By("validating the DaemonSet is still running after upgrade")
 	t.validateRunningDaemonSet(f)
 }
 
@@ -106,7 +107,7 @@ func (t *DaemonSetUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) {
-	By("confirming the DaemonSet pods are running on all expected nodes")
+	ginkgo.By("confirming the DaemonSet pods are running on all expected nodes")
 	res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	framework.ExpectNoError(err)
 	if !res {
@@ -114,7 +115,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	}
 
 	// DaemonSet resource itself should be good
-	By("confirming the DaemonSet resource is in a good state")
+	ginkgo.By("confirming the DaemonSet resource is in a good state")
 	res, err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
 	framework.ExpectNoError(err)
 	if !res {
