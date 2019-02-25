@@ -98,33 +98,7 @@ func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadm
 // createKubeConfigFiles creates all the requested kubeconfig files.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kubeConfigFileNames ...string) error {
-
-	// gets the KubeConfigSpecs, actualized for the current InitConfiguration
-	specs, err := getKubeConfigSpecs(cfg)
-	if err != nil {
-		return err
-	}
-
-	for _, kubeConfigFileName := range kubeConfigFileNames {
-		// retrives the KubeConfigSpec for given kubeConfigFileName
-		spec, exists := specs[kubeConfigFileName]
-		if !exists {
-			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
-		}
-
-		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
-		if err != nil {
-			return err
-		}
-
-		// writes the kubeconfig to disk if it not exists
-		if err = createKubeConfigFileIfNotExists(outDir, kubeConfigFileName, config); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handleKubeConfigFiles(createKubeConfigFileIfNotExists, outDir, cfg, kubeConfigFileNames...)
 }
 
 // getKubeConfigSpecs returns all KubeConfigSpecs actualized to the context of the current InitConfiguration
@@ -362,25 +336,35 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	}
 
+	return handleKubeConfigFiles(validateKubeConfig, outDir, cfg, kubeConfigFileNames...)
+}
+
+// handleKubeConfigFiles verify or create all the requested kubeconfig files according to the flag.
+func handleKubeConfigFiles(fn func(outDir, filename string, config *clientcmdapi.Config) error, outDir string, cfg *kubeadmapi.InitConfiguration, kubeConfigFileNames ...string) error {
+
+	// gets the KubeConfigSpecs, actualized for the current InitConfiguration
 	specs, err := getKubeConfigSpecs(cfg)
 	if err != nil {
 		return err
 	}
 
 	for _, kubeConfigFileName := range kubeConfigFileNames {
+		// retrieves the KubeConfigSpec for given kubeConfigFileName
 		spec, exists := specs[kubeConfigFileName]
 		if !exists {
-			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
+			return errors.Errorf("couldn't retrieve KubeConfigSpec for %s", kubeConfigFileName)
 		}
 
-		kubeconfig, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
+		// builds the KubeConfig object
+		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
 		if err != nil {
 			return err
 		}
 
-		if err = validateKubeConfig(outDir, kubeConfigFileName, kubeconfig); err != nil {
+		if err = fn(outDir, kubeConfigFileName, config); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
