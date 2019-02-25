@@ -106,7 +106,6 @@ try {
   Download-HelperScripts
 
   Create-DockerRegistryKey
-  Create-PauseImage
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
   Create-KubeletKubeconfig
