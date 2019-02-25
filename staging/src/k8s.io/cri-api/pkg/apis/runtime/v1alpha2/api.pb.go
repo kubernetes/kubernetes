@@ -3864,7 +3864,7 @@ type RuntimeServiceClient interface {
 	// ContainerStats returns stats of the container. If the container does not
 	// exist, the call returns an error.
 	ContainerStats(ctx context.Context, in *ContainerStatsRequest, opts ...grpc.CallOption) (*ContainerStatsResponse, error)
-	// ListContainerStats returns stats of all running containers.
+	// ListContainerStats returns stats of all existing containers.
 	ListContainerStats(ctx context.Context, in *ListContainerStatsRequest, opts ...grpc.CallOption) (*ListContainerStatsResponse, error)
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(ctx context.Context, in *UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*UpdateRuntimeConfigResponse, error)
@@ -4144,7 +4144,7 @@ type RuntimeServiceServer interface {
 	// ContainerStats returns stats of the container. If the container does not
 	// exist, the call returns an error.
 	ContainerStats(context.Context, *ContainerStatsRequest) (*ContainerStatsResponse, error)
-	// ListContainerStats returns stats of all running containers.
+	// ListContainerStats returns stats of all existing containers.
 	ListContainerStats(context.Context, *ListContainerStatsRequest) (*ListContainerStatsResponse, error)
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(context.Context, *UpdateRuntimeConfigRequest) (*UpdateRuntimeConfigResponse, error)

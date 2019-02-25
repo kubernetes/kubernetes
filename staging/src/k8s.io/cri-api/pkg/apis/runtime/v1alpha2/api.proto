@@ -99,7 +99,7 @@ service RuntimeService {
     // ContainerStats returns stats of the container. If the container does not
     // exist, the call returns an error.
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
-    // ListContainerStats returns stats of all running containers.
+    // ListContainerStats returns stats of all existing containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.

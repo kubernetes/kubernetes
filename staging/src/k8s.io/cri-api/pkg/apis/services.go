@@ -84,7 +84,7 @@ type ContainerStatsManager interface {
 	// ContainerStats returns stats of the container. If the container does not
 	// exist, the call returns an error.
 	ContainerStats(containerID string) (*runtimeapi.ContainerStats, error)
-	// ListContainerStats returns stats of all running containers.
+	// ListContainerStats returns stats of all existing containers.
 	ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error)
 }
 

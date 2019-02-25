@@ -245,7 +245,7 @@ func (f *RemoteRuntime) ContainerStats(ctx context.Context, req *kubeapi.Contain
 	return &kubeapi.ContainerStatsResponse{Stats: stats}, nil
 }
 
-// ListContainerStats returns stats of all running containers.
+// ListContainerStats returns stats of all existing containers.
 func (f *RemoteRuntime) ListContainerStats(ctx context.Context, req *kubeapi.ListContainerStatsRequest) (*kubeapi.ListContainerStatsResponse, error) {
 	stats, err := f.RuntimeService.ListContainerStats(req.Filter)
 	if err != nil {
