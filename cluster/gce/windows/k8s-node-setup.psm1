@@ -36,6 +36,12 @@
     # Execute functions manually or run configure.ps1.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 # TODO: update scripts for these style guidelines:
 #  - Remove {} around variable references unless actually needed for clarity.
 #  - Always use single-quoted strings unless actually interpolating variables
