@@ -31,13 +31,10 @@
 ./cluster/update-storage-objects.sh
 ./cluster/validate-cluster.sh
 ./hack/cherry_pick_pull.sh
-./hack/generate-bindata.sh
-./hack/generate-docs.sh
 ./hack/ginkgo-e2e.sh
 ./hack/godep-restore.sh
 ./hack/godep-save.sh
 ./hack/grab-profiles.sh
-./hack/install-etcd.sh
 ./hack/jenkins/benchmark-dockerized.sh
 ./hack/jenkins/build.sh
 ./hack/jenkins/test-dockerized.sh
@@ -68,7 +65,6 @@
 ./hack/make-rules/vet.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-./hack/update-bazel.sh
 ./hack/update-codegen.sh
 ./hack/update-generated-kms-dockerized.sh
 ./hack/update-generated-protobuf-dockerized.sh
