@@ -226,6 +226,14 @@ func (IsPrivilegedUserCheck) Name() string {
 	return "IsPrivilegedUser"
 }
 
+// IsDockerSystemdCheck verifies if Docker is setup to use systemd as the cgroup driver.
+type IsDockerSystemdCheck struct{}
+
+// Name returns name for IsDockerSystemdCheck
+func (IsDockerSystemdCheck) Name() string {
+	return "IsDockerSystemdCheck"
+}
+
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
 	Path  string
@@ -863,8 +871,8 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
-// RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -872,7 +880,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
-		NumCPUCheck{NumCPU: kubeadmconstants.MasterNumCPU},
+		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
@@ -973,11 +981,11 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 }
 
 // RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
-func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
 	// Check ipvs required kernel module if we use ipvs kube-proxy mode
-	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks,
 			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)
@@ -998,6 +1006,10 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		if containerRuntime.IsDocker() {
 			isDocker = true
 			checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+			// Linux only
+			// TODO: support other CRIs for this check eventually
+			// https://github.com/kubernetes/kubeadm/issues/874
+			checks = append(checks, IsDockerSystemdCheck{})
 		}
 	}
 

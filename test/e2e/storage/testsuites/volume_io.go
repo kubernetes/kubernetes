@@ -74,87 +74,65 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-}
+func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	type local struct {
+		config      *PerTestConfig
+		testCleanup func()
 
-func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
-	var fsGroup *int64
-	driver := resource.driver
-	dInfo := driver.GetDriverInfo()
-	f := dInfo.Config.Framework
-	fileSizes := createFileSizes(dInfo.MaxFileSize)
-	volSource := resource.volSource
+		resource *genericVolumeTestResource
+	}
+	var (
+		dInfo = driver.GetDriverInfo()
+		l     local
+	)
 
-	if volSource == nil {
-		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+	// No preconditions to test. Normally they would be in a BeforeEach here.
+
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
+	f := framework.NewDefaultFramework("volumeio")
+
+	init := func() {
+		l = local{}
+
+		// Now do the more expensive test initialization.
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		if l.resource.volSource == nil {
+			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+		}
 	}
 
-	if dInfo.Capabilities[CapFsGroup] {
-		fsGroupVal := int64(1234)
-		fsGroup = &fsGroupVal
+	cleanup := func() {
+		if l.resource != nil {
+			l.resource.cleanupResource()
+			l.resource = nil
+		}
+
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
+		}
 	}
 
-	return volumeIOTestInput{
-		f:         f,
-		name:      dInfo.Name,
-		config:    &dInfo.Config,
-		volSource: *volSource,
-		testFile:  fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name),
-		podSec: v1.PodSecurityContext{
-			FSGroup: fsGroup,
-		},
-		fileSizes: fileSizes,
-	}
-}
-
-func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
-	Context(getTestNameStr(t, pattern), func() {
-		var (
-			resource     genericVolumeTestResource
-			input        volumeIOTestInput
-			needsCleanup bool
-		)
-
-		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
-			// Setup test resource for driver and testpattern
-			resource = genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
-
-			// Create test input
-			input = createVolumeIOTestInput(pattern, resource)
-		})
-
-		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
-		})
-
-		execTestVolumeIO(&input)
-	})
-}
-
-type volumeIOTestInput struct {
-	f         *framework.Framework
-	name      string
-	config    *TestConfig
-	volSource v1.VolumeSource
-	testFile  string
-	podSec    v1.PodSecurityContext
-	fileSizes []int64
-}
-
-func execTestVolumeIO(input *volumeIOTestInput) {
 	It("should write files of various sizes, verify size, validate content [Slow]", func() {
-		f := input.f
-		cs := f.ClientSet
+		init()
+		defer cleanup()
 
-		err := testVolumeIO(f, cs, convertTestConfig(input.config), input.volSource, &input.podSec, input.testFile, input.fileSizes)
+		cs := f.ClientSet
+		fileSizes := createFileSizes(dInfo.MaxFileSize)
+		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
+		var fsGroup *int64
+		if dInfo.Capabilities[CapFsGroup] {
+			fsGroupVal := int64(1234)
+			fsGroup = &fsGroupVal
+		}
+		podSec := v1.PodSecurityContext{
+			FSGroup: fsGroup,
+		}
+		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }

@@ -69,7 +69,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -83,7 +83,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -97,7 +97,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -168,7 +168,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},
@@ -182,7 +182,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},

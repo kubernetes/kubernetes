@@ -27,7 +27,7 @@ import (
 )
 
 // CalculateNodeAffinityPriorityMap prioritizes nodes according to node affinity scheduling preferences
-// indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
+// indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node matchs a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.

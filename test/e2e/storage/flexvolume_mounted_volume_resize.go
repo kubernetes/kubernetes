@@ -18,6 +18,8 @@ package storage
 
 import (
 	"fmt"
+	"path"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
@@ -27,8 +29,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"path"
 )
 
 var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
@@ -72,7 +74,14 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			isNodeLabeled = true
 		}
 
-		resizableSc, err = createStorageClass(ns, c)
+		test := testsuites.StorageClassTest{
+			Name:                 "flexvolume-resize",
+			ClaimSize:            "2Gi",
+			AllowVolumeExpansion: true,
+			Provisioner:          "flex-expand",
+		}
+
+		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}

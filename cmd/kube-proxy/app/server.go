@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/apiserver/pkg/util/flag"
 	informers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -47,12 +46,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
+	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
@@ -62,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -73,6 +75,7 @@ import (
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -85,6 +88,11 @@ const (
 	proxyModeIPVS        = "ipvs"
 	proxyModeKernelspace = "kernelspace"
 )
+
+// proxyRun defines the interface to run a specified ProxyServer
+type proxyRun interface {
+	Run() error
+}
 
 // Options contains everything necessary to create and run a proxy server.
 type Options struct {
@@ -101,6 +109,12 @@ type Options struct {
 	WindowsService bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
+	// watcher is used to watch on the update change of ConfigFile
+	watcher filesystem.FSWatcher
+	// proxyServer is the interface to run the proxy server
+	proxyServer proxyRun
+	// errCh is the channel that errors will be sent
+	errCh chan error
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
 	// config.KubeProxyConfiguration.
@@ -178,7 +192,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
 		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
-	fs.Var(flag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
@@ -190,6 +204,7 @@ func NewOptions() *Options {
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
+		errCh:       make(chan error),
 	}
 }
 
@@ -208,6 +223,10 @@ func (o *Options) Complete() error {
 		} else {
 			o.config = c
 		}
+
+		if err := o.initWatcher(); err != nil {
+			return err
+		}
 	}
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
@@ -217,8 +236,37 @@ func (o *Options) Complete() error {
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// Creates a new filesystem watcher and adds watches for the config file.
+func (o *Options) initWatcher() error {
+	fswatcher := filesystem.NewFsnotifyWatcher()
+	err := fswatcher.Init(o.eventHandler, o.errorHandler)
+	if err != nil {
+		return err
+	}
+	err = fswatcher.AddWatch(o.ConfigFile)
+	if err != nil {
+		return err
+	}
+	o.watcher = fswatcher
+	return nil
+}
+
+func (o *Options) eventHandler(ent fsnotify.Event) {
+	eventOpIs := func(Op fsnotify.Op) bool {
+		return ent.Op&Op == Op
+	}
+	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
+		// error out when ConfigFile is updated
+		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+	}
+	o.errCh <- nil
+}
+
+func (o *Options) errorHandler(err error) {
+	o.errCh <- err
 }
 
 // processHostnameOverrideFlag processes hostname-override flag
@@ -240,7 +288,6 @@ func (o *Options) Validate(args []string) error {
 	if len(args) != 0 {
 		return errors.New("no arguments are supported")
 	}
-
 	if errs := validation.Validate(o.config); len(errs) != 0 {
 		return errs.ToAggregate()
 	}
@@ -249,6 +296,7 @@ func (o *Options) Validate(args []string) error {
 }
 
 func (o *Options) Run() error {
+	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
@@ -257,8 +305,31 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
+	o.proxyServer = proxyServer
+	return o.runLoop()
+}
 
-	return proxyServer.Run()
+// runLoop will watch on the update change of the proxy server's configuration file.
+// Return an error when updated
+func (o *Options) runLoop() error {
+	if o.watcher != nil {
+		o.watcher.Run()
+	}
+
+	// run the proxy in goroutine
+	go func() {
+		err := o.proxyServer.Run()
+		o.errCh <- err
+	}()
+
+	for {
+		select {
+		case err := <-o.errCh:
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (o *Options) writeConfigFile() error {
@@ -583,7 +654,7 @@ func (s *ProxyServer) Run() error {
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
-			options.LabelSelector = "!service.kubernetes.io/service-proxy-name"
+			options.LabelSelector = "!" + apis.LabelServiceProxyName
 		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)

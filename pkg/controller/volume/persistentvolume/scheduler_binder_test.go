@@ -467,7 +467,10 @@ func (env *testEnv) validateBind(
 		if err != nil {
 			t.Errorf("Test %q failed: GetPV %q returned error: %v", name, pv.Name, err)
 		}
-		if !reflect.DeepEqual(cachedPV, pv) {
+		// Cache may be overridden by API object with higher version, compare but ignore resource version.
+		newCachedPV := cachedPV.DeepCopy()
+		newCachedPV.ResourceVersion = pv.ResourceVersion
+		if !reflect.DeepEqual(newCachedPV, pv) {
 			t.Errorf("Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pv, cachedPV))
 		}
 	}
@@ -492,7 +495,10 @@ func (env *testEnv) validateProvision(
 		if err != nil {
 			t.Errorf("Test %q failed: GetPVC %q returned error: %v", name, getPVCName(pvc), err)
 		}
-		if !reflect.DeepEqual(cachedPVC, pvc) {
+		// Cache may be overridden by API object with higher version, compare but ignore resource version.
+		newCachedPVC := cachedPVC.DeepCopy()
+		newCachedPVC.ResourceVersion = pvc.ResourceVersion
+		if !reflect.DeepEqual(newCachedPVC, pvc) {
 			t.Errorf("Test %q failed: cached PVC check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pvc, cachedPVC))
 		}
 	}

@@ -214,12 +214,12 @@ func testAudit(t *testing.T, version string) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer stream.Close()
-	missing, err := utils.CheckAuditLines(stream, expectedEvents, versions[version])
+	missingReport, err := utils.CheckAuditLines(stream, expectedEvents, versions[version])
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(missing) > 0 {
-		t.Errorf("Failed to match all expected events, events %#v not found!", missing)
+	if len(missingReport.MissingEvents) > 0 {
+		t.Errorf(missingReport.String())
 	}
 }
 

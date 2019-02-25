@@ -18,8 +18,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
 make test \
     WHAT="$*" \
     KUBE_COVER="" \

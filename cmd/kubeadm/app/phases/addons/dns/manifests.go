@@ -43,6 +43,7 @@ spec:
       labels:
         k8s-app: kube-dns
     spec:
+      priorityClassName: system-cluster-critical
       volumes:
       - name: kube-dns-config
         configMap:
@@ -204,6 +205,10 @@ spec:
     port: 53
     protocol: TCP
     targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
   selector:
     k8s-app: kube-dns
 `
@@ -231,12 +236,15 @@ spec:
       labels:
         k8s-app: kube-dns
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: coredns
         image: {{ .Image }}
@@ -271,6 +279,11 @@ spec:
           timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -307,7 +320,7 @@ data:
            fallthrough in-addr.arpa ip6.arpa
         }{{ .Federation }}
         prometheus :9153
-        proxy . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }}
         cache 30
         loop
         reload

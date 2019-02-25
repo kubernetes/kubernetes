@@ -76,7 +76,7 @@ import (
 
 type alwaysMutatingDeny struct{}
 
-func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
+func (alwaysMutatingDeny) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
@@ -86,7 +86,7 @@ func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
 
 type alwaysValidatingDeny struct{}
 
-func (alwaysValidatingDeny) Validate(a admission.Attributes) (err error) {
+func (alwaysValidatingDeny) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
 }
 
@@ -335,7 +335,6 @@ type SimpleRESTStorage struct {
 	fakeWatch                  *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
 	requestedFieldSelector     fields.Selector
-	requestedUninitialized     bool
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
@@ -390,7 +389,6 @@ func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainterna
 	if options != nil && options.FieldSelector != nil {
 		storage.requestedFieldSelector = options.FieldSelector
 	}
-	storage.requestedUninitialized = options.IncludeUninitialized
 	return result, storage.errors["list"]
 }
 
@@ -1686,52 +1684,6 @@ func TestGetCompression(t *testing.T) {
 		if !selfLinker.called {
 			t.Errorf("Never set self link")
 		}
-	}
-}
-
-func TestGetUninitialized(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		list: []genericapitesting.Simple{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Initializers: &metav1.Initializers{
-						Pending: []metav1.Initializer{{Name: "test"}},
-					},
-				},
-				Other: "foo",
-			},
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:              t,
-		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
-		name:           "id",
-		namespace:      "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple?includeUninitialized=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.SimpleList
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(itemOut.Items) != 1 || itemOut.Items[0].Other != "foo" {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if !simpleStorage.requestedUninitialized {
-		t.Errorf("Didn't set correct flag")
 	}
 }
 

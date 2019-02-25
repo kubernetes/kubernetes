@@ -17,11 +17,10 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -29,12 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -44,13 +40,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
-	drivers.InitGcePDCSIDriver,
+	func() testsuites.TestDriver { return drivers.InitGcePDCSIDriver(false /* topology enabled */) },
 	drivers.InitGcePDExternalCSIDriver,
 	drivers.InitHostPathV0CSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
@@ -63,212 +58,137 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
-}
-
-func csiTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	tunedPatterns := []testpatterns.TestPattern{}
-
-	for _, pattern := range patterns {
-		// Skip inline volume and pre-provsioned PV tests for csi drivers
-		if pattern.VolType == testpatterns.InlineVolume || pattern.VolType == testpatterns.PreprovisionedPV {
-			continue
-		}
-		tunedPatterns = append(tunedPatterns, pattern)
-	}
-
-	return tunedPatterns
+	testsuites.InitSnapshottableTestSuite,
 }
 
 // This executes testSuites for csi volumes.
 var _ = utils.SIGDescribe("CSI Volumes", func() {
-	f := framework.NewDefaultFramework("csi-volumes")
-
-	var (
-		cancel context.CancelFunc
-		cs     clientset.Interface
-		csics  csiclient.Interface
-		ns     *v1.Namespace
-		// Common configuration options for each driver.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "csi",
-		}
-	)
-
-	BeforeEach(func() {
-		ctx, c := context.WithCancel(context.Background())
-		cancel = c
-		cs = f.ClientSet
-		csics = f.CSIClientSet
-		ns = f.Namespace
-
-		// Debugging of the following tests heavily depends on the log output
-		// of the different containers. Therefore include all of that in log
-		// files (when using --report-dir, as in the CI) or the output stream
-		// (otherwise).
-		to := podlogs.LogOutput{
-			StatusWriter: GinkgoWriter,
-		}
-		if framework.TestContext.ReportDir == "" {
-			to.LogWriter = GinkgoWriter
-		} else {
-			test := CurrentGinkgoTestDescription()
-			reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
-			// We end the prefix with a slash to ensure that all logs
-			// end up in a directory named after the current test.
-			to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
-				reg.ReplaceAllString(test.FullTestText, "_") + "/"
-		}
-		podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
-
-		// pod events are something that the framework already collects itself
-		// after a failed test. Logging them live is only useful for interactive
-		// debugging, not when we collect reports.
-		if framework.TestContext.ReportDir == "" {
-			podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
-		}
-	})
-
-	AfterEach(func() {
-		cancel()
-	})
-
 	for _, initDriver := range csiTestDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
+		curDriver := initDriver()
+
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
-
-				// setupDriver
-				curDriver.CreateDriver()
-			})
-
-			AfterEach(func() {
-				// Cleanup driver
-				curDriver.CleanupDriver()
-			})
-
-			testsuites.RunTestSuite(f, curDriver, csiTestSuites, csiTunePattern)
+			testsuites.DefineTestSuite(curDriver, csiTestSuites)
 		})
 	}
 
 	Context("CSI Topology test using GCE PD driver [Feature:CSINodeInfo]", func() {
-		newConfig := config
-		newConfig.TopologyEnabled = true
-		driver := drivers.InitGcePDCSIDriver(newConfig).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		f := framework.NewDefaultFramework("csitopology")
+		driver := drivers.InitGcePDCSIDriver(true /* topology enabled */).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		var (
+			config      *testsuites.PerTestConfig
+			testCleanup func()
+		)
 		BeforeEach(func() {
-			driver.CreateDriver()
+			config, testCleanup = driver.PrepareTest(f)
 		})
 
 		AfterEach(func() {
-			driver.CleanupDriver()
+			if testCleanup != nil {
+				testCleanup()
+			}
 		})
 
 		It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "topology-positive"
-			testTopologyPositive(cs, suffix, ns.GetName(), false /* delayBinding */, true /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */, true /* allowedTopologies */)
 		})
 
 		It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
 			suffix := "delayed"
-			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, false /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, false /* allowedTopologies */)
 		})
 
 		It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "delayed-topology-positive"
-			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, true /* allowedTopologies */)
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, true /* allowedTopologies */)
 		})
 
 		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
-			framework.SkipUnlessMultizone(cs)
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "topology-negative"
-			testTopologyNegative(cs, suffix, ns.GetName(), false /* delayBinding */)
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */)
 		})
 
 		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
-			framework.SkipUnlessMultizone(cs)
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "delayed-topology-negative"
-			testTopologyNegative(cs, suffix, ns.GetName(), true /* delayBinding */)
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */)
 		})
 	})
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
-	Context("CSI attach test using HostPath driver [Feature:CSIDriverRegistry]", func() {
+
+	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err    error
 			driver testsuites.TestDriver
 		)
 
-		BeforeEach(func() {
-			config := testsuites.TestConfig{
-				Framework: f,
-				Prefix:    "csi-attach",
-			}
-			driver = drivers.InitHostPathCSIDriver(config)
-			driver.CreateDriver()
-		})
-
-		AfterEach(func() {
-			driver.CleanupDriver()
-		})
-
 		tests := []struct {
-			name                   string
-			driverAttachable       bool
-			driverExists           bool
-			expectVolumeAttachment bool
+			name             string
+			driverAttachable bool
+			deployDriverCRD  bool
 		}{
 			{
-				name:                   "non-attachable volume does not need VolumeAttachment",
-				driverAttachable:       false,
-				driverExists:           true,
-				expectVolumeAttachment: false,
+				name:             "should not require VolumeAttach for drivers without attachment",
+				driverAttachable: false,
+				deployDriverCRD:  true,
 			},
 			{
-				name:                   "attachable volume needs VolumeAttachment",
-				driverAttachable:       true,
-				driverExists:           true,
-				expectVolumeAttachment: true,
+				name:             "should require VolumeAttach for drivers with attachment",
+				driverAttachable: true,
+				deployDriverCRD:  true,
 			},
 			{
-				name:                   "volume with no CSI driver needs VolumeAttachment",
-				driverExists:           false,
-				expectVolumeAttachment: true,
+				name:             "should preserve attachment policy when no CSIDriver present",
+				driverAttachable: true,
+				deployDriverCRD:  false,
 			},
 		}
 
 		for _, t := range tests {
 			test := t
+			f := framework.NewDefaultFramework("csiattach")
+
 			It(test.name, func() {
-				if test.driverExists {
-					csiDriver := createCSIDriver(csics, testsuites.GetUniqueDriverName(driver), test.driverAttachable, nil)
-					if csiDriver != nil {
-						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
-					}
+				cs := f.ClientSet
+				csics := f.CSIClientSet
+				ns := f.Namespace
+
+				driver = drivers.InitMockCSIDriver(test.deployDriverCRD, test.driverAttachable, nil)
+				config, testCleanup := driver.PrepareTest(f)
+				driverName := config.GetUniqueDriverName()
+				defer testCleanup()
+
+				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driverName)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
+					defer destroyCSIDriver(csics, driverName)
 				}
 
 				By("Creating pod")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass("")
+					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
 				}
-				nodeName := driver.GetDriverInfo().Config.ClientNodeName
+				nodeName := config.ClientNodeName
 				scTest := testsuites.StorageClassTest{
 					Name:         driver.GetDriverInfo().Name,
 					Provisioner:  sc.Provisioner,
 					Parameters:   sc.Parameters,
 					ClaimSize:    "1Gi",
 					ExpectedSize: "1Gi",
-					NodeName:     nodeName,
 				}
-				class, claim, pod := startPausePod(cs, scTest, ns.Name)
+				nodeSelection := testsuites.NodeSelection{
+					Name: nodeName,
+				}
+				class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
 				if class != nil {
 					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
 				}
 				if claim != nil {
-					defer cs.CoreV1().PersistentVolumeClaims(ns.Name).Delete(claim.Name, nil)
+					// Fully delete PV before deleting CSI driver
+					defer deleteVolume(cs, claim)
 				}
 				if pod != nil {
 					// Fully delete (=unmount) the pod before deleting CSI driver
@@ -278,124 +198,122 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					return
 				}
 
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				By("Checking if VolumeAttachment was created for the pod")
-				// Check that VolumeAttachment does not exist
 				handle := getVolumeHandle(cs, claim)
 				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, scTest.Provisioner, nodeName)))
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
 				_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
-						if test.expectVolumeAttachment {
+						if test.driverAttachable {
 							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 						}
 					} else {
 						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
 					}
 				}
-				if !test.expectVolumeAttachment {
+				if !test.driverAttachable {
 					Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
 				}
 			})
 		}
 	})
 
-	Context("CSI workload information [Feature:CSIDriverRegistry]", func() {
+	Context("CSI workload information using mock driver [Feature:CSIDriverRegistry]", func() {
 		var (
+			err            error
 			driver         testsuites.TestDriver
 			podInfoV1      = "v1"
 			podInfoUnknown = "unknown"
 			podInfoEmpty   = ""
 		)
 
-		BeforeEach(func() {
-			config := testsuites.TestConfig{
-				Framework: f,
-				Prefix:    "csi-workload",
-			}
-			driver = drivers.InitMockCSIDriver(config)
-			driver.CreateDriver()
-		})
-
-		AfterEach(func() {
-			driver.CleanupDriver()
-		})
-
 		tests := []struct {
 			name                  string
 			podInfoOnMountVersion *string
-			driverExists          bool
+			deployDriverCRD       bool
 			expectPodInfo         bool
 		}{
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=nil",
 				podInfoOnMountVersion: nil,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should be passed when podInfoOnMountVersion=v1",
 				podInfoOnMountVersion: &podInfoV1,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         true,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<empty string>",
 				podInfoOnMountVersion: &podInfoEmpty,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
 				name:                  "should not be passed when podInfoOnMountVersion=<unknown string>",
 				podInfoOnMountVersion: &podInfoUnknown,
-				driverExists:          true,
+				deployDriverCRD:       true,
 				expectPodInfo:         false,
 			},
 			{
-				name:          "should not be passed when CSIDriver does not exist",
-				driverExists:  false,
-				expectPodInfo: false,
+				name:            "should not be passed when CSIDriver does not exist",
+				deployDriverCRD: false,
+				expectPodInfo:   false,
 			},
 		}
 		for _, t := range tests {
 			test := t
+			f := framework.NewDefaultFramework("csiworkload")
+
 			It(test.name, func() {
-				if test.driverExists {
-					csiDriver := createCSIDriver(csics, testsuites.GetUniqueDriverName(driver), true, test.podInfoOnMountVersion)
-					if csiDriver != nil {
-						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
-					}
+				cs := f.ClientSet
+				csics := f.CSIClientSet
+				ns := f.Namespace
+
+				driver = drivers.InitMockCSIDriver(test.deployDriverCRD, true, test.podInfoOnMountVersion)
+				config, testCleanup := driver.PrepareTest(f)
+				driverName := config.GetUniqueDriverName()
+				defer testCleanup()
+
+				if test.deployDriverCRD {
+					err = waitForCSIDriver(csics, driverName)
+					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
+					defer destroyCSIDriver(csics, driverName)
 				}
 
 				By("Creating pod")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass("")
+					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
 				}
-				nodeName := driver.GetDriverInfo().Config.ClientNodeName
+				nodeName := config.ClientNodeName
 				scTest := testsuites.StorageClassTest{
 					Name:         driver.GetDriverInfo().Name,
 					Parameters:   sc.Parameters,
 					ClaimSize:    "1Gi",
 					ExpectedSize: "1Gi",
-					// The mock driver only works when everything runs on a single node.
-					NodeName: nodeName,
 					// Provisioner and storage class name must match what's used in
 					// csi-storageclass.yaml, plus the test-specific suffix.
 					Provisioner:      sc.Provisioner,
 					StorageClassName: "csi-mock-sc-" + f.UniqueName,
-					// Mock driver does not provide any persistency.
-					SkipWriteReadCheck: true,
 				}
-				class, claim, pod := startPausePod(cs, scTest, ns.Name)
+				nodeSelection := testsuites.NodeSelection{
+					// The mock driver only works when everything runs on a single node.
+					Name: nodeName,
+				}
+				class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
 				if class != nil {
 					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
 				}
 				if claim != nil {
-					defer cs.CoreV1().PersistentVolumeClaims(ns.Name).Delete(claim.Name, nil)
+					// Fully delete PV before deleting CSI driver
+					defer deleteVolume(cs, claim)
 				}
 				if pod != nil {
 					// Fully delete (=unmount) the pod before deleting CSI driver
@@ -404,7 +322,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				if pod == nil {
 					return
 				}
-				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 				By("Checking CSI driver logs")
 				// The driver is deployed as a statefulset with stable pod names
@@ -425,14 +343,16 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 		topoZone := getRandomClusterZone(cs)
 		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
 	}
-	claim := newClaim(test, namespace, suffix)
-	claim.Spec.StorageClassName = &class.Name
+	test.Client = cs
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &class.Name
+	test.Class = class
 
 	if delayBinding {
-		_, node := testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+		_, node := test.TestBindingWaitForFirstConsumer(nil /* node selector */, false /* expect unschedulable */)
 		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
 	} else {
-		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+		test.TestDynamicProvisioning()
 	}
 }
 
@@ -450,34 +370,48 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 
 	test := createGCEPDStorageClassTest()
 	test.DelayBinding = delayBinding
-	test.NodeSelector = map[string]string{kubeletapis.LabelZoneFailureDomain: podZone}
-	test.ExpectUnschedulable = true
+	nodeSelector := map[string]string{v1.LabelZoneFailureDomain: podZone}
 
-	class := newStorageClass(test, namespace, suffix)
-	addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, pvZone)
-	claim := newClaim(test, namespace, suffix)
-	claim.Spec.StorageClassName = &class.Name
+	test.Client = cs
+	test.Class = newStorageClass(test, namespace, suffix)
+	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &test.Class.Name
 	if delayBinding {
-		testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {
-		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			// Ensure that a pod cannot be scheduled in an unsuitable zone.
+			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
+				testsuites.NodeSelection{Selector: nodeSelector})
+			defer testsuites.StopPod(cs, pod)
+			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
+		}
+		test.TestDynamicProvisioning()
 	}
 }
 
-func createCSIDriver(csics csiclient.Interface, name string, attachable bool, podInfoOnMountVersion *string) *csiv1alpha1.CSIDriver {
-	By("Creating CSIDriver instance")
-	driver := &csiv1alpha1.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: csiv1alpha1.CSIDriverSpec{
-			AttachRequired:        &attachable,
-			PodInfoOnMountVersion: podInfoOnMountVersion,
-		},
+func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
+	timeout := 2 * time.Minute
+
+	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
+		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			return err
+		}
 	}
-	driver, err := csics.CsiV1alpha1().CSIDrivers().Create(driver)
-	framework.ExpectNoError(err, "Failed to create CSIDriver: %v", err)
-	return driver
+	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
+}
+
+func destroyCSIDriver(csics csiclient.Interface, driverName string) {
+	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+	if err == nil {
+		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
+		// Uncomment the following line to get full dump of CSIDriver object
+		// framework.Logf("%s", framework.PrettyPrint(driverGet))
+		csics.CsiV1alpha1().CSIDrivers().Delete(driverName, nil)
+	}
 }
 
 func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
@@ -500,7 +434,16 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 	return pv.Spec.CSI.VolumeHandle
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func deleteVolume(cs clientset.Interface, claim *v1.PersistentVolumeClaim) {
+	// re-get the claim to the latest state with bound volume
+	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	if err == nil {
+		cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
+		framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute)
+	}
+}
+
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node testsuites.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	class, err := cs.StorageV1().StorageClasses().Create(class)
 	framework.ExpectNoError(err, "Failed to create class : %v", err)
@@ -514,6 +457,9 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
+			NodeName:     node.Name,
+			NodeSelector: node.Selector,
+			Affinity:     node.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:  "volume-tester",
@@ -541,9 +487,6 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 		},
 	}
 
-	if len(t.NodeName) != 0 {
-		pod.Spec.NodeName = t.NodeName
-	}
 	pod, err = cs.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return class, claim, pod

@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -202,7 +203,8 @@ while true; do sleep 1; done
 				},
 			} {
 				testCase := testCase
-				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
+				It(fmt.Sprintf("should report termination message %s [LinuxOnly]", testCase.name), func() {
+					// Cannot mount files in Windows Containers.
 					testCase.container.Name = "termination-message-container"
 					c := ConformanceContainer{
 						PodClient:     f.PodClient(),
@@ -271,14 +273,21 @@ while true; do sleep 1; done
 					waiting:     true,
 				},
 				{
-					description: "should be able to pull image from gcr.io",
-					image:       "gcr.io/google-containers/debian-base:0.4.0",
+					// TODO(claudiub): Add a Windows equivalent test.
+					description: "should be able to pull image from gcr.io [LinuxOnly]",
+					image:       "gcr.io/google-containers/debian-base:0.4.1",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
-					description: "should be able to pull image from docker hub",
+					description: "should be able to pull image from docker hub [LinuxOnly]",
 					image:       "alpine:3.7",
+					phase:       v1.PodRunning,
+					waiting:     false,
+				},
+				{
+					description: "should be able to pull image from docker hub [WindowsOnly]",
+					image:       "e2eteam/busybox:1.29",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
@@ -289,7 +298,7 @@ while true; do sleep 1; done
 					waiting:     true,
 				},
 				{
-					description: "should be able to pull from private registry with secret",
+					description: "should be able to pull from private registry with secret [LinuxOnly]",
 					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					secret:      true,
 					phase:       v1.PodRunning,
@@ -298,6 +307,9 @@ while true; do sleep 1; done
 			} {
 				testCase := testCase
 				It(testCase.description+" [NodeConformance]", func() {
+					if strings.Contains(testCase.description, "[WindowsOnly]") {
+						framework.SkipUnlessNodeOSDistroIs("windows")
+					}
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{

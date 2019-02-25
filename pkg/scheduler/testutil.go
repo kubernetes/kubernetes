@@ -92,7 +92,7 @@ func (fc *FakeConfigurator) CreateFromKeys(predicateKeys, priorityKeys sets.Stri
 	return fc.Config, nil
 }
 
-// EmptyPluginSet is the default plugin restirar used by the default scheduler.
+// EmptyPluginSet is the default plugin registrar used by the default scheduler.
 type EmptyPluginSet struct{}
 
 var _ = plugins.PluginSet(EmptyPluginSet{})

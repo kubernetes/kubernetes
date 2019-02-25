@@ -227,3 +227,73 @@ __EOF__
   set +o nounset
   set +o errexit
 }
+
+# Runs tests related to kubectl apply (server-side)
+run_kubectl_apply_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl apply --server-side"
+  ## kubectl apply should create the resource that doesn't exist yet
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod
+  kubectl apply --server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is created
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # Clean up
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## kubectl apply --server-dry-run
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply dry-run
+  kubectl apply --server-side --server-dry-run -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # No pod exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply non dry-run creates the pod
+  kubectl apply --server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # apply changes
+  kubectl apply --server-side --server-dry-run -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
+  # Post-Condition: label still has initial value
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+
+  # clean-up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+
+  ## kubectl apply dry-run on CR
+  # Create CRD
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "resources.mygroup.example.com"
+  },
+  "spec": {
+    "group": "mygroup.example.com",
+    "version": "v1alpha1",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "resources",
+      "singular": "resource",
+      "kind": "Kind",
+      "listKind": "KindList"
+    }
+  }
+}
+__EOF__
+
+  # Dry-run create the CR
+  kubectl "${kube_flags[@]}" apply --server-side --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
+  # Make sure that the CR doesn't exist
+  ! kubectl "${kube_flags[@]}" get resource/myobj
+
+  # clean-up
+  kubectl "${kube_flags[@]}" delete customresourcedefinition resources.mygroup.example.com
+
+  set +o nounset
+  set +o errexit
+}

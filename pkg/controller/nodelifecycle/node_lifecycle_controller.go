@@ -146,7 +146,7 @@ type Controller struct {
 	kubeClient        clientset.Interface
 
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
-	// to aviod the problem with time skew across the cluster.
+	// to avoid the problem with time skew across the cluster.
 	now func() metav1.Time
 
 	enterPartialDisruptionFunc func(nodeNum int) float32
@@ -370,17 +370,6 @@ func NewNodeLifecycleController(
 		})
 	}
 
-	// NOTE(resouer): nodeInformer to substitute deprecated taint key (notReady -> not-ready).
-	// Remove this logic when we don't need this backwards compatibility
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
-			return nc.doFixDeprecatedTaintKeyPass(node)
-		}),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-			return nc.doFixDeprecatedTaintKeyPass(newNode)
-		}),
-	})
-
 	nc.leaseLister = leaseInformer.Lister()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
 		nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
@@ -446,44 +435,6 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}, nc.nodeMonitorPeriod, stopCh)
 
 	<-stopCh
-}
-
-// doFixDeprecatedTaintKeyPass checks and replaces deprecated taint key with proper key name if needed.
-func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
-	taintsToAdd := []*v1.Taint{}
-	taintsToDel := []*v1.Taint{}
-
-	for _, taint := range node.Spec.Taints {
-		if taint.Key == schedulerapi.DeprecatedTaintNodeNotReady {
-			tDel := taint
-			taintsToDel = append(taintsToDel, &tDel)
-
-			tAdd := taint
-			tAdd.Key = schedulerapi.TaintNodeNotReady
-			taintsToAdd = append(taintsToAdd, &tAdd)
-		}
-
-		if taint.Key == schedulerapi.DeprecatedTaintNodeUnreachable {
-			tDel := taint
-			taintsToDel = append(taintsToDel, &tDel)
-
-			tAdd := taint
-			tAdd.Key = schedulerapi.TaintNodeUnreachable
-			taintsToAdd = append(taintsToAdd, &tAdd)
-		}
-	}
-
-	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
-		return nil
-	}
-
-	klog.Warningf("Detected deprecated taint keys: %v on node: %v, will substitute them with %v",
-		taintsToDel, node.GetName(), taintsToAdd)
-
-	if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, taintsToAdd, taintsToDel, node) {
-		return fmt.Errorf("failed to swap taints of node %+v", node)
-	}
-	return nil
 }
 
 func (nc *Controller) doNoScheduleTaintingPassWorker() {
@@ -573,9 +524,6 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 				// retry in 50 millisecond
 				return false, 50 * time.Millisecond
-			} else {
-				zone := utilnode.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
@@ -593,7 +541,14 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				return true, 0
 			}
 
-			return nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node), 0
+			result := nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
+			if result {
+				//count the evictionsNumber
+				zone := utilnode.GetZoneKey(node)
+				evictionsNumber.WithLabelValues(zone).Inc()
+			}
+
+			return result, 0
 		})
 	}
 }
@@ -609,9 +564,6 @@ func (nc *Controller) doEvictionPass() {
 				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
 			} else if err != nil {
 				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
-			} else {
-				zone := utilnode.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			nodeUID, _ := value.UID.(string)
 			remaining, err := nodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
@@ -622,6 +574,13 @@ func (nc *Controller) doEvictionPass() {
 			if remaining {
 				klog.Infof("Pods awaiting deletion due to Controller eviction")
 			}
+
+			//count the evictionsNumber
+			if node != nil {
+				zone := utilnode.GetZoneKey(node)
+				evictionsNumber.WithLabelValues(zone).Inc()
+			}
+
 			return true, 0
 		})
 	}

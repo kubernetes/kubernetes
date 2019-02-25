@@ -21,15 +21,10 @@ package fake
 import (
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 )
 
 type FakeExtensions struct {
 	*testing.Fake
-}
-
-func (c *FakeExtensions) Ingresses(namespace string) internalversion.IngressInterface {
-	return &FakeIngresses{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

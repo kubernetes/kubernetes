@@ -31,14 +31,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/version"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"k8s.io/klog"
@@ -171,6 +171,7 @@ type Cloud struct {
 	VirtualMachinesClient   VirtualMachinesClient
 	StorageAccountClient    StorageAccountClient
 	DisksClient             DisksClient
+	SnapshotsClient         *compute.SnapshotsClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
 	metadata                *InstanceMetadataService
@@ -345,6 +346,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		resourceRequestBackoff: resourceRequestBackoff,
 
 		DisksClient:                     newAzDisksClient(azClientConfig),
+		SnapshotsClient:                 newSnapshotsClient(azClientConfig),
 		RoutesClient:                    newAzRoutesClient(azClientConfig),
 		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
 		InterfacesClient:                newAzInterfacesClient(azClientConfig),
@@ -488,22 +490,8 @@ func initDiskControllers(az *Cloud) error {
 		cloud:                 az,
 	}
 
-	// BlobDiskController: contains the function needed to
-	// create/attach/detach/delete blob based (unmanaged disks)
-	blobController, err := newBlobDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
-	}
-
-	// ManagedDiskController: contains the functions needed to
-	// create/attach/detach/delete managed disks
-	managedController, err := newManagedDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
-	}
-
-	az.BlobDiskController = blobController
-	az.ManagedDiskController = managedController
+	az.BlobDiskController = &BlobDiskController{common: common}
+	az.ManagedDiskController = &ManagedDiskController{common: common}
 	az.controllerCommon = common
 
 	return nil
@@ -521,8 +509,8 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
-				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelZoneFailureDomain] ==
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -556,7 +544,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if prevNode != nil {
 		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
@@ -579,7 +567,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if newNode != nil {
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()

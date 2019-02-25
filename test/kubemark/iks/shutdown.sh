@@ -29,7 +29,7 @@ spawn-config
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
-rm -rf "${RESOURCE_DIRECTORY}/addons" 
+rm -rf "${RESOURCE_DIRECTORY}/addons"
 	"${RESOURCE_DIRECTORY}/hollow-node.yaml" &> /dev/null || true
 
 # Remove clusters, namespaces, and deployments

@@ -42,7 +42,9 @@ func NewInstrumentedInterface(dockerClient Interface) Interface {
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperations.WithLabelValues(operation).Inc()
-	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+	metrics.DeprecatedDockerOperations.WithLabelValues(operation).Inc()
+	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
+	metrics.DeprecatedDockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
 // recordError records error for metric if an error occurred.
@@ -50,9 +52,11 @@ func recordError(operation string, err error) {
 	if err != nil {
 		if _, ok := err.(operationTimeout); ok {
 			metrics.DockerOperationsTimeout.WithLabelValues(operation).Inc()
+			metrics.DeprecatedDockerOperationsTimeout.WithLabelValues(operation).Inc()
 		}
 		// Docker operation timeout error is also a docker error, so we don't add else here.
 		metrics.DockerOperationsErrors.WithLabelValues(operation).Inc()
+		metrics.DeprecatedDockerOperationsErrors.WithLabelValues(operation).Inc()
 	}
 }
 

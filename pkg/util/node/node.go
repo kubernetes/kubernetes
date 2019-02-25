@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -130,8 +129,8 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	region, _ := labels[kubeletapis.LabelZoneRegion]
-	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
+	region, _ := labels[v1.LabelZoneRegion]
+	failureDomain, _ := labels[v1.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""

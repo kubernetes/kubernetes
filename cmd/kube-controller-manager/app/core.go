@@ -33,9 +33,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
@@ -82,8 +83,8 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
-	var clusterCIDR *net.IPNet = nil
-	var serviceCIDR *net.IPNet = nil
+	var clusterCIDR *net.IPNet
+	var serviceCIDR *net.IPNet
 
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		return nil, false, nil
@@ -331,6 +332,10 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 	nsKubeconfig.QPS *= 20
 	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
+	return startModifiedNamespaceController(ctx, namespaceKubeClient, nsKubeconfig)
+}
+
+func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
 
 	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
 	if err != nil {

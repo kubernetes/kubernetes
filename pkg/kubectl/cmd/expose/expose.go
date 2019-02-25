@@ -74,7 +74,7 @@ var (
 		kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
 		# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-		kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+		kubectl expose rc streamer --port=4100 --protocol=UDP --name=video-stream
 
 		# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rs nginx --port=80 --target-port=8000
@@ -314,7 +314,8 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-			object, err = cmdutil.Merge(scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...), object, inline)
+			codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
+			object, err = cmdutil.Merge(codec, object, inline)
 			if err != nil {
 				return err
 			}

@@ -64,7 +64,9 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new NetworkPolicy.
 func (networkPolicyStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	networkPolicy := obj.(*networking.NetworkPolicy)
-	return validation.ValidateNetworkPolicy(networkPolicy)
+	allErrs := validation.ValidateNetworkPolicy(networkPolicy)
+	allErrs = append(allErrs, validation.ValidateConditionalNetworkPolicy(networkPolicy, nil)...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -79,6 +81,7 @@ func (networkPolicyStrategy) AllowCreateOnUpdate() bool {
 func (networkPolicyStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateNetworkPolicy(obj.(*networking.NetworkPolicy))
 	updateErrorList := validation.ValidateNetworkPolicyUpdate(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy))
+	updateErrorList = append(updateErrorList, validation.ValidateConditionalNetworkPolicy(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy))...)
 	return append(validationErrorList, updateErrorList...)
 }
 

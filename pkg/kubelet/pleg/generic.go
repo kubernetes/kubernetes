@@ -189,12 +189,14 @@ func (g *GenericPLEG) relist() {
 	klog.V(5).Infof("GenericPLEG: Relisting")
 
 	if lastRelistTime := g.getRelistTime(); !lastRelistTime.IsZero() {
-		metrics.PLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
+		metrics.PLEGRelistInterval.Observe(metrics.SinceInSeconds(lastRelistTime))
+		metrics.DeprecatedPLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
 	timestamp := g.clock.Now()
 	defer func() {
-		metrics.PLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
+		metrics.PLEGRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
+		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
 	// Get all the pods.
@@ -265,7 +267,12 @@ func (g *GenericPLEG) relist() {
 			if events[i].Type == ContainerChanged {
 				continue
 			}
-			g.eventChannel <- events[i]
+			select {
+			case g.eventChannel <- events[i]:
+			default:
+				metrics.PLEGDiscardEvents.WithLabelValues().Inc()
+				klog.Error("event channel is full, discard this relist() cycle event")
+			}
 		}
 	}
 
@@ -337,7 +344,7 @@ func (g *GenericPLEG) cacheEnabled() bool {
 	return g.cache != nil
 }
 
-// Preserve an older cached status' pod IP if the new status has no pod IP
+// getPodIP preserves an older cached status' pod IP if the new status has no pod IP
 // and its sandboxes have exited
 func (g *GenericPLEG) getPodIP(pid types.UID, status *kubecontainer.PodStatus) string {
 	if status.IP != "" {

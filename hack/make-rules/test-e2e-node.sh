@@ -115,14 +115,14 @@ if [ ${remote} = true ] ; then
   IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
-         if [[ $(gcloud compute instances list "${instance_prefix}-$i" | grep ${i}) ]]; then
-           if [[ ${hosts} != "" ]]; then
+         if [[ $(gcloud compute instances list "${instance_prefix}-${i}" | grep ${i}) ]]; then
+           if [[ "${hosts}" != "" ]]; then
              hosts="${hosts},"
            fi
-           echo "Reusing host ${instance_prefix}-$i"
+           echo "Reusing host ${instance_prefix}-${i}"
            hosts="${hosts}${instance_prefix}-${i}"
          else
-           if [[ ${images} != "" ]]; then
+           if [[ "${images}" != "" ]]; then
              images="${images},"
            fi
            images="${images}${i}"
@@ -169,7 +169,7 @@ else
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \
-    --system-spec-name="$system_spec_name" --ginkgo-flags="$ginkgoflags" \
+    --system-spec-name="${system_spec_name}" --ginkgo-flags="${ginkgoflags}" \
     --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     ${test_args}" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"

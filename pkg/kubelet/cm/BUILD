@@ -73,8 +73,8 @@ go_library(
             "//pkg/kubelet/events:go_default_library",
             "//pkg/kubelet/metrics:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//pkg/kubelet/types:go_default_library",
-            "//pkg/util/file:go_default_library",
             "//pkg/util/mount:go_default_library",
             "//pkg/util/oom:go_default_library",
             "//pkg/util/procfs:go_default_library",
@@ -88,6 +88,7 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/kubelet/cadvisor:go_default_library",

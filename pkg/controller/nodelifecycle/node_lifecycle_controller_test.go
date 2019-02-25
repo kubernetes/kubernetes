@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -175,8 +174,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 	labels := map[string]string{
-		kubeletapis.LabelZoneRegion:        "region1",
-		kubeletapis.LabelZoneFailureDomain: "zone1",
+		v1.LabelZoneRegion:        "region1",
+		v1.LabelZoneFailureDomain: "zone1",
 	}
 
 	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
@@ -212,8 +211,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: fakeNow,
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 					},
@@ -222,8 +221,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -292,8 +291,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -312,8 +311,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -356,8 +355,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -376,8 +375,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -447,8 +446,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -467,8 +466,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -511,8 +510,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -531,8 +530,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -575,8 +574,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -595,8 +594,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -734,8 +733,8 @@ func TestPodStatusChange(t *testing.T) {
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -754,8 +753,8 @@ func TestPodStatusChange(t *testing.T) {
 							Name:              "node1",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 							Labels: map[string]string{
-								kubeletapis.LabelZoneRegion:        "region1",
-								kubeletapis.LabelZoneFailureDomain: "zone1",
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
 							},
 						},
 						Status: v1.NodeStatus{
@@ -897,8 +896,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -917,8 +916,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node1",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -952,8 +951,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -972,8 +971,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node1",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region2",
-							kubeletapis.LabelZoneFailureDomain: "zone2",
+							v1.LabelZoneRegion:        "region2",
+							v1.LabelZoneFailureDomain: "zone2",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1014,8 +1013,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1034,8 +1033,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node1",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone2",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone2",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1075,8 +1074,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1095,8 +1094,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node-master",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1134,8 +1133,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1154,8 +1153,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node1",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone2",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone2",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1196,8 +1195,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node0",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1216,8 +1215,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node1",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1236,8 +1235,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node2",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1256,8 +1255,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node3",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1276,8 +1275,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 						Name:              "node4",
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						Labels: map[string]string{
-							kubeletapis.LabelZoneRegion:        "region1",
-							kubeletapis.LabelZoneFailureDomain: "zone1",
+							v1.LabelZoneRegion:        "region1",
+							v1.LabelZoneFailureDomain: "zone1",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -2366,8 +2365,8 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2388,8 +2387,8 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 					Name:              "node1",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2409,8 +2408,8 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 					Name:              "node2",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2512,8 +2511,8 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2535,8 +2534,8 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 					Name:              "node1",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2660,8 +2659,8 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2718,8 +2717,8 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2748,8 +2747,8 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2778,8 +2777,8 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2802,8 +2801,8 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -2908,171 +2907,6 @@ func TestNodeEventGeneration(t *testing.T) {
 		actualUID := string(involvedObject.UID)
 		if actualUID != "1234567890" {
 			t.Fatalf("unexpected event uid: %v", actualUID)
-		}
-	}
-}
-
-// TestFixDeprecatedTaintKey verifies we have backwards compatibility after upgraded alpha taint key to GA taint key.
-// TODO(resouer): this is introduced in 1.9 and should be removed in the future.
-func TestFixDeprecatedTaintKey(t *testing.T) {
-	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
-	evictionTimeout := 10 * time.Minute
-
-	fakeNodeHandler := &testutil.FakeNodeHandler{
-		Existing: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-			},
-		},
-		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-	}
-
-	nodeController, _ := newNodeLifecycleControllerFromClient(
-		fakeNodeHandler,
-		evictionTimeout,
-		testRateLimiterQPS,
-		testRateLimiterQPS,
-		testLargeClusterThreshold,
-		testUnhealthyThreshold,
-		testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod,
-		testNodeMonitorPeriod,
-		true)
-	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
-
-	deprecatedNotReadyTaint := &v1.Taint{
-		Key:    schedulerapi.DeprecatedTaintNodeNotReady,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
-	nodeNotReadyTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeNotReady,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
-	deprecatedUnreachableTaint := &v1.Taint{
-		Key:    schedulerapi.DeprecatedTaintNodeUnreachable,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
-	nodeUnreachableTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeUnreachable,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
-	tests := []struct {
-		Name           string
-		Node           *v1.Node
-		ExpectedTaints []*v1.Taint
-	}{
-		{
-			Name: "Node with deprecated not-ready taint key",
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						*deprecatedNotReadyTaint,
-					},
-				},
-			},
-			ExpectedTaints: []*v1.Taint{nodeNotReadyTaint},
-		},
-		{
-			Name: "Node with deprecated unreachable taint key",
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						*deprecatedUnreachableTaint,
-					},
-				},
-			},
-			ExpectedTaints: []*v1.Taint{nodeUnreachableTaint},
-		},
-		{
-			Name: "Node with not-ready taint key",
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						*nodeNotReadyTaint,
-					},
-				},
-			},
-			ExpectedTaints: []*v1.Taint{nodeNotReadyTaint},
-		},
-		{
-			Name: "Node with unreachable taint key",
-			Node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region1",
-						kubeletapis.LabelZoneFailureDomain: "zone1",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{
-						*nodeUnreachableTaint,
-					},
-				},
-			},
-			ExpectedTaints: []*v1.Taint{nodeUnreachableTaint},
-		},
-	}
-
-	for _, test := range tests {
-		fakeNodeHandler.Update(test.Node)
-		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		nodeController.doFixDeprecatedTaintKeyPass(test.Node)
-		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		node, err := nodeController.nodeLister.Get(test.Node.GetName())
-		if err != nil {
-			t.Errorf("Can't get current node...")
-			return
-		}
-		if len(node.Spec.Taints) != len(test.ExpectedTaints) {
-			t.Errorf("%s: Unexpected number of taints: expected %d, got %d",
-				test.Name, len(test.ExpectedTaints), len(node.Spec.Taints))
-		}
-		for _, taint := range test.ExpectedTaints {
-			if !taintutils.TaintExists(node.Spec.Taints, taint) {
-				t.Errorf("%s: Can't find taint %v in %v", test.Name, taint, node.Spec.Taints)
-			}
 		}
 	}
 }

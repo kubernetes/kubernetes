@@ -21,6 +21,18 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/status"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,20 +44,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/webhook"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
-	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
-	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
-	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
-	"k8s.io/apiextensions-apiserver/pkg/controller/status"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
-
-	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 )
 
 var (
@@ -184,6 +182,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		c.ExtraConfig.ServiceResolver,
 		c.ExtraConfig.AuthResolverWrapper,
 		c.ExtraConfig.MasterCount,
+		s.GenericAPIServer.Authorizer,
 	)
 	if err != nil {
 		return nil, err
@@ -199,11 +198,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdHandler,
 	)
 
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)

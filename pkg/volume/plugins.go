@@ -188,12 +188,6 @@ type DeletableVolumePlugin interface {
 	NewDeleter(spec *Spec) (Deleter, error)
 }
 
-const (
-	// Name of a volume in external cloud that is being provisioned and thus
-	// should be ignored by rest of Kubernetes.
-	ProvisionedVolumeName = "placeholder-for-provisioning"
-)
-
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
 // used to create volumes for the cluster.
 type ProvisionableVolumePlugin interface {
@@ -210,6 +204,8 @@ type AttachableVolumePlugin interface {
 	DeviceMountableVolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
+	// CanAttach tests if provided volume spec is attachable
+	CanAttach(spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -823,7 +819,9 @@ func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVol
 		return nil, err
 	}
 	if attachableVolumePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
-		return attachableVolumePlugin, nil
+		if attachableVolumePlugin.CanAttach(spec) {
+			return attachableVolumePlugin, nil
+		}
 	}
 	return nil, nil
 }
@@ -874,10 +872,10 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 		if spec.IsKubeletExpandable() {
 			// for kubelet expandable volumes, return a noop plugin that
 			// returns success for expand on the controller
-			klog.Warningf("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
+			klog.V(4).Infof("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
 			return &noopExpandableVolumePluginInstance{spec}, nil
 		}
-		klog.Warningf("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
+		klog.V(4).Infof("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
 		return nil, err
 	}
 

@@ -8,8 +8,8 @@ go_library(
     deps = [
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 

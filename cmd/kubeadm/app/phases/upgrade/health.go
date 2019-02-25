@@ -109,16 +109,16 @@ func masterNodesReady(client clientset.Interface) error {
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "couldn't list masters in cluster")
+		return errors.Wrap(err, "couldn't list control-planes in cluster")
 	}
 
 	if len(masters.Items) == 0 {
-		return errors.New("failed to find any nodes with master role")
+		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
 	notReadyMasters := getNotReadyNodes(masters.Items)
 	if len(notReadyMasters) != 0 {
-		return errors.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
+		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyMasters)
 	}
 	return nil
 }
@@ -126,7 +126,7 @@ func masterNodesReady(client clientset.Interface) error {
 // staticPodManifestHealth makes sure the required static pods are presents
 func staticPodManifestHealth(_ clientset.Interface) error {
 	nonExistentManifests := []string{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
 			nonExistentManifests = append(nonExistentManifests, manifestFile)
@@ -152,7 +152,7 @@ func IsControlPlaneSelfHosted(client clientset.Interface) bool {
 // getNotReadyDaemonSets gets the amount of Ready control plane DaemonSets
 func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
 		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
 		if err != nil {

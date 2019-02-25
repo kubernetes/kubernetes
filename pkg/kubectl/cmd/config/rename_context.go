@@ -48,7 +48,7 @@ var (
 		CONTEXT_NAME is the context name that you wish change.
 
 		NEW_NAME is the new name you wish to set.
-		
+
 		Note: In case the context being renamed is the 'current-context', this field will also be updated.`)
 
 	renameContextExample = templates.Examples(`

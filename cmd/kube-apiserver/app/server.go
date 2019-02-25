@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/cobra"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,13 +49,14 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/klog"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -126,15 +127,15 @@ cluster's shared state through which all other components interact.`,
 	}
 
 	usageFmt := "Usage:\n  %s\n"
-	cols, _, _ := apiserverflag.TerminalSize(cmd.OutOrStdout())
+	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
 		return nil
 	})
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
 
 	return cmd
@@ -415,7 +416,7 @@ func buildGenericConfig(
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	storageFactoryConfig.ApiResourceConfig = genericConfig.MergedResourceConfig
-	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd, s.StorageSerialization)
+	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd)
 	if err != nil {
 		lastErr = err
 		return
@@ -490,7 +491,6 @@ func buildGenericConfig(
 		genericConfig,
 		versionedInformers,
 		kubeClientConfig,
-		legacyscheme.Scheme,
 		pluginInitializers...)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to initialize admission: %v", err)
@@ -580,7 +580,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 
 	if s.ServiceAccountSigningKeyFile != "" && s.Authentication.ServiceAccounts.Issuer != "" {
-		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
+		sk, err := keyutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
 		if err != nil {
 			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 		}
@@ -689,7 +689,6 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStatus":                               "io.k8s.api.extensions.v1beta1.DeploymentStatus",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1beta1.RoleRef":                                              "io.k8s.api.rbac.v1beta1.RoleRef",
 		"io.k8s.kubernetes.pkg.apis.apps.v1beta1.Scale":                                                "io.k8s.api.apps.v1beta1.Scale",
-		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.InitializerConfiguration":           "io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration",
 		"io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource":                                "io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource",
 		"io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm":                                         "io.k8s.api.core.v1.PreferredSchedulingTerm",
 		"io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec":                                                  "io.k8s.api.batch.v1.JobSpec",
@@ -727,7 +726,6 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.api.v1.Volume":                                                          "io.k8s.api.core.v1.Volume",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1alpha1.RoleBindingList":                                     "io.k8s.api.rbac.v1alpha1.RoleBindingList",
 		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.Rule":                               "io.k8s.api.admissionregistration.v1alpha1.Rule",
-		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.InitializerConfigurationList":       "io.k8s.api.admissionregistration.v1alpha1.InitializerConfigurationList",
 		"io.k8s.kubernetes.pkg.apis.extensions.v1beta1.NetworkPolicy":                                  "io.k8s.api.extensions.v1beta1.NetworkPolicy",
 		"io.k8s.kubernetes.pkg.apis.rbac.v1alpha1.ClusterRoleList":                                     "io.k8s.api.rbac.v1alpha1.ClusterRoleList",
 		"io.k8s.kubernetes.pkg.api.v1.ObjectFieldSelector":                                             "io.k8s.api.core.v1.ObjectFieldSelector",

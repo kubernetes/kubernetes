@@ -12,8 +12,8 @@ go_test(
     name = "go_default_test",
     srcs = ["crd_test.go"],
     data = [
+        ":csi-manifests",
         "//cluster/addons:addon-srcs",
-        "//staging/src/k8s.io/csi-api/pkg/crd:manifests",
     ],
     embed = [":go_default_library"],
     deps = ["//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library"],
@@ -28,9 +28,7 @@ filegroup(
 
 filegroup(
     name = "csi-manifests",
-    srcs = [
-        "//staging/src/k8s.io/csi-api/pkg/crd:manifests",
-    ],
+    srcs = glob(["manifests/**"]),
     visibility = ["//visibility:public"],
 )
 

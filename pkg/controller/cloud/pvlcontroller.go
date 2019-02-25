@@ -38,13 +38,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
-
-const initializerName = "pvlabel.kubernetes.io"
 
 // PersistentVolumeLabelController handles adding labels to persistent volumes when they are created
 type PersistentVolumeLabelController struct {
@@ -74,11 +71,9 @@ func NewPersistentVolumeLabelController(
 	pvlc.pvlIndexer, pvlc.pvlController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.IncludeUninitialized = true
 				return kubeClient.CoreV1().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.IncludeUninitialized = true
 				return kubeClient.CoreV1().PersistentVolumes().Watch(options)
 			},
 		},
@@ -184,7 +179,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinity(key string) er
 func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
 	// Only add labels if the next pending initializer.
-	if needsInitialization(vol.Initializers, initializerName) {
+	if needsInitialization(vol) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
 			labels, err := labeler.GetLabelsForVolume(context.TODO(), vol)
 			if err != nil {
@@ -214,8 +209,8 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		// Set NodeSelectorRequirements based on the labels
 		if populateAffinity {
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
-				zones, err := volumeutil.LabelZonesToSet(v)
+			if k == v1.LabelZoneFailureDomain {
+				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v)
 				}
@@ -249,8 +244,8 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 			}
 		}
 	}
-	newVolume.Initializers = removeInitializer(newVolume.Initializers, initializerName)
-	klog.V(4).Infof("removed initializer on PersistentVolume %s", newVolume.Name)
+	markInitialized(newVolume)
+	klog.V(4).Infof("marked PersistentVolume %s initialized", newVolume.Name)
 
 	oldData, err := json.Marshal(vol)
 	if err != nil {
@@ -286,38 +281,13 @@ func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolu
 	return nil
 }
 
-func removeInitializer(initializers *metav1.Initializers, name string) *metav1.Initializers {
-	if initializers == nil {
-		return nil
-	}
-
-	var updated []metav1.Initializer
-	for _, pending := range initializers.Pending {
-		if pending.Name != name {
-			updated = append(updated, pending)
-		}
-	}
-	if len(updated) == len(initializers.Pending) {
-		return initializers
-	}
-	if len(updated) == 0 {
-		return nil
-	}
-
-	return &metav1.Initializers{Pending: updated}
+func markInitialized(vol *v1.PersistentVolume) {
+	// TODO: mark initialized using a different field, since initializers are not being promoted past alpha, or convert to an admission plugin
 }
 
 // needsInitialization checks whether or not the PVL is the next pending initializer.
-func needsInitialization(initializers *metav1.Initializers, name string) bool {
-	if initializers == nil {
-		return false
-	}
-
-	if len(initializers.Pending) == 0 {
-		return false
-	}
-
-	// There is at least one initializer still pending so check to
-	// see if the PVL is the next in line.
-	return initializers.Pending[0].Name == name
+func needsInitialization(vol *v1.PersistentVolume) bool {
+	// TODO: determine whether initialization is required based on a different attribute,
+	// since initializers are not being promoted past alpha, or convert to an admission plugin
+	return false
 }

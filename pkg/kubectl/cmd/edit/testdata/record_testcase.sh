@@ -25,7 +25,7 @@ fi
 
 # Clean up the test server
 function cleanup {
-    if [[ ! -z "${pid-}" ]]; then
+    if [[ -n "${pid-}" ]]; then
         echo "Stopping recording server (${pid})"
         # kill the process `go run` launched
         pkill -P "${pid}"
@@ -36,7 +36,7 @@ function cleanup {
 
 testcase="${1}"
 
-test_root="$(dirname "${BASH_SOURCE}")"
+test_root="$(dirname "${BASH_SOURCE[0]}")"
 testcase_dir="${test_root}/testcase-${testcase}"
 mkdir -p "${testcase_dir}"
 

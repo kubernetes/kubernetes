@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -57,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/utils/integer"
 )
 
 const (
@@ -964,6 +964,12 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
 		failedPodsObserved += failedPodsObservedOnNode
 	}
 
+	// Remove pods assigned to not existing nodes when daemonset pods are scheduled by default scheduler.
+	// If node doesn't exist then pods are never scheduled and can't be deleted by PodGCController.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+		podsToDelete = append(podsToDelete, getPodsWithoutNode(nodeList, nodeToDaemonPods)...)
+	}
+
 	// Label new pods using the hash label value of the current history when creating them
 	if err = dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
 		return err
@@ -1523,4 +1529,21 @@ func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
 
 func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
 	return fmt.Sprintf("%s/%d/%s", ds.UID, ds.Status.ObservedGeneration, nodeName)
+}
+
+// getPodsWithoutNode returns list of pods assigned to not existing nodes.
+func getPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) []string {
+	var results []string
+	isNodeRunning := make(map[string]bool)
+	for _, node := range runningNodesList {
+		isNodeRunning[node.Name] = true
+	}
+	for n, pods := range nodeToDaemonPods {
+		if !isNodeRunning[n] {
+			for _, pod := range pods {
+				results = append(results, pod.Name)
+			}
+		}
+	}
+	return results
 }

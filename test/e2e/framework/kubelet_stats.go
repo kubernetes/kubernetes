@@ -102,13 +102,13 @@ func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletM
 // Note that the KubeletMetrics passed in should not contain subsystem prefix.
 func GetDefaultKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMetricNames := sets.NewString(
-		kubeletmetrics.PodWorkerLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PodStartLatencyKey,
+		kubeletmetrics.PodWorkerDurationKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PodStartDurationKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		dockermetrics.DockerOperationsLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PLEGRelistLatencyKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PLEGRelistDurationKey,
 	)
 	return GetKubeletLatencyMetrics(ms, latencyMetricNames)
 }

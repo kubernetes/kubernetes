@@ -115,7 +115,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 // with a connectvity check to the loadbalancer ip.
 func (t *IngressUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	switch upgrade {
-	case MasterUpgrade:
+	case MasterUpgrade, ClusterUpgrade:
 		// Restarting the ingress controller shouldn't disrupt a steady state
 		// Ingress. Restarting the ingress controller and deleting ingresses
 		// while it's down will leak cloud resources, because the ingress

@@ -40,6 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -173,6 +174,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: extensionsv1beta1.GroupName, Kind: "DaemonSet"}:                   &DaemonSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
@@ -642,6 +644,9 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings descri
 			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
+			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
+				ref.UID = types.UID(pod.Annotations[corev1.MirrorPodAnnotationKey])
+			}
 			events, _ = d.Core().Events(namespace).Search(scheme.Scheme, ref)
 		}
 	}
@@ -2677,7 +2682,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings descr
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
@@ -2716,14 +2721,14 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
 		w.Write(LEVEL_1, "---------\t-----------------\t--------------\t-----\n")
 		for _, r := range compactRules {
-			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", combineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
+			w.Write(LEVEL_1, "%s\t%v\t%v\t%v\n", CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs)
 		}
 
 		return nil
 	})
 }
 
-func combineResourceGroup(resource, group []string) string {
+func CombineResourceGroup(resource, group []string) string {
 	if len(resource) == 0 {
 		return ""
 	}
@@ -3119,11 +3124,20 @@ func describeHorizontalPodAutoscaler(hpa *autoscalingv2beta2.HorizontalPodAutosc
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
 			case autoscalingv2beta2.ObjectMetricSourceType:
-				current := "<unknown>"
-				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
-					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
+				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, "(target average value):\t%s / %s\n", current, metric.Object.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+						current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
+					}
+					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
 			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
@@ -3699,7 +3713,7 @@ type PriorityClassDescriber struct {
 }
 
 func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	pc, err := s.Scheduling().PriorityClasses().Get(name, metav1.GetOptions{})
+	pc, err := s.SchedulingV1beta1().PriorityClasses().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

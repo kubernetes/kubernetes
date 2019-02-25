@@ -864,7 +864,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	//            gc.resyncMonitors()
 	//            controller.WaitForCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
 	//
-	// Setting the period to 200ms allows the WaitForCacheSync() to check for cache sync ~2 times in every wait.PollImmediateUntil() loop.
+	// Setting the period to 200ms allows the WaitForCacheSync() to check
+	// for cache sync ~2 times in every wait.PollImmediateUntil() loop.
+	//
+	// The 1s sleep in the test allows GetDelableResources and
+	// gc.resyncMoitors to run ~5 times to ensure the changes to the
+	// fakeDiscoveryClient are picked up.
 	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, stopCh)
 
 	// Wait until the sync discovers the initial resources
@@ -943,8 +948,13 @@ func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string
 	return nil, nil
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return nil, nil, nil
 }
 
 func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {

@@ -45,7 +45,7 @@ function create-clusters {
 		echo -e "${color_cyan}Warning: new clusters may take up to 60 minutes to be ready${color_norm}"
 		echo -n "Clusters loading"
 	fi
-	while ! bx cs clusters | grep 'kubeSpawnTester' | grep -Fq 'normal' 
+	while ! bx cs clusters | grep 'kubeSpawnTester' | grep -Fq 'normal'
 	do
 		echo -n "."
 		sleep 5

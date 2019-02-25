@@ -102,7 +102,7 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - hongchaodeng    
+    - hongchaodeng
     - jianhuiz
     - liggitt
     - mbohlool
@@ -125,14 +125,13 @@ aliases:
   sig-storage-reviewers:
     - saad-ali
     - childsb
+
   sig-scheduling-maintainers:
     - bsalamat
-    - davidopp
     - k82cn
-    - timothysc
     - wojtek-t
-    - aveshagarwal
     - ravisantoshgudimetla
+    - Huang-Wei
   sig-scheduling:
     - bsalamat
     - k82cn
@@ -140,6 +139,8 @@ aliases:
     - ravisantoshgudimetla
     - misterikkit
     - Huang-Wei
+    - wgliang
+
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -287,11 +288,13 @@ aliases:
     - jsafrane
     - jbeda
   dep-approvers:
+    - apelisse
+    - BenTheElder
     - cblecker
     - thockin
     - sttts
+    - soltysh
   feature-approvers:
-    - AdoHe           # CLI
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
     - bsalamat        # Scheduling
@@ -322,6 +325,7 @@ aliases:
     - quinton-hoole   # Multicluster
     - roberthbailey   # Cluster Lifecycle
     - saad-ali        # Storage
+    - seans3          # CLI
     - soltysh         # CLI
     - tallclair       # Auth
     - thockin         # Network

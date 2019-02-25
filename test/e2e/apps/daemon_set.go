@@ -374,9 +374,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-
+		if framework.TestContext.CloudConfig.NumNodes < 2 {
+			framework.Logf("Conformance test suite needs a cluster with at least 2 nodes.")
+		}
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
 		ds := newDaemonSet(dsName, image, label)
@@ -414,7 +414,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		Expect(len(existingPods)).NotTo(Equal(0))
+		if framework.TestContext.CloudConfig.NumNodes < 2 {
+			Expect(len(existingPods)).To(Equal(0))
+		} else {
+			Expect(len(existingPods)).NotTo(Equal(0))
+		}
 		Expect(len(newPods)).NotTo(Equal(0))
 
 		framework.Logf("Roll back the DaemonSet before rollout is complete")
@@ -718,7 +722,7 @@ func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]st
 	listHistoryFn := func() (bool, error) {
 		selector := labels.Set(label).AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+		historyList, err := c.AppsV1().ControllerRevisions(ns).List(options)
 		if err != nil {
 			return false, err
 		}

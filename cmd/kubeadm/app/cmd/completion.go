@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"io"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -50,7 +50,7 @@ var (
 		The shell code must be evaluated to provide interactive
 		completion of kubeadm commands. This can be done by sourcing it from
 		the .bash_profile.
-		
+
 		Note: this requires the bash-completion framework.
 
 		To install it on Mac use homebrew:

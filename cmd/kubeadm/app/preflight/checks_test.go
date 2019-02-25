@@ -23,15 +23,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 
 	"net/http"
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
@@ -185,7 +184,7 @@ func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	return
 }
 
-func TestRunInitMasterChecks(t *testing.T) {
+func TestRunInitNodeChecks(t *testing.T) {
 	var tests = []struct {
 		name     string
 		cfg      *kubeadmapi.InitConfiguration
@@ -232,11 +231,11 @@ func TestRunInitMasterChecks(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make RunInitMasterChecks accept a ClusterConfiguration object instead of InitConfiguration
-		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
+		// TODO: Make RunInitNodeChecks accept a ClusterConfiguration object instead of InitConfiguration
+		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
 				rt.expected,
 				(actual == nil),
 				actual,
@@ -756,7 +755,7 @@ func TestImagePullCheck(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1beta1.DefaultCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}

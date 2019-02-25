@@ -168,7 +168,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config Volume
 		},
 	}
 	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
-	Expect(err).NotTo(HaveOccurred(), "failed to create endpoints for Gluster server")
+	ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
 }
@@ -401,7 +401,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple VolumeTests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
+func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, fsType string, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
 	var gracePeriod int64 = 1
 	clientPod := &v1.Pod{
@@ -468,24 +468,31 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 	for i, test := range tests {
 		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"cat", fileName}, test.ExpectedContent, time.Minute)
-		Expect(err).NotTo(HaveOccurred(), "failed: finding the contents of the mounted file %s.", fileName)
+		ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 	}
 
 	if fsGroup != nil {
 		By("Checking fsGroup is correct.")
 		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-		Expect(err).NotTo(HaveOccurred(), "failed: getting the right privileges in the file %v", int(*fsGroup))
+		ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
+	}
+
+	if fsType != "" {
+		By("Checking fsType is correct.")
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
+		ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 	}
 }
 
 // Insert index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
+func InjectHtml(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.Prefix, " injector"))
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
 	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
+	privileged := true
 
 	injectPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -511,12 +518,13 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 							MountPath: "/mnt",
 						},
 					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					Level: "s0:c0,c1",
-				},
+				FSGroup: fsGroup,
 			},
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
@@ -537,7 +545,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	injectPod, err := podClient.Create(injectPod)
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 }
 
 func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {

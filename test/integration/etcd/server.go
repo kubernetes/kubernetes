@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -54,7 +54,7 @@ import (
 )
 
 // StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
-func StartRealMasterOrDie(t *testing.T) *Master {
+func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *Master {
 	certDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -79,11 +79,12 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
 	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	kubeAPIServerOptions.APIEnablement.RuntimeConfig["api/all"] = "true"
+	for _, f := range configFuncs {
+		f(kubeAPIServerOptions)
+	}
 	completedOptions, err := app.Complete(kubeAPIServerOptions)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := completedOptions.APIEnablement.RuntimeConfig.Set("api/all=true"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -14,7 +14,7 @@
 
 load("//build:kazel_generated.bzl", "go_prefix", "tags_values_pkgs")
 load("//build:openapi.bzl", "openapi_vendor_prefix")
-load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
+load("@io_k8s_repo_infra//defs:go.bzl", "go_genrule")
 
 def bazel_go_library(pkg):
     """Returns the Bazel label for the Go library for the provided package.

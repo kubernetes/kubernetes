@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
@@ -79,36 +80,13 @@ done < <(find . -name "*.sh" \
 
 # make sure known failures are sorted
 failure_file="${KUBE_ROOT}/hack/.shellcheck_failures"
-if ! diff -u "${failure_file}" <(LC_ALL=C sort "${failure_file}"); then
-  {
-    echo
-    echo "hack/.shellcheck_failures is not in alphabetical order. Please sort it:"
-    echo
-    echo "  LC_ALL=C sort -o hack/.shellcheck_failures hack/.shellcheck_failures"
-    echo
-  } >&2
-  false
-fi
+kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 # load known failure files
 failing_files=()
 while IFS=$'\n' read -r script;
   do failing_files+=("$script");
 done < <(cat "${failure_file}")
-
-# TODO(bentheelder): we should probably move this and the copy in verify-golint.sh
-# to one of the bash libs
-array_contains () {
-  local seeking=$1; shift # shift will iterate through the array
-  local in=1 # in holds the exit status for the function
-  for element; do
-    if [[ "$element" == "$seeking" ]]; then
-      in=0 # set in to 0 since we found it
-      break
-    fi
-  done
-  return $in
-}
 
 # detect if the host machine has the required shellcheck version installed
 # if so, we will use that instead.
@@ -149,9 +127,9 @@ for f in "${all_shell_scripts[@]}"; do
   else
     failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
                  shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
-  fi  
+  fi
   set -o errexit
-  array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
+  kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
     errors+=( "${failedLint}" )
   fi
@@ -193,7 +171,7 @@ fi
 # Check that all failing_packages actually still exist
 gone=()
 for f in "${failing_files[@]}"; do
-  array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
+  kube::util::array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
 done
 
 if [[ ${#gone[@]} -gt 0 ]]; then

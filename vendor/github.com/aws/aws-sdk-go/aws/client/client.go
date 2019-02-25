@@ -18,7 +18,7 @@ type Config struct {
 
 	// States that the signing name did not come from a modeled source but
 	// was derived based on other data. Used by service client constructors
-	// to determine if the signin name can be overriden based on metadata the
+	// to determine if the signin name can be overridden based on metadata the
 	// service has.
 	SigningNameDerived bool
 }

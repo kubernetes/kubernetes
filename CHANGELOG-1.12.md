@@ -582,7 +582,7 @@ Sig Azure was focused on two primary new alpha features:
 Besides the above new features, support for Azure Virtual Machine Scale Sets (VMSS) and Cluster-Autoscaler is now stable and considered GA:
 
 - Azure virtual machine scale sets (VMSS) allow you to create and manage identical load balanced VMs that automatically increase or decrease based on demand or a set schedule.
-- With this new stable feature, Kubernetes supports the scaling of containerized applications with Azure VMSS, including the ability to integrate it with cluster-autoscaler to automatically adjust the size of the Kubernetes clusters based on the same conditions. 
+- With this new stable feature, Kubernetes supports the scaling of containerized applications with Azure VMSS, including the ability to integrate it with cluster-autoscaler to automatically adjust the size of the Kubernetes clusters based on the same conditions.
 
 ### SIG-cli
 
@@ -593,11 +593,11 @@ SIG CLI focused on implementing the new plugin mechanism, providing a library wi
 This is the first Kubernetes release for this SIG! In v1.12, SIG Cloud Provider focused on building the processes and infrastructure to better support existing and new cloud providers. Some of these initiatives (many of which are still in progress) are:
 
 - Reporting E2E conformance test results to TestGrid from every cloud provider (in collaboration with SIG Testing & SIG Release)
-- Defining minimum required documentation from each cloud provider which includes (in collaboration with SIG Docs): 
+- Defining minimum required documentation from each cloud provider which includes (in collaboration with SIG Docs):
   - example manifests for the kube-apiserver, kube-controller-manager, kube-schedule, kubelet, and the cloud-controller-manager
   - labels/annotations that are consumed by any cloud specific controllers
 
-In addition to the above, SIG Cloud Provider has been focusing on a long running effort to remove cloud provider code from kubernetes/kubernetes. 
+In addition to the above, SIG Cloud Provider has been focusing on a long running effort to remove cloud provider code from kubernetes/kubernetes.
 
 ### SIG-cluster-lifecycle
 
@@ -638,11 +638,11 @@ No feature work, but a large refactoring of metrics-server as well as a number o
 
 ### SIG-node
 
-SIG-node graduated the PodShareProcessNamespace feature from alpha to beta.  This feature allows a pod spec to request that all containers in a pod share a common process namespaces.  
+SIG-node graduated the PodShareProcessNamespace feature from alpha to beta.  This feature allows a pod spec to request that all containers in a pod share a common process namespaces.
 
-Two alpha features were also added in this release.  
+Two alpha features were also added in this release.
 
-The RuntimeClass alpha feature enables a node to surface multiple runtime options to support a variety of workload types.  Examples include native linux containers, and “sandboxed” containers that isolate the container from the host kernel.  
+The RuntimeClass alpha feature enables a node to surface multiple runtime options to support a variety of workload types.  Examples include native linux containers, and “sandboxed” containers that isolate the container from the host kernel.
 
 The CustomCFSQuotaPeriod alpha feature enables node administrators to change the default period used to enforce CFS quota on a node.  This can improve performance for some workloads that experience latency while using CFS quota with the default measurement period.  Finally, the SIG continues to focus on improving reliability by fixing bugs while working out design and implementation of future features.
 
@@ -732,7 +732,7 @@ SIG Windows focused on stability and reliability of our existing feature set. We
 - kubeadm: The `v1alpha1` config API has been removed. ([#65628](https://github.com/kubernetes/kubernetes/pull/65628), [@luxas](https://github.com/luxas)) Courtesy of SIG Cluster Lifecycle
 - kube-apiserver: When using `--enable-admission-plugins` the `Priority` admission plugin is now enabled by default (matching changes in 1.11.1+). If using `--admission-control` to fully specify the set of admission plugins, it is now necessary to add the `Priority` admission plugin for the PodPriority feature to work properly. ([#65739](https://github.com/kubernetes/kubernetes/pull/65739), [@liggitt](https://github.com/liggitt)) Courtesy of SIG Scheduling
 - The `system-node-critical` and `system-cluster-critical` priority classes are now limited to the `kube-system` namespace by the `PodPriority` admission plugin (matching changes in 1.11.1+). ([#65593](https://github.com/kubernetes/kubernetes/pull/65593), [@bsalamat](https://github.com/bsalamat)) Courtesy of SIG Scheduling
-- kubeadm: Control plane images (etcd, kube-apiserver, kube-proxy, etc.) no longer use arch suffixes. Arch suffixes are kept for kube-dns only. ([#66960](https://github.com/kubernetes/kubernetes/pull/66960), 
+- kubeadm: Control plane images (etcd, kube-apiserver, kube-proxy, etc.) no longer use arch suffixes. Arch suffixes are kept for kube-dns only. ([#66960](https://github.com/kubernetes/kubernetes/pull/66960),
 [@rosti](https://github.com/rosti)) Courtesy of SIG Cluster Lifecycle, SIG Release, and SIG Testing
 - kubeadm - Feature-gates HighAvailability, SelfHosting, CertsInSecrets are now deprecated and can no longer be used for new clusters. Cluster updates using above feature-gates flag is not supported. ([#67786](https://github.com/kubernetes/kubernetes/pull/67786), [@fabriziopandini](https://github.com/fabriziopandini)) Courtesy of SIG Cluster Lifecycle
 - 'KubeSchedulerConfiguration' which used to be under GroupVersion 'componentconfig/v1alpha1',
@@ -798,7 +798,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 - kubeadm now supports the phase command "alpha phase kubelet config annotate-cri". ([#68449](https://github.com/kubernetes/kubernetes/pull/68449), [@fabriziopandini](https://github.com/fabriziopandini))
 - kubeadm: --cri-socket now defaults to tcp://localhost:2375 when running on Windows. ([#67447](https://github.com/kubernetes/kubernetes/pull/67447), [@benmoss](https://github.com/benmoss))
 - kubeadm now includes a new EXPERIMENTAL `--rootfs`, which (if specified) causes kubeadm to chroot before performing any file operations.  This is expected to be useful when setting up kubernetes on a different filesystem, such as invoking kubeadm from docker. ([#54935](https://github.com/kubernetes/kubernetes/pull/54935), [@anguslees](https://github.com/anguslees))
-- The  command line option  --cri-socket-path of the kubeadm subcommand "kubeadm config images pull" has been renamed to --cri-socket to be consistent with the rest of kubeadm subcommands. 
+- The  command line option  --cri-socket-path of the kubeadm subcommand "kubeadm config images pull" has been renamed to --cri-socket to be consistent with the rest of kubeadm subcommands.
 - kubeadm: The ControlPlaneEndpoint was moved from the API config struct to ClusterConfiguration ([#67830](https://github.com/kubernetes/kubernetes/pull/67830), [@fabriziopandini](https://github.com/fabriziopandini))
 - kubeadm: InitConfiguration now consists of two structs: InitConfiguration and ClusterConfiguration ([#67441](https://github.com/kubernetes/kubernetes/pull/67441), [@rosti](https://github.com/rosti))
 - The RuntimeClass API has been added. This feature is in alpha, and the RuntimeClass feature gate must be enabled in order to use it. The RuntimeClass API resource defines different classes of runtimes that may be used to run containers in the cluster. Pods can select a RuntimeClass to use via the RuntimeClassName field. ([#67737](https://github.com/kubernetes/kubernetes/pull/67737), [@tallclair](https://github.com/tallclair))
@@ -845,7 +845,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 
 ### SIG Auth
 
-- TokenRequest and TokenRequestProjection are now beta features. To enable these feature, the API server needs to be started with the `--service-account-issuer`, `--service-account-signing-key-file`, and `--service-account-api-audiences` flags. 
+- TokenRequest and TokenRequestProjection are now beta features. To enable these feature, the API server needs to be started with the `--service-account-issuer`, `--service-account-signing-key-file`, and `--service-account-api-audiences` flags.
 ([#67349](https://github.com/kubernetes/kubernetes/pull/67349), [@mikedanese](https://github.com/mikedanese))
 - The admin RBAC role now aggregates edit and view.  The edit RBAC role now aggregates view.  ([#66684](https://github.com/kubernetes/kubernetes/pull/66684), [@deads2k](https://github.com/deads2k))
 - UserInfo derived from service account tokens created from the TokenRequest API now include the pod name and UID in the Extra field. ([#61858](https://github.com/kubernetes/kubernetes/pull/61858), [@mikedanese](https://github.com/mikedanese))
@@ -907,7 +907,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 - kubeadm uses audit policy v1 instead of v1beta1 ([#67176](https://github.com/kubernetes/kubernetes/pull/67176), [@charrywanganthony](https://github.com/charrywanganthony))
 - Kubeadm nodes will no longer be able to run with an empty or invalid hostname in /proc/sys/kernel/hostname ([#64815](https://github.com/kubernetes/kubernetes/pull/64815), [@dixudx](https://github.com/dixudx))
 - kubeadm now can join the cluster with pre-existing client certificate if provided ([#66482](https://github.com/kubernetes/kubernetes/pull/66482), [@dixudx](https://github.com/dixudx))
-([#66382](https://github.com/kubernetes/kubernetes/pull/66382), [@bart0sh](https://github.com/bart0sh)) 
+([#66382](https://github.com/kubernetes/kubernetes/pull/66382), [@bart0sh](https://github.com/bart0sh))
 - kubeadm will no longer hang indefinitely if there is no Internet connection and --kubernetes-version is not specified.([#65676](https://github.com/kubernetes/kubernetes/pull/65676), [@dkoshkin](https://github.com/dkoshkin))
 - kubeadm: kube-proxy will now run on all nodes, and not just master nodes.([#65931](https://github.com/kubernetes/kubernetes/pull/65931), [@neolit123](https://github.com/neolit123))
 - kubeadm now uses separate YAML documents for the kubelet and kube-proxy ComponentConfigs. ([#65787](https://github.com/kubernetes/kubernetes/pull/65787), [@luxas](https://github.com/luxas))
@@ -1653,7 +1653,7 @@ filename | sha256 hash
 * The PodShareProcessNamespace feature to configure PID namespace sharing within a pod has been promoted to beta. ([#66507](https://github.com/kubernetes/kubernetes/pull/66507), [@verb](https://github.com/verb))
 * `kubectl create {clusterrole,role}`'s `--resources` flag supports asterisk to specify all resources. ([#62945](https://github.com/kubernetes/kubernetes/pull/62945), [@nak3](https://github.com/nak3))
 * Bump up version number of debian-base, debian-hyperkube-base and debian-iptables.  ([#67026](https://github.com/kubernetes/kubernetes/pull/67026), [@satyasm](https://github.com/satyasm))
-    * Also updates dependencies of users of debian-base. 
+    * Also updates dependencies of users of debian-base.
     * debian-base version 0.3.1 is already available.
 * DynamicProvisioningScheduling and VolumeScheduling is now supported for Azure managed disks. Feature gates DynamicProvisioningScheduling and VolumeScheduling should be enabled before using this feature. ([#67121](https://github.com/kubernetes/kubernetes/pull/67121), [@feiskyer](https://github.com/feiskyer))
 * kube-apiserver now includes all registered API groups in discovery, including registered extension API group/versions for unavailable extension API servers. ([#66932](https://github.com/kubernetes/kubernetes/pull/66932), [@nilebox](https://github.com/nilebox))

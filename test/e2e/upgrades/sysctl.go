@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -52,7 +52,7 @@ func (t *SysctlUpgradeTest) Setup(f *framework.Framework) {
 func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
 	switch upgrade {
-	case MasterUpgrade:
+	case MasterUpgrade, ClusterUpgrade:
 		By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())

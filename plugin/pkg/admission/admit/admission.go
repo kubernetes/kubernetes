@@ -40,12 +40,12 @@ var _ admission.MutationInterface = alwaysAdmit{}
 var _ admission.ValidationInterface = alwaysAdmit{}
 
 // Admit makes an admission decision based on the request attributes
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+func (alwaysAdmit) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (alwaysAdmit) Validate(a admission.Attributes) (err error) {
+func (alwaysAdmit) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 

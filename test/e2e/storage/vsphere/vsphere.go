@@ -27,6 +27,7 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -82,6 +83,33 @@ func (vs *VSphere) GetVMByUUID(ctx context.Context, vmUUID string, dc object.Ref
 	s := object.NewSearchIndex(vs.Client.Client)
 	vmUUID = strings.ToLower(strings.TrimSpace(vmUUID))
 	return s.FindByUuid(ctx, datacenter, vmUUID, true, nil)
+}
+
+// Get host object reference of the host on which the specified VM resides
+func (vs *VSphere) GetHostFromVMReference(ctx context.Context, vm types.ManagedObjectReference) types.ManagedObjectReference {
+	Connect(ctx, vs)
+	var vmMo mo.VirtualMachine
+	vs.Client.RetrieveOne(ctx, vm, []string{"summary.runtime.host"}, &vmMo)
+	host := *vmMo.Summary.Runtime.Host
+	return host
+}
+
+// Get the datastore references of all the datastores mounted on the specified host
+func (vs *VSphere) GetDatastoresMountedOnHost(ctx context.Context, host types.ManagedObjectReference) []types.ManagedObjectReference {
+	Connect(ctx, vs)
+	var hostMo mo.HostSystem
+	vs.Client.RetrieveOne(ctx, host, []string{"datastore"}, &hostMo)
+	return hostMo.Datastore
+}
+
+// Get the datastore reference of the specified datastore
+func (vs *VSphere) GetDatastoreRefFromName(ctx context.Context, dc object.Reference, datastoreName string) (types.ManagedObjectReference, error) {
+	Connect(ctx, vs)
+	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
+	finder := find.NewFinder(vs.Client.Client, false)
+	finder.SetDatacenter(datacenter)
+	datastore, err := finder.Datastore(ctx, datastoreName)
+	return datastore.Reference(), err
 }
 
 // GetFolderByPath gets the Folder Object Reference from the given folder path

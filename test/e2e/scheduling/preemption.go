@@ -25,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/api/scheduling/v1beta1"
+	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +63,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 	AfterEach(func() {
 		for _, pair := range priorityPairs {
-			cs.SchedulingV1beta1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
+			cs.SchedulingV1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
 		}
 	})
 
@@ -72,7 +72,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
 		for _, pair := range priorityPairs {
-			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 		}
 
@@ -394,7 +394,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			framework.ExpectNoError(err)
 		}
 		for _, pair := range priorityPairs {
-			cs.SchedulingV1beta1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
+			cs.SchedulingV1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
 		}
 	})
 
@@ -427,7 +427,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityName := fmt.Sprintf("p%d", i)
 			priorityVal := int32(i)
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
-			_, err := cs.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
+			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 		}
 	})

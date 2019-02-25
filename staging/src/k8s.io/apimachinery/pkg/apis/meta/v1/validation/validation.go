@@ -18,6 +18,7 @@ package validation
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -95,6 +96,15 @@ func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
 
 func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
 	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+}
+
+func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if patchType != types.ApplyPatchType && options.Force != nil {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+	}
+	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	return allErrs
 }
 
 var allowedDryRunValues = sets.NewString(metav1.DryRunAll)

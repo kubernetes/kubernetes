@@ -458,7 +458,7 @@ func (dswp *desiredStateOfWorldPopulator) markPodProcessed(
 	dswp.pods.processedPods[podName] = true
 }
 
-// markPodProcessed removes the specified pod from processedPods
+// deleteProcessedPod removes the specified pod from processedPods
 func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	podName volumetypes.UniquePodName) {
 	dswp.pods.Lock()
