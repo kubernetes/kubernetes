@@ -97,7 +97,7 @@ are a starting point and should not be considered to be production ready.
 
 If you like to run these tools in a production environment you could use the
 [Helm](https://helm.sh) charts, provided by the Helm community, which are used
-by a lot of people and therefore a widely tested. You can find them all via the
+by a lot of people and therefore are widely tested. You can find them all via the
 [Helm Hub](https://hub.helm.sh/).
 
 The source of the mentioned charts can be found here:
