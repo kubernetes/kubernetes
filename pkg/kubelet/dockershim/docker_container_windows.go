@@ -29,8 +29,6 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 )
@@ -45,10 +43,8 @@ type containerCreationCleanupInfo struct {
 func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.CreateContainerRequest, createConfig *dockertypes.ContainerCreateConfig) (*containerCreationCleanupInfo, error) {
 	cleanupInfo := &containerCreationCleanupInfo{}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		if err := applyGMSAConfig(request.GetConfig(), createConfig, cleanupInfo); err != nil {
-			return nil, err
-		}
+	if err := applyGMSAConfig(request.GetConfig(), createConfig, cleanupInfo); err != nil {
+		return nil, err
 	}
 
 	return cleanupInfo, nil
@@ -60,7 +56,8 @@ func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.C
 // whose location could potentially change down the line, or even be unknown (eg if docker is not installed on the
 // C: drive)
 // When docker supports passing a credential spec's contents directly, we should switch to using that
-// as it will avoid cluttering the registry.
+// as it will avoid cluttering the registry - there is a moby PR out for this:
+// https://github.com/moby/moby/pull/38777
 func applyGMSAConfig(config *runtimeapi.ContainerConfig, createConfig *dockertypes.ContainerCreateConfig, cleanupInfo *containerCreationCleanupInfo) error {
 	credSpec := config.Annotations[kuberuntime.GMSASpecContainerAnnotationKey]
 	if credSpec == "" {
@@ -163,10 +160,8 @@ func randomString(length int) (string, error) {
 // after a container creation. Any errors it returns are simply logged, but do not fail the container
 // creation.
 func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanupInfo *containerCreationCleanupInfo) (errors []error) {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		if err := removeGMSARegistryValue(cleanupInfo); err != nil {
-			errors = append(errors, err)
-		}
+	if err := removeGMSARegistryValue(cleanupInfo); err != nil {
+		errors = append(errors, err)
 	}
 
 	return
@@ -194,10 +189,7 @@ func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
 // creating containers.
 // Errors are simply logged, but don't prevent dockershim from starting.
 func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		errors = removeAllGMSARegistryValues()
-	}
-	return
+	return removeAllGMSARegistryValues()
 }
 
 func removeAllGMSARegistryValues() (errors []error) {
