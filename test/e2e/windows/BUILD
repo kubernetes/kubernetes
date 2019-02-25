@@ -8,6 +8,7 @@ go_library(
         "density.go",
         "framework.go",
         "networking.go",
+        "volumes.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/windows",
     visibility = ["//visibility:public"],
