@@ -390,7 +390,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 
 		// the normal Spec conversion could have populated out.Spec.Metrics with a single element, so deal with that
 		outMetrics := make([]autoscaling.MetricSpec, len(otherMetrics)+len(out.Spec.Metrics))
-		if out.Spec.Metrics != nil && cpuMetricIndex < len(outMetrics){
+		if out.Spec.Metrics != nil && cpuMetricIndex < len(outMetrics) {
 			outMetrics[cpuMetricIndex] = out.Spec.Metrics[0]
 		}
 		for i, metric := range otherMetrics {
