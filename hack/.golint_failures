@@ -7,7 +7,6 @@ cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/util/system
 pkg/apis/abac/latest
 pkg/apis/admission
-pkg/apis/admission/v1beta1
 pkg/apis/admissionregistration
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
@@ -19,10 +18,8 @@ pkg/apis/apps/validation
 pkg/apis/auditregistration/v1alpha1
 pkg/apis/authentication
 pkg/apis/authentication/v1
-pkg/apis/authentication/v1beta1
 pkg/apis/authorization
 pkg/apis/authorization/v1
-pkg/apis/authorization/v1beta1
 pkg/apis/authorization/validation
 pkg/apis/autoscaling
 pkg/apis/autoscaling/v1
@@ -38,8 +35,6 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/coordination
-pkg/apis/coordination/v1
-pkg/apis/coordination/v1beta1
 pkg/apis/core
 pkg/apis/core/helper
 pkg/apis/core/helper/qos
@@ -53,7 +48,6 @@ pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy
-pkg/apis/imagepolicy/v1alpha1
 pkg/apis/networking
 pkg/apis/networking/v1
 pkg/apis/policy
@@ -65,15 +59,11 @@ pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
-pkg/apis/scheduling/v1alpha1
-pkg/apis/scheduling/v1beta1
 pkg/apis/settings
-pkg/apis/settings/v1alpha1
 pkg/apis/storage
 pkg/apis/storage/util
 pkg/apis/storage/v1
 pkg/apis/storage/v1/util
-pkg/apis/storage/v1alpha1
 pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
