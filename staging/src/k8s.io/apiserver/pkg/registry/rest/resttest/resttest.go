@@ -921,13 +921,15 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	opts.Preconditions = metav1.NewPreconditionDeleteOptionsWithResourceVersion("RV1111").Preconditions
-	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
+	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewPreconditionDeleteOptionsWithResourceVersion("RV0000"))
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
+	}
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewRVDeletionPrecondition("RV0000"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

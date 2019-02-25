@@ -228,8 +228,8 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
-// NewPreconditionDeleteOptionsWithResourceVersion returns a DeleteOptions with a ResourceVersion precondition set.
-func NewPreconditionDeleteOptionsWithResourceVersion(rv string) *DeleteOptions {
+// NewRVDeletionPrecondition returns a DeleteOptions with a ResourceVersion precondition set.
+func NewRVDeletionPrecondition(rv string) *DeleteOptions {
 	p := Preconditions{ResourceVersion: &rv}
 	return &DeleteOptions{Preconditions: &p}
 }
