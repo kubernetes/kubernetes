@@ -184,6 +184,7 @@ var InterestingControllerManagerMetrics = []string{
 }
 
 var InterestingKubeletMetrics = []string{
+	"kubelet_docker_operations_errors_total",
 	"kubelet_docker_operations_duration_seconds",
 	"kubelet_pod_start_duration_seconds",
 	"kubelet_pod_worker_duration_seconds",
