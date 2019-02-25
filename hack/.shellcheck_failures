@@ -24,7 +24,6 @@
 ./cluster/kubemark/gce/config-default.sh
 ./cluster/kubemark/iks/config-default.sh
 ./cluster/kubemark/util.sh
-./cluster/local/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
