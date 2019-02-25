@@ -211,6 +211,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - create
@@ -326,6 +327,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - get
