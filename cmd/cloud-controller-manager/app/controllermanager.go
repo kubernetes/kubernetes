@@ -273,7 +273,6 @@ func newControllerInitializers() map[string]initFunc {
 	controllers := map[string]initFunc{}
 	controllers["cloud-node"] = startCloudNodeController
 	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
-	controllers["persistentvolume-binder"] = startPersistentVolumeLabelController
 	controllers["service"] = startServiceController
 	controllers["route"] = startRouteController
 	return controllers
