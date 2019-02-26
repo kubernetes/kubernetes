@@ -724,6 +724,19 @@ metadata:
 		})
 	})
 
+	framework.KubeDescribe("Kubectl get componentstatuses", func() {
+		It("should get componentstatuses", func() {
+			By("getting list of componentstatuses")
+			output := framework.RunKubectlOrDie("get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
+			components := strings.Split(output, " ")
+			By("getting details of componentstatuses")
+			for _, component := range components {
+				By("getting status of " + component)
+				framework.RunKubectlOrDie("get", "componentstatuses", component)
+			}
+		})
+	})
+
 	framework.KubeDescribe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
 			controllerJson := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
