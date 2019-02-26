@@ -650,7 +650,6 @@ test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
 test/e2e/chaosmonkey
-test/e2e/cloud
 test/e2e/common
 test/e2e/framework
 test/e2e/framework/ingress
