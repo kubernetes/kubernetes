@@ -73,10 +73,8 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/features:go_default_library",
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],
