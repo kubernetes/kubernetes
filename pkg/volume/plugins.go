@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 type ProbeOperation uint32
@@ -367,6 +368,9 @@ type VolumeHost interface {
 
 	// Returns the event recorder of kubelet.
 	GetEventRecorder() record.EventRecorder
+
+	// Returns an interface that should be used to execute subpath operations
+	GetSubpather() subpath.Interface
 }
 
 // VolumePluginMgr tracks registered plugins.
