@@ -168,8 +168,20 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 // validateSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+	switch {
+	case source.InlineCSIVolumeSource == nil && source.PersistentVolumeName == nil:
+		allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineCSIVolumeSource and persistentVolumeName"))
+	case source.InlineCSIVolumeSource != nil && source.PersistentVolumeName != nil:
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must specify exactly one of inlineCSIVolumeSource and persistentVolumeName"))
+	case source.PersistentVolumeName != nil:
+		if len(*source.PersistentVolumeName) == 0 {
+			// Invalid err
+			allErrs = append(allErrs, field.Required(fldPath, "must specify non empty persistentVolumeName"))
+		}
+	case source.InlineCSIVolumeSource != nil:
+		csiErrs := storagevalidation.ValidateCSIPersistentVolumeSource(source.InlineCSIVolumeSource, fldPath)
+		allErrs = append(allErrs, csiErrs...)
+
 	}
 	return allErrs
 }
