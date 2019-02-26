@@ -99,7 +99,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return validateDirExists(filepath.Join(podDir, "volumes/plugin/name"))
+				return validateDirNotExists(filepath.Join(podDir, "volumes/plugin/name"))
 			},
 		},
 		"pod-doesnot-exist-with-subpath": {
