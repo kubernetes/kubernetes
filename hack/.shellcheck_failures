@@ -79,15 +79,10 @@
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
-./hack/verify-linkcheck.sh
 ./hack/verify-no-vendor-cycles.sh
 ./hack/verify-openapi-spec.sh
-./hack/verify-pkg-names.sh
 ./hack/verify-readonly-packages.sh
-./hack/verify-spelling.sh
-./hack/verify-staging-godeps.sh
 ./hack/verify-staging-meta-files.sh
-./hack/verify-symbols.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
