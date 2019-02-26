@@ -58,7 +58,8 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
 
-type CronJobController struct {
+// Controller is a controller for CronJobs.
+type Controller struct {
 	kubeClient clientset.Interface
 	jobControl jobControlInterface
 	sjControl  sjControlInterface
@@ -66,7 +67,8 @@ type CronJobController struct {
 	recorder   record.EventRecorder
 }
 
-func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
+// NewController creates and initializes a new Controller.
+func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -77,7 +79,7 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 		}
 	}
 
-	jm := &CronJobController{
+	jm := &Controller{
 		kubeClient: kubeClient,
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
@@ -88,8 +90,8 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 	return jm, nil
 }
 
-// Run the main goroutine responsible for watching and syncing jobs.
-func (jm *CronJobController) Run(stopCh <-chan struct{}) {
+// Run starts the main goroutine responsible for watching and syncing jobs.
+func (jm *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
@@ -99,7 +101,7 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 }
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
-func (jm *CronJobController) syncAll() {
+func (jm *Controller) syncAll() {
 	// List children (Jobs) before parents (CronJob).
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).

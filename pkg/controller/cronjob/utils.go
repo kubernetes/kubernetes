@@ -142,7 +142,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		// but less than "lots".
 		if len(starts) > 100 {
 			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("Too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew.")
+			return []time.Time{}, fmt.Errorf("too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew")
 		}
 	}
 	return starts, nil
@@ -183,6 +183,7 @@ func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
 	return false, ""
 }
 
+// IsJobFinished returns whether or not a job has completed successfully or failed.
 func IsJobFinished(j *batchv1.Job) bool {
 	isFinished, _ := getFinishedStatus(j)
 	return isFinished
