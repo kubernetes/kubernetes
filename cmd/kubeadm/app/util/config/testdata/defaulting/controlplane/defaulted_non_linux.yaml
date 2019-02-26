@@ -13,7 +13,7 @@ localAPIEndpoint:
   bindPort: 6443
 nodeRegistration:
   criSocket: /var/run/criruntime.sock
-  name: master-1
+  name: control-plane-1
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
