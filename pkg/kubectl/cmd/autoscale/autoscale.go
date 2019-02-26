@@ -28,11 +28,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
+	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -74,10 +74,10 @@ type AutoscaleOptions struct {
 	namespace        string
 	dryRun           bool
 	builder          *resource.Builder
-	canBeAutoscaled  polymorphichelpers.CanBeAutoscaledFunc
 	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
 
-	HPAClient autoscalingv1client.HorizontalPodAutoscalersGetter
+	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
+	scaleKindResolver scale.ScaleKindResolver
 
 	genericclioptions.IOStreams
 }
@@ -133,7 +133,11 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
-	o.canBeAutoscaled = polymorphichelpers.CanBeAutoscaledFn
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)
 	o.args = args
 	o.RecordFlags.Complete(cmd)
 
@@ -196,7 +200,7 @@ func (o *AutoscaleOptions) Validate() error {
 
 func (o *AutoscaleOptions) Run() error {
 	r := o.builder.
-		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, o.FilenameOptions).
@@ -214,8 +218,9 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		mapping := info.ResourceMapping()
-		if err := o.canBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
-			return err
+		gvr := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource.Resource)
+		if _, err := o.scaleKindResolver.ScaleForResource(gvr); err != nil {
+			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
 		}
 
 		generator, err := o.generatorFunc(info.Name, mapping)
