@@ -6,8 +6,8 @@
 #### How to release by hand
 
 ```console
-# First, build the binaries
-$ build/run.sh make cross
+# First, build the binaries by running make from the root directory
+$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl"
 
 # Build for linux/amd64 (default)
 # export REGISTRY=$HOST/$ORG to switch from staging-k8s.gcr.io
@@ -48,7 +48,6 @@ metadata:
 spec:
   containers:
   - name: conformance-container
-    image: gcr.io/heptio-images/kube-conformance:latest
     image: staging-k8s.gcr.io/conformance-amd64:v1.12.1
     imagePullPolicy: IfNotPresent
     env:

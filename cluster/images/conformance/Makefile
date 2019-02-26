@@ -20,9 +20,13 @@
 REGISTRY?=staging-k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
-GINKGO_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/ginkgo
-KUBECTL_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/kubectl
-E2E_TEST_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/e2e.test
+
+OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)
+BINARY_PATH=$(shell test -d $(OUTPUT_PATH)/dockerized && echo $(OUTPUT_PATH)/dockerized || echo $(OUTPUT_PATH)/local)
+
+GINKGO_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/ginkgo
+KUBECTL_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/kubectl
+E2E_TEST_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/e2e.test
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1
