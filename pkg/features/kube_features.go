@@ -411,6 +411,12 @@ const (
 	//
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit utilfeature.Feature = "SupportNodePidsLimit"
+
+	// owner: @wk8
+	// alpha: v1.14
+	//
+	// Enables GMSA support for Windows workloads.
+	WindowsGMSA utilfeature.Feature = "WindowsGMSA"
 )
 
 func init() {

@@ -72,11 +72,12 @@ var _ = SIGDescribe("Aggregator", func() {
 		aggrclient = f.AggregatorClient
 	})
 
-	It("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
-		// Make sure the relevant provider supports Aggregator
-		framework.SkipUnlessServerVersionGTE(serverAggregatorVersion, f.ClientSet.Discovery())
-		framework.SkipUnlessProviderIs("gce", "gke")
-
+	/*
+		    Testname: aggregator-supports-the-sample-apiserver
+		    Description: Ensure that the sample-apiserver code from 1.10 and compiled against 1.10
+			will work on the current Aggregator/API-Server.
+	*/
+	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
 		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
 	})

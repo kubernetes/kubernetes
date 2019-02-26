@@ -67,15 +67,15 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
 	proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
 		struct {
-			MasterEndpoint    string
-			ProxyConfig       string
-			ProxyConfigMap    string
-			ProxyConfigMapKey string
+			ControlPlaneEndpoint string
+			ProxyConfig          string
+			ProxyConfigMap       string
+			ProxyConfigMapKey    string
 		}{
-			MasterEndpoint:    controlPlaneEndpoint,
-			ProxyConfig:       prefixBytes.String(),
-			ProxyConfigMap:    constants.KubeProxyConfigMap,
-			ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
+			ControlPlaneEndpoint: controlPlaneEndpoint,
+			ProxyConfig:          prefixBytes.String(),
+			ProxyConfigMap:       constants.KubeProxyConfigMap,
+			ProxyConfigMapKey:    constants.KubeProxyConfigMapKey,
 		})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing kube-proxy configmap template")

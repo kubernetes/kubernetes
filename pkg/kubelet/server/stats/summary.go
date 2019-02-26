@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
+// SummaryProvider provides summaries of the stats from Kubelet.
 type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
@@ -41,14 +42,14 @@ type summaryProviderImpl struct {
 	// systemBootTime is the time at which the system was started
 	systemBootTime metav1.Time
 
-	provider StatsProvider
+	provider Provider
 }
 
 var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
-func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
+func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	kubeletCreationTime := metav1.Now()
 	bootTime, err := util.GetBootTime()
 	if err != nil {

@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -35,15 +33,6 @@ var (
 		kubeadm init phase preflight --config kubeadm-config.yml
 		`)
 )
-
-// preflightData defines the behavior that a runtime data struct passed to the Preflight phase
-// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
-// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
-type preflightData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	DryRun() bool
-	IgnorePreflightErrors() sets.String
-}
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new control-plane node.
 func NewPreflightPhase() workflow.Phase {
@@ -62,7 +51,7 @@ func NewPreflightPhase() workflow.Phase {
 
 // runPreflight executes preflight checks logic.
 func runPreflight(c workflow.RunData) error {
-	data, ok := c.(preflightData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}

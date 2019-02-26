@@ -28,8 +28,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -43,12 +43,13 @@ const (
 type KubeProxyUpgradeTest struct {
 }
 
+// Name returns the tracking name of the test.
 func (KubeProxyUpgradeTest) Name() string { return "[sig-network] kube-proxy-upgrade" }
 
 // Setup verifies kube-proxy static pods is running before uprgade.
 func (t *KubeProxyUpgradeTest) Setup(f *framework.Framework) {
-	By("Waiting for kube-proxy static pods running and ready")
-	Expect(waitForKubeProxyStaticPodsRunning(f.ClientSet)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods running and ready")
+	gomega.Expect(waitForKubeProxyStaticPodsRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
 }
 
 // Test validates if kube-proxy is migrated from static pods to DaemonSet.
@@ -56,14 +57,14 @@ func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	c := f.ClientSet
 
 	// Block until upgrade is done.
-	By("Waiting for upgrade to finish")
+	ginkgo.By("Waiting for upgrade to finish")
 	<-done
 
-	By("Waiting for kube-proxy static pods disappear")
-	Expect(waitForKubeProxyStaticPodsDisappear(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods disappear")
+	gomega.Expect(waitForKubeProxyStaticPodsDisappear(c)).NotTo(gomega.HaveOccurred())
 
-	By("Waiting for kube-proxy DaemonSet running and ready")
-	Expect(waitForKubeProxyDaemonSetRunning(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
+	gomega.Expect(waitForKubeProxyDaemonSetRunning(c)).NotTo(gomega.HaveOccurred())
 }
 
 // Teardown does nothing.
@@ -74,12 +75,13 @@ func (t *KubeProxyUpgradeTest) Teardown(f *framework.Framework) {
 type KubeProxyDowngradeTest struct {
 }
 
+// Name returns the tracking name of the test.
 func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-downgrade" }
 
 // Setup verifies kube-proxy DaemonSet is running before uprgade.
 func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
-	By("Waiting for kube-proxy DaemonSet running and ready")
-	Expect(waitForKubeProxyDaemonSetRunning(f.ClientSet)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
+	gomega.Expect(waitForKubeProxyDaemonSetRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
 }
 
 // Test validates if kube-proxy is migrated from DaemonSet to static pods.
@@ -87,14 +89,14 @@ func (t *KubeProxyDowngradeTest) Test(f *framework.Framework, done <-chan struct
 	c := f.ClientSet
 
 	// Block until upgrade is done.
-	By("Waiting for upgrade to finish")
+	ginkgo.By("Waiting for upgrade to finish")
 	<-done
 
-	By("Waiting for kube-proxy DaemonSet disappear")
-	Expect(waitForKubeProxyDaemonSetDisappear(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet disappear")
+	gomega.Expect(waitForKubeProxyDaemonSetDisappear(c)).NotTo(gomega.HaveOccurred())
 
-	By("Waiting for kube-proxy static pods running and ready")
-	Expect(waitForKubeProxyStaticPodsRunning(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods running and ready")
+	gomega.Expect(waitForKubeProxyStaticPodsRunning(c)).NotTo(gomega.HaveOccurred())
 }
 
 // Teardown does nothing.

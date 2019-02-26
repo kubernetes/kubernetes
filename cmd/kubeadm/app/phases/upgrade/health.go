@@ -56,7 +56,7 @@ func (c *healthCheck) Name() string {
 
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
-// - all master Nodes are Ready
+// - all control-plane Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
@@ -69,9 +69,9 @@ func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.Stri
 			f:      apiServerHealthy,
 		},
 		&healthCheck{
-			name:   "MasterNodesReady",
+			name:   "ControlPlaneNodesReady",
 			client: client,
-			f:      masterNodesReady,
+			f:      controlPlaneNodesReady,
 		},
 		// TODO: Add a check for ComponentStatuses here?
 	}
@@ -100,25 +100,25 @@ func apiServerHealthy(client clientset.Interface) error {
 	return nil
 }
 
-// masterNodesReady checks whether all master Nodes in the cluster are in the Running state
-func masterNodesReady(client clientset.Interface) error {
+// controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
+func controlPlaneNodesReady(client clientset.Interface) error {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleMaster: "",
 	}))
-	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+	controlPlanes, err := client.CoreV1().Nodes().List(metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
 		return errors.Wrap(err, "couldn't list control-planes in cluster")
 	}
 
-	if len(masters.Items) == 0 {
+	if len(controlPlanes.Items) == 0 {
 		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
-	notReadyMasters := getNotReadyNodes(masters.Items)
-	if len(notReadyMasters) != 0 {
-		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyMasters)
+	notReadyControlPlanes := getNotReadyNodes(controlPlanes.Items)
+	if len(notReadyControlPlanes) != 0 {
+		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
 	return nil
 }

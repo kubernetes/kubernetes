@@ -395,6 +395,8 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
+	ds.initCleanup()
+
 	// Initialize the legacy cleanup flag.
 	if ds.startLocalStreamingServer {
 		go func() {
@@ -404,6 +406,16 @@ func (ds *dockerService) Start() error {
 		}()
 	}
 	return ds.containerManager.Start()
+}
+
+// initCleanup is responsible for cleaning up any crufts left by previous
+// runs. If there are any errros, it simply logs them.
+func (ds *dockerService) initCleanup() {
+	errors := ds.platformSpecificContainerCreationInitCleanup()
+
+	for _, err := range errors {
+		klog.Warningf("initialization error: %v", err)
+	}
 }
 
 // Status returns the status of the runtime.

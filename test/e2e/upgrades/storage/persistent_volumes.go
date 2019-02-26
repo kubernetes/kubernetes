@@ -21,8 +21,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
@@ -33,6 +33,7 @@ type PersistentVolumeUpgradeTest struct {
 	pvc      *v1.PersistentVolumeClaim
 }
 
+// Name returns the tracking name of the test.
 func (PersistentVolumeUpgradeTest) Name() string { return "[sig-storage] persistent-volume-upgrade" }
 
 const (
@@ -55,7 +56,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace.Name
 
-	By("Initializing PV source")
+	ginkgo.By("Initializing PV source")
 	t.pvSource, _ = framework.CreateGCEVolume()
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix: "pv-upgrade",
@@ -65,12 +66,12 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	emptyStorageClass := ""
 	pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &emptyStorageClass}
 
-	By("Creating the PV and PVC")
+	ginkgo.By("Creating the PV and PVC")
 	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
-	By("Consuming the PV before upgrade")
+	ginkgo.By("Consuming the PV before upgrade")
 	t.testPod(f, pvWriteCmd+";"+pvReadCmd)
 }
 
@@ -78,7 +79,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 // and that the volume data persists.
 func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
-	By("Consuming the PV after upgrade")
+	ginkgo.By("Consuming the PV after upgrade")
 	t.testPod(f, pvReadCmd)
 }
 

@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -58,12 +57,6 @@ var (
 		},
 	}
 )
-
-type controlPlaneData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	KubeConfigDir() string
-	ManifestDir() string
-}
 
 func getPhaseDescription(component string) string {
 	return fmt.Sprintf("Generates the %s static Pod manifest", component)
@@ -133,7 +126,7 @@ func getControlPlanePhaseFlags(name string) []string {
 }
 
 func runControlPlanePhase(c workflow.RunData) error {
-	data, ok := c.(controlPlaneData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("control-plane phase invoked with an invalid data struct")
 	}
@@ -144,7 +137,7 @@ func runControlPlanePhase(c workflow.RunData) error {
 
 func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
-		data, ok := c.(controlPlaneData)
+		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("control-plane phase invoked with an invalid data struct")
 		}

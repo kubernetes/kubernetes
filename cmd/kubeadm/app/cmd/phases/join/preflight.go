@@ -23,7 +23,6 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -51,12 +50,6 @@ var (
 
 		`)))
 )
-
-type preflightData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	IgnorePreflightErrors() sets.String
-}
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
 func NewPreflightPhase() workflow.Phase {
@@ -86,7 +79,7 @@ func NewPreflightPhase() workflow.Phase {
 
 // runPreflight executes preflight checks logic.
 func runPreflight(c workflow.RunData) error {
-	j, ok := c.(preflightData)
+	j, ok := c.(JoinData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}

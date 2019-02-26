@@ -87,7 +87,10 @@ type initOptions struct {
 	uploadCerts           bool
 }
 
-// initData defines all the runtime information used when running the kubeadm init workflow;
+// compile-time assert that the local data object satisfies the phases data interface.
+var _ phases.InitData = &initData{}
+
+// initData defines all the runtime information used when running the kubeadm init worklow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
 	cfg                   *kubeadmapi.InitConfiguration

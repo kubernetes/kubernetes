@@ -732,14 +732,6 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
 	return framework.PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
 }
 
-func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
-	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
-	if err != nil {
-		return 0, err
-	}
-	return defaultSvc.Spec.Ports[0].NodePort, nil
-}
-
 // GetIngressNodePorts returns related backend services' nodePorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
