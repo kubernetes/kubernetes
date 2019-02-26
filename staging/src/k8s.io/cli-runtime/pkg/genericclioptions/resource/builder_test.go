@@ -392,7 +392,7 @@ func TestFilenameOptionsValidate(t *testing.T) {
 			kustomize: "dir",
 			recursive: true,
 			errExp:    true,
-			msgExp:    "-R is not allowed to work with -k",
+			msgExp:    "the -k flag can't be used with -f or -R",
 		},
 		{
 			filenames: []string{"file"},
@@ -672,6 +672,11 @@ func TestKustomizeDirectoryBuilder(t *testing.T) {
 			directory:     dir,
 			expectErr:     false,
 			expectedNames: []string{"test-the-map", "test-the-deployment", "test-the-service"},
+		},
+		{
+			directory: filepath.Join(dir, "kustomization.yaml"),
+			expectErr: true,
+			errMsg:    "must be a directory to be a root",
 		},
 		{
 			directory: "../../../artifacts/kustomization/should-not-load.yaml",

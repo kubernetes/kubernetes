@@ -229,7 +229,7 @@ __EOF__
   kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
   kube::test::get_object_assert 'service test-the-service' "{{${id_field}}}" 'test-the-service'
   # cleanup
-  kubectl delete configmap/test-the-map deployment/test-the-deployment service/test-the-service
+  kubectl delete -k hack/testdata/kustomize
 
   ## kubectl apply --kustomize somedir
   kubectl apply --kustomize hack/testdata/kustomize
@@ -237,7 +237,7 @@ __EOF__
   kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
   kube::test::get_object_assert 'service test-the-service' "{{${id_field}}}" 'test-the-service'
   # cleanup
-  kubectl delete -k hack/testdata/kustomize
+  kubectl delete --kustomize hack/testdata/kustomize
 
   set +o nounset
   set +o errexit

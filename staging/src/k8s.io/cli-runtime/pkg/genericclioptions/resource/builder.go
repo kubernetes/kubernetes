@@ -140,7 +140,7 @@ func (o *FilenameOptions) validate() []error {
 		errs = append(errs, fmt.Errorf("only one of -f or -k can be specified"))
 	}
 	if len(o.Kustomize) > 0 && o.Recursive {
-		errs = append(errs, fmt.Errorf("-R is not allowed to work with -k"))
+		errs = append(errs, fmt.Errorf("the -k flag can't be used with -f or -R"))
 	}
 	return errs
 }
