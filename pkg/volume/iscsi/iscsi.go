@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	ioutil "k8s.io/kubernetes/pkg/volume/util"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
@@ -131,8 +131,8 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		exec:         exec,
-		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
-		mountOptions: ioutil.MountOptionFromSpec(spec),
+		deviceUtil:   volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
+		mountOptions: volumeutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -166,7 +166,7 @@ func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUI
 		iscsiDisk:  iscsiDisk,
 		readOnly:   readOnly,
 		exec:       exec,
-		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil
 }
 
@@ -185,7 +185,7 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 		},
 		mounter:    mounter,
 		exec:       exec,
-		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil
 }
 
@@ -203,7 +203,7 @@ func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID,
 			plugin:  plugin,
 		},
 		exec:       exec,
-		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil
 }
 
@@ -309,7 +309,7 @@ type iscsiDiskMounter struct {
 	volumeMode   v1.PersistentVolumeMode
 	mounter      *mount.SafeFormatAndMount
 	exec         mount.Exec
-	deviceUtil   ioutil.DeviceUtil
+	deviceUtil   volumeutil.DeviceUtil
 	mountOptions []string
 }
 
@@ -347,7 +347,7 @@ type iscsiDiskUnmounter struct {
 	*iscsiDisk
 	mounter    mount.Interface
 	exec       mount.Exec
-	deviceUtil ioutil.DeviceUtil
+	deviceUtil volumeutil.DeviceUtil
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}
@@ -367,7 +367,7 @@ type iscsiDiskMapper struct {
 	*iscsiDisk
 	readOnly   bool
 	exec       mount.Exec
-	deviceUtil ioutil.DeviceUtil
+	deviceUtil volumeutil.DeviceUtil
 }
 
 var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
@@ -377,13 +377,13 @@ func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
 }
 
 func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return volumeutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       mount.Exec
-	deviceUtil ioutil.DeviceUtil
+	deviceUtil volumeutil.DeviceUtil
 }
 
 var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
