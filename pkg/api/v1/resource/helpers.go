@@ -107,7 +107,7 @@ func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.P
 }
 
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
-// by providing container name and node allocatable
+// by providing container name and allocatable node
 func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
