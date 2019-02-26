@@ -33,7 +33,8 @@ fi
 export PATH="${KUBE_OUTPUT_BINPATH}:${PATH}"
 
 if ! which go-bindata &>/dev/null ; then
-	echo "Cannot find go-bindata."
+	echo 'Can not find go-bindata, install with:'
+	echo 'go get github.com/jteeuwen/go-bindata/...'
 	exit 5
 fi
 
