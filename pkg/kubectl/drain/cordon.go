@@ -73,7 +73,7 @@ func (c *CordonHelper) UpdateIfRequired(desired bool) bool {
 // JSON, or if either patch or update calls fail; it will also return a second error
 // whenever creating a patch has failed
 func (c *CordonHelper) PatchOrReplace(clientset kubernetes.Interface) (error, error) {
-	client := clientset.Core().Nodes()
+	client := clientset.CoreV1().Nodes()
 
 	oldData, err := json.Marshal(c.node)
 	if err != nil {

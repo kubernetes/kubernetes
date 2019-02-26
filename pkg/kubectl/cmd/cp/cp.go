@@ -499,7 +499,7 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 	}
 
 	options.Config = o.ClientConfig
-	options.PodClient = o.Clientset.Core()
+	options.PodClient = o.Clientset.CoreV1()
 
 	if err := options.Validate(); err != nil {
 		return err
