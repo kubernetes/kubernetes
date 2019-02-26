@@ -60,7 +60,6 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/api/v1/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -71,6 +70,7 @@ go_library(
             "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
             "//test/e2e/perftype:go_default_library",
             "//test/e2e_node/perftype:go_default_library",
+            "//test/utils:go_default_library",
             "//vendor/github.com/google/cadvisor/client/v2:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
@@ -114,7 +114,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//pkg/api/v1/node:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
@@ -157,6 +156,7 @@ go_test(
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e_node/perf/workloads:go_default_library",
         "//test/e2e_node/services:go_default_library",
+        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
@@ -175,7 +175,6 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
             "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-            "//test/utils:go_default_library",
             "//vendor/github.com/kardianos/osext:go_default_library",
             "//vendor/github.com/onsi/ginkgo/config:go_default_library",
             "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",

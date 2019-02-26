@@ -39,7 +39,6 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -234,7 +233,7 @@ func waitForNodeReady() {
 		if err != nil {
 			return fmt.Errorf("failed to get node: %v", err)
 		}
-		if !nodeutil.IsNodeReady(node) {
+		if !isNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
@@ -309,4 +308,14 @@ func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
 		return nil, err
 	}
 	return spec, nil
+}
+
+// isNodeReady returns true if a node is ready; false otherwise.
+func isNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }
