@@ -64,6 +64,7 @@ const (
 	dummyValidatingWebhookConfigName       = "e2e-test-dummy-validating-webhook-config"
 	dummyMutatingWebhookConfigName         = "e2e-test-dummy-mutating-webhook-config"
 	crdWebhookConfigName                   = "e2e-test-webhook-config-crd"
+	slowWebhookConfigName                  = "e2e-test-webhook-config-slow"
 
 	skipNamespaceLabelKey   = "skip-webhook-admission"
 	skipNamespaceLabelValue = "yes"
@@ -199,6 +200,31 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer crdWebhookCleanup()
 
 		testCRDDenyWebhook(f)
+	})
+
+	It("Should honor timeout", func() {
+		policyFail := v1beta1.Fail
+		policyIgnore := v1beta1.Ignore
+
+		By("Setting timeout (1s) shorter than webhook latency (5s)")
+		slowWebhookCleanup := registerSlowWebhook(f, context, &policyFail, int32Ptr(1))
+		testSlowWebhookTimeoutFailEarly(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is shorter than webhook latency and failure policy is ignore")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyIgnore, int32Ptr(1))
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is longer than webhook latency")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyFail, int32Ptr(10))
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is empty (defaulted to 10s in v1beta1)")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyFail, nil)
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
 	})
 
 	// TODO: add more e2e tests for mutating webhooks
@@ -356,6 +382,8 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 }
 
 func strPtr(s string) *string { return &s }
+
+func int32Ptr(i int32) *int32 { return &i }
 
 func registerWebhook(f *framework.Framework, context *certContext) func() {
 	client := f.ClientSet
@@ -1444,4 +1472,70 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
+}
+
+func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v1beta1.FailurePolicyType, timeout *int32) func() {
+	client := f.ClientSet
+	By("Registering slow webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := slowWebhookConfigName
+
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "allow-configmap-with-delay-webhook.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"configmaps"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/always-allow-delay-5s"),
+					},
+					CABundle: context.signingCert,
+				},
+				FailurePolicy:  policy,
+				TimeoutSeconds: timeout,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering slow webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+
+	return func() {
+		client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
+	}
+}
+
+func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {
+	By("Request fails when timeout (1s) is shorter than slow webhook latency (5s)")
+	client := f.ClientSet
+	name := "e2e-test-slow-webhook-configmap"
+	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	Expect(err).To(HaveOccurred(), "create configmap in namespace %s should have timed-out reaching slow webhook", f.Namespace.Name)
+	expectedErrMsg := `/always-allow-delay-5s?timeout=1s: context deadline exceeded`
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
+}
+
+func testSlowWebhookTimeoutNoError(f *framework.Framework) {
+	client := f.ClientSet
+	name := "e2e-test-slow-webhook-configmap"
+	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	Expect(err).To(BeNil())
+	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(name, &metav1.DeleteOptions{})
+	Expect(err).To(BeNil())
 }

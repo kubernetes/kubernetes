@@ -32,6 +32,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.FailurePolicy = &p
 			s := admissionregistration.SideEffectClassUnknown
 			obj.SideEffects = &s
+			if obj.TimeoutSeconds == nil {
+				i := int32(30)
+				obj.TimeoutSeconds = &i
+			}
 		},
 	}
 }
