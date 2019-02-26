@@ -569,7 +569,93 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
+func setupKustomizeDirectory() (string, error) {
+	path, err := ioutil.TempDir("/tmp", "")
+	if err != nil {
+		return "", err
+	}
+
+	contents := map[string]string{
+		"configmap.yaml": `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: the-map
+data:
+  altGreeting: "Good Morning!"
+  enableRisky: "false"
+`,
+		"deployment.yaml": `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: the-deployment
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        deployment: hello
+    spec:
+      containers:
+      - name: the-container
+        image: monopole/hello:1
+        command: ["/hello",
+                  "--port=8080",
+                  "--enableRiskyFeature=$(ENABLE_RISKY)"]
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ALT_GREETING
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: altGreeting
+        - name: ENABLE_RISKY
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: enableRisky
+`,
+		"service.yaml": `
+kind: Service
+apiVersion: v1
+metadata:
+  name: the-service
+spec:
+  selector:
+    deployment: hello
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 8666
+    targetPort: 8080
+`,
+		"kustomization.yaml": `
+nameprefix: test-
+resources:
+- deployment.yaml
+- service.yaml
+- configmap.yaml
+`,
+	}
+
+	for filename, content := range contents {
+		err = ioutil.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
+		if err != nil {
+			return "", err
+		}
+	}
+	return path, nil
+}
+
 func TestKustomizeDirectoryBuilder(t *testing.T) {
+	dir, err := setupKustomizeDirectory()
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	defer os.RemoveAll(dir)
+
 	tests := []struct {
 		directory     string
 		expectErr     bool
@@ -582,12 +668,11 @@ func TestKustomizeDirectoryBuilder(t *testing.T) {
 			expectErr: true,
 			errMsg:    "No kustomization file found",
 		},
-		// TODO(Liujingfang1): Fix this test in bazel test
-		//{
-		//	directory: "../../../artifacts/kustomization",
-		//	expectErr: false,
-		//	expectedNames: []string{"test-the-map", "test-the-deployment", "test-the-service"},
-		//},
+		{
+			directory:     dir,
+			expectErr:     false,
+			expectedNames: []string{"test-the-map", "test-the-deployment", "test-the-service"},
+		},
 		{
 			directory: "../../../artifacts/kustomization/should-not-load.yaml",
 			expectErr: true,
