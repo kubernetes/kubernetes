@@ -28,7 +28,7 @@ import (
 	"reflect"
 
 	api "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -208,7 +208,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 					DetachError: nil,
 				},
 			}
-			_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
 			if err != nil {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
@@ -363,7 +363,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
 
-		_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
 		if err != nil {
 			t.Errorf("failed to setup VolumeAttachment: %v", err)
 			continue

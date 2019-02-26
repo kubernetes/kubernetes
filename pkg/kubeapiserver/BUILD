@@ -21,7 +21,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/policy:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
