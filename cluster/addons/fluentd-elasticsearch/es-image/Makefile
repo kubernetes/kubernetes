@@ -16,7 +16,7 @@
 
 PREFIX = gcr.io/fluentd-elasticsearch
 IMAGE = elasticsearch
-TAG = v6.3.0
+TAG = v6.6.1
 
 build:
 	gcloud builds submit --tag ${PREFIX}/${IMAGE}:${TAG}

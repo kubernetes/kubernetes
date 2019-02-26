@@ -17,7 +17,7 @@ COPY elasticsearch_logging_discovery.go go.mod go.sum /
 RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -a -ldflags "-w" -o /elasticsearch_logging_discovery /elasticsearch_logging_discovery.go
 
 
-FROM docker.elastic.co/elasticsearch/elasticsearch-oss:6.3.2
+FROM docker.elastic.co/elasticsearch/elasticsearch-oss:6.6.1
 
 VOLUME ["/data"]
 EXPOSE 9200 9300
