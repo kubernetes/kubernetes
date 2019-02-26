@@ -311,3 +311,7 @@ func getUint64Value(value *uint64) uint64 {
 
 	return *value
 }
+
+func Uint64Ptr(i uint64) *uint64 {
+	return &i
+}
