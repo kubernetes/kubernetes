@@ -36,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -691,7 +692,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]
-				volumeVSet, err := volumeutil.LabelZonesToSet(v)
+				volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
 					continue

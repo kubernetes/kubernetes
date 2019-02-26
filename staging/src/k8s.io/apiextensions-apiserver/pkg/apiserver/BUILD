@@ -13,7 +13,6 @@ go_library(
         "customresource_discovery.go",
         "customresource_discovery_controller.go",
         "customresource_handler.go",
-        "helpers.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",

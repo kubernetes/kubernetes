@@ -17,7 +17,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Ensure that we find the binaries we build before anything else.
@@ -26,6 +27,7 @@ PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
 go install k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+go install k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/buildozer
 go install k8s.io/kubernetes/vendor/k8s.io/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
@@ -43,3 +45,11 @@ gazelle fix \
     "${KUBE_ROOT}"
 
 kazel
+
+# make targets in vendor manual
+# buildozer exits 3 when no changes are made ¯\_(ツ)_/¯
+# https://github.com/bazelbuild/buildtools/tree/master/buildozer#error-code
+buildozer -quiet 'add tags manual' '//vendor/...:%go_binary' '//vendor/...:%go_test' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi

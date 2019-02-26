@@ -101,15 +101,15 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	}
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
-		struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
-			DeploymentName: kubeadmconstants.KubeDNSDeploymentName,
-			KubeDNSImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
-			DNSMasqImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
-			SidecarImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
-			DNSBindAddr:    dnsBindAddr,
-			DNSProbeAddr:   dnsProbeAddr,
-			DNSDomain:      cfg.Networking.DNSDomain,
-			MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
+		struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+			DeploymentName:       kubeadmconstants.KubeDNSDeploymentName,
+			KubeDNSImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
+			DNSMasqImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
+			SidecarImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
+			DNSBindAddr:          dnsBindAddr,
+			DNSProbeAddr:         dnsProbeAddr,
+			DNSDomain:            cfg.Networking.DNSDomain,
+			ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 		})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing kube-dns deployment template")
@@ -157,10 +157,10 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 
 func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	// Get the YAML manifest
-	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ DeploymentName, Image, MasterTaintKey string }{
-		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
-		Image:          images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
-		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
+	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
+		Image:                images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
+		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")

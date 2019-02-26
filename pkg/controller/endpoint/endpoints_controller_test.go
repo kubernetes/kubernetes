@@ -1269,3 +1269,49 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
+
+func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Annotations: map[string]string{
+				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+		}},
+	})
+	// Neither pod nor service has trigger time, this should cause annotation to be cleared.
+	addPods(endpoints.podStore, ns, 1, 1, 0)
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+
+	endpointsHandler.ValidateRequestCount(t, 1)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Annotations:     map[string]string{}, // Annotation not set anymore.
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}

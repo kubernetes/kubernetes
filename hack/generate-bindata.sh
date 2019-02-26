@@ -18,7 +18,8 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 

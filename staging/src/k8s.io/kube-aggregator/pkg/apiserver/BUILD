@@ -78,6 +78,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/status:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

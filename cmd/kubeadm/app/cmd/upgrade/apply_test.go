@@ -19,143 +19,73 @@ package upgrade
 import (
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestSetImplicitFlags(t *testing.T) {
-	var tests = []struct {
-		name          string
-		flags         *applyFlags
-		expectedFlags applyFlags
-		errExpected   bool
+func TestAssertVersionStringIsEmpty(t *testing.T) {
+	var tcases = []struct {
+		name        string
+		version     string
+		expectedErr bool
 	}{
 		{
-			name: "if not dryRun or force is set; the nonInteractiveMode field should not be touched",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              false,
-				nonInteractiveMode: false,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              false,
-				nonInteractiveMode: false,
-			},
+			name:    "Version string is not empty",
+			version: "some string",
 		},
 		{
-			name: "if not dryRun or force is set; the nonInteractiveMode field should not be touched",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              false,
-				nonInteractiveMode: true,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              false,
-				nonInteractiveMode: true,
-			},
-		},
-		{
-			name: "if dryRun or force is set; the nonInteractiveMode field should be set to true",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              false,
-				nonInteractiveMode: false,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              false,
-				nonInteractiveMode: true,
-			},
-		},
-		{
-			name: "if dryRun or force is set; the nonInteractiveMode field should be set to true",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              true,
-				nonInteractiveMode: false,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             false,
-				force:              true,
-				nonInteractiveMode: true,
-			},
-		},
-		{
-			name: "if dryRun or force is set; the nonInteractiveMode field should be set to true",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              true,
-				nonInteractiveMode: false,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              true,
-				nonInteractiveMode: true,
-			},
-		},
-		{
-			name: "if dryRun or force is set; the nonInteractiveMode field should be set to true",
-			flags: &applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              true,
-				nonInteractiveMode: true,
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr:   "v1.8.0",
-				dryRun:             true,
-				force:              true,
-				nonInteractiveMode: true,
-			},
-		},
-		{
-			name: "if the new version is empty; it should error out",
-			flags: &applyFlags{
-				newK8sVersionStr: "",
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr: "",
-			},
-			errExpected: true,
+			name:        "Version string is empty",
+			expectedErr: true,
 		},
 	}
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			actualErr := SetImplicitFlags(rt.flags)
-
-			// If an error was returned; make newK8sVersion nil so it's easy to match using reflect.DeepEqual later (instead of a random pointer)
-			if actualErr != nil {
-				rt.flags.newK8sVersion = nil
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if assertVersionStringIsEmpty(tt.version) == nil && tt.expectedErr {
+				t.Errorf("No error triggered for string '%s'", tt.version)
 			}
+		})
+	}
+}
 
-			if !reflect.DeepEqual(*rt.flags, rt.expectedFlags) {
-				t.Errorf(
-					"failed SetImplicitFlags:\n\texpected flags: %v\n\t  actual: %v",
-					rt.expectedFlags,
-					*rt.flags,
-				)
-			}
-			if (actualErr != nil) != rt.errExpected {
-				t.Errorf(
-					"failed SetImplicitFlags:\n\texpected error: %t\n\t  actual: %t",
-					rt.errExpected,
-					(actualErr != nil),
-				)
+func TestSessionIsInteractive(t *testing.T) {
+	var tcases = []struct {
+		name     string
+		flags    *applyFlags
+		expected bool
+	}{
+		{
+			name: "Explicitly non-interactive",
+			flags: &applyFlags{
+				nonInteractiveMode: true,
+			},
+			expected: false,
+		},
+		{
+			name: "Implicitly non-interactive since --dryRun is used",
+			flags: &applyFlags{
+				dryRun: true,
+			},
+			expected: false,
+		},
+		{
+			name: "Implicitly non-interactive since --force is used",
+			flags: &applyFlags{
+				force: true,
+			},
+			expected: false,
+		},
+		{
+			name:     "Interactive session",
+			flags:    &applyFlags{},
+			expected: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.flags.sessionIsInteractive() != tt.expected {
+				t.Error("unexpected result")
 			}
 		})
 	}

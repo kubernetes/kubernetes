@@ -9,7 +9,6 @@ go_library(
         "device_util_linux.go",
         "device_util_unsupported.go",
         "doc.go",
-        "error.go",
         "finalizer.go",
         "io_util.go",
         "metrics.go",

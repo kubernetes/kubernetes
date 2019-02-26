@@ -75,13 +75,14 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakePDManager struct {
-	api           apiImplementer
-	attachCalled  bool
-	detachCalled  bool
-	mountCalled   bool
-	unmountCalled bool
-	createCalled  bool
-	deleteCalled  bool
+	api                apiImplementer
+	attachCalled       bool
+	attachDeviceCalled bool
+	detachCalled       bool
+	mountCalled        bool
+	unmountCalled      bool
+	createCalled       bool
+	deleteCalled       bool
 }
 
 func (fake *fakePDManager) NewAPI(apiCfg *storageosAPIConfig) error {
@@ -106,6 +107,11 @@ func (fake *fakePDManager) CreateVolume(p *storageosProvisioner) (*storageosVolu
 func (fake *fakePDManager) AttachVolume(b *storageosMounter) (string, error) {
 	fake.attachCalled = true
 	return "", nil
+}
+
+func (fake *fakePDManager) AttachDevice(b *storageosMounter, dir string) error {
+	fake.attachDeviceCalled = true
+	return nil
 }
 
 func (fake *fakePDManager) DetachVolume(b *storageosUnmounter, loopDevice string) error {
@@ -213,6 +219,9 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
+	if !fakeManager.attachDeviceCalled {
+		t.Errorf("AttachDevice not called")
+	}
 	if !fakeManager.attachCalled {
 		t.Errorf("Attach not called")
 	}

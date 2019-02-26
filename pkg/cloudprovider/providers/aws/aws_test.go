@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/volume"
+	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const TestClusterID = "clusterid.test"
@@ -1221,7 +1221,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 				Spec: v1.PersistentVolumeSpec{
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-							VolumeID: volume.ProvisionedVolumeName,
+							VolumeID: cloudvolume.ProvisionedVolumeName,
 						},
 					},
 				},

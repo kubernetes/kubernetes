@@ -126,7 +126,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // ControllerExpectationsInterface is an interface that allows users to set and wait on expectations.
@@ -291,7 +291,7 @@ var UIDSetKeyFunc = func(obj interface{}) (string, error) {
 	if u, ok := obj.(*UIDSet); ok {
 		return u.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // UIDSet holds a key and a set of UIDs. Used by the
@@ -627,7 +627,7 @@ func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, 
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *spec)
 	if f.Err != nil {
@@ -641,7 +641,7 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
@@ -656,7 +656,7 @@ func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *template)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
@@ -920,7 +920,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to update taint of node!")
+				return fmt.Errorf("failed to update taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -977,7 +977,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to remove taint of node!")
+				return fmt.Errorf("failed to remove taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -1021,7 +1021,7 @@ func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs 
 	klog.Infof("Waiting for caches to sync for %s controller", controllerName)
 
 	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("Unable to sync caches for %s controller", controllerName))
+		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s controller", controllerName))
 		return false
 	}
 

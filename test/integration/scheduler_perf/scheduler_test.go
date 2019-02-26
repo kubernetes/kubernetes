@@ -130,7 +130,7 @@ func schedulePods(config *testConfig) int32 {
 	prev := 0
 	// On startup there may be a latent period where NO scheduling occurs (qps = 0).
 	// We are interested in low scheduling rates (i.e. qps=2),
-	minQps := int32(math.MaxInt32)
+	minQPS := int32(math.MaxInt32)
 	start := time.Now()
 	// Bake in time for the first pod scheduling event.
 	for {
@@ -167,15 +167,15 @@ func schedulePods(config *testConfig) int32 {
 				consumed = 1
 			}
 			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average). min QPS was %v\n",
-				config.numPods, consumed, config.numPods/consumed, minQps)
-			return minQps
+				config.numPods, consumed, config.numPods/consumed, minQPS)
+			return minQPS
 		}
 
 		// There's no point in printing it for the last iteration, as the value is random
 		qps := len(scheduled) - prev
-		qpsStats[qps] += 1
-		if int32(qps) < minQps {
-			minQps = int32(qps)
+		qpsStats[qps]++
+		if int32(qps) < minQPS {
+			minQPS = int32(qps)
 		}
 		fmt.Printf("%ds\trate: %d\ttotal: %d (qps frequency: %v)\n", time.Since(start)/time.Second, qps, len(scheduled), qpsStats)
 		prev = len(scheduled)

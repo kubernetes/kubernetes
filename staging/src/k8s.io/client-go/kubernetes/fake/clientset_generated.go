@@ -68,6 +68,8 @@ import (
 	fakeextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
+	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	fakenetworkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -76,6 +78,8 @@ import (
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
+	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
+	fakeschedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1/fake"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 	fakeschedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
@@ -308,6 +312,11 @@ func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
 	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
 }
 
+// NetworkingV1beta1 retrieves the NetworkingV1beta1Client
+func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
+	return &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &c.Fake}
+}
+
 // PolicyV1beta1 retrieves the PolicyV1beta1Client
 func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
 	return &fakepolicyv1beta1.FakePolicyV1beta1{Fake: &c.Fake}
@@ -348,9 +357,14 @@ func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Inter
 	return &fakeschedulingv1beta1.FakeSchedulingV1beta1{Fake: &c.Fake}
 }
 
-// Scheduling retrieves the SchedulingV1beta1Client
-func (c *Clientset) Scheduling() schedulingv1beta1.SchedulingV1beta1Interface {
-	return &fakeschedulingv1beta1.FakeSchedulingV1beta1{Fake: &c.Fake}
+// SchedulingV1 retrieves the SchedulingV1Client
+func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
+	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
+}
+
+// Scheduling retrieves the SchedulingV1Client
+func (c *Clientset) Scheduling() schedulingv1.SchedulingV1Interface {
+	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
 }
 
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client

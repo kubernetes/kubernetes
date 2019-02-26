@@ -1385,6 +1385,18 @@ func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, disk
 	return
 }
 
+func newSnapshotsClient(config *azClientConfig) *compute.SnapshotsClient {
+	snapshotsClient := compute.NewSnapshotsClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
+	snapshotsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+	snapshotsClient.PollingDelay = 5 * time.Second
+	if config.ShouldOmitCloudProviderBackoff {
+		snapshotsClient.RetryAttempts = config.CloudProviderBackoffRetries
+		snapshotsClient.RetryDuration = time.Duration(config.CloudProviderBackoffDuration) * time.Second
+	}
+	configureUserAgent(&snapshotsClient.Client)
+	return &snapshotsClient
+}
+
 // azVirtualMachineSizesClient implements VirtualMachineSizesClient.
 type azVirtualMachineSizesClient struct {
 	client            compute.VirtualMachineSizesClient

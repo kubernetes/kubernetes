@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
@@ -36,4 +37,6 @@ func init() {
 	utilruntime.Must(v1.AddToScheme(Scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(Scheme))
 	utilruntime.Must(v1beta1.AddToScheme(Scheme))
+	utilruntime.Must(auditinternal.AddToScheme(Scheme))
+	utilruntime.Must(Scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }

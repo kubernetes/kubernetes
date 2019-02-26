@@ -21,12 +21,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/clientcmd/api/latest"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -39,7 +39,7 @@ type ViewOptions struct {
 	PrintObject printers.ResourcePrinterFunc
 
 	ConfigAccess clientcmd.ConfigAccess
-	Merge        flag.Tristate
+	Merge        cliflag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool

@@ -40,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

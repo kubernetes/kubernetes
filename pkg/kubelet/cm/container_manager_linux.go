@@ -53,6 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -123,6 +124,8 @@ type containerManagerImpl struct {
 	cgroupManager CgroupManager
 	// Capacity of this node.
 	capacity v1.ResourceList
+	// Capacity of this node, including internal resources.
+	internalCapacity v1.ResourceList
 	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
 	// This path include a top level container for enforcing Node Allocatable.
 	cgroupRoot CgroupName
@@ -219,6 +222,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	var capacity = v1.ResourceList{}
+	var internalCapacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -227,6 +231,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+	for k, v := range capacity {
+		internalCapacity[k] = v
+	}
+	pidlimits, err := pidlimit.Stats()
+	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
+		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(
+			int64(*pidlimits.MaxPID),
+			resource.DecimalSI)
+	}
 
 	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
@@ -264,6 +277,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		subsystems:          subsystems,
 		cgroupManager:       cgroupManager,
 		capacity:            capacity,
+		internalCapacity:    internalCapacity,
 		cgroupRoot:          cgroupRoot,
 		recorder:            recorder,
 		qosContainerManager: qosContainerManager,

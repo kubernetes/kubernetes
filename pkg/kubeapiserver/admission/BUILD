@@ -19,7 +19,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
-        "//staging/src/k8s.io/client-go/discovery/cached:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",

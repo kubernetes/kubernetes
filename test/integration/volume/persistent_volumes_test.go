@@ -244,7 +244,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	maxClaims := 100
 	claims := []*v1.PersistentVolumeClaim{}
 	for counter <= maxClaims {
-		counter += 1
+		counter++
 		newPvc := pvc.DeepCopy()
 		newPvc.ObjectMeta = metav1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(newPvc)
@@ -313,19 +313,19 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 		modes   = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 		reclaim = v1.PersistentVolumeReclaimRetain
 
-		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
-		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
-		pvc      = createPVC("pvc-ls-1", ns.Name, "1G", modes, "")
+		pvTrue  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
+		pvFalse = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc     = createPVC("pvc-ls-1", ns.Name, "1G", modes, "")
 	)
 
-	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "true"})
-	pv_false.ObjectMeta.SetLabels(map[string]string{"foo": "false"})
+	pvTrue.ObjectMeta.SetLabels(map[string]string{"foo": "true"})
+	pvFalse.ObjectMeta.SetLabels(map[string]string{"foo": "false"})
 
-	_, err = testClient.CoreV1().PersistentVolumes().Create(pv_true)
+	_, err = testClient.CoreV1().PersistentVolumes().Create(pvTrue)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolume: %v", err)
 	}
-	_, err = testClient.CoreV1().PersistentVolumes().Create(pv_false)
+	_, err = testClient.CoreV1().PersistentVolumes().Create(pvFalse)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolume: %v", err)
 	}
@@ -394,19 +394,19 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 		modes   = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 		reclaim = v1.PersistentVolumeReclaimRetain
 
-		pv_true  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
-		pv_false = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
-		pvc      = createPVC("pvc-ls-1", ns.Name, "1G", modes, "")
+		pvTrue  = createPV("pv-true", "/tmp/foo-label", "1G", modes, reclaim)
+		pvFalse = createPV("pv-false", "/tmp/foo-label", "1G", modes, reclaim)
+		pvc     = createPVC("pvc-ls-1", ns.Name, "1G", modes, "")
 	)
 
-	pv_true.ObjectMeta.SetLabels(map[string]string{"foo": "valA", "bar": ""})
-	pv_false.ObjectMeta.SetLabels(map[string]string{"foo": "valB", "baz": ""})
+	pvTrue.ObjectMeta.SetLabels(map[string]string{"foo": "valA", "bar": ""})
+	pvFalse.ObjectMeta.SetLabels(map[string]string{"foo": "valB", "baz": ""})
 
-	_, err = testClient.CoreV1().PersistentVolumes().Create(pv_true)
+	_, err = testClient.CoreV1().PersistentVolumes().Create(pvTrue)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolume: %v", err)
 	}
-	_, err = testClient.CoreV1().PersistentVolumes().Create(pv_false)
+	_, err = testClient.CoreV1().PersistentVolumes().Create(pvFalse)
 	if err != nil {
 		t.Fatalf("Failed to create PersistentVolume: %v", err)
 	}
@@ -539,7 +539,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 			t.Fatalf("Bind mismatch! Expected %s capacity %d but got %s capacity %d", pvc.Name, expectedCapVal, pv.Spec.ClaimRef.Name, pvCap)
 		}
 		t.Logf("claim bounded to %s capacity %v", pv.Name, pv.Spec.Capacity[v1.ResourceStorage])
-		bound += 1
+		bound++
 	}
 	t.Log("volumes checked")
 
@@ -965,18 +965,18 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	defer close(stopCh)
 
 	// This PV will be claimed, released, and deleted
-	pv_rwo := createPV("pv-rwo", "/tmp/foo", "10G",
+	pvRwo := createPV("pv-rwo", "/tmp/foo", "10G",
 		[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
-	pv_rwm := createPV("pv-rwm", "/tmp/bar", "10G",
+	pvRwm := createPV("pv-rwm", "/tmp/bar", "10G",
 		[]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}, v1.PersistentVolumeReclaimRetain)
 
 	pvc := createPVC("pvc-rwm", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}, "")
 
-	_, err := testClient.CoreV1().PersistentVolumes().Create(pv_rwm)
+	_, err := testClient.CoreV1().PersistentVolumes().Create(pvRwm)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolume: %v", err)
 	}
-	_, err = testClient.CoreV1().PersistentVolumes().Create(pv_rwo)
+	_, err = testClient.CoreV1().PersistentVolumes().Create(pvRwo)
 	if err != nil {
 		t.Errorf("Failed to create PersistentVolume: %v", err)
 	}

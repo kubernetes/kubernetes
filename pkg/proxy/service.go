@@ -79,6 +79,20 @@ func (info *BaseServiceInfo) GetNodePort() int {
 	return info.NodePort
 }
 
+// ExternalIPStrings is part of ServicePort interface.
+func (info *BaseServiceInfo) ExternalIPStrings() []string {
+	return info.ExternalIPs
+}
+
+// LoadBalancerIPStrings is part of ServicePort interface.
+func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
+	var ips []string
+	for _, ing := range info.LoadBalancerStatus.Ingress {
+		ips = append(ips, ing.IP)
+	}
+	return ips
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {

@@ -159,27 +159,40 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		if err != nil {
 			return nil, cleanupAction, err
 		}
-		if mount.SubPath != "" {
+
+		subPath := mount.SubPath
+		if mount.SubPathExpr != "" {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
 				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
 			}
 
-			// Expand subpath variables
-			if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion) {
-				mount.SubPath = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion) {
+				return nil, cleanupAction, fmt.Errorf("volume subpath expansion is disabled")
 			}
 
-			if filepath.IsAbs(mount.SubPath) {
-				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
-			}
+			subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
 
-			err = volumevalidation.ValidatePathNoBacksteps(mount.SubPath)
 			if err != nil {
-				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
+				return nil, cleanupAction, err
+			}
+		}
+
+		if subPath != "" {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
+				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
+			}
+
+			if filepath.IsAbs(subPath) {
+				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
+			}
+
+			err = volumevalidation.ValidatePathNoBacksteps(subPath)
+			if err != nil {
+				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", subPath, err)
 			}
 
 			volumePath := hostPath
-			hostPath = filepath.Join(volumePath, mount.SubPath)
+			hostPath = filepath.Join(volumePath, subPath)
 
 			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
 				klog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
@@ -193,7 +206,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				if err != nil {
 					return nil, cleanupAction, err
 				}
-				if err := mounter.SafeMakeDir(mount.SubPath, volumePath, perm); err != nil {
+				if err := mounter.SafeMakeDir(subPath, volumePath, perm); err != nil {
 					// Don't pass detailed error back to the user because it could give information about host filesystem
 					klog.Errorf("failed to create subPath directory for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
 					return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)

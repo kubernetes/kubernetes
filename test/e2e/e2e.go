@@ -50,6 +50,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
 )
 
 var (

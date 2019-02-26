@@ -459,12 +459,12 @@ func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 
 	for _, samples := range ms {
 		for _, sample := range samples {
-			if sample.Metric["__name__"] == kubemetrics.KubeletSubsystem+"_"+kubemetrics.PodStartLatencyKey {
+			if sample.Metric["__name__"] == kubemetrics.KubeletSubsystem+"_"+kubemetrics.PodStartDurationKey {
 				quantile, _ := strconv.ParseFloat(string(sample.Metric["quantile"]), 64)
 				latencyMetrics = append(latencyMetrics,
 					framework.KubeletLatencyMetric{
 						Quantile: quantile,
-						Method:   kubemetrics.PodStartLatencyKey,
+						Method:   kubemetrics.PodStartDurationKey,
 						Latency:  time.Duration(int(sample.Value)) * time.Microsecond})
 			}
 		}

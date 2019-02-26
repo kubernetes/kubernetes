@@ -4,15 +4,16 @@ reviewers:
   - bentheelder
   - eparis
   - jbeda
+  - Katharine
   - mikedanese
   - roberthbailey
-  - spiffxp
   - zmerlynn
 approvers:
   - eparis
   - jbeda
   - mikedanese
   - roberthbailey
+  - spiffxp
   - zmerlynn
 labels:
 - sig/cluster-lifecycle

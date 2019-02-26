@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const (
@@ -39,10 +40,6 @@ const (
 	volIDDiskNameValue = 5
 	volIDTotalElements = 6
 
-	// LabelZoneFailureDomain is the label on PVs indicating the zone they are provisioned in
-	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
-	// LabelMultiZoneDelimiter separates zones for RePD volumes
-	LabelMultiZoneDelimiter = "__"
 	// UnspecifiedValue is used for an unknown zone string
 	UnspecifiedValue = "UNSPECIFIED"
 )
@@ -72,8 +69,8 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
-	zonesLabel := pv.Labels[LabelZoneFailureDomain]
-	zones := strings.Split(zonesLabel, LabelMultiZoneDelimiter)
+	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
+	zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)

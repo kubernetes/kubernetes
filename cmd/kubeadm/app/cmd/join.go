@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"text/template"
 
 	"github.com/lithammer/dedent"
@@ -41,9 +40,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -55,7 +51,7 @@ var (
 		* Certificate signing request was sent to apiserver and a response was received.
 		* The Kubelet was informed of the new secure connection details.
 
-		Run 'kubectl get nodes' on the master to see this node join the cluster.
+		Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
 
 		`)
 
@@ -64,7 +60,7 @@ var (
 
 		* Certificate signing request was sent to apiserver and approval was received.
 		* The Kubelet was informed of the new secure connection details.
-		* Master label and taint were applied to the new node.
+		* Control plane (master) label and taint were applied to the new node.
 		* The Kubernetes control plane instances scaled up.
 		{{.etcdMessage}}
 
@@ -81,8 +77,8 @@ var (
 	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
-		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
-		Master trust the Node).
+		trust the Kubernetes Control Plane) and TLS bootstrap (having the
+		Kubernetes Control Plane trust the Node).
 
 		There are 2 main schemes for discovery. The first is to use a shared
 		token along with the IP address of the API server. The second is to
@@ -97,8 +93,8 @@ var (
 
 		If you use a shared token for discovery, you should also pass the
 		--discovery-token-ca-cert-hash flag to validate the public key of the
-		root certificate authority (CA) presented by the Kubernetes Master. The
-		value of this flag is specified as "<hash-type>:<hex-encoded-value>",
+		root certificate authority (CA) presented by the Kubernetes Control Plane.
+		The value of this flag is specified as "<hash-type>:<hex-encoded-value>",
 		where the supported hash type is "sha256". The hash is calculated over
 		the bytes of the Subject Public Key Info (SPKI) object (as in RFC7469).
 		This value is available in the output of "kubeadm init" or can be
@@ -108,12 +104,12 @@ var (
 		If you cannot know the CA public key hash ahead of time, you can pass
 		the --discovery-token-unsafe-skip-ca-verification flag to disable this
 		verification. This weakens the kubeadm security model since other nodes
-		can potentially impersonate the Kubernetes Master.
+		can potentially impersonate the Kubernetes Control Plane.
 
 		The TLS bootstrap mechanism is also driven via a shared token. This is
-		used to temporarily authenticate with the Kubernetes Master to submit a
+		used to temporarily authenticate with the Kubernetes Control Plane to submit a
 		certificate signing request (CSR) for a locally created key pair. By
-		default, kubeadm will set up the Kubernetes Master to automatically
+		default, kubeadm will set up the Kubernetes Control Plane to automatically
 		approve these signing requests. This token is passed in with the
 		--tls-bootstrap-token abcdef.1234567890abcdef flag.
 
@@ -137,6 +133,7 @@ type joinOptions struct {
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {
 	cfg                   *kubeadmapi.JoinConfiguration
+	skipTokenPrint        bool
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
 	clientSets            map[string]*clientset.Clientset
@@ -162,16 +159,32 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 			c, err := joinRunner.InitData(args)
 			kubeadmutil.CheckErr(err)
 
+			data := c.(*joinData)
+
 			err = joinRunner.Run(args)
 			kubeadmutil.CheckErr(err)
 
-			// TODO: remove this once we have all phases in place.
-			// the method joinData.Run() itself should be removed too.
-			data := c.(*joinData)
-			err = data.Run()
-			kubeadmutil.CheckErr(err)
+			// if the node is hosting a new control plane instance
+			if data.cfg.ControlPlane != nil {
+				// outputs the join control plane done message and exit
+				etcdMessage := ""
+				if data.initCfg.Etcd.External == nil {
+					etcdMessage = "* A new etcd member was added to the local/stacked etcd cluster."
+				}
+
+				ctx := map[string]string{
+					"KubeConfigPath": data.KubeConfigPath(),
+					"etcdMessage":    etcdMessage,
+				}
+				joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
+
+			} else {
+				// otherwise, if the node joined as a worker node;
+				// outputs the join done message and exit
+				fmt.Fprintf(data.outputWriter, joinWorkerNodeDoneMsg)
+			}
 		},
-		// We accept the master location as an optional positional argument
+		// We accept the control-plane location as an optional positional argument
 		Args: cobra.MaximumNArgs(1),
 	}
 
@@ -182,6 +195,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	joinRunner.AppendPhase(phases.NewControlPlanePreparePhase())
 	joinRunner.AppendPhase(phases.NewCheckEtcdPhase())
 	joinRunner.AppendPhase(phases.NewKubeletStartPhase())
+	joinRunner.AppendPhase(phases.NewControlPlaneJoinPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -231,7 +245,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 	)
 	flagSet.StringVar(
 		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
-		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
+		`Specify the token used to temporarily authenticate with the Kubernetes Control Plane while joining the node.`,
 	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
@@ -366,6 +380,11 @@ func (j *joinData) Cfg() *kubeadmapi.JoinConfiguration {
 	return j.cfg
 }
 
+// KubeConfigPath returns the default kubeconfig path.
+func (j *joinData) KubeConfigPath() string {
+	return kubeadmconstants.GetAdminKubeConfigPath()
+}
+
 // TLSBootstrapCfg returns the cluster-info (kubeconfig).
 func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
 	if j.tlsBootstrapCfg != nil {
@@ -413,89 +432,6 @@ func (j *joinData) OutputWriter() io.Writer {
 	return j.outputWriter
 }
 
-// Run executes worker node provisioning and tries to join an existing cluster.
-func (j *joinData) Run() error {
-	// Fetch the init configuration based on the join configuration.
-	// TODO: individual phases should call these:
-	//   - phases that need initCfg should call joinData.InitCfg().
-	//   - phases that need tlsBootstrapCfg should call joinData.TLSBootstrapCfg().
-	initCfg, err := j.InitCfg()
-	if err != nil {
-		return err
-	}
-
-	// if the node is hosting a new control plane instance
-	if j.cfg.ControlPlane != nil {
-		// Completes the control plane setup
-		if err := j.PostInstallControlPlane(initCfg); err != nil {
-			return err
-		}
-
-		// outputs the join control plane done template and exits
-		etcdMessage := ""
-		// in case of local etcd
-		if initCfg.Etcd.External == nil {
-			etcdMessage = "* A new etcd member was added to the local/stacked etcd cluster."
-		}
-
-		ctx := map[string]string{
-			"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
-			"etcdMessage":    etcdMessage,
-		}
-		joinControPlaneDoneTemp.Execute(j.outputWriter, ctx)
-		return nil
-	}
-
-	// otherwise, if the node joined as a worker node;
-	// outputs the join done message and exits
-	fmt.Fprintf(j.outputWriter, joinWorkerNodeDoneMsg)
-	return nil
-}
-
-// PostInstallControlPlane marks the new node as master and update the cluster status with information about current node
-func (j *joinData) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
-	kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
-
-	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
-	}
-
-	// in case of local etcd
-	if initConfiguration.Etcd.External == nil {
-		// creates target folder if doesn't exist already
-		if err := os.MkdirAll(initConfiguration.Etcd.Local.DataDir, 0700); err != nil {
-			return errors.Wrapf(err, "failed to create etcd directory %q", initConfiguration.Etcd.Local.DataDir)
-		}
-
-		// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
-		// the existing etcd members before being created.
-		// This operation must be executed after kubelet is already started in order to minimize the time
-		// between the new etcd member is announced and the start of the static pod running the new etcd member, because during
-		// this time frame etcd gets temporary not available (only when moving from 1 to 2 members in the etcd cluster).
-		// From https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
-		// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
-		// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
-		// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the existing one."
-		klog.V(1).Info("[join] adding etcd")
-		if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), initConfiguration.NodeRegistration.Name, &initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint); err != nil {
-			return errors.Wrap(err, "error creating local etcd static pod manifest file")
-		}
-	}
-
-	klog.V(1).Info("[join] uploading currently used configuration to the cluster")
-	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
-	}
-
-	klog.V(1).Info("[join] marking the control-plane with right label")
-	if err = markcontrolplanephase.MarkControlPlane(client, initConfiguration.NodeRegistration.Name, initConfiguration.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error applying control-plane label and taints")
-	}
-
-	return nil
-}
-
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
 func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
 	// Retrieves the kubeadm configuration
@@ -530,7 +466,7 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	}
 
 	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "", true)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, os.Stdout, "join", true)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

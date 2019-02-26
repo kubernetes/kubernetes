@@ -38,9 +38,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // PersistentVolumeLabelController handles adding labels to persistent volumes when they are created
@@ -210,7 +210,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		if populateAffinity {
 			var values []string
 			if k == v1.LabelZoneFailureDomain {
-				zones, err := volumeutil.LabelZonesToSet(v)
+				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v)
 				}

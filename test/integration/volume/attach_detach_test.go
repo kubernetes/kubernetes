@@ -350,9 +350,8 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

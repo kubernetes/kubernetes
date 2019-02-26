@@ -183,6 +183,24 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testCRDDenyWebhook(f)
 	})
 
+	It("Should mutate custom resource with different stored version", func() {
+		testcrd, err := framework.CreateMultiVersionTestCRDWithV1Storage(f)
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
+		defer webhookCleanup()
+		testMultiVersionCustomResourceWebhook(f, testcrd)
+	})
+
+	It("Should deny crd creation", func() {
+		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
+		defer crdWebhookCleanup()
+
+		testCRDDenyWebhook(f)
+	})
+
 	// TODO: add more e2e tests for mutating webhooks
 	// 1. mutating webhook that mutates pod
 	// 2. mutating webhook that sends empty patch
@@ -1154,7 +1172,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 			{
 				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
 						APIVersions: testcrd.GetAPIVersions(),
@@ -1195,7 +1213,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 			{
 				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
 						APIVersions: testcrd.GetAPIVersions(),
@@ -1290,6 +1308,37 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
 	}
+}
+
+func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *framework.TestCrd) {
+	customResourceClient := testcrd.GetV1DynamicClient()
+	By("Creating a custom resource while v1 is storage version")
+	crName := "cr-instance-1"
+	cr := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       testcrd.Crd.Spec.Names.Kind,
+			"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Version,
+			"metadata": map[string]interface{}{
+				"name":      crName,
+				"namespace": f.Namespace.Name,
+			},
+			"data": map[string]interface{}{
+				"mutation-start": "yes",
+			},
+		},
+	}
+	_, err := customResourceClient.Create(cr, metav1.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred(), "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+
+	By("Patching Custom Resource Definition to set v2 as storage")
+	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
+	_, err = testcrd.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
+	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
+
+	By("Patching the custom resource while v2 is storage version")
+	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
+	_, err = testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
+	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
 }
 
 func registerValidatingWebhookForCRD(f *framework.Framework, context *certContext) func() {

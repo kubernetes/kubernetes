@@ -613,6 +613,18 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
+				}
+			}
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
+				}
+			}
 		}
 	}
 }
@@ -1340,6 +1352,11 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).Infof("Closing local ports after iptables-restore failure")
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
+	}
+	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
+		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+		metrics.NetworkProgrammingLatency.Observe(latency)
+		klog.V(4).Infof("Network programming took %f seconds", latency)
 	}
 
 	// Close old local ports and save new ones.

@@ -36,7 +36,7 @@ import (
 
 var (
 	uploadKubeadmConfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Uploads the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace. 
+		Uploads the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace.
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.

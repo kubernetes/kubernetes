@@ -34,11 +34,13 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
+// APIHandlerManager defines the behaviour that an API handler should have.
 type APIHandlerManager interface {
 	AddAPIService(apiService *apiregistration.APIService) error
 	RemoveAPIService(apiServiceName string)
 }
 
+// APIServiceRegistrationController is responsible for registering and removing API services.
 type APIServiceRegistrationController struct {
 	apiHandlerManager APIHandlerManager
 
@@ -51,6 +53,7 @@ type APIServiceRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewAPIServiceRegistrationController returns a new APIServiceRegistrationController.
 func NewAPIServiceRegistrationController(apiServiceInformer informers.APIServiceInformer, apiHandlerManager APIHandlerManager) *APIServiceRegistrationController {
 	c := &APIServiceRegistrationController{
 		apiHandlerManager: apiHandlerManager,
@@ -83,6 +86,7 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
+// Run starts APIServiceRegistrationController which will process all registration requests until stopCh is closed.
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()

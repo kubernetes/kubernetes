@@ -328,7 +328,7 @@ type certKeyLocation struct {
 }
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
-// equal across masters: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {

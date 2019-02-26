@@ -25,6 +25,7 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
+	"github.com/go-openapi/spec"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -46,6 +47,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/handler"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -122,6 +124,14 @@ type GenericAPIServer struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
+	// OpenAPIVersionedService controls the /openapi/v2 endpoint, and can be used to update the served spec.
+	// It is set during PrepareRun.
+	OpenAPIVersionedService *handler.OpenAPIService
+
+	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
+	// It is set during PrepareRun.
+	StaticOpenAPISpec *spec.Swagger
+
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error.
@@ -156,6 +166,10 @@ type GenericAPIServer struct {
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+
+	// The limit on the request body size that would be accepted and decoded in a write request.
+	// 0 means no limit.
+	maxRequestBodyBytes int64
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -235,7 +249,7 @@ type preparedGenericAPIServer struct {
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIConfig != nil {
-		routes.OpenAPI{
+		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}
@@ -336,6 +350,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 		apiGroupVersion.OpenAPIModels = openAPIModels
+		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)

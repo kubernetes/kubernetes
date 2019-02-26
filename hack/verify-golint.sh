@@ -36,18 +36,6 @@ go install k8s.io/kubernetes/vendor/golang.org/x/lint/golint
 
 cd "${KUBE_ROOT}"
 
-array_contains () {
-    local seeking=$1; shift # shift will iterate through the array
-    local in=1 # in holds the exit status for the function
-    for element; do
-        if [[ "$element" == "$seeking" ]]; then
-            in=0 # set in to 0 since we found it
-            break
-        fi
-    done
-    return $in
-}
-
 # Check that the file is in alphabetical order
 failure_file="${KUBE_ROOT}/hack/.golint_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
@@ -76,7 +64,7 @@ for p in "${all_packages[@]}"; do
   # Ref: https://github.com/kubernetes/kubernetes/pull/67675
   # Ref: https://github.com/golang/lint/issues/68
   failedLint=$(ls "$p"/*.go | egrep -v "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
-  array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
+  kube::util::array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
     errors+=( "${failedLint}" )
   fi
@@ -88,7 +76,7 @@ done
 # Check that all failing_packages actually still exist
 gone=()
 for p in "${failing_packages[@]}"; do
-  array_contains "$p" "${all_packages[@]}" || gone+=( "$p" )
+  kube::util::array_contains "$p" "${all_packages[@]}" || gone+=( "$p" )
 done
 
 # Check to be sure all the packages that should pass lint are.

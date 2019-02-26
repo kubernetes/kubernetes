@@ -54,7 +54,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -733,14 +732,6 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
 	return framework.PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
 }
 
-func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
-	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
-	if err != nil {
-		return 0, err
-	}
-	return defaultSvc.Spec.Ports[0].NodePort, nil
-}
-
 // GetIngressNodePorts returns related backend services' nodePorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
@@ -753,14 +744,14 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 	return nodePorts
 }
 
-// GetIngressNodePorts returns related backend services' svcPorts.
+// GetServicePorts returns related backend services' svcPorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
 func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
 	svcPorts := make(map[string]v1.ServicePort)
 	if includeDefaultBackend {
 		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		svcPorts[defaultBackendName] = defaultSvc.Spec.Ports[0]
 	}
 
@@ -775,7 +766,7 @@ func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]
 	}
 	for _, svcName := range backendSvcs {
 		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
 	return svcPorts

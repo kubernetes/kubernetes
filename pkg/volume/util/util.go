@@ -18,14 +18,11 @@ package util
 
 import (
 	"fmt"
-	"hash/fnv"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,11 +47,6 @@ import (
 )
 
 const (
-	// GB - GigaByte size
-	GB = 1000 * 1000 * 1000
-	// GIB - GibiByte size
-	GIB = 1024 * 1024 * 1024
-
 	readyFileName = "ready"
 
 	// ControllerManagedAttachAnnotation is the key of the annotation on Node
@@ -73,20 +65,7 @@ const (
 	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
-
-	// LabelMultiZoneDelimiter separates zones for volumes
-	LabelMultiZoneDelimiter = "__"
 )
-
-// VolumeZoneConfig contains config information about zonal volume.
-type VolumeZoneConfig struct {
-	ZonePresent                bool
-	ZonesPresent               bool
-	ReplicaZoneFromNodePresent bool
-	Zone                       string
-	Zones                      string
-	ReplicaZoneFromNode        string
-}
 
 // IsReady checks for the existence of a regular file
 // called 'ready' in the given directory and returns
@@ -219,174 +198,6 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// SelectZoneForVolume is a wrapper around SelectZonesForVolume
-// to select a single zone for a volume based on parameters
-func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
-	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcName, 1)
-	if err != nil {
-		return "", err
-	}
-	zone, ok := zones.PopAny()
-	if !ok {
-		return "", fmt.Errorf("could not determine a zone to provision volume in")
-	}
-	return zone, nil
-}
-
-// SelectZonesForVolume selects zones for a volume based on several factors:
-// node.zone, allowedTopologies, zone/zones parameters from storageclass,
-// zones with active nodes from the cluster. The number of zones = replicas.
-func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.String, error) {
-	if zoneParameterPresent && zonesParameterPresent {
-		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
-	}
-
-	var zoneFromNode string
-	// pick one zone from node if present
-	if node != nil {
-		// VolumeScheduling implicit since node is not nil
-		if zoneParameterPresent || zonesParameterPresent {
-			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones")
-		}
-
-		// pick node's zone for one of the replicas
-		var ok bool
-		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		if !ok {
-			return nil, fmt.Errorf("%s Label for node missing", v1.LabelZoneFailureDomain)
-		}
-		// if single replica volume and node with zone found, return immediately
-		if numReplicas == 1 {
-			return sets.NewString(zoneFromNode), nil
-		}
-	}
-
-	// pick zone from allowedZones if specified
-	allowedZones, err := ZonesFromAllowedTopologies(allowedTopologies)
-	if err != nil {
-		return nil, err
-	}
-
-	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
-		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomain)
-	}
-
-	if allowedZones.Len() > 0 {
-		// VolumeScheduling implicit since allowedZones present
-		if zoneParameterPresent || zonesParameterPresent {
-			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
-		}
-		// scheduler will guarantee if node != null above, zoneFromNode is member of allowedZones.
-		// so if zoneFromNode != "", we can safely assume it is part of allowedZones.
-		zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas)
-		if err != nil {
-			return nil, fmt.Errorf("cannot process zones in allowedTopologies: %v", err)
-		}
-		return zones, nil
-	}
-
-	// pick zone from parameters if present
-	if zoneParameterPresent {
-		if numReplicas > 1 {
-			return nil, fmt.Errorf("zone cannot be specified if desired number of replicas for pv is greather than 1. Please specify zones or allowedTopologies to specify desired zones")
-		}
-		return sets.NewString(zoneParameter), nil
-	}
-
-	if zonesParameterPresent {
-		if uint32(zonesParameter.Len()) < numReplicas {
-			return nil, fmt.Errorf("not enough zones found in zones parameter to provision a volume with %d replicas. Found %d zones, need %d zones", numReplicas, zonesParameter.Len(), numReplicas)
-		}
-		// directly choose from zones parameter; no zone from node need to be considered
-		return ChooseZonesForVolume(zonesParameter, pvcName, numReplicas), nil
-	}
-
-	// pick zone from zones with nodes
-	if zonesWithNodes.Len() > 0 {
-		// If node != null (and thus zoneFromNode != ""), zoneFromNode will be member of zonesWithNodes
-		zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas)
-		if err != nil {
-			return nil, fmt.Errorf("cannot process zones where nodes exist in the cluster: %v", err)
-		}
-		return zones, nil
-	}
-	return nil, fmt.Errorf("cannot determine zones to provision volume in")
-}
-
-// ZonesFromAllowedTopologies returns a list of zones specified in allowedTopologies
-func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (sets.String, error) {
-	zones := make(sets.String)
-	for _, term := range allowedTopologies {
-		for _, exp := range term.MatchLabelExpressions {
-			if exp.Key == v1.LabelZoneFailureDomain {
-				for _, value := range exp.Values {
-					zones.Insert(value)
-				}
-			} else {
-				return nil, fmt.Errorf("unsupported key found in matchLabelExpressions: %s", exp.Key)
-			}
-		}
-	}
-	return zones, nil
-}
-
-// ZonesSetToLabelValue converts zones set to label value
-func ZonesSetToLabelValue(strSet sets.String) string {
-	return strings.Join(strSet.UnsortedList(), LabelMultiZoneDelimiter)
-}
-
-// ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
-	zones, err := stringToSet(zonesString, ",")
-	if err != nil {
-		return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", zonesString, err)
-	}
-	return zones, nil
-}
-
-// LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
-func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
-	return stringToSet(labelZonesValue, LabelMultiZoneDelimiter)
-}
-
-// StringToSet converts a string containing list separated by specified delimiter to a set
-func stringToSet(str, delimiter string) (sets.String, error) {
-	zonesSlice := strings.Split(str, delimiter)
-	zonesSet := make(sets.String)
-	for _, zone := range zonesSlice {
-		trimmedZone := strings.TrimSpace(zone)
-		if trimmedZone == "" {
-			return make(sets.String), fmt.Errorf(
-				"%q separated list (%q) must not contain an empty string",
-				delimiter,
-				str)
-		}
-		zonesSet.Insert(trimmedZone)
-	}
-	return zonesSet, nil
-}
-
-// LabelZonesToList converts a PV label value from string containing a delimited list of zones to list
-func LabelZonesToList(labelZonesValue string) ([]string, error) {
-	return stringToList(labelZonesValue, LabelMultiZoneDelimiter)
-}
-
-// StringToList converts a string containing list separated by specified delimiter to a list
-func stringToList(str, delimiter string) ([]string, error) {
-	zonesSlice := make([]string, 0)
-	for _, zone := range strings.Split(str, delimiter) {
-		trimmedZone := strings.TrimSpace(zone)
-		if trimmedZone == "" {
-			return nil, fmt.Errorf(
-				"%q separated list (%q) must not contain an empty string",
-				delimiter,
-				str)
-		}
-		zonesSlice = append(zonesSlice, trimmedZone)
-	}
-	return zonesSlice, nil
-}
-
 // CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
 // recycle operation. The calculation and return value is either the
 // minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is
@@ -401,57 +212,6 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 		return int64(minimumTimeout)
 	}
 	return timeout
-}
-
-// RoundUpSize calculates how many allocation units are needed to accommodate
-// a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
-// allocates volumes in gibibyte-sized chunks,
-// RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
-// (2 GiB is the smallest allocatable volume that can hold 1500MiB)
-func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
-	roundedUp := volumeSizeBytes / allocationUnitBytes
-	if volumeSizeBytes%allocationUnitBytes > 0 {
-		roundedUp++
-	}
-	return roundedUp
-}
-
-// RoundUpToGB rounds up given quantity to chunks of GB
-func RoundUpToGB(size resource.Quantity) int64 {
-	requestBytes := size.Value()
-	return RoundUpSize(requestBytes, GB)
-}
-
-// RoundUpToGiB rounds up given quantity upto chunks of GiB
-func RoundUpToGiB(size resource.Quantity) int64 {
-	requestBytes := size.Value()
-	return RoundUpSize(requestBytes, GIB)
-}
-
-// RoundUpSizeInt calculates how many allocation units are needed to accommodate
-// a volume of given size. It returns an int instead of an int64 and an error if
-// there's overflow
-func RoundUpSizeInt(volumeSizeBytes int64, allocationUnitBytes int64) (int, error) {
-	roundedUp := RoundUpSize(volumeSizeBytes, allocationUnitBytes)
-	roundedUpInt := int(roundedUp)
-	if int64(roundedUpInt) != roundedUp {
-		return 0, fmt.Errorf("capacity %v is too great, casting results in integer overflow", roundedUp)
-	}
-	return roundedUpInt, nil
-}
-
-// RoundUpToGBInt rounds up given quantity to chunks of GB. It returns an
-// int instead of an int64 and an error if there's overflow
-func RoundUpToGBInt(size resource.Quantity) (int, error) {
-	requestBytes := size.Value()
-	return RoundUpSizeInt(requestBytes, GB)
-}
-
-// RoundUpToGiBInt rounds up given quantity upto chunks of GiB. It returns an
-// int instead of an int64 and an error if there's overflow
-func RoundUpToGiBInt(size resource.Quantity) (int, error) {
-	requestBytes := size.Value()
-	return RoundUpSizeInt(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function
@@ -477,148 +237,6 @@ func GetPath(mounter volume.Mounter) (string, error) {
 		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
 	}
 	return path, nil
-}
-
-// ChooseZoneForVolume  implements our heuristics for choosing a zone for volume creation based on the volume name
-// Volumes are generally round-robin-ed across all active zones, using the hash of the PVC Name.
-// However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
-// This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
-// assuming the id values are consecutive.
-func ChooseZoneForVolume(zones sets.String, pvcName string) string {
-	// No zones available, return empty string.
-	if zones.Len() == 0 {
-		return ""
-	}
-
-	// We create the volume in a zone determined by the name
-	// Eventually the scheduler will coordinate placement into an available zone
-	hash, index := getPVCNameHashAndIndexOffset(pvcName)
-
-	// Zones.List returns zones in a consistent order (sorted)
-	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during StatefulSet volume creation.  However, this is
-	// probably relatively unlikely because we expect the set of zones to be essentially
-	// static for clusters.
-	// Hopefully we can address this problem if/when we do full scheduler integration of
-	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
-	// unhealthy zones)
-	zoneSlice := zones.List()
-	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
-
-	klog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
-	return zone
-}
-
-// chooseZonesForVolumeIncludingZone is a wrapper around ChooseZonesForVolume that ensures zoneToInclude is chosen
-// zoneToInclude can either be empty in which case it is ignored. If non-empty, zoneToInclude is expected to be member of zones.
-// numReplicas is expected to be > 0 and <= zones.Len()
-func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
-	if numReplicas == 0 {
-		return nil, fmt.Errorf("invalid number of replicas passed")
-	}
-	if uint32(zones.Len()) < numReplicas {
-		return nil, fmt.Errorf("not enough zones found to provision a volume with %d replicas. Need at least %d distinct zones for a volume with %d replicas", numReplicas, numReplicas, numReplicas)
-	}
-	if zoneToInclude != "" && !zones.Has(zoneToInclude) {
-		return nil, fmt.Errorf("zone to be included: %s needs to be member of set: %v", zoneToInclude, zones)
-	}
-	if uint32(zones.Len()) == numReplicas {
-		return zones, nil
-	}
-	if zoneToInclude != "" {
-		zones.Delete(zoneToInclude)
-		numReplicas = numReplicas - 1
-	}
-	zonesChosen := ChooseZonesForVolume(zones, pvcName, numReplicas)
-	if zoneToInclude != "" {
-		zonesChosen.Insert(zoneToInclude)
-	}
-	return zonesChosen, nil
-}
-
-// ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
-func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
-	// No zones available, return empty set.
-	replicaZones := sets.NewString()
-	if zones.Len() == 0 {
-		return replicaZones
-	}
-
-	// We create the volume in a zone determined by the name
-	// Eventually the scheduler will coordinate placement into an available zone
-	hash, index := getPVCNameHashAndIndexOffset(pvcName)
-
-	// Zones.List returns zones in a consistent order (sorted)
-	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during StatefulSet volume creation.  However, this is
-	// probably relatively unlikely because we expect the set of zones to be essentially
-	// static for clusters.
-	// Hopefully we can address this problem if/when we do full scheduler integration of
-	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
-	// unhealthy zones)
-	zoneSlice := zones.List()
-
-	startingIndex := index * numZones
-	for index = startingIndex; index < startingIndex+numZones; index++ {
-		zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
-		replicaZones.Insert(zone)
-	}
-
-	klog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
-		pvcName, replicaZones.UnsortedList(), zoneSlice)
-	return replicaZones
-}
-
-func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
-	if pvcName == "" {
-		// We should always be called with a name; this shouldn't happen
-		klog.Warningf("No name defined during volume create; choosing random zone")
-
-		hash = rand.Uint32()
-	} else {
-		hashString := pvcName
-
-		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
-		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
-		// where Id is an integer index.
-		// Note though that if a StatefulSet pod has multiple claims, we need them to be
-		// in the same zone, because otherwise the pod will be unable to mount both volumes,
-		// and will be unschedulable.  So we hash _only_ the "StatefulSetName" portion when
-		// it looks like `ClaimName-StatefulSetName-Id`.
-		// We continue to round-robin volume names that look like `Name-Id` also; this is a useful
-		// feature for users that are creating statefulset-like functionality without using statefulsets.
-		lastDash := strings.LastIndexByte(pvcName, '-')
-		if lastDash != -1 {
-			statefulsetIDString := pvcName[lastDash+1:]
-			statefulsetID, err := strconv.ParseUint(statefulsetIDString, 10, 32)
-			if err == nil {
-				// Offset by the statefulsetID, so we round-robin across zones
-				index = uint32(statefulsetID)
-				// We still hash the volume name, but only the prefix
-				hashString = pvcName[:lastDash]
-
-				// In the special case where it looks like `ClaimName-StatefulSetName-Id`,
-				// hash only the StatefulSetName, so that different claims on the same StatefulSet
-				// member end up in the same zone.
-				// Note that StatefulSetName (and ClaimName) might themselves both have dashes.
-				// We actually just take the portion after the final - of ClaimName-StatefulSetName.
-				// For our purposes it doesn't much matter (just suboptimal spreading).
-				lastDash := strings.LastIndexByte(hashString, '-')
-				if lastDash != -1 {
-					hashString = hashString[lastDash+1:]
-				}
-
-				klog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
-			}
-		}
-
-		// We hash the (base) volume name, so we don't bias towards the first N zones
-		h := fnv.New32()
-		h.Write([]byte(hashString))
-		hash = h.Sum32()
-	}
-
-	return hash, index
 }
 
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
@@ -667,16 +285,6 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.List()
-}
-
-// ValidateZone returns:
-// - an error in case zone is an empty string or contains only any combination of spaces and tab characters
-// - nil otherwise
-func ValidateZone(zone string) error {
-	if strings.TrimSpace(zone) == "" {
-		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
-	}
-	return nil
 }
 
 // AccessModesContains returns whether the requested mode is contained by modes

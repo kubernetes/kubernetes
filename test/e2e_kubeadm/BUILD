@@ -1,6 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load(
+    "//build:go.bzl",
+    go_test = "go_test_conditional_pure",
+)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_test(
     name = "go_default_test",
@@ -8,6 +12,7 @@ go_test(
         "e2e_kubeadm_suite_test.go",
         "kubeadm_test.go",
     ],
+    out = "e2e_kubeadm.test",
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
@@ -30,15 +35,6 @@ filegroup(
     srcs = glob(["**"]),
     tags = ["automanaged"],
     visibility = ["//visibility:private"],
-)
-
-genrule(
-    name = "gen_e2e_kubeadm.test",
-    testonly = 1,
-    srcs = [":go_default_test"],
-    outs = ["e2e_kubeadm.test"],
-    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
-    output_to_bindir = 1,
 )
 
 filegroup(

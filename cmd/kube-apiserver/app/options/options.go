@@ -25,7 +25,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -47,7 +47,6 @@ type ServerRunOptions struct {
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
-	StorageSerialization    *kubeoptions.StorageSerializationOptions
 	APIEnablement           *genericoptions.APIEnablementOptions
 
 	AllowPrivileged           bool
@@ -87,7 +86,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
-		StorageSerialization:    kubeoptions.NewStorageSerializationOptions(),
 		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
@@ -123,7 +121,7 @@ func NewServerRunOptions() *ServerRunOptions {
 }
 
 // Flags returns flags for a specific APIServer by section name
-func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
+func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
 	s.Etcd.AddFlags(fss.FlagSet("etcd"))
@@ -135,7 +133,6 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
-	s.StorageSerialization.AddFlags(fss.FlagSet("storage"))
 	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 

@@ -31,7 +31,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
@@ -263,7 +263,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
 	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", utilflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
 		kc.FeatureGates = framework.TestContext.FeatureGates
 	}
 

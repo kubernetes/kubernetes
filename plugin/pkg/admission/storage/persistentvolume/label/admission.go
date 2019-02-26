@@ -27,12 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	vol "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -59,6 +59,7 @@ type persistentVolumeLabel struct {
 	gcePVLabeler       cloudprovider.PVLabeler
 	azurePVLabeler     cloudprovider.PVLabeler
 	openStackPVLabeler cloudprovider.PVLabeler
+	vspherePVLabeler   cloudprovider.PVLabeler
 }
 
 var _ admission.MutationInterface = &persistentVolumeLabel{}
@@ -96,7 +97,7 @@ func nodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []api.NodeSelector
 	return false
 }
 
-func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
+func (l *persistentVolumeLabel) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
 		return nil
 	}
@@ -138,7 +139,13 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 		}
 		volumeLabels = labels
 	}
-
+	if volume.Spec.VsphereVolume != nil {
+		labels, err := l.findVsphereVolumeLabels(volume)
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("error querying vSphere Volume %s: %v", volume.Spec.VsphereVolume.VolumePath, err))
+		}
+		volumeLabels = labels
+	}
 	requirements := make([]api.NodeSelectorRequirement, 0)
 	if len(volumeLabels) != 0 {
 		if volume.Labels == nil {
@@ -153,7 +160,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 			// Set NodeSelectorRequirements based on the labels
 			var values []string
 			if k == v1.LabelZoneFailureDomain {
-				zones, err := volumeutil.LabelZonesToSet(v)
+				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
 				}
@@ -192,7 +199,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.AWSElasticBlockStore.VolumeID == vol.ProvisionedVolumeName {
+	if volume.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 	pvlabler, err := l.getAWSPVLabeler()
@@ -240,7 +247,7 @@ func (l *persistentVolumeLabel) getAWSPVLabeler() (cloudprovider.PVLabeler, erro
 
 func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.GCEPersistentDisk.PDName == vol.ProvisionedVolumeName {
+	if volume.Spec.GCEPersistentDisk.PDName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -315,7 +322,7 @@ func (l *persistentVolumeLabel) getAzurePVLabeler() (cloudprovider.PVLabeler, er
 
 func (l *persistentVolumeLabel) findAzureDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.AzureDisk.DiskName == vol.ProvisionedVolumeName {
+	if volume.Spec.AzureDisk.DiskName == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -364,7 +371,7 @@ func (l *persistentVolumeLabel) getOpenStackPVLabeler() (cloudprovider.PVLabeler
 
 func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if volume.Spec.Cinder.VolumeID == vol.ProvisionedVolumeName {
+	if volume.Spec.Cinder.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -383,4 +390,49 @@ func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolum
 	}
 	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
 
+}
+
+func (l *persistentVolumeLabel) findVsphereVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	pvlabler, err := l.getVspherePVLabeler()
+	if err != nil {
+		return nil, err
+	}
+	if pvlabler == nil {
+		return nil, fmt.Errorf("unable to build vSphere cloud provider")
+	}
+
+	pv := &v1.PersistentVolume{}
+	err = k8s_api_v1.Convert_core_PersistentVolume_To_v1_PersistentVolume(volume, pv, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
+	}
+	labels, err := pvlabler.GetLabelsForVolume(context.TODO(), pv)
+	if err != nil {
+		return nil, err
+	}
+
+	return labels, nil
+}
+
+func (l *persistentVolumeLabel) getVspherePVLabeler() (cloudprovider.PVLabeler, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if l.vspherePVLabeler == nil {
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+		cloudProvider, err := cloudprovider.GetCloudProvider("vsphere", cloudConfigReader)
+		if err != nil || cloudProvider == nil {
+			return nil, err
+		}
+		vspherePVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
+		if !ok {
+			// GetCloudProvider failed
+			return nil, errors.New("vSphere Cloud Provider does not implement PV labeling")
+		}
+		l.vspherePVLabeler = vspherePVLabeler
+	}
+	return l.vspherePVLabeler, nil
 }

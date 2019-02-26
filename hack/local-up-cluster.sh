@@ -116,6 +116,9 @@ START_MODE=${START_MODE:-"all"}
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 
+# Audit policy
+AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -477,7 +480,6 @@ function generate_certs {
     kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" ${API_HOST_IP} ${API_HOST} ${FIRST_SERVICE_CLUSTER_IP}
 
     # Create client certs signed with client-ca, given id, given CN and a number of groups
-    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' controller system:kube-controller-manager
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler  system:kube-scheduler
@@ -490,6 +492,11 @@ function generate_certs {
     # TODO remove masters and add rolebinding
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+}
+
+function generate_kubelet_certs {
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
 }
 
 function start_apiserver {
@@ -552,6 +559,17 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
+    if [[ -n "${AUDIT_POLICY_FILE}" ]]; then
+      cat <<EOF > /tmp/kube-audit-policy-file
+# Log all requests at the Metadata level.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+- level: Metadata
+EOF
+      AUDIT_POLICY_FILE="/tmp/kube-audit-policy-file"
+    fi
+
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
@@ -559,6 +577,8 @@ function start_apiserver {
       ${node_port_range} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
+      --audit-policy-file="${AUDIT_POLICY_FILE}" \
+      --audit-log-path=${LOG_DIR}/kube-apiserver-audit.log \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
@@ -598,7 +618,6 @@ function start_apiserver {
     # Create kubeconfigs for all components, using client certs
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
     ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
-    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
@@ -780,6 +799,10 @@ function start_kubelet {
       --port="${KUBELET_PORT}"
       ${KUBELET_FLAGS}
     )
+
+    if [[ "${REUSE_CERTS}" != true ]]; then
+        generate_kubelet_certs
+    fi
 
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &

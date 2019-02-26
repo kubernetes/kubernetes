@@ -23,13 +23,8 @@ const (
 
 	LabelInstanceType = "beta.kubernetes.io/instance-type"
 
-	LabelOS   = "kubernetes.io/os"
-	LabelArch = "kubernetes.io/arch"
-	// The OS/Arch labels are promoted to GA in 1.14. kubelet applies both beta
-	// and GA labels to ensure backward compatibility.
-	// TODO: stop applying the beta OS/Arch labels in Kubernetes 1.17.
-	LegacyLabelOS   = "beta.kubernetes.io/os"
-	LegacyLabelArch = "beta.kubernetes.io/arch"
+	LabelOSStable   = "kubernetes.io/os"
+	LabelArchStable = "kubernetes.io/arch"
 
 	// LabelNamespaceSuffixKubelet is an allowed label namespace suffix kubelets can self-set ([*.]kubelet.kubernetes.io/*)
 	LabelNamespaceSuffixKubelet = "kubelet.kubernetes.io"

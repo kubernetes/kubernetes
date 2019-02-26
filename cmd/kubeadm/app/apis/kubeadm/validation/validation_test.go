@@ -354,7 +354,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
-		{"invalid missing master configuration",
+		{"invalid missing InitConfiguration",
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
@@ -400,7 +400,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 			}, false},
-		{"valid master configuration with incorrect IPv4 pod subnet",
+		{"valid InitConfiguration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
 				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -416,7 +416,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
-		{"valid master configuration with IPv4 service subnet",
+		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
 				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -463,7 +463,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
-		{"valid master configuration using IPv6 service subnet",
+		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
 				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",

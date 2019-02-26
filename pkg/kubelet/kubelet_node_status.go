@@ -37,6 +37,7 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -133,6 +134,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	requiresUpdate := false
 	for k := range node.Status.Capacity {
 		if v1helper.IsExtendedResourceName(k) {
+			klog.Infof("Zero out resource %s capacity in existing node.", k)
 			node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			requiresUpdate = true
@@ -148,10 +150,10 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelZoneFailureDomain,
 		v1.LabelZoneRegion,
 		v1.LabelInstanceType,
-		v1.LabelOS,
-		v1.LabelArch,
-		v1.LegacyLabelOS,
-		v1.LegacyLabelArch,
+		v1.LabelOSStable,
+		v1.LabelArchStable,
+		kubeletapis.LabelOS,
+		kubeletapis.LabelArch,
 	}
 
 	needsUpdate := false
@@ -214,11 +216,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				v1.LabelHostname:   kl.hostname,
-				v1.LabelOS:         goruntime.GOOS,
-				v1.LabelArch:       goruntime.GOARCH,
-				v1.LegacyLabelOS:   goruntime.GOOS,
-				v1.LegacyLabelArch: goruntime.GOARCH,
+				v1.LabelHostname:      kl.hostname,
+				v1.LabelOSStable:      goruntime.GOOS,
+				v1.LabelArchStable:    goruntime.GOARCH,
+				kubeletapis.LabelOS:   goruntime.GOOS,
+				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -426,6 +428,23 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	now := kl.clock.Now()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) && now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+			// We must mark the volumes as ReportedInUse in volume manager's dsw even
+			// if no changes were made to the node status (no volumes were added or removed
+			// from the VolumesInUse list).
+			//
+			// The reason is that on a kubelet restart, the volume manager's dsw is
+			// repopulated and the volume ReportedInUse is initialized to false, while the
+			// VolumesInUse list from the Node object still contains the state from the
+			// previous kubelet instantiation.
+			//
+			// Once the volumes are added to the dsw, the ReportedInUse field needs to be
+			// synced from the VolumesInUse list in the Node.Status.
+			//
+			// The MarkVolumesAsReportedInUse() call cannot be performed in dsw directly
+			// because it does not have access to the Node object.
+			// This also cannot be populated on node status manager init because the volume
+			// may not have been added to dsw at that time.
+			kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 			return nil
 		}
 	}

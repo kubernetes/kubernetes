@@ -123,6 +123,12 @@ function validate-hash {
   fi
 }
 
+# Get default service account credentials of the VM.
+function get-credentials {
+  curl "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+}
+
 # Retry a download until we get it. Takes a hash and a set of URLs.
 #
 # $1 is the sha1 of the URL. Can be "" if the sha1 is unknown.
@@ -136,7 +142,12 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
+      # if the url belongs to GCS API we should use oauth2_token in the headers
+      local curl_headers=""
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]]; then
+        curl_headers="Authorization: Bearer $(get-credentials)"
+      fi
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="

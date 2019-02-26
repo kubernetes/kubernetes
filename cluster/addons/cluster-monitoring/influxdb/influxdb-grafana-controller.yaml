@@ -49,7 +49,6 @@ spec:
             mountPath: /data
         - name: grafana
           image: k8s.gcr.io/heapster-grafana-amd64:v4.4.3
-          env:
           resources:
             # keep request = limit to keep this container in guaranteed class
             limits:
