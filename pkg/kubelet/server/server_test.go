@@ -115,7 +115,7 @@ func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) 
 	return fk.machineInfoFunc()
 }
 
-func (_ *fakeKubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
+func (*fakeKubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return &cadvisorapi.VersionInfo{}, nil
 }
 
@@ -249,23 +249,23 @@ func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types
 }
 
 // Unused functions
-func (_ *fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
-func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
-func (_ *fakeKubelet) GetPodCgroupRoot() string                         { return "" }
-func (_ *fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
+func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
+func (*fakeKubelet) GetPodCgroupRoot() string                         { return "" }
+func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
 }
 
-func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
-func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
-func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
-func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
-func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
+func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
+func (*fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
+func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
-func (_ *fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	return nil, nil
 }
 
@@ -744,7 +744,7 @@ func TestAuthFilters(t *testing.T) {
 The kubelet API has likely registered a handler for a new path.
 If the new path has a use case for partitioned authorization when requested from the kubelet API,
 add a specific subresource for it in auth.go#GetRequestAttributes() and in TestAuthFilters().
-Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters().`, path))
+Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters()`, path))
 		}
 	}
 	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
@@ -1553,9 +1553,8 @@ func TestServePortForward(t *testing.T) {
 			if test.redirect {
 				assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
 				return
-			} else {
-				assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 			}
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
 			require.NoError(t, err, "creating streaming connection")
