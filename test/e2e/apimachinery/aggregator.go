@@ -57,7 +57,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want cleanTest to happen before the namespace cleanup AfterEach
 	// inserted by NewDefaultFramework, so we put this AfterEach in front
 	// of NewDefaultFramework.
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
 	})
 
@@ -66,13 +66,13 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
 	// after NewDefaultFramework.
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		aggrclient = f.AggregatorClient
 	})
 
-	It("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
+	ginkgo.It("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Make sure the relevant provider supports Aggregator
 		framework.SkipUnlessServerVersionGTE(serverAggregatorVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke")
@@ -99,7 +99,7 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 // TestSampleAPIServer a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(f *framework.Framework, image string) {
-	By("Registering the sample API server.")
+	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 	aggrclient := f.AggregatorClient
