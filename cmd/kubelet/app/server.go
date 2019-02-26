@@ -508,9 +508,20 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		klog.Errorf("unable to register KubeletConfiguration with configz, error: %v", err)
 	}
 
+	// TODO(v1.17.0): Remove --register-node, it is deprecated
+	// AND --register-node and --kubeconfig to support the case where someone
+	// could be providing --kubeconfig, but intentionally setting --register-node
+	// to false to skip registration.
+	// This gives them time to stop setting both --kubeconfig and --register-node.
+
+	// TODO(mtaufen): mikedanese also brought up the scenario where a user might be
+	// setting RegisterNode to false so they can independently create their own Node
+	// object, but would still want the Kubelet to send updates after that Node object
+	// is created. Does that block this forever?
+
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
-	if len(s.KubeConfig) > 0 {
+	if s.RegisterNode && len(s.KubeConfig) > 0 {
 		standaloneMode = false
 	}
 
@@ -1004,7 +1015,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
-		kubeServer.RegisterNode,
+		kubeDeps.KubeClient != nil,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
 		kubeServer.RemoteRuntimeEndpoint,
