@@ -82,7 +82,18 @@ func TestApplyStripsFields(t *testing.T) {
 			"uid": "b",
 			"clusterName": "b",
 			"generation": 0,
-			"managedFields": [],
+			"managedFields": [{
+					"manager": "apply",
+					"operation": "Apply",
+					"apiVersion": "v1",
+					"fields": {
+						"f:metadata": {
+							"f:labels": {
+								"f:test-label": {}
+							}
+						}
+					}
+				}],
 			"resourceVersion": "b"
 		}
 	}`), false)
