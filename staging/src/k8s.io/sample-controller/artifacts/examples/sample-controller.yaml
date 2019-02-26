@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wardle
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: wardle-controller
+  namespace: wardle
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wardle-controller-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # TODO: bind to the ClusterRole that meets the minimum permissions requirements
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: wardle-controller
+  namespace: wardle
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wardle-controller
+  namespace: wardle
+  labels:
+    controller: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      controller: "true"
+  template:
+    metadata:
+      labels:
+        controller: "true"
+    spec:
+      serviceAccountName: wardle-controller
+      containers:
+      - name: wardle-controller
+        image: kube-sample-controller:latest
+        imagePullPolicy: Never
+        command: [ "/kube-sample-controller" ]
