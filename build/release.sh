@@ -43,3 +43,5 @@ fi
 kube::build::copy_output
 
 kube::release::package_tarballs
+
+kube::build::delete_kubebuild

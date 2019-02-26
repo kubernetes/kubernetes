@@ -738,3 +738,12 @@ function kube::build::copy_output() {
 
   kube::build::stop_rsyncd_container
 }
+
+# Clean up kube-build container and image after building.
+function kube::build::delete_kubebuild() {
+  kube::log::status "Deleting kube-build container ${KUBE_DATA_CONTAINER_NAME}"
+  "${DOCKER[@]}" rm "${KUBE_DATA_CONTAINER_NAME}" &>/dev/null || true
+
+  kube::log::status "Deleting kube-build image ${KUBE_BUILD_IMAGE}"
+  "${DOCKER[@]}" rmi "${KUBE_BUILD_IMAGE}" &>/dev/null || true
+}
