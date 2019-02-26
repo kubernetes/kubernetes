@@ -455,12 +455,19 @@ func (p *criStatsProvider) makeContainerStats(
 		if usageNanoCores != nil {
 			result.CPU.UsageNanoCores = usageNanoCores
 		}
+	} else {
+		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.CPU.UsageCoreNanoSeconds = Uint64Ptr(0)
+		result.CPU.UsageNanoCores = Uint64Ptr(0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
 		if stats.Memory.WorkingSetBytes != nil {
 			result.Memory.WorkingSetBytes = &stats.Memory.WorkingSetBytes.Value
 		}
+	} else {
+		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.Memory.WorkingSetBytes = Uint64Ptr(0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -516,13 +523,21 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		if usageNanoCores != nil {
 			result.CPU.UsageNanoCores = usageNanoCores
 		}
+	} else {
+		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.CPU.UsageCoreNanoSeconds = Uint64Ptr(0)
+		result.CPU.UsageNanoCores = Uint64Ptr(0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
 		if stats.Memory.WorkingSetBytes != nil {
 			result.Memory.WorkingSetBytes = &stats.Memory.WorkingSetBytes.Value
 		}
+	} else {
+		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.Memory.WorkingSetBytes = Uint64Ptr(0)
 	}
+
 	return result
 }
 
