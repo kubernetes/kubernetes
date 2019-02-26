@@ -78,7 +78,6 @@ func TestApplyStripsFields(t *testing.T) {
 			"name": "b",
 			"namespace": "b",
 			"creationTimestamp": "2016-05-19T09:59:00Z",
-			"deletionTimestamp": "2016-05-19T09:59:00Z",
 			"selfLink": "b",
 			"uid": "b",
 			"clusterName": "b",
