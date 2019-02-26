@@ -113,6 +113,7 @@ try {
   Set-PodCidr
   Configure-HostNetworkingService
   Configure-CniNetworking
+  Configure-GcePdTools
   Configure-Kubelet
 
   Start-WorkerServices
