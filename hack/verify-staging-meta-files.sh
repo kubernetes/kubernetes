@@ -18,9 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-staging_repos=($(ls "${KUBE_ROOT}/staging/src/k8s.io/"))
+IFS=" " read -r -a staging_repos <<< "$(ls "${KUBE_ROOT}/staging/src/k8s.io/")"
 
 expected_filenames=(
   .github/PULL_REQUEST_TEMPLATE.md
@@ -36,8 +36,8 @@ exceptions=(
 )
 
 RESULT=0
-for repo in ${staging_repos[@]}; do
-  for filename in ${expected_filenames[@]}; do
+for repo in "${staging_repos[@]}"; do
+  for filename in "${expected_filenames[@]}"; do
     if echo " ${exceptions[*]} " | grep -F " ${repo}/${filename} " >/dev/null; then
       continue
     elif [ ! -f "${KUBE_ROOT}/staging/src/k8s.io/${repo}/${filename}" ]; then
