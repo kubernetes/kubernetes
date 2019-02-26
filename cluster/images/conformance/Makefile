@@ -22,7 +22,7 @@ ARCH?=amd64
 OUT_DIR?=_output
 
 OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)
-BINARY_PATH=$(shell test -d $(OUTPUT_PATH)/dockerized && echo $(OUTPUT_PATH)/dockerized || echo $(OUTPUT_PATH)/local)
+BINARY_PATH=$(shell test -d $(OUTPUT_PATH)/local && echo $(OUTPUT_PATH)/local || echo $(OUTPUT_PATH)/dockerized)
 
 GINKGO_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/ginkgo
 KUBECTL_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/kubectl
