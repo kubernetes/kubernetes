@@ -103,7 +103,8 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		Long:                  createLong,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+				ioStreams.ErrOut.Write([]byte("Error: must specify one of -f and -k\n\n"))
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
 				defaultRunFunc(cmd, args)
 				return
@@ -119,7 +120,6 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 
 	usage := "to use to create the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
@@ -184,7 +184,6 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 // Complete completes all the required options
 func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
