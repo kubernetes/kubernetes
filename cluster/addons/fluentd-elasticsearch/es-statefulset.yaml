@@ -73,7 +73,7 @@ spec:
     spec:
       serviceAccountName: elasticsearch-logging
       containers:
-      - image: k8s.gcr.io/elasticsearch:v6.6.1
+      - image: gcr.io/fluentd-elasticsearch/elasticsearch:v6.6.1
         name: elasticsearch-logging
         resources:
           # need more cpu upon initialization, therefore burstable class
