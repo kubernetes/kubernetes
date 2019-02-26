@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "alpha.go",
         "certs.go",
-        "kubeconfig.go",
         "kubelet.go",
         "selfhosting.go",
     ],
@@ -22,7 +21,6 @@ go_library(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/certs/renewal:go_default_library",
-        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
@@ -54,10 +52,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "certs_test.go",
-        "kubeconfig_test.go",
-    ],
+    srcs = ["certs_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -66,8 +61,6 @@ go_test(
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//cmd/kubeadm/test/cmd:go_default_library",
-        "//cmd/kubeadm/test/kubeconfig:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
