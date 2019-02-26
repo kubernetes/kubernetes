@@ -143,6 +143,12 @@ func (plugin *cinderPlugin) GetVolumeLimits() (map[string]int64, error) {
 	if cloud.ProviderName() != openstack.ProviderName {
 		return nil, fmt.Errorf("Expected Openstack cloud, found %s", cloud.ProviderName())
 	}
+
+	openstackCloud, ok := cloud.(*openstack.OpenStack)
+	if ok && openstackCloud.NodeVolumeAttachLimit() > 0 {
+		volumeLimits[util.CinderVolumeLimitKey] = int64(openstackCloud.NodeVolumeAttachLimit())
+	}
+
 	return volumeLimits, nil
 }
 
