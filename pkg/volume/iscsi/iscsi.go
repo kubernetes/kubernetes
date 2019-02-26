@@ -191,10 +191,10 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 
 // NewBlockVolumeUnmapper creates a new volume.BlockVolumeUnmapper from recoverable state.
 func (plugin *iscsiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	return plugin.newUnmapperInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newUnmapperInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, exec mount.Exec) (volume.BlockVolumeUnmapper, error) {
+func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.BlockVolumeUnmapper, error) {
 	return &iscsiDiskUnmapper{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
@@ -202,6 +202,7 @@ func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID,
 			manager: manager,
 			plugin:  plugin,
 		},
+		mounter:    mounter,
 		exec:       exec,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil
@@ -227,7 +228,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	}
 
 	// Obtain iscsi disk configurations from globalPDPath
-	device, _, err := extractDeviceAndPrefix(globalPDPath)
+	device, err := extractDevice(globalPDPath)
 	if err != nil {
 		return nil, err
 	}
@@ -366,6 +367,7 @@ func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
 type iscsiDiskMapper struct {
 	*iscsiDisk
 	readOnly   bool
+	mounter    mount.Interface
 	exec       mount.Exec
 	deviceUtil volumeutil.DeviceUtil
 }
@@ -382,6 +384,7 @@ func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, vo
 
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
+	mounter    mount.Interface
 	exec       mount.Exec
 	deviceUtil volumeutil.DeviceUtil
 }
@@ -625,7 +628,7 @@ func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.S
 	// plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
 
 	// device: 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
-	device, _, err := extractDeviceAndPrefix(globalMapPath)
+	device, err := extractDevice(globalMapPath)
 	if err != nil {
 		return nil, err
 	}

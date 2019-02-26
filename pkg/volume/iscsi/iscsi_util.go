@@ -19,6 +19,7 @@ package iscsi
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -160,28 +161,67 @@ func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransp
 	return false
 }
 
-// getDevicePrefixRefCount: given a prefix of device path, find its reference count from /proc/mounts
-// returns the reference count to the device and error code
-// for services like iscsi construct multiple device paths with the same prefix pattern.
-// this function aggregates all references to a service based on the prefix pattern
-// More specifically, this prefix semantics is to aggregate disk paths that belong to the same iSCSI target/iqn pair.
-// an iSCSI target could expose multiple LUNs through the same IQN, and Linux iSCSI initiator creates disk paths that start the same prefix but end with different LUN number
-// When we decide whether it is time to logout a target, we have to see if none of the LUNs are used any more.
-// That's where the prefix based ref count kicks in. If we only count the disks using exact match, we could log other disks out.
-func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (int, error) {
-	mps, err := mounter.List()
+type ReadDirFunc func(string) ([]os.FileInfo, error)
+
+// findDevicePrefixRef: given a device's mount and map path, find a reference
+// in /proc/mounts or the global volume device plugin dir to a device with the
+// same portal and IQN. Such a device being referenced in either place means it
+// is in use and so it is unsafe to log out. An iSCSI target could expose
+// multiple LUNs through the same IQN, logging out from the IQN prematurely
+// would disconnect everyone and cause them i/o errors.
+// returns true if a reference is found and error
+func findDevicePrefixRef(mountPath string, mounter mount.Interface, mapPath string, readDir ReadDirFunc) (bool, error) {
+	// mntPath is the global plugin dir, i.e. the return value of MakeGlobalPDName
+	index := strings.LastIndex(mountPath, "-lun-")
+	if index < 0 {
+		return false, fmt.Errorf("malformed mount path: %s", mountPath)
+	}
+	mountPathPrefix := mountPath[:index]
+
+	// Find any mountpoints that have the prefix
+	mountPoints, err := mounter.List()
 	if err != nil {
-		return -1, err
+		return false, err
 	}
 
-	// Find the number of references to the device.
-	refCount := 0
-	for i := range mps {
-		if strings.HasPrefix(mps[i].Path, deviceNamePrefix) {
-			refCount++
+	for _, p := range mountPoints {
+		if strings.HasPrefix(p.Path, mountPathPrefix) {
+			return true, nil
 		}
 	}
-	return refCount, nil
+
+	// mapPath is the global volume device plugin dir, i.e. the return value of MakeGlobalVDPDName for a disk
+	index = strings.LastIndex(mapPath, "-lun-")
+	if index < 0 {
+		return false, fmt.Errorf("malformed map path: %s", mapPath)
+	}
+	mapPathPrefix := mapPath[:index]
+
+	// Find other directories in the same iface directory that have the prefix, e.g.:
+	// mapPath is: /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
+	// directory tree looks like:
+	// - volumeDevices
+	//   - iface-default
+	//     - 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
+	//     - 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-1
+	// 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-1 has the prefix, return true
+	ifacePath, _ := path.Split(mapPath)
+	dirs, err := readDir(ifacePath)
+	if err != nil {
+		return false, err
+	}
+
+	for _, dir := range dirs {
+		path := path.Join(ifacePath, dir.Name())
+		if path == mapPath {
+			continue
+		}
+		if strings.HasPrefix(path, mapPathPrefix) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
@@ -552,17 +592,17 @@ func deleteDevice(deviceName string) error {
 
 // deleteDevices tries to remove all the block devices and multipath map devices
 // associated with a given iscsi device
-func deleteDevices(c iscsiDiskUnmounter) error {
-	lunNumber, err := strconv.Atoi(c.iscsiDisk.Lun)
+func deleteDevices(disk *iscsiDisk, exec mount.Exec, deviceUtil volumeutil.DeviceUtil) error {
+	lunNumber, err := strconv.Atoi(disk.Lun)
 	if err != nil {
-		klog.Errorf("iscsi delete devices: lun is not a number: %s\nError: %v", c.iscsiDisk.Lun, err)
+		klog.Errorf("iscsi delete devices: lun is not a number: %s\nError: %v", disk.Lun, err)
 		return err
 	}
 	// Enumerate the devices so we can delete them
-	deviceNames, err := c.deviceUtil.FindDevicesForISCSILun(c.iscsiDisk.Iqn, lunNumber)
+	deviceNames, err := deviceUtil.FindDevicesForISCSILun(disk.Iqn, lunNumber)
 	if err != nil {
 		klog.Errorf("iscsi delete devices: could not get devices associated with LUN %d on target %s\nError: %v",
-			lunNumber, c.iscsiDisk.Iqn, err)
+			lunNumber, disk.Iqn, err)
 		return err
 	}
 	// Find the multipath device path(s)
@@ -570,13 +610,13 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	for _, deviceName := range deviceNames {
 		path := "/dev/" + deviceName
 		// check if the dev is using mpio and if so mount it via the dm-XX device
-		if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
+		if mappedDevicePath := deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
 			mpathDevices[mappedDevicePath] = true
 		}
 	}
 	// Flush any multipath device maps
 	for mpathDevice := range mpathDevices {
-		_, err = c.exec.Run("multipath", "-f", mpathDevice)
+		_, err = exec.Run("multipath", "-f", mpathDevice)
 		if err != nil {
 			klog.Warningf("Warning: Failed to flush multipath device map: %s\nError: %v", mpathDevice, err)
 			// Fall through -- keep deleting the block devices
@@ -614,7 +654,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 
 	// if device is no longer used, see if need to logout the target
-	device, prefix, err := extractDeviceAndPrefix(mntPath)
+	device, err := extractDevice(mntPath)
 	if err != nil {
 		return err
 	}
@@ -643,7 +683,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 
 	// Delete all the scsi devices and any multipath devices after unmounting
-	if err = deleteDevices(c); err != nil {
+	if err = deleteDevices(c.iscsiDisk, c.exec, c.deviceUtil); err != nil {
 		klog.Warningf("iscsi detach disk: failed to delete devices\nError: %v", err)
 		// Fall through -- even if deleting fails, a logout may fix problems
 	}
@@ -653,8 +693,9 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	defer c.plugin.targetLocks.UnlockKey(iqn)
 
 	// if device is no longer used, see if need to logout the target
-	refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
-	if err != nil || refCount != 0 {
+	mapPath := util.MakeGlobalVDPDName(*c.iscsiDisk)
+	refFound, err := findDevicePrefixRef(mntPath, c.mounter, mapPath, ioutil.ReadDir)
+	if err != nil || refFound == true {
 		return nil
 	}
 
@@ -670,7 +711,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	return nil
 }
 
-// DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
+// DetachBlockISCSIDisk detaches a volume from node
 func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
@@ -678,18 +719,21 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
 	}
+
 	// If we arrive here, device is no longer used, see if need to logout the target
 	// device: 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
-	device, _, err := extractDeviceAndPrefix(mapPath)
+	device, err := extractDevice(mapPath)
 	if err != nil {
 		return err
 	}
+
 	var bkpPortal []string
-	var volName, iqn, lun, iface, initiatorName string
+	var volName, iqn, iface, initiatorName string
 	found := true
+
 	// load iscsi disk config from json file
 	if err := util.loadISCSI(c.iscsiDisk, mapPath); err == nil {
-		bkpPortal, iqn, lun, iface, volName = c.iscsiDisk.Portals, c.iscsiDisk.Iqn, c.iscsiDisk.Lun, c.iscsiDisk.Iface, c.iscsiDisk.VolName
+		bkpPortal, iqn, iface, volName = c.iscsiDisk.Portals, c.iscsiDisk.Iqn, c.iscsiDisk.Iface, c.iscsiDisk.VolName
 		initiatorName = c.iscsiDisk.InitiatorName
 	} else {
 		// If the iscsi disk config is not found, fall back to the original behavior.
@@ -700,31 +744,34 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 		if err != nil {
 			return err
 		}
-		arr := strings.Split(device, "-lun-")
-		if len(arr) < 2 {
-			return fmt.Errorf("failed to retrieve lun from mapPath: %v", mapPath)
-		}
-		lun = arr[1]
 		// Extract the iface from the mountPath and use it to log out. If the iface
 		// is not found, maintain the previous behavior to facilitate kubelet upgrade.
 		// Logout may fail as no session may exist for the portal/IQN on the specified interface.
 		iface, found = extractIface(mapPath)
 	}
+
+	// Delete all the scsi devices and any multipath devices
+	if err = deleteDevices(c.iscsiDisk, c.exec, c.deviceUtil); err != nil {
+		klog.Warningf("iscsi detach disk: failed to delete devices\nError: %v", err)
+		// Fall through -- even if deleting fails, a logout may fix problems
+	}
+
+	// Lock the target while we determine if we can safely log out or not
+	c.plugin.targetLocks.LockKey(iqn)
+	defer c.plugin.targetLocks.UnlockKey(iqn)
+
+	// if device is no longer used, see if need to logout the target
+	mntPath := util.MakeGlobalPDName(*c.iscsiDisk)
+	refFound, err := findDevicePrefixRef(mntPath, c.mounter, mapPath, ioutil.ReadDir)
+	if err != nil || refFound == true {
+		return nil
+	}
+
 	portals := removeDuplicate(bkpPortal)
 	if len(portals) == 0 {
 		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations")
 	}
 
-	devicePath := getDevByPath(portals[0], iqn, lun)
-	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
-	if _, err = os.Stat(devicePath); err != nil {
-		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
-	}
-	// check if the dev is using mpio and if so mount it via the dm-XX device
-	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
-		devicePath = mappedDevicePath
-	}
-	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
 		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
@@ -783,19 +830,21 @@ func extractTransportname(ifaceOutput string) (iscsiTransport string) {
 	return iscsiTransport
 }
 
-func extractDeviceAndPrefix(mntPath string) (string, string, error) {
+// extractDevice extracts the device from a path, e.g.
+// "[...]/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0" returns device
+// "192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0"
+func extractDevice(mntPath string) (string, error) {
 	ind := strings.LastIndex(mntPath, "/")
 	if ind < 0 {
-		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+		return "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
 	}
 	device := mntPath[(ind + 1):]
-	// strip -lun- from mount path
+	// Ensure mount path has -lun-
 	ind = strings.LastIndex(mntPath, "-lun-")
 	if ind < 0 {
-		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+		return "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
 	}
-	prefix := mntPath[:ind]
-	return device, prefix, nil
+	return device, nil
 }
 
 func extractIface(mntPath string) (string, bool) {

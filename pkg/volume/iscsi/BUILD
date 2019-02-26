@@ -41,6 +41,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/util/filesystem:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

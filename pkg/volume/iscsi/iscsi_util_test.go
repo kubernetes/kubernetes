@@ -24,48 +24,82 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func TestGetDevicePrefixRefCount(t *testing.T) {
+func TestFindDevicePrefixRef(t *testing.T) {
+	mountPath := "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-99"
+
 	fm := &mount.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdb",
 				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-1"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-2"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-3"},
 		},
 	}
+	fmEmpty := &mount.FakeMounter{}
+
+	mapPath := "/var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface-default/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-98"
+
+	volumeDevices := []string{
+		mapPath,
+		"/var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface-default/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-1",
+	}
+	fs := filesystem.NewFakeFs()
+	for _, p := range volumeDevices {
+		fs.MkdirAll(p, 666)
+	}
+	readDir := fs.ReadDir
+
+	// Realistically, mapPath will be one of the volumeDevices as it won't be deleted until later. It should be ignored, test by making the dir otherwise empty
+	fsOtherwiseEmpty := filesystem.NewFakeFs()
+	fsOtherwiseEmpty.MkdirAll(mapPath, 666)
+	readDirOtherwiseEmpty := fsOtherwiseEmpty.ReadDir
+
+	readDirEmpty := func(_ string) ([]os.FileInfo, error) { return nil, nil }
 
 	tests := []struct {
-		devicePrefix string
-		expectedRefs int
+		mounter          mount.Interface
+		readDir          ReadDirFunc
+		expectedRefFound bool
 	}{
 		{
-			"/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00",
-			4,
+			fm,
+			readDirEmpty,
+			true,
+		},
+		{
+			fmEmpty,
+			readDir,
+			true,
+		},
+		{
+			fmEmpty,
+			readDirOtherwiseEmpty,
+			false,
+		},
+		{
+			fmEmpty,
+			readDirEmpty,
+			false,
 		},
 	}
 
 	for i, test := range tests {
-		if refs, err := getDevicePrefixRefCount(fm, test.devicePrefix); err != nil || test.expectedRefs != refs {
-			t.Errorf("%d. GetDevicePrefixRefCount(%s) = %d, %v; expected %d, nil", i, test.devicePrefix, refs, err, test.expectedRefs)
+		if refFound, err := findDevicePrefixRef(mountPath, test.mounter, mapPath, test.readDir); err != nil || test.expectedRefFound != refFound {
+			t.Errorf("%d. FindDevicePrefixRef = %v, %v; expected %v, nil", i, refFound, err, test.expectedRefFound)
 		}
 	}
 }
 
-func TestExtractDeviceAndPrefix(t *testing.T) {
+func TestExtractDevice(t *testing.T) {
 	devicePath := "127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00"
 	mountPrefix := "/var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/" + devicePath
 	lun := "-lun-0"
-	device, prefix, err := extractDeviceAndPrefix(mountPrefix + lun)
-	if err != nil || device != (devicePath+lun) || prefix != mountPrefix {
-		t.Errorf("extractDeviceAndPrefix: expected %s and %s, got %v %s and %s", devicePath+lun, mountPrefix, err, device, prefix)
+	device, err := extractDevice(mountPrefix + lun)
+	if err != nil || device != (devicePath+lun) {
+		t.Errorf("extractDevice: expected %s, got %v %s", devicePath+lun, err, device)
 	}
 }
 
