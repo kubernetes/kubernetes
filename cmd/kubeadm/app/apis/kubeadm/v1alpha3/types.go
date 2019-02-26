@@ -147,7 +147,7 @@ type APIEndpoint struct {
 // NodeRegistrationOptions holds fields that relate to registering a new control-plane or node to the cluster, either via "kubeadm init" or "kubeadm join"
 type NodeRegistrationOptions struct {
 
-	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
+	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm join` operation.
 	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
 	// Defaults to the hostname of the node if not provided.
 	Name string `json:"name,omitempty"`
