@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/pborman/uuid"
 	"k8s.io/klog"
 
-	"reflect"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -117,8 +117,9 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	if ae.ObjectRef == nil {
 		ae.ObjectRef = &auditinternal.ObjectReference{}
 	}
-	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
-		meta := acc.GetObjectMeta()
+
+	// meta.Accessor is more general than ObjectMetaAccessor, but if it fails, we can just skip setting these bits
+	if meta, err := meta.Accessor(obj); err == nil {
 		if len(ae.ObjectRef.Namespace) == 0 {
 			ae.ObjectRef.Namespace = meta.GetNamespace()
 		}
