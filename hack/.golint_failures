@@ -673,9 +673,6 @@ test/e2e/storage/testsuites
 test/e2e/storage/utils
 test/e2e/storage/vsphere
 test/e2e/ui
-test/e2e/upgrades
-test/e2e/upgrades/apps
-test/e2e/upgrades/storage
 test/e2e/windows
 test/e2e_kubeadm
 test/e2e_node
