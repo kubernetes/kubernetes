@@ -216,6 +216,14 @@ type Webhook struct {
 	// sideEffects == Unknown or Some. Defaults to Unknown.
 	// +optional
 	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// Default to 30 seconds.
+	// +optional
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
