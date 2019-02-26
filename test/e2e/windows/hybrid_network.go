@@ -30,9 +30,8 @@ import (
 )
 
 const (
-	LinuxOS    = "linux"
-	WindowsOS  = "windows"
-	Iterations = 5
+	linuxOS   = "linux"
+	windowsOS = "windows"
 )
 
 var (
@@ -49,66 +48,55 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 	Context("for all supported CNIs", func() {
 
-		It("should have stable networking for linux and windows pods", func() {
+		It("should have stable networking for Linux and Windows pods", func() {
 			By("creating linux and windows pods")
-			linuxPod := CreateTestPod(f, linuxBusyBoxImage, LinuxOS)
-			windowsPod := CreateTestPod(f, windowsBusyBoximage, WindowsOS)
+			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 
-			By("checking connectivity to 8.8.8.8 53 (google.com) from linux")
-			CheckLinuxConnectivity(f, linuxPod.ObjectMeta.Name, "8.8.8.8", "53")
+			By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
+			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
 
-			By("checkin connectivity to www.google.com from windows")
-			CheckWindowsConnectivity(f, windowsPod.ObjectMeta.Name, "www.google.com")
+			By("checking connectivity to www.google.com from Windows")
+			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"))
 
-			By("checking connectivity from linux to windows")
-			CheckLinuxConnectivity(f, linuxPod.ObjectMeta.Name, windowsPod.Status.PodIP, "80")
+			By("checking connectivity from Linux to Windows")
+			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80))
 
-			By("checking connectivity from windows to linux")
-			CheckWindowsConnectivity(f, windowsPod.ObjectMeta.Name, linuxPod.Status.PodIP)
+			By("checking connectivity from Windows to Linux")
+			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
 
 		})
 
 	})
 })
 
-func CheckContainerOutput(f *framework.Framework, podName string, os string, cmd []string) (string, string, error) {
-	By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
-	out, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
-	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, out, stderr)
-	Expect(err).NotTo(HaveOccurred(), msg)
-	return out, msg, err
+var (
+	duration      = "10s"
+	poll_interval = "1s"
+	timeout       = 10 // seconds
+)
+
+func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
+	Consistently(func() error {
+		By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
+		_, _, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
+		return err
+	}, duration, poll_interval).ShouldNot(HaveOccurred())
 }
 
-func CheckLinuxConnectivity(f *framework.Framework, podName string, address string, port string) {
-	successes := 0
-	for i := 0; i < Iterations; i++ {
-		nc := fmt.Sprintf("nc -vz %s %s", address, port)
-		cmd := []string{"/bin/sh", "-c", nc}
-		_, _, err := CheckContainerOutput(f, podName, LinuxOS, cmd)
-		if err != nil {
-			break
-		}
-		successes++
-	}
-	Expect(successes).To(Equal(Iterations))
+func linuxCheck(address string, port int) []string {
+	nc := fmt.Sprintf("nc -vz %s %v -w %v", address, port, timeout)
+	cmd := []string{"/bin/sh", "-c", nc}
+	return cmd
 }
 
-func CheckWindowsConnectivity(f *framework.Framework, podName string, address string) {
-	successes := 0
-	for i := 0; i < Iterations; i++ {
-		ps := fmt.Sprintf("$r=invoke-webrequest %s -usebasicparsing; echo $r.StatusCode", address)
-		cmd := []string{"powershell", "-command", ps}
-		out, msg, err := CheckContainerOutput(f, podName, WindowsOS, cmd)
-		if err != nil || out != "200" {
-			framework.Logf(msg)
-			break
-		}
-		successes++
-	}
-	Expect(successes).To(Equal(Iterations))
+func windowsCheck(address string) []string {
+	curl := fmt.Sprintf("curl.exe %s --connect-timeout %v --fail", address, timeout)
+	cmd := []string{"cmd", "/c", curl}
+	return cmd
 }
 
-func CreateTestPod(f *framework.Framework, image string, os string) *v1.Pod {
+func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 	containerName := fmt.Sprintf("%s-container", os)
 	podName := "pod-" + string(uuid.NewUUID())
 	pod := &v1.Pod{
@@ -132,7 +120,7 @@ func CreateTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 			},
 		},
 	}
-	if os == LinuxOS {
+	if os == linuxOS {
 		pod.Spec.Tolerations = []v1.Toleration{
 			{
 				Key:      "key",
