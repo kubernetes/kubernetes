@@ -18,9 +18,6 @@
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
 ./cluster/images/conformance/run_e2e.sh
-./cluster/kubemark/gce/config-default.sh
-./cluster/kubemark/iks/config-default.sh
-./cluster/kubemark/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
@@ -133,16 +130,6 @@
 ./test/images/volume/rbd/create_block.sh
 ./test/images/volume/rbd/mon.sh
 ./test/images/volume/rbd/osd.sh
-./test/kubemark/common/util.sh
-./test/kubemark/gce/util.sh
-./test/kubemark/iks/shutdown.sh
-./test/kubemark/iks/startup.sh
-./test/kubemark/iks/util.sh
-./test/kubemark/master-log-dump.sh
-./test/kubemark/resources/start-kubemark-master.sh
-./test/kubemark/run-e2e-tests.sh
-./test/kubemark/start-kubemark.sh
-./test/kubemark/stop-kubemark.sh
 ./third_party/forked/shell2junit/sh2ju.sh
 ./third_party/intemp/intemp.sh
 ./third_party/multiarch/qemu-user-static/register/qemu-binfmt-conf.sh
