@@ -86,17 +86,17 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
 	defer ss.vmssVMCache.Delete(key)
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", nodeResourceGroup, nodeName, diskName)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s)", nodeResourceGroup, nodeName, diskName, diskURI)
 	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 	if err != nil {
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
 			// if lease cannot be acquired or disk not found, immediately detach the disk and return the original error
-			klog.Infof("azureDisk - err %s, try detach disk(%s)", detail, diskName)
+			klog.Infof("azureDisk - err %s, try detach disk(%s, %s)", detail, diskName, diskURI)
 			ss.DetachDiskByName(diskName, diskURI, nodeName)
 		}
 	} else {
-		klog.V(2).Infof("azureDisk - attach disk(%s) succeeded", diskName)
+		klog.V(2).Infof("azureDisk - attach disk(%s, %s) succeeded", diskName, diskURI)
 	}
 	return err
 }
