@@ -102,6 +102,7 @@ type DeleteOptions struct {
 	DeleteNow           bool
 	ForceDeletion       bool
 	WaitForDeletion     bool
+	Quiet               bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -313,7 +314,9 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
-	o.PrintObj(info)
+	if !o.Quiet {
+		o.PrintObj(info)
+	}
 	return deleteResponse, nil
 }
 
