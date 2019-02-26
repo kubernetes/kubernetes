@@ -23,7 +23,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog"
@@ -54,13 +53,6 @@ var (
 		`)
 )
 
-type kubeletStartData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	ClientSetFromFile(path string) (*clientset.Clientset, error)
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	TLSBootstrapCfg() (*clientcmdapi.Config, error)
-}
-
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
@@ -81,8 +73,8 @@ func NewKubeletStartPhase() workflow.Phase {
 	}
 }
 
-func getKubeletStartJoinData(c workflow.RunData) (kubeletStartData, *kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
-	data, ok := c.(kubeletStartData)
+func getKubeletStartJoinData(c workflow.RunData) (JoinData, *kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
+	data, ok := c.(JoinData)
 	if !ok {
 		return nil, nil, nil, nil, errors.New("kubelet-start phase invoked with an invalid data struct")
 	}

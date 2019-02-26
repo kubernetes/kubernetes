@@ -7,6 +7,7 @@ go_library(
         "bootstraptoken.go",
         "certs.go",
         "controlplane.go",
+        "data.go",
         "etcd.go",
         "kubeconfig.go",
         "kubelet.go",
@@ -58,7 +59,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["certs_test.go"],
+    srcs = [
+        "certs_test.go",
+        "data_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
@@ -67,6 +71,8 @@ go_test(
         "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

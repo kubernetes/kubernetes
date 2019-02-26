@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -38,13 +36,6 @@ var (
 		kubeadm join phase control-plane-join all
 		`)
 )
-
-type controlPlaneJoinData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	ClientSetFromFile(string) (*clientset.Clientset, error)
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	KubeConfigPath() string
-}
 
 func getControlPlaneJoinPhaseFlags() []string {
 	return []string{
@@ -109,7 +100,7 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 }
 
 func runEtcdPhase(c workflow.RunData) error {
-	data, ok := c.(controlPlaneJoinData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
 	}
@@ -151,7 +142,7 @@ func runEtcdPhase(c workflow.RunData) error {
 }
 
 func runUploadConfigPhase(c workflow.RunData) error {
-	data, ok := c.(controlPlaneJoinData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
 	}
@@ -179,7 +170,7 @@ func runUploadConfigPhase(c workflow.RunData) error {
 }
 
 func runMarkControlPlanePhase(c workflow.RunData) error {
-	data, ok := c.(controlPlaneJoinData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
 	}

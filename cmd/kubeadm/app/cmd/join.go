@@ -129,6 +129,9 @@ type joinOptions struct {
 	externalcfg           *kubeadmapiv1beta1.JoinConfiguration
 }
 
+// compile-time assert that the local data object satisfies the phases data interface.
+var _ phases.JoinData = &joinData{}
+
 // joinData defines all the runtime information used when running the kubeadm join worklow;
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {

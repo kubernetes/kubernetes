@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -41,12 +40,6 @@ var (
 		kubeadm init phase etcd local --config config.yaml
 		`)
 )
-
-type etcdData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	DryRun() bool
-	ManifestDir() string
-}
 
 // NewEtcdPhase creates a kubeadm workflow phase that implements handling of etcd.
 func NewEtcdPhase() workflow.Phase {
@@ -83,7 +76,7 @@ func getEtcdPhaseFlags() []string {
 
 func runEtcdPhaseLocal() func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
-		data, ok := c.(etcdData)
+		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("etcd phase invoked with an invalid data struct")
 		}
