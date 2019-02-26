@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"text/tabwriter"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"

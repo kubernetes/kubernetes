@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -44,8 +44,8 @@ const (
 	podName              = "pfpod"
 )
 
-var classGold string = "gold"
-var extendedResourceName string = "example.com/dongle"
+var classGold = "gold"
+var extendedResourceName = "example.com/dongle"
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")

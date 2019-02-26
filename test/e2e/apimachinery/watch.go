@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -434,9 +434,8 @@ func waitForNextConfigMapEvent(watch watch.Interface) *v1.ConfigMap {
 	case event := <-watch.ResultChan():
 		if configMap, ok := event.Object.(*v1.ConfigMap); ok {
 			return configMap
-		} else {
-			framework.Failf("expected config map")
 		}
+		framework.Failf("expected config map")
 	case <-time.After(10 * time.Second):
 		framework.Failf("timed out waiting for watch event")
 	}

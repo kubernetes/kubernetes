@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
@@ -41,7 +41,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	By("Creating testing namespaces")
 	wg := &sync.WaitGroup{}
 	wg.Add(totalNS)
-	for n := 0; n < totalNS; n += 1 {
+	for n := 0; n < totalNS; n++ {
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()

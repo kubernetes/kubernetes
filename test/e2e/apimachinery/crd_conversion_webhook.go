@@ -34,9 +34,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	_ "github.com/stretchr/testify/assert"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -61,7 +61,7 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 	},
 }
 
-var alternativeApiVersions = []v1beta1.CustomResourceDefinitionVersion{
+var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
 	{
 		Name:    "v1",
 		Served:  true,
@@ -347,7 +347,7 @@ func testCRListConversion(f *framework.Framework, testCrd *framework.TestCrd) {
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
 	crd, err = integration.UpdateCustomResourceDefinitionWithRetry(testCrd.ApiExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
-		c.Spec.Versions = alternativeApiVersions
+		c.Spec.Versions = alternativeAPIVersions
 	})
 	Expect(err).To(BeNil())
 	By("Create a v2 custom resource")

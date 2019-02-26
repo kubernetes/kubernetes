@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 

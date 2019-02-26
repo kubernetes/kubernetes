@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
@@ -159,8 +159,6 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return client.Resource(gvr).Namespace(ns)
-	} else {
-		return client.Resource(gvr)
 	}
-
+	return client.Resource(gvr)
 }

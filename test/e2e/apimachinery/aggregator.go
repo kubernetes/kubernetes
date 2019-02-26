@@ -43,7 +43,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
@@ -96,7 +96,7 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
