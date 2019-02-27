@@ -19,11 +19,9 @@ package fieldmanager_test
 import (
 	"errors"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
@@ -71,14 +69,7 @@ func TestFieldManagerCreation(t *testing.T) {
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager(t)
 
-	obj := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "a",
-			Namespace:         "a",
-			CreationTimestamp: metav1.Time{Time: time.Time{}},
-			SelfLink:          "a",
-		},
-	}
+	obj := &corev1.Pod{}
 
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "v1",
@@ -89,6 +80,20 @@ func TestApplyStripsFields(t *testing.T) {
 			"creationTimestamp": "2016-05-19T09:59:00Z",
 			"selfLink": "b",
 			"uid": "b",
+			"clusterName": "b",
+			"generation": 0,
+			"managedFields": [{
+					"manager": "apply",
+					"operation": "Apply",
+					"apiVersion": "v1",
+					"fields": {
+						"f:metadata": {
+							"f:labels": {
+								"f:test-label": {}
+							}
+						}
+					}
+				}],
 			"resourceVersion": "b"
 		}
 	}`), false)
@@ -108,14 +113,7 @@ func TestApplyStripsFields(t *testing.T) {
 func TestApplyDoesNotStripLabels(t *testing.T) {
 	f := NewTestFieldManager(t)
 
-	obj := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "a",
-			Namespace:         "a",
-			CreationTimestamp: metav1.Time{Time: time.Time{}},
-			SelfLink:          "a",
-		},
-	}
+	obj := &corev1.Pod{}
 
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "v1",
