@@ -123,7 +123,6 @@ func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 	if os == linuxOS {
 		pod.Spec.Tolerations = []v1.Toleration{
 			{
-				Key:      "key",
 				Operator: v1.TolerationOpExists,
 				Effect:   v1.TaintEffectNoSchedule,
 			},
