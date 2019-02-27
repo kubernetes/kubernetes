@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
@@ -379,6 +380,34 @@ func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}
+}
+
+// partitionStatefulSetPods partition pods into two valid lists replicas and condemned Pods.
+func partitionStatefulSetPods(set *apps.StatefulSet, pods []*v1.Pod) (replicas []*v1.Pod, condemned []*v1.Pod) {
+	replicaCount := int(*set.Spec.Replicas)
+
+	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
+	replicas = make([]*v1.Pod, replicaCount)
+	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
+	condemned = make([]*v1.Pod, 0, len(pods))
+
+	for i := range pods {
+		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
+			// if the ordinal of the pod is within the range of the current number of replicas,
+			// insert it at the indirection of its ordinal
+			replicas[ord] = pods[i]
+
+		} else if ord >= replicaCount {
+			// if the ordinal is greater than the number of replicas add it to the condemned list
+			condemned = append(condemned, pods[i])
+		}
+		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
+	}
+
+	// sort the condemned Pods by their ordinals
+	sort.Sort(ascendingOrdinal(condemned))
+
+	return
 }
 
 // ascendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
