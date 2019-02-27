@@ -383,7 +383,8 @@ func (p *PriorityQueue) clearPodBackoff(pod *v1.Pod) {
 	p.podBackoff.ClearPodBackoff(nsNameForPod(pod))
 }
 
-// isPodBackingOff returns whether a pod is currently undergoing backoff in the podBackoff structure
+// isPodBackingOff returns true if a pod is still waiting for its backoff timer.
+// If this returns true, the pod should not be re-tried.
 func (p *PriorityQueue) isPodBackingOff(pod *v1.Pod) bool {
 	boTime, exists := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
 	if !exists {
@@ -411,11 +412,10 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 	return p.schedulingCycle
 }
 
-// AddUnschedulableIfNotPresent does nothing if the pod is present in any
-// queue. If pod is unschedulable, it adds pod to unschedulable queue if
-// p.moveRequestCycle > podSchedulingCycle or to backoff queue if p.moveRequestCycle
-// <= podSchedulingCycle but pod is subject to backoff. In other cases, it adds pod to
-// active queue.
+// AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
+// the queue, unless it is already in the queue. Normally, PriorityQueue puts
+// unschedulable pods in `unschedulableQ`. But if there has been a recent move
+// request, then the pod is put in `podBackoffQ`.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -430,30 +430,26 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingC
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
 		return fmt.Errorf("pod is already present in the backoffQ")
 	}
-	if podSchedulingCycle > p.moveRequestCycle && isPodUnschedulable(pod) {
-		p.backoffPod(pod)
-		p.unschedulableQ.addOrUpdate(pInfo)
-		p.nominatedPods.add(pod, "")
-		return nil
-	}
 
-	// If a move request has been received and the pod is subject to backoff, move it to the BackoffQ.
-	if p.isPodBackingOff(pod) && isPodUnschedulable(pod) {
-		err := p.podBackoffQ.Add(pInfo)
-		if err != nil {
-			klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
-		} else {
-			p.nominatedPods.add(pod, "")
+	// Every unschedulable pod is subject to backoff timers.
+	p.backoffPod(pod)
+
+	// If a move request has been received, move it to the BackoffQ, otherwise move
+	// it to unschedulableQ.
+	if p.moveRequestCycle >= podSchedulingCycle {
+		if err := p.podBackoffQ.Add(pInfo); err != nil {
+			// TODO: Delete this klog call and log returned errors at the call site.
+			err = fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
+			klog.Error(err)
+			return err
 		}
-		return err
+	} else {
+		p.unschedulableQ.addOrUpdate(pInfo)
 	}
 
-	err := p.activeQ.Add(pInfo)
-	if err == nil {
-		p.nominatedPods.add(pod, "")
-		p.cond.Broadcast()
-	}
-	return err
+	p.nominatedPods.add(pod, "")
+	return nil
+
 }
 
 // flushBackoffQCompleted Moves all pods from backoffQ which have completed backoff in to activeQ
