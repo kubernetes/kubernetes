@@ -15,9 +15,9 @@
 # Build the conformance image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="staging-k8s.gcr.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
+#   [ARCH=amd64] [REGISTRY="k8s.gcr.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
 
-REGISTRY?=staging-k8s.gcr.io
+REGISTRY?=k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
 
