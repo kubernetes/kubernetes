@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 
@@ -379,6 +380,34 @@ func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}
+}
+
+// findFirstUnhealthyPod returns the first unhealthy pod and ordinal with total unhealthy pods count.
+// If always check replicas for unhealthy pod first.
+func findFirstUnhealthyPod(replicas []*v1.Pod, condemned []*v1.Pod) (firstUnhealthyPod *v1.Pod, unhealthyCount int) {
+	firstUnhealthyOrdinal := math.MaxInt32
+
+	for i := range replicas {
+		if !isHealthy(replicas[i]) {
+			unhealthyCount++
+			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
+				firstUnhealthyOrdinal = ord
+				firstUnhealthyPod = replicas[i]
+			}
+		}
+	}
+
+	for i := range condemned {
+		if !isHealthy(condemned[i]) {
+			unhealthyCount++
+			if ord := getOrdinal(condemned[i]); ord < firstUnhealthyOrdinal {
+				firstUnhealthyOrdinal = ord
+				firstUnhealthyPod = condemned[i]
+			}
+		}
+	}
+
+	return
 }
 
 // ascendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted

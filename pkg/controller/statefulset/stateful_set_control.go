@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"math"
 	"sort"
 
 	"k8s.io/klog"
@@ -280,9 +279,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	replicas := make([]*v1.Pod, replicaCount)
 	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
 	condemned := make([]*v1.Pod, 0, len(pods))
-	unhealthy := 0
-	firstUnhealthyOrdinal := math.MaxInt32
-	var firstUnhealthyPod *v1.Pod
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
@@ -330,25 +326,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	sort.Sort(ascendingOrdinal(condemned))
 
 	// find the first unhealthy Pod
-	for i := range replicas {
-		if !isHealthy(replicas[i]) {
-			unhealthy++
-			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
-				firstUnhealthyPod = replicas[i]
-			}
-		}
-	}
-
-	for i := range condemned {
-		if !isHealthy(condemned[i]) {
-			unhealthy++
-			if ord := getOrdinal(condemned[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
-				firstUnhealthyPod = condemned[i]
-			}
-		}
-	}
+	firstUnhealthyPod, unhealthy := findFirstUnhealthyPod(replicas, condemned)
 
 	if unhealthy > 0 {
 		klog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
