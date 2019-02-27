@@ -33,6 +33,7 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
+	initsystem "k8s.io/kubernetes/pkg/util/initsystem"
 )
 
 // HostPortManager is an interface for adding and removing hostport for a given pod sandbox.
@@ -87,7 +88,11 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	}
 	podIP := podPortMapping.IP.String()
 
-	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return fmt.Errorf("Failed to determine init systemL %v", err)
+	}
+	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName, initSystem); err != nil {
 		return err
 	}
 

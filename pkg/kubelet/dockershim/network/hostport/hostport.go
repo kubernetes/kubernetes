@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	initsystem "k8s.io/kubernetes/pkg/util/initsystem"
 )
 
 const (
@@ -110,7 +111,7 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 }
 
 // ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly
-func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string) error {
+func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string, initSystem initSystem.InitSystem) error {
 	klog.V(4).Info("Ensuring kubelet hostport chains")
 	// Ensure kubeHostportChain
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
@@ -134,6 +135,15 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
 		}
 	}
+
+	// If systemd-resolved is in use (e.g. Ubuntu Bionic), add a rule to avoid breaking it with the general MASQUERADE rule
+	if initSystem.ServiceIsActive("systemd-resolved") {
+		args = []string{"-m", "comment", "--comment", "SNAT for systemd-resolved", "-o", natInterfaceName, "-d", "127.0.0.53", "--to-source", "127.0.0.1", "-j", "SNAT"}
+		if _, err := iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
+			return fmt.Errorf("Failed to ensure that %s chain %s has systemd-resolved exception: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+		}
+	}
+
 	// Need to SNAT traffic from localhost
 	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", "127.0.0.0/8", "-j", "MASQUERADE"}
 	if _, err := iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {

@@ -30,6 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	initsystem "k8s.io/kubernetes/pkg/util/initsystem"
 )
 
 // HostportSyncer takes a list of PodPortMappings and implements hostport all at once
@@ -197,7 +198,11 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	}
 
 	// Ensure KUBE-HOSTPORTS chains
-	ensureKubeHostportChains(h.iptables, natInterfaceName)
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return fmt.Errorf("Failed to determine init system: %v", err)
+	}
+	ensureKubeHostportChains(h.iptables, natInterfaceName, initSystem)
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore

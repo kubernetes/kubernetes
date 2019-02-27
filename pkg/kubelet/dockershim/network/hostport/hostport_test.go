@@ -62,7 +62,8 @@ func TestEnsureKubeHostportChains(t *testing.T) {
 	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"
 
 	fakeIPTables := NewFakeIPTables()
-	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName))
+	fakeInitSystem := NewFakeInitSystem()
+	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName, fakeInitSystem))
 
 	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
 	assert.NoError(t, err)
@@ -71,6 +72,35 @@ func TestEnsureKubeHostportChains(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, len(chain.rules), 1)
 	assert.Contains(t, chain.rules[0], masqRule)
+
+	for _, chainName := range builtinChains {
+		_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(chainName))
+		assert.NoError(t, err)
+		assert.EqualValues(t, len(chain.rules), 1)
+		assert.Contains(t, chain.rules[0], jumpRule)
+	}
+
+}
+
+func TestEnsureKubeHostportChainsWithSystemdResolved(t *testing.T) {
+	interfaceName := "cbr0"
+	builtinChains := []string{"PREROUTING", "OUTPUT"}
+	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
+	systemdRule := "-m comment --comment \"SNAT for systemd-resolved\" -o cbr0 -d 127.0.0.53 --to-source 127.0.0.1 -j SNAT"
+	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"
+
+	fakeIPTables := NewFakeIPTables()
+	fakeInitSystem := NewFakeInitSystemWithSystemdResolved()
+	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName, fakeInitSystem))
+
+	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
+	assert.NoError(t, err)
+
+	_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.ChainPostrouting)
+	assert.NoError(t, err)
+	assert.EqualValues(t, len(chain.rules), 2)
+	assert.Contains(t, chain.rules[0], systemdRule)
+	assert.Contains(t, chain.rules[1], masqRule)
 
 	for _, chainName := range builtinChains {
 		_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(chainName))
