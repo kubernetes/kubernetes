@@ -5,12 +5,14 @@ go_library(
     srcs = [
         "doc.go",
         "register.go",
-        "types.go",
+        "zz_generated.conversion.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/node",
+    importpath = "k8s.io/kubernetes/pkg/apis/node/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//pkg/apis/node:go_default_library",
+        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
@@ -25,13 +27,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/apis/node/install:all-srcs",
-        "//pkg/apis/node/v1alpha1:all-srcs",
-        "//pkg/apis/node/v1beta1:all-srcs",
-        "//pkg/apis/node/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

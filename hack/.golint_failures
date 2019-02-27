@@ -50,6 +50,7 @@ pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy
 pkg/apis/networking
 pkg/apis/networking/v1
+pkg/apis/node/v1alpha1
 pkg/apis/policy
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation

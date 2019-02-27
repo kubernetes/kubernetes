@@ -81,6 +81,7 @@ imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
 networking.k8s.io/v1beta1 \
 node.k8s.io/v1alpha1 \
+node.k8s.io/v1beta1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
