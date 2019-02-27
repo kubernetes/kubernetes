@@ -357,7 +357,7 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
-			It("should be able to pull image from docker hub [WindowsOnly] [NodeConformance]", func() {
+			It("should be able to pull image from docker hub [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
 				image := "e2eteam/busybox:1.29"
 				imagePullTest(image, false, v1.PodRunning, false, true)
