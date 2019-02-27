@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
@@ -26,15 +27,28 @@ import (
 
 const (
 	ProductVerFileName = "/sys/class/dmi/id/product_version"
+	BiosVerFileName    = "/sys/class/dmi/id/bios_vendor"
 	Amazon             = "amazon"
 )
 
 func onAWS() bool {
-	data, err := ioutil.ReadFile(ProductVerFileName)
-	if err != nil {
-		return false
+	var dataProduct []byte
+	var dataBios []byte
+	if _, err := os.Stat(ProductVerFileName); err == nil {
+		dataProduct, err = ioutil.ReadFile(ProductVerFileName)
+		if err != nil {
+			return false
+		}
 	}
-	return strings.Contains(string(data), Amazon)
+
+	if _, err := os.Stat(BiosVerFileName); err == nil {
+		dataBios, err = ioutil.ReadFile(BiosVerFileName)
+		if err != nil {
+			return false
+		}
+	}
+
+	return strings.Contains(string(dataProduct), Amazon) || strings.Contains(strings.ToLower(string(dataBios)), Amazon)
 }
 
 func getAwsMetadata(name string) string {
