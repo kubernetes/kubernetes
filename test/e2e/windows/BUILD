@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "density.go",
         "framework.go",
+        "hybrid_network.go",
         "networking.go",
         "volumes.go",
     ],
