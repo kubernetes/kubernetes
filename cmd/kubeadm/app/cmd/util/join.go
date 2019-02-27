@@ -30,12 +30,19 @@ import (
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}{{if .UploadCerts}} --certificate-key {{.CertificateKey}}{{end}}`,
+	`{{if .UploadCerts}}You can now join any number of control-plane node running the following command on each as a root:{{else}}You can now join any number of control-plane node by copying the required certificate authorities on each node and then running the following as root:{{end}}
+	kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}} --experimental-control-plane {{if .UploadCerts}}--certificate-key {{.CertificateKey}}
+
+  Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+  As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use kubeadm init phase upload-certs to reload certs afterward.{{end}}
+	
+  Then you can join any number of worker nodes by running the following on each as root:
+	kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
 ))
 
 // GetJoinCommand returns the kubeadm join command for a given token and
 // and Kubernetes cluster (the current cluster in the kubeconfig file)
-func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCerts bool) (string, error) {
+func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCerts, skipCertificateKeyPrint bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
@@ -80,6 +87,9 @@ func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCer
 
 	if skipTokenPrint {
 		ctx["Token"] = template.HTML("<value withheld>")
+	}
+	if skipCertificateKeyPrint {
+		ctx["CertificateKey"] = template.HTML("<value withheld>")
 	}
 
 	var out bytes.Buffer

@@ -75,16 +75,18 @@ var (
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
 type initOptions struct {
-	cfgPath               string
-	skipTokenPrint        bool
-	dryRun                bool
-	kubeconfigDir         string
-	kubeconfigPath        string
-	featureGatesString    string
-	ignorePreflightErrors []string
-	bto                   *options.BootstrapTokenOptions
-	externalcfg           *kubeadmapiv1beta1.InitConfiguration
-	uploadCerts           bool
+	cfgPath                 string
+	skipTokenPrint          bool
+	dryRun                  bool
+	kubeconfigDir           string
+	kubeconfigPath          string
+	featureGatesString      string
+	ignorePreflightErrors   []string
+	bto                     *options.BootstrapTokenOptions
+	externalcfg             *kubeadmapiv1beta1.InitConfiguration
+	uploadCerts             bool
+	certificateKey          string
+	skipCertificateKeyPrint bool
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -93,20 +95,21 @@ var _ phases.InitData = &initData{}
 // initData defines all the runtime information used when running the kubeadm init worklow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
-	cfg                   *kubeadmapi.InitConfiguration
-	skipTokenPrint        bool
-	dryRun                bool
-	kubeconfigDir         string
-	kubeconfigPath        string
-	ignorePreflightErrors sets.String
-	certificatesDir       string
-	dryRunDir             string
-	externalCA            bool
-	client                clientset.Interface
-	waiter                apiclient.Waiter
-	outputWriter          io.Writer
-	uploadCerts           bool
-	certificateKey        string
+	cfg                     *kubeadmapi.InitConfiguration
+	skipTokenPrint          bool
+	dryRun                  bool
+	kubeconfigDir           string
+	kubeconfigPath          string
+	ignorePreflightErrors   sets.String
+	certificatesDir         string
+	dryRunDir               string
+	externalCA              bool
+	client                  clientset.Interface
+	waiter                  apiclient.Waiter
+	outputWriter            io.Writer
+	uploadCerts             bool
+	certificateKey          string
+	skipCertificateKeyPrint bool
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -241,7 +244,15 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 	)
 	flagSet.BoolVar(
 		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
-		"Upload certfificates to kubeadm-certs secret.",
+		"Upload control-plane certificates to the kubeadm-certs Secret.",
+	)
+	flagSet.StringVar(
+		&initOptions.certificateKey, options.CertificateKey, "",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+	)
+	flagSet.BoolVar(
+		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
+		"Don't print the key used to encrypt the control-plane certificates.",
 	)
 }
 
@@ -337,17 +348,19 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	}
 
 	return &initData{
-		cfg:                   cfg,
-		certificatesDir:       cfg.CertificatesDir,
-		skipTokenPrint:        options.skipTokenPrint,
-		dryRun:                options.dryRun,
-		dryRunDir:             dryRunDir,
-		kubeconfigDir:         options.kubeconfigDir,
-		kubeconfigPath:        options.kubeconfigPath,
-		ignorePreflightErrors: ignorePreflightErrorsSet,
-		externalCA:            externalCA,
-		outputWriter:          out,
-		uploadCerts:           options.uploadCerts,
+		cfg:                     cfg,
+		certificatesDir:         cfg.CertificatesDir,
+		skipTokenPrint:          options.skipTokenPrint,
+		dryRun:                  options.dryRun,
+		dryRunDir:               dryRunDir,
+		kubeconfigDir:           options.kubeconfigDir,
+		kubeconfigPath:          options.kubeconfigPath,
+		ignorePreflightErrors:   ignorePreflightErrorsSet,
+		externalCA:              externalCA,
+		outputWriter:            out,
+		uploadCerts:             options.uploadCerts,
+		certificateKey:          options.certificateKey,
+		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
 	}, nil
 }
 
@@ -472,7 +485,7 @@ func (d *initData) Tokens() []string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinCommand, err := cmdutil.GetJoinCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.uploadCerts)
+	joinCommand, err := cmdutil.GetJoinCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.uploadCerts, i.skipCertificateKeyPrint)
 	if err != nil {
 		return err
 	}
