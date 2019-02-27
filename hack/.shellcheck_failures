@@ -103,9 +103,6 @@
 ./test/cmd/request-timeout.sh
 ./test/cmd/run.sh
 ./test/cmd/save-config.sh
-./test/cmd/storage.sh
-./test/cmd/template-output.sh
-./test/cmd/version.sh
 ./test/e2e_node/conformance/run_test.sh
 ./test/e2e_node/environment/setup_host.sh
 ./test/e2e_node/gubernator.sh
