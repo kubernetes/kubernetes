@@ -35,7 +35,7 @@ func (sched *Scheduler) onPvAdd(obj interface{}) {
 	// Pods created when there are no PVs available will be stuck in
 	// unschedulable queue. But unbound PVs created for static provisioning and
 	// delay binding storage class are skipped in PV controller dynamic
-	// provisiong and binding process, will not trigger events to schedule pod
+	// provisioning and binding process, will not trigger events to schedule pod
 	// again. So we need to move pods to active queue on PV add for this
 	// scenario.
 	sched.config.SchedulingQueue.MoveAllToActiveQueue()

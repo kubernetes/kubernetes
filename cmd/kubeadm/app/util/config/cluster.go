@@ -59,7 +59,6 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, 
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
-	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {

@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: node-exporter 
-  namespace: kube-system 
+  name: node-exporter
+  namespace: kube-system
   labels:
-    k8s-app: node-exporter 
+    k8s-app: node-exporter
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.15.2
 spec:
   selector:
     matchLabels:
-      k8s-app: node-exporter 
+      k8s-app: node-exporter
       version: v0.15.2
   updateStrategy:
     type: OnDelete
   template:
     metadata:
       labels:
-        k8s-app: node-exporter 
+        k8s-app: node-exporter
         version: v0.15.2
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''

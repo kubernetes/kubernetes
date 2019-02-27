@@ -33,9 +33,13 @@ function get-node-instance-metadata-from-file {
   echo "${metadata}"
 }
 
-# $1: template name (required).
+# Assumed vars:
+#   scope_flags
+# Parameters:
+#   $1: template name (required).
 function create-linux-node-instance-template {
   local template_name="$1"
   ensure-gci-metadata-files
+  # shellcheck disable=2154 # 'scope_flags' is assigned by upstream
   create-node-template "${template_name}" "${scope_flags[*]}" "$(get-node-instance-metadata-from-file)" "" "linux"
 }

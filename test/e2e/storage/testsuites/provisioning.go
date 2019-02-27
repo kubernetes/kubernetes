@@ -41,6 +41,9 @@ import (
 // StorageClassTest represents parameters to be used by provisioning tests.
 // Not all parameters are used by all tests.
 type StorageClassTest struct {
+	Client               clientset.Interface
+	Claim                *v1.PersistentVolumeClaim
+	Class                *storage.StorageClass
 	Name                 string
 	CloudProviders       []string
 	Provisioner          string
@@ -76,183 +79,162 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-}
+func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	type local struct {
+		config      *PerTestConfig
+		testCleanup func()
 
-func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
-	// Setup test resource for driver and testpattern
-	resource := provisioningTestResource{}
-	resource.setupResource(driver, pattern)
-
-	input := provisioningTestInput{
-		testCase: StorageClassTest{
-			ClaimSize:    resource.claimSize,
-			ExpectedSize: resource.claimSize,
-		},
-		cs:       driver.GetDriverInfo().Config.Framework.ClientSet,
-		dc:       driver.GetDriverInfo().Config.Framework.DynamicClient,
-		pvc:      resource.pvc,
-		sc:       resource.sc,
-		vsc:      resource.vsc,
-		dInfo:    driver.GetDriverInfo(),
-		nodeName: driver.GetDriverInfo().Config.ClientNodeName,
+		testCase *StorageClassTest
+		cs       clientset.Interface
+		pvc      *v1.PersistentVolumeClaim
+		sc       *storage.StorageClass
 	}
+	var (
+		dInfo   = driver.GetDriverInfo()
+		dDriver DynamicPVTestDriver
+		l       local
+	)
 
-	return resource, input
-}
-
-func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
-	Context(getTestNameStr(p, pattern), func() {
-		var (
-			resource     provisioningTestResource
-			input        provisioningTestInput
-			needsCleanup bool
-		)
-
-		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(p, driver, pattern)
-			needsCleanup = true
-
-			// Create test input
-			resource, input = createProvisioningTestInput(driver, pattern)
-		})
-
-		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
-		})
-
-		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function
-		// to be a single struct and to be passed as a pointer.
-		// Please see https://onsi.github.io/ginkgo/#global-shared-behaviors for details.
-		testProvisioning(&input)
-	})
-}
-
-type provisioningTestResource struct {
-	driver TestDriver
-
-	claimSize string
-	sc        *storage.StorageClass
-	pvc       *v1.PersistentVolumeClaim
-	// follow parameter is used to test provision volume from snapshot
-	vsc *unstructured.Unstructured
-}
-
-var _ TestResource = &provisioningTestResource{}
-
-func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	// Setup provisioningTest resource
-	switch pattern.VolType {
-	case testpatterns.DynamicPV:
-		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			p.sc = dDriver.GetDynamicProvisionStorageClass("")
-			if p.sc == nil {
-				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
-			}
-			p.driver = driver
-			p.claimSize = dDriver.GetClaimSize()
-			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
-			p.pvc.Spec.StorageClassName = &p.sc.Name
-			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
-			if sDriver, ok := driver.(SnapshottableTestDriver); ok {
-				p.vsc = sDriver.GetSnapshotClass()
-			}
+	BeforeEach(func() {
+		// Check preconditions.
+		if pattern.VolType != testpatterns.DynamicPV {
+			framework.Skipf("Suite %q does not support %v", p.tsInfo.name, pattern.VolType)
 		}
-	default:
-		framework.Failf("Dynamic Provision test doesn't support: %s", pattern.VolType)
+		ok := false
+		dDriver, ok = driver.(DynamicPVTestDriver)
+		if !ok {
+			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		}
+	})
+
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
+	f := framework.NewDefaultFramework("provisioning")
+
+	init := func() {
+		l = local{}
+
+		// Now do the more expensive test initialization.
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.cs = l.config.Framework.ClientSet
+		claimSize := dDriver.GetClaimSize()
+		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, "")
+		if l.sc == nil {
+			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
+		}
+		l.pvc = getClaim(claimSize, l.config.Framework.Namespace.Name)
+		l.pvc.Spec.StorageClassName = &l.sc.Name
+		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.sc, l.pvc)
+		l.testCase = &StorageClassTest{
+			Client:       l.config.Framework.ClientSet,
+			Claim:        l.pvc,
+			Class:        l.sc,
+			ClaimSize:    claimSize,
+			ExpectedSize: claimSize,
+		}
 	}
-}
 
-func (p *provisioningTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-}
-
-type provisioningTestInput struct {
-	testCase StorageClassTest
-	cs       clientset.Interface
-	dc       dynamic.Interface
-	pvc      *v1.PersistentVolumeClaim
-	sc       *storage.StorageClass
-	vsc      *unstructured.Unstructured
-	dInfo    *DriverInfo
-	nodeName string
-}
-
-func testProvisioning(input *provisioningTestInput) {
-	// common checker for most of the test cases below
-	pvcheck := func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-		PVWriteReadSingleNodeCheck(input.cs, claim, volume, NodeSelection{Name: input.nodeName})
+	cleanup := func() {
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
+		}
 	}
 
 	It("should provision storage with defaults", func() {
-		input.testCase.PvCheck = pvcheck
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		init()
+		defer cleanup()
+
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should provision storage with mount options", func() {
-		if input.dInfo.SupportedMountOption == nil {
-			framework.Skipf("Driver %q does not define supported mount option - skipping", input.dInfo.Name)
+		if dInfo.SupportedMountOption == nil {
+			framework.Skipf("Driver %q does not define supported mount option - skipping", dInfo.Name)
 		}
 
-		input.sc.MountOptions = input.dInfo.SupportedMountOption.Union(input.dInfo.RequiredMountOption).List()
-		input.testCase.PvCheck = pvcheck
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		init()
+		defer cleanup()
+
+		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should access volume from different nodes", func() {
+		init()
+		defer cleanup()
+
 		// The assumption is that if the test hasn't been
 		// locked onto a single node, then the driver is
 		// usable on all of them *and* supports accessing a volume
 		// from any node.
-		if input.nodeName != "" {
-			framework.Skipf("Driver %q only supports testing on one node - skipping", input.dInfo.Name)
+		if l.config.ClientNodeName != "" {
+			framework.Skipf("Driver %q only supports testing on one node - skipping", dInfo.Name)
 		}
+
 		// Ensure that we actually have more than one node.
-		nodes := framework.GetReadySchedulableNodesOrDie(input.cs)
+		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
 		if len(nodes.Items) <= 1 {
 			framework.Skipf("need more than one node - skipping")
 		}
-		input.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			PVMultiNodeCheck(input.cs, claim, volume, NodeSelection{Name: input.nodeName})
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			PVMultiNodeCheck(l.cs, claim, volume, NodeSelection{Name: l.config.ClientNodeName})
 		}
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should create and delete block persistent volumes", func() {
-		if !input.dInfo.Capabilities[CapBlock] {
-			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
+		if !dInfo.Capabilities[CapBlock] {
+			framework.Skipf("Driver %q does not support BlockVolume - skipping", dInfo.Name)
 		}
+
+		init()
+		defer cleanup()
+
 		block := v1.PersistentVolumeBlock
-		input.testCase.VolumeMode = &block
-		input.pvc.Spec.VolumeMode = &block
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		l.testCase.VolumeMode = &block
+		l.pvc.Spec.VolumeMode = &block
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func() {
-		if !input.dInfo.Capabilities[CapDataSource] {
-			framework.Skipf("Driver %q does not support populate data from snapshot - skipping", input.dInfo.Name)
+		if !dInfo.Capabilities[CapDataSource] {
+			framework.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}
 
-		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: input.nodeName}, input.cs, input.dc, input.pvc, input.sc, input.vsc)
+		sDriver, ok := driver.(SnapshottableTestDriver)
+		if !ok {
+			framework.Failf("Driver %q has CapDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+		}
+
+		init()
+		defer cleanup()
+
+		dc := l.config.Framework.DynamicClient
+		vsc := sDriver.GetSnapshotClass(l.config)
+		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
-		input.pvc.Spec.DataSource = dataSource
-		input.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		l.pvc.Spec.DataSource = dataSource
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(input.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: input.nodeName})
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: l.config.ClientNodeName})
 		}
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		l.testCase.TestDynamicProvisioning()
 	})
 
 	It("should allow concurrent writes on the same node", func() {
-		if !input.dInfo.Capabilities[CapMultiPODs] {
-			framework.Skipf("Driver %q does not support multiple concurrent pods - skipping", input.dInfo.Name)
+		if !dInfo.Capabilities[CapMultiPODs] {
+			framework.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
 		}
-		input.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+
+		init()
+		defer cleanup()
+
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			// We start two pods concurrently on the same node,
 			// using the same PVC. Both wait for other to create a
 			// file before returning. The pods are forced onto the
@@ -265,7 +247,7 @@ func testProvisioning(input *provisioningTestInput) {
 				defer GinkgoRecover()
 				defer wg.Done()
 				node := NodeSelection{
-					Name: input.nodeName,
+					Name: l.config.ClientNodeName,
 				}
 				if podName == secondPodName {
 					node.Affinity = &v1.Affinity{
@@ -283,18 +265,24 @@ func testProvisioning(input *provisioningTestInput) {
 						},
 					}
 				}
-				RunInPodWithVolume(input.cs, claim.Namespace, claim.Name, podName, command, node)
+				RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, podName, command, node)
 			}
 			go run(firstPodName, "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
 			go run(secondPodName, "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
 			wg.Wait()
 		}
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		l.testCase.TestDynamicProvisioning()
 	})
 }
 
-// TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest and storageClass
-func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) *v1.PersistentVolume {
+// TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest
+func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
+	client := t.Client
+	Expect(client).NotTo(BeNil(), "StorageClassTest.Client is required")
+	claim := t.Claim
+	Expect(claim).NotTo(BeNil(), "StorageClassTest.Claim is required")
+	class := t.Class
+
 	var err error
 	if class != nil {
 		Expect(*claim.Spec.StorageClassName).To(Equal(class.Name))
@@ -493,29 +481,29 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	pod = nil
 }
 
-func TestBindingWaitForFirstConsumer(t StorageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass, nodeSelector map[string]string, expectUnschedulable bool) (*v1.PersistentVolume, *v1.Node) {
-	pvs, node := TestBindingWaitForFirstConsumerMultiPVC(t, client, []*v1.PersistentVolumeClaim{claim}, class, nodeSelector, expectUnschedulable)
+func (t StorageClassTest) TestBindingWaitForFirstConsumer(nodeSelector map[string]string, expectUnschedulable bool) (*v1.PersistentVolume, *v1.Node) {
+	pvs, node := t.TestBindingWaitForFirstConsumerMultiPVC([]*v1.PersistentVolumeClaim{t.Claim}, nodeSelector, expectUnschedulable)
 	if pvs == nil {
 		return nil, node
 	}
 	return pvs[0], node
 }
 
-func TestBindingWaitForFirstConsumerMultiPVC(t StorageClassTest, client clientset.Interface, claims []*v1.PersistentVolumeClaim, class *storage.StorageClass, nodeSelector map[string]string, expectUnschedulable bool) ([]*v1.PersistentVolume, *v1.Node) {
+func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.PersistentVolumeClaim, nodeSelector map[string]string, expectUnschedulable bool) ([]*v1.PersistentVolume, *v1.Node) {
 	var err error
 	Expect(len(claims)).ToNot(Equal(0))
 	namespace := claims[0].Namespace
 
-	By("creating a storage class " + class.Name)
-	class, err = client.StorageV1().StorageClasses().Create(class)
+	By("creating a storage class " + t.Class.Name)
+	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
 	Expect(err).NotTo(HaveOccurred())
-	defer deleteStorageClass(client, class.Name)
+	defer deleteStorageClass(t.Client, class.Name)
 
 	By("creating claims")
 	var claimNames []string
 	var createdClaims []*v1.PersistentVolumeClaim
 	for _, claim := range claims {
-		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 		claimNames = append(claimNames, c.Name)
 		createdClaims = append(createdClaims, c)
 		Expect(err).NotTo(HaveOccurred())
@@ -523,7 +511,7 @@ func TestBindingWaitForFirstConsumerMultiPVC(t StorageClassTest, client clientse
 	defer func() {
 		var errors map[string]error
 		for _, claim := range createdClaims {
-			err := framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace)
+			err := framework.DeletePersistentVolumeClaim(t.Client, claim.Name, claim.Namespace)
 			if err != nil {
 				errors[claim.Name] = err
 			}
@@ -537,44 +525,44 @@ func TestBindingWaitForFirstConsumerMultiPVC(t StorageClassTest, client clientse
 
 	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
 	By("checking the claims are in pending state")
-	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
+	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
 	Expect(err).To(HaveOccurred())
-	verifyPVCsPending(client, createdClaims)
+	verifyPVCsPending(t.Client, createdClaims)
 
 	By("creating a pod referring to the claims")
 	// Create a pod referring to the claim and wait for it to get to running
 	var pod *v1.Pod
 	if expectUnschedulable {
-		pod, err = framework.CreateUnschedulablePod(client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
+		pod, err = framework.CreateUnschedulablePod(t.Client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
 	} else {
-		pod, err = framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
+		pod, err = framework.CreatePod(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	}
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
-		framework.WaitForPodToDisappear(client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		framework.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
+		framework.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 	}()
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.
-		verifyPVCsPending(client, createdClaims)
+		verifyPVCsPending(t.Client, createdClaims)
 		return nil, nil
 	}
 
 	// collect node details
-	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	node, err := t.Client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	By("re-checking the claims to see they binded")
 	var pvs []*v1.PersistentVolume
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
-		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		// make sure claim did bind
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
-		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := t.Client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		pvs = append(pvs, pv)
 	}

@@ -12,7 +12,6 @@ go_library(
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//cmd/controller-manager/app:go_default_library",
-        "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/controller/cloud:go_default_library",
         "//pkg/controller/route:go_default_library",
         "//pkg/controller/service:go_default_library",

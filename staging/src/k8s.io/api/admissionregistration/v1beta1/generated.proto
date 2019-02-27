@@ -217,6 +217,14 @@ message Webhook {
   // sideEffects == Unknown or Some. Defaults to Unknown.
   // +optional
   optional string sideEffects = 6;
+
+  // TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+  // the webhook call will be ignored or the API call will fail based on the
+  // failure policy.
+  // The timeout value must be between 1 and 30 seconds.
+  // Default to 30 seconds.
+  // +optional
+  optional int32 timeoutSeconds = 7;
 }
 
 // WebhookClientConfig contains the information to make a TLS

@@ -1,3 +1,4 @@
+test/e2e/apimachinery/aggregator.go: "Should be able to support the 1.10 Sample API Server using the current Aggregator"
 test/e2e/apimachinery/custom_resource_definition.go: "creating/deleting custom resource definition objects works"
 test/e2e/apimachinery/garbage_collector.go: "should delete pods created by rc when not orphaning"
 test/e2e/apimachinery/garbage_collector.go: "should orphan pods created by rc if delete options say so"
@@ -178,6 +179,7 @@ test/e2e/kubectl/kubectl.go: "should create a job from an image, then delete the
 test/e2e/kubectl/kubectl.go: "should support proxy with --port 0"
 test/e2e/kubectl/kubectl.go: "should support --unix-socket=/path"
 test/e2e/network/dns.go: "should provide DNS for the cluster"
+test/e2e/network/dns.go: "should provide /etc/hosts entries for the cluster"
 test/e2e/network/dns.go: "should provide DNS for services"
 test/e2e/network/proxy.go: "should proxy logs on node with explicit kubelet port using proxy subresource"
 test/e2e/network/proxy.go: "should proxy logs on node using proxy subresource"

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -508,7 +507,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 
 func (config *NetworkingTestConfig) DeleteNodePortService() {
 	err := config.getServiceClient().Delete(config.NodePortService.Name, nil)
-	Expect(err).NotTo(HaveOccurred(), "error while deleting NodePortService. err:%v)", err)
+	ExpectNoError(err, "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
 
@@ -536,13 +535,13 @@ func (config *NetworkingTestConfig) createTestPods() {
 
 func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
 	_, err := config.getServiceClient().Create(serviceSpec)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
+	ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
+	ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(serviceSpec.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
+	ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	return createdService
 }
@@ -706,7 +705,7 @@ func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 }
 
 // Does an HTTP GET, but does not reuse TCP connections

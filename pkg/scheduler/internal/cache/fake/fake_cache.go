@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Cache is used for testing
@@ -75,8 +74,8 @@ func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 // RemoveNode is a fake method for testing.
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
-// UpdateNodeNameToInfoMap is a fake method for testing.
-func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulernodeinfo.NodeInfo) error {
+// UpdateNodeInfoSnapshot is a fake method for testing.
+func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulerinternalcache.NodeInfoSnapshot) error {
 	return nil
 }
 

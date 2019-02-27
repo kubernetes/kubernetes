@@ -133,6 +133,8 @@ type EndpointRestrictions interface {
 	AllowsStreamSchema(schema string) bool
 }
 
+// DefaultEndpointRestrictions is the default EndpointRestrictions which allows
+// content-type negotiation to verify server support for specific options
 var DefaultEndpointRestrictions = emptyEndpointRestrictions{}
 
 type emptyEndpointRestrictions struct{}

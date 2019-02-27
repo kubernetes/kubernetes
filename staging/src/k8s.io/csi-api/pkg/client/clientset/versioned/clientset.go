@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Csi() csiv1alpha1.CsiV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // CsiV1alpha1 retrieves the CsiV1alpha1Client
 func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
-	return c.csiV1alpha1
-}
-
-// Deprecated: Csi retrieves the default version of CsiClient.
-// Please explicitly pick a version.
-func (c *Clientset) Csi() csiv1alpha1.CsiV1alpha1Interface {
 	return c.csiV1alpha1
 }
 

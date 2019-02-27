@@ -66,7 +66,7 @@ var gpuUpgradeTests = []upgrades.Test{
 }
 
 var statefulsetUpgradeTests = []upgrades.Test{
-	&upgrades.MySqlUpgradeTest{},
+	&upgrades.MySQLUpgradeTest{},
 	&upgrades.EtcdUpgradeTest{},
 	&upgrades.CassandraUpgradeTest{},
 }

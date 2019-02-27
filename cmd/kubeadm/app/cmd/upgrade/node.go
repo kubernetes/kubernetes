@@ -43,7 +43,7 @@ var (
 	upgradeNodeConfigLongDesc = normalizer.LongDesc(`
 		Downloads the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the --kubelet-version parameter to determine
-		what the _desired_ kubelet version is. Give 
+		what the _desired_ kubelet version is. Give
 		`)
 
 	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`

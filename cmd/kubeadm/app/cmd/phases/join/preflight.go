@@ -23,7 +23,6 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -40,7 +39,7 @@ var (
 		kubeadm join phase preflight --config kubeadm-config.yml
 		`)
 
-	notReadyToJoinControPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
+	notReadyToJoinControlPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
 		One or more conditions for hosting a new control plane instance is not satisfied.
 
 		{{.Error}}
@@ -51,12 +50,6 @@ var (
 
 		`)))
 )
-
-type preflightData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	IgnorePreflightErrors() sets.String
-}
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
 func NewPreflightPhase() workflow.Phase {
@@ -86,7 +79,7 @@ func NewPreflightPhase() workflow.Phase {
 
 // runPreflight executes preflight checks logic.
 func runPreflight(c workflow.RunData) error {
-	j, ok := c.(preflightData)
+	j, ok := c.(JoinData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
@@ -112,20 +105,21 @@ func runPreflight(c workflow.RunData) error {
 	if j.Cfg().ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
-		if err := checkIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration); err != nil {
+		hasCertificateKey := len(j.CertificateKey()) > 0
+		if err := checkIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration, hasCertificateKey); err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
 			}
 
 			var msg bytes.Buffer
-			notReadyToJoinControPlaneTemp.Execute(&msg, ctx)
+			notReadyToJoinControlPlaneTemp.Execute(&msg, ctx)
 			return errors.New(msg.String())
 		}
 
 		// run kubeadm init preflight checks for checking all the prequisites
 		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
-		if err := preflight.RunInitMasterChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
+		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
 			return err
 		}
 
@@ -141,15 +135,17 @@ func runPreflight(c workflow.RunData) error {
 
 // checkIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to preflight
-func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration) error {
+func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
 		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
-	// checks if the certificates that must be equal across contolplane instances are provided
-	if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
-		return err
+	if !hasCertificateKey {
+		// checks if the certificates that must be equal across controlplane instances are provided
+		if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
+			return err
+		}
 	}
 
 	return nil

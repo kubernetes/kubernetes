@@ -111,7 +111,7 @@ func TestApiserverMetrics(t *testing.T) {
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	if _, err := client.Core().Pods(metav1.NamespaceDefault).List(metav1.ListOptions{}); err != nil {
+	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 

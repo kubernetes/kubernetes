@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -229,7 +229,10 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	// if --print-join-command was specified, print the full `kubeadm join` command
 	// otherwise, just print the token
 	if printJoinCommand {
-		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), false)
+		key := ""
+		skipTokenPrint := false
+		uploadCerts := false
+		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), key, skipTokenPrint, uploadCerts)
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}

@@ -26,6 +26,8 @@ import (
 
 func strPtr(s string) *string { return &s }
 
+func int32Ptr(i int32) *int32 { return &i }
+
 func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
 	return &admissionregistration.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -543,6 +545,63 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				}),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
+		},
+		{
+			name: "timeout seconds cannot be greater than 30",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(31),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: 31: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "timeout seconds cannot be smaller than 1",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(0),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: 0: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "timeout seconds must be positive",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(-1),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: -1: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "valid timeout seconds",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(1),
+					},
+					{
+						Name:           "webhook2.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(15),
+					},
+					{
+						Name:           "webhook3.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(30),
+					},
+				}),
 		},
 	}
 	for _, test := range tests {

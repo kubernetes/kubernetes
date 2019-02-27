@@ -36,7 +36,7 @@ import (
 
 var (
 	uploadKubeadmConfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Uploads the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace. 
+		Uploads the kubeadm ClusterConfiguration to a ConfigMap called %s in the %s namespace.
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
@@ -57,11 +57,6 @@ var (
 		kubeadm init phase upload-config kubelet --config kubeadm.yaml
 		`)
 )
-
-type uploadConfigData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	Client() (clientset.Interface, error)
-}
 
 // NewUploadConfigPhase returns the phase to uploadConfig
 func NewUploadConfigPhase() workflow.Phase {
@@ -138,7 +133,7 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 }
 
 func getUploadConfigData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, error) {
-	data, ok := c.(uploadConfigData)
+	data, ok := c.(InitData)
 	if !ok {
 		return nil, nil, errors.New("upload-config phase invoked with an invalid data struct")
 	}

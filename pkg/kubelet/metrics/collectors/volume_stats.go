@@ -59,11 +59,11 @@ var (
 )
 
 type volumeStatsCollector struct {
-	statsProvider serverstats.StatsProvider
+	statsProvider serverstats.Provider
 }
 
 // NewVolumeStatsCollector creates a volume stats prometheus collector.
-func NewVolumeStatsCollector(statsProvider serverstats.StatsProvider) prometheus.Collector {
+func NewVolumeStatsCollector(statsProvider serverstats.Provider) prometheus.Collector {
 	return &volumeStatsCollector{statsProvider: statsProvider}
 }
 

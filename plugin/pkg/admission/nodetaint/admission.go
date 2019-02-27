@@ -64,7 +64,7 @@ var (
 )
 
 // Admit is the main function that checks node identity and adds taints as needed.
-func (p *Plugin) Admit(a admission.Attributes) error {
+func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// If TaintNodesByCondition is not enabled, we don't need to do anything.
 	if !p.features.Enabled(features.TaintNodesByCondition) {
 		return nil

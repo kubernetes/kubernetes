@@ -56,7 +56,7 @@ if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
   # In multizone mode we need to add instances for all nodes in the region.
   if [[ "${MULTIZONE:-}" == "true" ]]; then
     EXPECTED_NUM_NODES=$(gcloud -q compute instances list --project="${PROJECT}" --format=[no-heading] \
-      --filter="name ~ '${NODE_INSTANCE_PREFIX}.*' AND zone:($(gcloud -q compute zones list --project="${PROJECT}" --filter=region=${REGION} --format=csv[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//"))" | wc -l)
+      --filter="(name ~ '${NODE_INSTANCE_PREFIX}.*' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}.*') AND zone:($(gcloud -q compute zones list --project="${PROJECT}" --filter=region=${REGION} --format=csv[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//"))" | wc -l)
     echo "Computing number of nodes, NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX}, REGION=${REGION}, EXPECTED_NUM_NODES=${EXPECTED_NUM_NODES}"
   fi
 else

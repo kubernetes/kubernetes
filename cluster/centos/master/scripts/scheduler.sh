@@ -30,7 +30,7 @@ KUBE_LOG_LEVEL="--v=4"
 # --master: The address of the Kubernetes API server (overrides any value in kubeconfig).
 KUBE_MASTER="--master=${MASTER_ADDRESS}:8080"
 
-# --leader-elect: Start a leader election client and gain leadership before 
+# --leader-elect: Start a leader election client and gain leadership before
 # executing the main loop. Enable this when running replicated components for high availability.
 KUBE_LEADER_ELECT="--leader-elect"
 

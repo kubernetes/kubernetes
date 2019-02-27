@@ -140,8 +140,9 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Release : v1.13
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
+			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
 		*/
-		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func() {
+		framework.ConformanceIt("should write entries to /etc/hosts [LinuxOnly] [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,

@@ -79,12 +79,14 @@ extensions/v1beta1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
+networking.k8s.io/v1beta1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
 rbac.authorization.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1beta1 \
+scheduling.k8s.io/v1 \
 settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \

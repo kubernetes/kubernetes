@@ -61,7 +61,7 @@ var (
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects.
 
 		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
-		
+
 		Existing roles are updated to include the permissions in the input objects,
 		and remove extra permissions if --remove-extra-permissions is specified.
 
@@ -107,13 +107,16 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", o.DryRun, "If true, display results but do not submit changes")
 	cmd.Flags().BoolVar(&o.RemoveExtraPermissions, "remove-extra-permissions", o.RemoveExtraPermissions, "If true, removes extra permissions added to roles")
 	cmd.Flags().BoolVar(&o.RemoveExtraSubjects, "remove-extra-subjects", o.RemoveExtraSubjects, "If true, removes extra subjects added to rolebindings")
-	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }
 
 // Complete completes all the required options
 func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
+	if err := o.FilenameOptions.RequireFilenameOrKustomize(); err != nil {
+		return err
+	}
+
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
 	}

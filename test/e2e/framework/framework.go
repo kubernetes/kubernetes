@@ -119,7 +119,7 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest metrics.MetricsCollection
+	clusterAutoscalerMetricsBeforeTest metrics.Collection
 }
 
 type TestDataSummary interface {
@@ -175,7 +175,7 @@ func (f *Framework) BeforeEach() {
 				componentTexts)
 		}
 
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
 		if f.Options.GroupVersion != nil {
@@ -185,23 +185,23 @@ func (f *Framework) BeforeEach() {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.APIExtensionsClientSet, err = apiextensionsclient.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.InternalClientset, err = internalclientset.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		// csi.storage.k8s.io is based on CRD, which is served only as JSON
 		jsonConfig := config
 		jsonConfig.ContentType = "application/json"
 		f.CSIClientSet, err = csi.NewForConfig(jsonConfig)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		// node.k8s.io is also based on CRD
 		f.NodeAPIClientSet, err = nodeapiclient.NewForConfig(jsonConfig)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 		// as they are required when creating a REST client.
@@ -212,9 +212,9 @@ func (f *Framework) BeforeEach() {
 			config.NegotiatedSerializer = legacyscheme.Codecs
 		}
 		restClient, err := rest.RESTClientFor(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
@@ -229,14 +229,14 @@ func (f *Framework) BeforeEach() {
 		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 
 		f.Namespace = namespace
 
 		if TestContext.VerifyServiceAccount {
 			By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-			Expect(err).NotTo(HaveOccurred())
+			ExpectNoError(err)
 		} else {
 			Logf("Skipping waiting for service account")
 		}

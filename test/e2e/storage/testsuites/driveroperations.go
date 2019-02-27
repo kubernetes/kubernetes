@@ -37,13 +37,13 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 }
 
 // CreateVolume creates volume for test unless dynamicPV test
-func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface{} {
+func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns.TestVolType) TestVolume {
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			return pDriver.CreateVolume(volType)
+			return pDriver.CreateVolume(config, volType)
 		}
 	case testpatterns.DynamicPV:
 		// No need to create volume
@@ -51,22 +51,6 @@ func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface
 		framework.Failf("Invalid volType specified: %v", volType)
 	}
 	return nil
-}
-
-// DeleteVolume deletes volume for test unless dynamicPV test
-func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType, testResource interface{}) {
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			pDriver.DeleteVolume(volType, testResource)
-		}
-	case testpatterns.DynamicPV:
-		// No need to delete volume
-	default:
-		framework.Failf("Invalid volType specified: %v", volType)
-	}
 }
 
 // GetStorageClass constructs a new StorageClass instance
@@ -118,9 +102,4 @@ func GetSnapshotClass(
 	}
 
 	return snapshotClass
-}
-
-// GetUniqueDriverName returns unique driver name that can be used parallelly in tests
-func GetUniqueDriverName(driver TestDriver) string {
-	return fmt.Sprintf("%s-%s", driver.GetDriverInfo().Name, driver.GetDriverInfo().Config.Framework.UniqueName)
 }

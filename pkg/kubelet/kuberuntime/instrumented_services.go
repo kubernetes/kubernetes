@@ -183,7 +183,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandbox
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
-	defer metrics.RunPodSandboxLatencies.WithLabelValues(runtimeHandler).Observe(metrics.SinceInMicroseconds(startTime))
+	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
 
 	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)

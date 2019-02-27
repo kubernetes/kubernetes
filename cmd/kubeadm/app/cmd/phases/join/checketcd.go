@@ -20,18 +20,10 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 )
-
-type checkEtcdData interface {
-	Cfg() *kubeadmapi.JoinConfiguration
-	ClientSetFromFile(string) (*clientset.Clientset, error)
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-}
 
 // NewCheckEtcdPhase is a hidden phase that runs after the control-plane-prepare and
 // before the bootstrap-kubelet phase that ensures etcd is healthy
@@ -44,7 +36,7 @@ func NewCheckEtcdPhase() workflow.Phase {
 }
 
 func runCheckEtcdPhase(c workflow.RunData) error {
-	data, ok := c.(checkEtcdData)
+	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("check-etcd phase invoked with an invalid data struct")
 	}

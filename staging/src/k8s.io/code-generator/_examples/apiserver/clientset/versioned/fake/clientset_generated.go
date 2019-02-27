@@ -78,17 +78,7 @@ func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
 	return &fakeexamplev1.FakeExampleV1{Fake: &c.Fake}
 }
 
-// Example retrieves the ExampleV1Client
-func (c *Clientset) Example() examplev1.ExampleV1Interface {
-	return &fakeexamplev1.FakeExampleV1{Fake: &c.Fake}
-}
-
 // SecondExampleV1 retrieves the SecondExampleV1Client
 func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
-	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
-}
-
-// SecondExample retrieves the SecondExampleV1Client
-func (c *Clientset) SecondExample() secondexamplev1.SecondExampleV1Interface {
 	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
 }

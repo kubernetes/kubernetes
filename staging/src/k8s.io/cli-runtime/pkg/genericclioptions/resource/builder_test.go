@@ -374,6 +374,62 @@ func writeTestFile(t *testing.T, path string, contents string) {
 	}
 }
 
+func TestFilenameOptionsValidate(t *testing.T) {
+	testcases := []struct {
+		filenames []string
+		kustomize string
+		recursive bool
+		errExp    bool
+		msgExp    string
+	}{
+		{
+			filenames: []string{"file"},
+			kustomize: "dir",
+			errExp:    true,
+			msgExp:    "only one of -f or -k can be specified",
+		},
+		{
+			kustomize: "dir",
+			recursive: true,
+			errExp:    true,
+			msgExp:    "the -k flag can't be used with -f or -R",
+		},
+		{
+			filenames: []string{"file"},
+			errExp:    false,
+		},
+		{
+			filenames: []string{"dir"},
+			recursive: true,
+			errExp:    false,
+		},
+		{
+			kustomize: "dir",
+			errExp:    false,
+		},
+	}
+	for _, testcase := range testcases {
+		o := &FilenameOptions{
+			Kustomize: testcase.kustomize,
+			Filenames: testcase.filenames,
+			Recursive: testcase.recursive,
+		}
+		errs := o.validate()
+		if testcase.errExp {
+			if len(errs) == 0 {
+				t.Fatalf("expected error not happened")
+			}
+			if errs[0].Error() != testcase.msgExp {
+				t.Fatalf("expected %s, but got %#v", testcase.msgExp, errs[0])
+			}
+		} else {
+			if len(errs) > 0 {
+				t.Fatalf("Unexpected error %#v", errs)
+			}
+		}
+	}
+}
+
 func TestPathBuilderWithMultiple(t *testing.T) {
 	// create test dirs
 	tmpDir, err := utiltesting.MkTmpdir("recursive_test_multiple")
@@ -510,6 +566,160 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("unexpected responses: %#v", test.Infos)
+	}
+}
+
+func setupKustomizeDirectory() (string, error) {
+	path, err := ioutil.TempDir("/tmp", "")
+	if err != nil {
+		return "", err
+	}
+
+	contents := map[string]string{
+		"configmap.yaml": `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: the-map
+data:
+  altGreeting: "Good Morning!"
+  enableRisky: "false"
+`,
+		"deployment.yaml": `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: the-deployment
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        deployment: hello
+    spec:
+      containers:
+      - name: the-container
+        image: monopole/hello:1
+        command: ["/hello",
+                  "--port=8080",
+                  "--enableRiskyFeature=$(ENABLE_RISKY)"]
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ALT_GREETING
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: altGreeting
+        - name: ENABLE_RISKY
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: enableRisky
+`,
+		"service.yaml": `
+kind: Service
+apiVersion: v1
+metadata:
+  name: the-service
+spec:
+  selector:
+    deployment: hello
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 8666
+    targetPort: 8080
+`,
+		"kustomization.yaml": `
+nameprefix: test-
+resources:
+- deployment.yaml
+- service.yaml
+- configmap.yaml
+`,
+	}
+
+	for filename, content := range contents {
+		err = ioutil.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
+		if err != nil {
+			return "", err
+		}
+	}
+	return path, nil
+}
+
+func TestKustomizeDirectoryBuilder(t *testing.T) {
+	dir, err := setupKustomizeDirectory()
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	tests := []struct {
+		directory     string
+		expectErr     bool
+		errMsg        string
+		number        int
+		expectedNames []string
+	}{
+		{
+			directory: "../../../artifacts/guestbook",
+			expectErr: true,
+			errMsg:    "No kustomization file found",
+		},
+		{
+			directory:     dir,
+			expectErr:     false,
+			expectedNames: []string{"test-the-map", "test-the-deployment", "test-the-service"},
+		},
+		{
+			directory: filepath.Join(dir, "kustomization.yaml"),
+			expectErr: true,
+			errMsg:    "must be a directory to be a root",
+		},
+		{
+			directory: "../../../artifacts/kustomization/should-not-load.yaml",
+			expectErr: true,
+			errMsg:    "must be a directory to be a root",
+		},
+	}
+	for _, tt := range tests {
+		b := newDefaultBuilder().
+			FilenameParam(false, &FilenameOptions{Kustomize: tt.directory}).
+			NamespaceParam("test").DefaultNamespace()
+		test := &testVisitor{}
+		err := b.Do().Visit(test.Handle)
+		if tt.expectErr {
+			if err == nil {
+				t.Fatalf("expected error unhappened")
+			}
+			if !strings.Contains(err.Error(), tt.errMsg) {
+				t.Fatalf("expected %s but got %s", tt.errMsg, err.Error())
+			}
+		} else {
+			if err != nil || len(test.Infos) < tt.number {
+				t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+			}
+			contained := func(name string) bool {
+				for _, info := range test.Infos {
+					if info.Name == name && info.Namespace == "test" && info.Object != nil {
+						return true
+					}
+				}
+				return false
+			}
+
+			allFound := true
+			for _, name := range tt.expectedNames {
+				if !contained(name) {
+					allFound = false
+				}
+			}
+			if !allFound {
+				t.Errorf("unexpected responses: %#v", test.Infos)
+			}
+		}
 	}
 }
 

@@ -18,11 +18,9 @@ package wait
 
 import (
 	"io/ioutil"
-	"testing"
-
-	"time"
-
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -32,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
@@ -203,7 +200,7 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			timeout: 1 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -254,7 +251,7 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			timeout: 3 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
@@ -554,7 +551,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			timeout: 1 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -605,7 +602,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			timeout: 3 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))

@@ -28,7 +28,7 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_PriorityClass = map[string]string{
-	"":              "PriorityClass defines mapping from a priority class name to the priority integer value. The value can be any valid integer.",
+	"":              "DEPRECATED - This group version of PriorityClass is deprecated by scheduling.k8s.io/v1/PriorityClass. PriorityClass defines mapping from a priority class name to the priority integer value. The value can be any valid integer.",
 	"metadata":      "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"value":         "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
 	"globalDefault": "globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class. Only one PriorityClass can be marked as `globalDefault`. However, if more than one PriorityClasses exists with their `globalDefault` field set to true, the smallest value of such global default PriorityClasses will be used as the default priority.",

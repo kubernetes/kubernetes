@@ -77,7 +77,7 @@ spec:
             path: /readiness
             port: 8081
             scheme: HTTP
-          # we poll on pod startup for the Kubernetes master service and
+          # we poll on pod startup for the Kubernetes control-plane service and
           # only setup the /readiness HTTP server once that's available.
           initialDelaySeconds: 3
           timeoutSeconds: 5
@@ -173,7 +173,7 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
+      - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
 `
 
@@ -241,7 +241,7 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
+      - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
       nodeSelector:
         beta.kubernetes.io/os: linux
@@ -279,6 +279,11 @@ spec:
           timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

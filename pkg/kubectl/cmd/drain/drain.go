@@ -20,77 +20,40 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/drain"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-type DrainOptions struct {
+type DrainCmdOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
-	Namespace          string
-	client             kubernetes.Interface
-	restClient         *restclient.RESTClient
-	Force              bool
-	DryRun             bool
-	GracePeriodSeconds int
-	IgnoreDaemonsets   bool
-	Timeout            time.Duration
-	DeleteLocalData    bool
-	Selector           string
-	PodSelector        string
-	nodeInfos          []*resource.Info
+	Namespace string
+
+	drainer   *drain.Helper
+	nodeInfos []*resource.Info
 
 	genericclioptions.IOStreams
 }
-
-// Takes a pod and returns a bool indicating whether or not to operate on the
-// pod, an optional warning message, and an optional fatal error.
-type podFilter func(corev1.Pod) (include bool, w *warning, f *fatal)
-type warning struct {
-	string
-}
-type fatal struct {
-	string
-}
-
-const (
-	EvictionKind        = "Eviction"
-	EvictionSubresource = "pods/eviction"
-
-	daemonsetFatal      = "DaemonSet-managed Pods (use --ignore-daemonsets to ignore)"
-	daemonsetWarning    = "ignoring DaemonSet-managed Pods"
-	localStorageFatal   = "Pods with local storage (use --delete-local-data to override)"
-	localStorageWarning = "deleting Pods with local storage"
-	unmanagedFatal      = "Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
-	unmanagedWarning    = "deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
-)
 
 var (
 	cordonLong = templates.LongDesc(i18n.T(`
@@ -102,7 +65,7 @@ var (
 )
 
 func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewDrainOptions(f, ioStreams)
+	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "cordon NODE",
@@ -115,7 +78,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
 		},
 	}
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -130,7 +93,7 @@ var (
 )
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewDrainOptions(f, ioStreams)
+	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "uncordon NODE",
@@ -143,7 +106,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
 		},
 	}
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -153,7 +116,7 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		'drain' evicts the pods if the APIServer supports 
+		'drain' evicts the pods if the APIServer supports
 		[eviction](http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
@@ -182,17 +145,19 @@ var (
 		$ kubectl drain foo --grace-period=900`))
 )
 
-func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainOptions {
-	return &DrainOptions{
+func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
+	return &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
-
-		IOStreams:          ioStreams,
-		GracePeriodSeconds: -1,
+		IOStreams:  ioStreams,
+		drainer: &drain.Helper{
+			GracePeriodSeconds: -1,
+			ErrOut:             ioStreams.ErrOut,
+		},
 	}
 }
 
 func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewDrainOptions(f, ioStreams)
+	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "drain NODE",
@@ -205,13 +170,13 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Force, "force", o.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&o.IgnoreDaemonsets, "ignore-daemonsets", o.IgnoreDaemonsets, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&o.DeleteLocalData, "delete-local-data", o.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
-	cmd.Flags().IntVar(&o.GracePeriodSeconds, "grace-period", o.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before giving up, zero means infinite")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
-	cmd.Flags().StringVarP(&o.PodSelector, "pod-selector", "", o.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&o.drainer.DeleteLocalData, "delete-local-data", o.drainer.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
+	cmd.Flags().IntVar(&o.drainer.GracePeriodSeconds, "grace-period", o.drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -219,31 +184,26 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 
 // Complete populates some fields from the factory, grabs command line
 // arguments and looks up the node using Builder
-func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	if len(args) == 0 && !cmd.Flags().Changed("selector") {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
-	if len(args) > 0 && len(o.Selector) > 0 {
+	if len(args) > 0 && len(o.drainer.Selector) > 0 {
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.client, err = f.KubernetesClientSet(); err != nil {
+	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
 
-	if len(o.PodSelector) > 0 {
-		if _, err := labels.Parse(o.PodSelector); err != nil {
+	if len(o.drainer.PodSelector) > 0 {
+		if _, err := labels.Parse(o.drainer.PodSelector); err != nil {
 			return errors.New("--pod-selector=<pod_selector> must be a valid label selector")
 		}
-	}
-
-	o.restClient, err = f.RESTClient()
-	if err != nil {
-		return err
 	}
 
 	o.nodeInfos = []*resource.Info{}
@@ -255,7 +215,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
+		if o.drainer.DryRun {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -274,8 +234,8 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		SingleResourceType().
 		Flatten()
 
-	if len(o.Selector) > 0 {
-		builder = builder.LabelSelectorParam(o.Selector).
+	if len(o.drainer.Selector) > 0 {
+		builder = builder.LabelSelectorParam(o.drainer.Selector).
 			ResourceTypes("nodes")
 	}
 
@@ -299,7 +259,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 // RunDrain runs the 'drain' command
-func (o *DrainOptions) RunDrain() error {
+func (o *DrainCmdOptions) RunDrain() error {
 	if err := o.RunCordonOrUncordon(true); err != nil {
 		return err
 	}
@@ -314,10 +274,10 @@ func (o *DrainOptions) RunDrain() error {
 
 	for _, info := range o.nodeInfos {
 		var err error
-		if !o.DryRun {
+		if !o.drainer.DryRun {
 			err = o.deleteOrEvictPodsSimple(info)
 		}
-		if err == nil || o.DryRun {
+		if err == nil || o.drainer.DryRun {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
@@ -344,218 +304,43 @@ func (o *DrainOptions) RunDrain() error {
 	return fatal
 }
 
-func (o *DrainOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
-	pods, err := o.getPodsForDeletion(nodeInfo)
-	if err != nil {
-		return err
+func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
+	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+	if errs != nil {
+		return utilerrors.NewAggregate(errs)
+	}
+	if warnings := list.Warnings(); warnings != "" {
+		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
 	}
 
-	err = o.deleteOrEvictPods(pods)
-	if err != nil {
-		pendingPods, newErr := o.getPodsForDeletion(nodeInfo)
-		if newErr != nil {
-			return newErr
-		}
+	if err := o.deleteOrEvictPods(list.Pods()); err != nil {
+		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+
 		fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
-		for _, pendingPod := range pendingPods {
+		for _, pendingPod := range pendingList.Pods() {
 			fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
 		}
-	}
-	return err
-}
-
-func (o *DrainOptions) getPodController(pod corev1.Pod) *metav1.OwnerReference {
-	return metav1.GetControllerOf(&pod)
-}
-
-func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fatal) {
-	// any finished pod can be removed
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return true, nil, nil
-	}
-
-	controllerRef := o.getPodController(pod)
-	if controllerRef != nil {
-		return true, nil, nil
-	}
-	if o.Force {
-		return true, &warning{unmanagedWarning}, nil
-	}
-
-	return false, nil, &fatal{unmanagedFatal}
-}
-
-func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
-	// Note that we return false in cases where the pod is DaemonSet managed,
-	// regardless of flags.
-	//
-	// The exception is for pods that are orphaned (the referencing
-	// management resource - including DaemonSet - is not found).
-	// Such pods will be deleted if --force is used.
-	controllerRef := o.getPodController(pod)
-	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
-		return true, nil, nil
-	}
-	// Any finished pod can be removed.
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return true, nil, nil
-	}
-
-	if _, err := o.client.AppsV1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
-		// remove orphaned pods with a warning if --force is used
-		if apierrors.IsNotFound(err) && o.Force {
-			return true, &warning{err.Error()}, nil
+		if newErrs != nil {
+			fmt.Fprintf(o.ErrOut, "following errors also occurred:\n%s", utilerrors.NewAggregate(newErrs))
 		}
-
-		return false, nil, &fatal{err.Error()}
+		return err
 	}
-
-	if !o.IgnoreDaemonsets {
-		return false, nil, &fatal{daemonsetFatal}
-	}
-
-	return false, &warning{daemonsetWarning}, nil
-}
-
-func mirrorPodFilter(pod corev1.Pod) (bool, *warning, *fatal) {
-	if _, found := pod.ObjectMeta.Annotations[corev1.MirrorPodAnnotationKey]; found {
-		return false, nil, nil
-	}
-	return true, nil, nil
-}
-
-func hasLocalStorage(pod corev1.Pod) bool {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.EmptyDir != nil {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (o *DrainOptions) localStorageFilter(pod corev1.Pod) (bool, *warning, *fatal) {
-	if !hasLocalStorage(pod) {
-		return true, nil, nil
-	}
-	// Any finished pod can be removed.
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return true, nil, nil
-	}
-	if !o.DeleteLocalData {
-		return false, nil, &fatal{localStorageFatal}
-	}
-
-	return true, &warning{localStorageWarning}, nil
-}
-
-// Map of status message to a list of pod names having that status.
-type podStatuses map[string][]string
-
-func (ps podStatuses) Message() string {
-	msgs := []string{}
-
-	for key, pods := range ps {
-		msgs = append(msgs, fmt.Sprintf("%s: %s", key, strings.Join(pods, ", ")))
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
-// are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
-func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
-	labelSelector, err := labels.Parse(o.PodSelector)
-	if err != nil {
-		return pods, err
-	}
-
-	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
-	if err != nil {
-		return pods, err
-	}
-
-	ws := podStatuses{}
-	fs := podStatuses{}
-
-	for _, pod := range podList.Items {
-		podOk := true
-		for _, filt := range []podFilter{o.daemonsetFilter, mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter} {
-			filterOk, w, f := filt(pod)
-
-			podOk = podOk && filterOk
-			if w != nil {
-				ws[w.string] = append(ws[w.string], pod.Name)
-			}
-			if f != nil {
-				fs[f.string] = append(fs[f.string], pod.Name)
-			}
-
-			// short-circuit as soon as pod not ok
-			// at that point, there is no reason to run pod
-			// through any additional filters
-			if !podOk {
-				break
-			}
-		}
-		if podOk {
-			pods = append(pods, pod)
-		}
-	}
-
-	if len(fs) > 0 {
-		return []corev1.Pod{}, errors.New(fs.Message())
-	}
-	if len(ws) > 0 {
-		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", ws.Message())
-	}
-	return pods, nil
-}
-
-func (o *DrainOptions) deletePod(pod corev1.Pod) error {
-	deleteOptions := &metav1.DeleteOptions{}
-	if o.GracePeriodSeconds >= 0 {
-		gracePeriodSeconds := int64(o.GracePeriodSeconds)
-		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
-	}
-	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
-}
-
-func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
-	deleteOptions := &metav1.DeleteOptions{}
-	if o.GracePeriodSeconds >= 0 {
-		gracePeriodSeconds := int64(o.GracePeriodSeconds)
-		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
-	}
-	eviction := &policyv1beta1.Eviction{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyGroupVersion,
-			Kind:       EvictionKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		},
-		DeleteOptions: deleteOptions,
-	}
-	// Remember to change change the URL manipulation func when Evction's version change
-	return o.client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(eviction)
+	return nil
 }
 
 // deleteOrEvictPods deletes or evicts the pods on the api server
-func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
+func (o *DrainCmdOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
 
-	policyGroupVersion, err := SupportEviction(o.client)
+	policyGroupVersion, err := drain.CheckEvictionSupport(o.drainer.Client)
 	if err != nil {
 		return err
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.drainer.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {
@@ -565,14 +350,14 @@ func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	}
 }
 
-func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	returnCh := make(chan error, 1)
 
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
-			var err error
 			for {
-				err = o.evictPod(pod, policyGroupVersion)
+				fmt.Fprintf(o.Out, "evicting pod %q\n", pod.Name)
+				err := o.drainer.EvictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
 				} else if apierrors.IsNotFound(err) {
@@ -586,8 +371,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 					return
 				}
 			}
-			podArray := []corev1.Pod{pod}
-			_, err = o.waitForDelete(podArray, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn)
+			_, err := o.waitForDelete([]corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn)
 			if err == nil {
 				returnCh <- nil
 			} else {
@@ -601,10 +385,10 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if o.Timeout == 0 {
+	if o.drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = o.Timeout
+		globalTimeout = o.drainer.Timeout
 	}
 	globalTimeoutCh := time.After(globalTimeout)
 	numPods := len(pods)
@@ -616,22 +400,22 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 				errors = append(errors, err)
 			}
 		case <-globalTimeoutCh:
-			return fmt.Errorf("Drain did not complete within %v", globalTimeout)
+			return fmt.Errorf("drain did not complete within %v", globalTimeout)
 		}
 	}
 	return utilerrors.NewAggregate(errors)
 }
 
-func (o *DrainOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+func (o *DrainCmdOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
-	if o.Timeout == 0 {
+	if o.drainer.Timeout == 0 {
 		globalTimeout = time.Duration(math.MaxInt64)
 	} else {
-		globalTimeout = o.Timeout
+		globalTimeout = o.drainer.Timeout
 	}
 	for _, pod := range pods {
-		err := o.deletePod(pod)
+		err := o.drainer.DeletePod(pod)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -640,7 +424,7 @@ func (o *DrainOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, na
 	return err
 }
 
-func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error)) ([]corev1.Pod, error) {
+func (o *DrainCmdOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error)) ([]corev1.Pod, error) {
 	var verbStr string
 	if usingEviction {
 		verbStr = "evicted"
@@ -674,65 +458,29 @@ func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.D
 	return pods, err
 }
 
-// SupportEviction uses Discovery API to find out if the server support eviction subresource
-// If support, it will return its groupVersion; Otherwise, it will return ""
-func SupportEviction(clientset kubernetes.Interface) (string, error) {
-	discoveryClient := clientset.Discovery()
-	groupList, err := discoveryClient.ServerGroups()
-	if err != nil {
-		return "", err
-	}
-	foundPolicyGroup := false
-	var policyGroupVersion string
-	for _, group := range groupList.Groups {
-		if group.Name == "policy" {
-			foundPolicyGroup = true
-			policyGroupVersion = group.PreferredVersion.GroupVersion
-			break
-		}
-	}
-	if !foundPolicyGroup {
-		return "", nil
-	}
-	resourceList, err := discoveryClient.ServerResourcesForGroupVersion("v1")
-	if err != nil {
-		return "", err
-	}
-	for _, resource := range resourceList.APIResources {
-		if resource.Name == EvictionSubresource && resource.Kind == EvictionKind {
-			return policyGroupVersion, nil
-		}
-	}
-	return "", nil
-}
-
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
 // "Unschedulable" is passed as the first arg.
-func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
+func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 	cordonOrUncordon := "cordon"
 	if !desired {
 		cordonOrUncordon = "un" + cordonOrUncordon
 	}
 
 	for _, nodeInfo := range o.nodeInfos {
-		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := scheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+
+		printError := func(err error) {
+			fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
+		}
+
+		gvk := nodeInfo.ResourceMapping().GroupVersionKind
+		if gvk.Kind == "Node" {
+			c, err := drain.NewCordonHelperFromRuntimeObject(nodeInfo.Object, scheme.Scheme, gvk)
 			if err != nil {
-				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
+				printError(err)
 				continue
 			}
-			oldData, err := json.Marshal(obj)
-			if err != nil {
-				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
-				continue
-			}
-			node, ok := obj.(*corev1.Node)
-			if !ok {
-				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: unexpected Type%T, expected Node\n", cordonOrUncordon, nodeInfo.Name, obj)
-				continue
-			}
-			unsched := node.Spec.Unschedulable
-			if unsched == desired {
+
+			if updateRequired := c.UpdateIfRequired(desired); !updateRequired {
 				printObj, err := o.ToPrinter(already(desired))
 				if err != nil {
 					fmt.Fprintf(o.ErrOut, "error: %v\n", err)
@@ -740,22 +488,13 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				}
 				printObj(nodeInfo.Object, o.Out)
 			} else {
-				if !o.DryRun {
-					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
-					node.Spec.Unschedulable = desired
-					newData, err := json.Marshal(obj)
-					if err != nil {
-						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
-						continue
+				if !o.drainer.DryRun {
+					err, patchErr := c.PatchOrReplace(o.drainer.Client)
+					if patchErr != nil {
+						printError(patchErr)
 					}
-					patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 					if err != nil {
-						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
-						continue
-					}
-					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes, nil)
-					if err != nil {
-						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
+						printError(err)
 						continue
 					}
 				}

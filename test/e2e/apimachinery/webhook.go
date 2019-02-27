@@ -64,6 +64,7 @@ const (
 	dummyValidatingWebhookConfigName       = "e2e-test-dummy-validating-webhook-config"
 	dummyMutatingWebhookConfigName         = "e2e-test-dummy-mutating-webhook-config"
 	crdWebhookConfigName                   = "e2e-test-webhook-config-crd"
+	slowWebhookConfigName                  = "e2e-test-webhook-config-slow"
 
 	skipNamespaceLabelKey   = "skip-webhook-admission"
 	skipNamespaceLabelValue = "yes"
@@ -181,6 +182,49 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer crdWebhookCleanup()
 
 		testCRDDenyWebhook(f)
+	})
+
+	It("Should mutate custom resource with different stored version", func() {
+		testcrd, err := framework.CreateMultiVersionTestCRDWithV1Storage(f)
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
+		defer webhookCleanup()
+		testMultiVersionCustomResourceWebhook(f, testcrd)
+	})
+
+	It("Should deny crd creation", func() {
+		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
+		defer crdWebhookCleanup()
+
+		testCRDDenyWebhook(f)
+	})
+
+	It("Should honor timeout", func() {
+		policyFail := v1beta1.Fail
+		policyIgnore := v1beta1.Ignore
+
+		By("Setting timeout (1s) shorter than webhook latency (5s)")
+		slowWebhookCleanup := registerSlowWebhook(f, context, &policyFail, int32Ptr(1))
+		testSlowWebhookTimeoutFailEarly(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is shorter than webhook latency and failure policy is ignore")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyIgnore, int32Ptr(1))
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is longer than webhook latency")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyFail, int32Ptr(10))
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
+
+		By("Having no error when timeout is empty (defaulted to 10s in v1beta1)")
+		slowWebhookCleanup = registerSlowWebhook(f, context, &policyFail, nil)
+		testSlowWebhookTimeoutNoError(f)
+		slowWebhookCleanup()
 	})
 
 	// TODO: add more e2e tests for mutating webhooks
@@ -338,6 +382,8 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 }
 
 func strPtr(s string) *string { return &s }
+
+func int32Ptr(i int32) *int32 { return &i }
 
 func registerWebhook(f *framework.Framework, context *certContext) func() {
 	client := f.ClientSet
@@ -1154,7 +1200,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 			{
 				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
 						APIVersions: testcrd.GetAPIVersions(),
@@ -1195,7 +1241,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 			{
 				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{testcrd.ApiGroup},
 						APIVersions: testcrd.GetAPIVersions(),
@@ -1290,6 +1336,37 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
 	}
+}
+
+func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *framework.TestCrd) {
+	customResourceClient := testcrd.GetV1DynamicClient()
+	By("Creating a custom resource while v1 is storage version")
+	crName := "cr-instance-1"
+	cr := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       testcrd.Crd.Spec.Names.Kind,
+			"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Version,
+			"metadata": map[string]interface{}{
+				"name":      crName,
+				"namespace": f.Namespace.Name,
+			},
+			"data": map[string]interface{}{
+				"mutation-start": "yes",
+			},
+		},
+	}
+	_, err := customResourceClient.Create(cr, metav1.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred(), "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+
+	By("Patching Custom Resource Definition to set v2 as storage")
+	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
+	_, err = testcrd.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
+	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
+
+	By("Patching the custom resource while v2 is storage version")
+	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
+	_, err = testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
+	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
 }
 
 func registerValidatingWebhookForCRD(f *framework.Framework, context *certContext) func() {
@@ -1395,4 +1472,70 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
+}
+
+func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v1beta1.FailurePolicyType, timeout *int32) func() {
+	client := f.ClientSet
+	By("Registering slow webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := slowWebhookConfigName
+
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "allow-configmap-with-delay-webhook.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"configmaps"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/always-allow-delay-5s"),
+					},
+					CABundle: context.signingCert,
+				},
+				FailurePolicy:  policy,
+				TimeoutSeconds: timeout,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering slow webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+
+	return func() {
+		client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
+	}
+}
+
+func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {
+	By("Request fails when timeout (1s) is shorter than slow webhook latency (5s)")
+	client := f.ClientSet
+	name := "e2e-test-slow-webhook-configmap"
+	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	Expect(err).To(HaveOccurred(), "create configmap in namespace %s should have timed-out reaching slow webhook", f.Namespace.Name)
+	expectedErrMsg := `/always-allow-delay-5s?timeout=1s: context deadline exceeded`
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
+}
+
+func testSlowWebhookTimeoutNoError(f *framework.Framework) {
+	client := f.ClientSet
+	name := "e2e-test-slow-webhook-configmap"
+	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	Expect(err).To(BeNil())
+	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(name, &metav1.DeleteOptions{})
+	Expect(err).To(BeNil())
 }

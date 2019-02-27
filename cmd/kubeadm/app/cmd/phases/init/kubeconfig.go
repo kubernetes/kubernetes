@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -45,7 +44,7 @@ var (
 			short: "Generates a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
 			long: normalizer.LongDesc(`
 					Generates the kubeconfig file for the kubelet to use and saves it to %s file.
-			
+
 					Please note that this should *only* be used for cluster bootstrapping purposes. After your control plane is up,
 					you should request all kubelet credentials from the CSR API.`),
 		},
@@ -61,17 +60,6 @@ var (
 		},
 	}
 )
-
-// kubeConfigData defines the behavior that a runtime data struct passed to the kubeconfig phase
-// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
-// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
-type kubeConfigData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	ExternalCA() bool
-	CertificateDir() string
-	CertificateWriteDir() string
-	KubeConfigDir() string
-}
 
 // NewKubeConfigPhase creates a kubeadm workflow phase that creates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
 func NewKubeConfigPhase() workflow.Phase {
@@ -123,7 +111,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 }
 
 func runKubeConfig(c workflow.RunData) error {
-	data, ok := c.(kubeConfigData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubeconfig phase invoked with an invalid data struct")
 	}
@@ -135,7 +123,7 @@ func runKubeConfig(c workflow.RunData) error {
 // runKubeConfigFile executes kubeconfig creation logic.
 func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 	return func(c workflow.RunData) error {
-		data, ok := c.(kubeConfigData)
+		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("kubeconfig phase invoked with an invalid data struct")
 		}

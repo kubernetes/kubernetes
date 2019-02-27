@@ -41,6 +41,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/bootstraptoken/node:all-srcs",
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/controlplane:all-srcs",
+        "//cmd/kubeadm/app/phases/copycerts:all-srcs",
         "//cmd/kubeadm/app/phases/etcd:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/phases/kubelet:all-srcs",

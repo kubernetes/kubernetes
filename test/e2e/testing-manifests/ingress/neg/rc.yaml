@@ -8,7 +8,7 @@ spec:
   minReadySeconds: 60
   selector:
     matchLabels:
-      run: hostname  
+      run: hostname
   template:
     metadata:
       labels:

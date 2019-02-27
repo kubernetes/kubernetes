@@ -24,13 +24,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -48,13 +45,12 @@ var (
 )
 
 type SnapshotClassTest struct {
-	Name                 string
-	CloudProviders       []string
-	Snapshotter          string
-	Parameters           map[string]string
-	NodeName             string
-	NodeSelector         map[string]string // NodeSelector for the pod
-	SnapshotContentCheck func(snapshotContent *unstructured.Unstructured) error
+	Name           string
+	CloudProviders []string
+	Snapshotter    string
+	Parameters     map[string]string
+	NodeName       string
+	NodeSelector   map[string]string // NodeSelector for the pod
 }
 
 type snapshottableTestSuite struct {
@@ -79,218 +75,129 @@ func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapDataSource] {
-		framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
-	}
-}
+func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	var (
+		sDriver SnapshottableTestDriver
+		dDriver DynamicPVTestDriver
+	)
 
-func createSnapshottableTestInput(driver TestDriver, pattern testpatterns.TestPattern) (snapshottableTestResource, snapshottableTestInput) {
-	// Setup test resource for driver and testpattern
-	resource := snapshottableTestResource{}
-	resource.setupResource(driver, pattern)
-
-	dInfo := driver.GetDriverInfo()
-	input := snapshottableTestInput{
-		testCase: SnapshotClassTest{
-			NodeName: dInfo.Config.ClientNodeName,
-		},
-		cs:    dInfo.Config.Framework.ClientSet,
-		dc:    dInfo.Config.Framework.DynamicClient,
-		pvc:   resource.pvc,
-		sc:    resource.sc,
-		vsc:   resource.vsc,
-		dInfo: dInfo,
-	}
-
-	return resource, input
-}
-
-func (s *snapshottableTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
-	Context(getTestNameStr(s, pattern), func() {
-		var (
-			resource     snapshottableTestResource
-			input        snapshottableTestInput
-			needsCleanup bool
-		)
-
-		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(s, driver, pattern)
-			needsCleanup = true
-
-			// Create test input
-			resource, input = createSnapshottableTestInput(driver, pattern)
-		})
-
-		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
-		})
-
-		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function
-		// to be a single struct and to be passed as a pointer.
-		// Please see https://onsi.github.io/ginkgo/#global-shared-behaviors for details.
-		testSnapshot(&input)
+	BeforeEach(func() {
+		// Check preconditions.
+		Expect(pattern.SnapshotType).To(Equal(testpatterns.DynamicCreatedSnapshot))
+		dInfo := driver.GetDriverInfo()
+		ok := false
+		sDriver, ok = driver.(SnapshottableTestDriver)
+		if !dInfo.Capabilities[CapDataSource] || !ok {
+			framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+		}
+		dDriver, ok = driver.(DynamicPVTestDriver)
+		if !ok {
+			framework.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
+		}
 	})
-}
 
-type snapshottableTestResource struct {
-	driver    TestDriver
-	claimSize string
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
+	f := framework.NewDefaultFramework("snapshotting")
 
-	sc  *storage.StorageClass
-	pvc *v1.PersistentVolumeClaim
-	// volume snapshot class
-	vsc *unstructured.Unstructured
-}
+	It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
+		cs := f.ClientSet
+		dc := f.DynamicClient
 
-var _ TestResource = &snapshottableTestResource{}
+		// Now do the more expensive test initialization.
+		config, testCleanup := driver.PrepareTest(f)
+		defer testCleanup()
 
-func (s *snapshottableTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	// Setup snapshottableTest resource
-	switch pattern.SnapshotType {
-	case testpatterns.DynamicCreatedSnapshot:
-		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			s.sc = dDriver.GetDynamicProvisionStorageClass("")
-			if s.sc == nil {
-				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
-			}
-			s.driver = driver
-			s.claimSize = dDriver.GetClaimSize()
-			s.pvc = getClaim(s.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
-			s.pvc.Spec.StorageClassName = &s.sc.Name
-			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", s.sc, s.pvc)
-
-			if sDriver, ok := driver.(SnapshottableTestDriver); ok {
-				s.vsc = sDriver.GetSnapshotClass()
-			}
+		vsc := sDriver.GetSnapshotClass(config)
+		class := dDriver.GetDynamicProvisionStorageClass(config, "")
+		if class == nil {
+			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
 
-	default:
-		framework.Failf("Dynamic Snapshot test doesn't support: %s", pattern.SnapshotType)
-	}
-}
+		claimSize := dDriver.GetClaimSize()
+		pvc := getClaim(claimSize, config.Framework.Namespace.Name)
+		pvc.Spec.StorageClassName = &class.Name
+		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
-func (s *snapshottableTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-}
-
-type snapshottableTestInput struct {
-	testCase SnapshotClassTest
-	cs       clientset.Interface
-	dc       dynamic.Interface
-	pvc      *v1.PersistentVolumeClaim
-	sc       *storage.StorageClass
-	// volume snapshot class
-	vsc   *unstructured.Unstructured
-	dInfo *DriverInfo
-}
-
-func testSnapshot(input *snapshottableTestInput) {
-	It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
-		TestCreateSnapshot(input.testCase, input.cs, input.dc, input.pvc, input.sc, input.vsc)
-	})
-}
-
-// TestCreateSnapshot tests dynamic creating snapshot with specified SnapshotClassTest and snapshotClass
-func TestCreateSnapshot(
-	t SnapshotClassTest,
-	client clientset.Interface,
-	dynamicClient dynamic.Interface,
-	claim *v1.PersistentVolumeClaim,
-	class *storage.StorageClass,
-	snapshotClass *unstructured.Unstructured,
-) *unstructured.Unstructured {
-	var err error
-	if class != nil {
 		By("creating a StorageClass " + class.Name)
-		class, err = client.StorageV1().StorageClasses().Create(class)
+		class, err := cs.StorageV1().StorageClasses().Create(class)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
+			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
-	}
 
-	By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
-		// typically this claim has already been deleted
-		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
-		}
-	}()
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("checking the claim")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("creating a SnapshotClass")
-	snapshotClass, err = dynamicClient.Resource(snapshotClassGVR).Create(snapshotClass, metav1.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
-		framework.ExpectNoError(dynamicClient.Resource(snapshotClassGVR).Delete(snapshotClass.GetName(), nil))
-	}()
-
-	By("creating a snapshot")
-	snapshot := getSnapshot(claim.Name, claim.Namespace, snapshotClass.GetName())
-
-	snapshot, err = dynamicClient.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
-		// typically this snapshot has already been deleted
-		err = dynamicClient.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
-		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting snapshot %q. Error: %v", claim.Name, err)
-		}
-	}()
-	err = WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("checking the snapshot")
-	// Get new copy of the snapshot
-	snapshot, err = dynamicClient.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Get the bound snapshotContent
-	snapshotSpec := snapshot.Object["spec"].(map[string]interface{})
-	snapshotContentName := snapshotSpec["snapshotContentName"].(string)
-	snapshotContent, err := dynamicClient.Resource(snapshotContentGVR).Get(snapshotContentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	snapshotContentSpec := snapshotContent.Object["spec"].(map[string]interface{})
-	volumeSnapshotRef := snapshotContentSpec["volumeSnapshotRef"].(map[string]interface{})
-	persistentVolumeRef := snapshotContentSpec["persistentVolumeRef"].(map[string]interface{})
-
-	// Check SnapshotContent properties
-	By("checking the SnapshotContent")
-	Expect(snapshotContentSpec["snapshotClassName"]).To(Equal(snapshotClass.GetName()))
-	Expect(volumeSnapshotRef["name"]).To(Equal(snapshot.GetName()))
-	Expect(volumeSnapshotRef["namespace"]).To(Equal(snapshot.GetNamespace()))
-	Expect(persistentVolumeRef["name"]).To(Equal(pv.Name))
-
-	// Run the checker
-	if t.SnapshotContentCheck != nil {
-		err = t.SnapshotContentCheck(snapshotContent)
+		By("creating a claim")
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())
-	}
+		defer func() {
+			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			// typically this claim has already been deleted
+			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
+			if err != nil && !apierrs.IsNotFound(err) {
+				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+			}
+		}()
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred())
 
-	return snapshotContent
+		By("checking the claim")
+		// Get new copy of the claim
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Get the bound PV
+		pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating a SnapshotClass")
+		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
+			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
+		}()
+
+		By("creating a snapshot")
+		snapshot := getSnapshot(pvc.Name, pvc.Namespace, vsc.GetName())
+
+		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+			// typically this snapshot has already been deleted
+			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
+			if err != nil && !apierrs.IsNotFound(err) {
+				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
+			}
+		}()
+		err = WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("checking the snapshot")
+		// Get new copy of the snapshot
+		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Get the bound snapshotContent
+		snapshotSpec := snapshot.Object["spec"].(map[string]interface{})
+		snapshotContentName := snapshotSpec["snapshotContentName"].(string)
+		snapshotContent, err := dc.Resource(snapshotContentGVR).Get(snapshotContentName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		snapshotContentSpec := snapshotContent.Object["spec"].(map[string]interface{})
+		volumeSnapshotRef := snapshotContentSpec["volumeSnapshotRef"].(map[string]interface{})
+		persistentVolumeRef := snapshotContentSpec["persistentVolumeRef"].(map[string]interface{})
+
+		// Check SnapshotContent properties
+		By("checking the SnapshotContent")
+		Expect(snapshotContentSpec["snapshotClassName"]).To(Equal(vsc.GetName()))
+		Expect(volumeSnapshotRef["name"]).To(Equal(snapshot.GetName()))
+		Expect(volumeSnapshotRef["namespace"]).To(Equal(snapshot.GetNamespace()))
+		Expect(persistentVolumeRef["name"]).To(Equal(pv.Name))
+	})
 }
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.

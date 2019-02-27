@@ -17,10 +17,12 @@ limitations under the License.
 package logs
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,6 +61,9 @@ var (
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
 
+		# Begin streaming the logs from all containers in pods defined by label app=nginx
+		kubectl logs -f -lapp=nginx --all-containers=true
+
 		# Display only the most recent 20 lines of output in pod nginx
 		kubectl logs --tail=20 nginx
 
@@ -86,7 +91,7 @@ type LogsOptions struct {
 	Options       runtime.Object
 	Resources     []string
 
-	ConsumeRequestFn func(*rest.Request, io.Writer) error
+	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
 	SinceTime    string
@@ -101,6 +106,7 @@ type LogsOptions struct {
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
 	Selector               string
+	MaxFollowConcurency    int
 
 	Object           runtime.Object
 	GetPodTimeout    time.Duration
@@ -112,9 +118,10 @@ type LogsOptions struct {
 
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
-		IOStreams:     streams,
-		AllContainers: allContainers,
-		Tail:          -1,
+		IOStreams:           streams,
+		AllContainers:       allContainers,
+		Tail:                -1,
+		MaxFollowConcurency: 5,
 	}
 }
 
@@ -151,6 +158,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
+	cmd.Flags().IntVar(&o.MaxFollowConcurency, "max-log-requests", o.MaxFollowConcurency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	return cmd
 }
 
@@ -256,10 +264,6 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 }
 
 func (o LogsOptions) Validate() error {
-	if o.Follow && len(o.Selector) > 0 {
-		return fmt.Errorf("only one of follow (-f) or selector (-l) is allowed")
-	}
-
 	if len(o.SinceTime) > 0 && o.SinceSeconds != 0 {
 		return fmt.Errorf("at most one of `sinceTime` or `sinceSeconds` may be specified")
 	}
@@ -298,6 +302,47 @@ func (o LogsOptions) RunLogs() error {
 		return err
 	}
 
+	if o.Follow && len(requests) > 1 {
+		if len(requests) > o.MaxFollowConcurency {
+			return fmt.Errorf(
+				"you are attempting to follow %d log streams, but maximum allowed concurency is %d, use --max-log-requests to increase the limit",
+				len(requests), o.MaxFollowConcurency,
+			)
+		}
+
+		return o.parallelConsumeRequest(requests)
+	}
+
+	return o.sequentialConsumeRequest(requests)
+}
+
+func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) error {
+	reader, writer := io.Pipe()
+	wg := &sync.WaitGroup{}
+	wg.Add(len(requests))
+	for _, request := range requests {
+		go func(request rest.ResponseWrapper) {
+			if err := o.ConsumeRequestFn(request, writer); err != nil {
+				writer.CloseWithError(err)
+
+				// It's important to return here to propagate the error via the pipe
+				return
+			}
+
+			wg.Done()
+		}(request)
+	}
+
+	go func() {
+		wg.Wait()
+		writer.Close()
+	}()
+
+	_, err := io.Copy(o.Out, reader)
+	return err
+}
+
+func (o LogsOptions) sequentialConsumeRequest(requests []rest.ResponseWrapper) error {
 	for _, request := range requests {
 		if err := o.ConsumeRequestFn(request, o.Out); err != nil {
 			return err
@@ -307,13 +352,33 @@ func (o LogsOptions) RunLogs() error {
 	return nil
 }
 
-func DefaultConsumeRequest(request *rest.Request, out io.Writer) error {
+// DefaultConsumeRequest reads the data from request and writes into
+// the out writer. It buffers data from requests until the newline or io.EOF
+// occurs in the data, so it doesn't interleave logs sub-line
+// when running concurrently.
+//
+// A successful read returns err == nil, not err == io.EOF.
+// Because the function is defined to read from request until io.EOF, it does
+// not treat an io.EOF as an error to be reported.
+func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
 	readCloser, err := request.Stream()
 	if err != nil {
 		return err
 	}
 	defer readCloser.Close()
 
-	_, err = io.Copy(out, readCloser)
-	return err
+	r := bufio.NewReader(readCloser)
+	for {
+		bytes, err := r.ReadBytes('\n')
+		if _, err := out.Write(bytes); err != nil {
+			return err
+		}
+
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			return nil
+		}
+	}
 }

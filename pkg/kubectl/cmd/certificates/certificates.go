@@ -104,7 +104,7 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 }
 
 func (o *CertificateOptions) Validate() error {
-	if len(o.csrNames) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.csrNames) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("one or more CSRs must be specified as <name> or -f <filename>")
 	}
 	return nil

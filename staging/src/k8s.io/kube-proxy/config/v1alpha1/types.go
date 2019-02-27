@@ -74,6 +74,20 @@ type KubeProxyConntrackConfiguration struct {
 	TCPCloseWaitTimeout *metav1.Duration `json:"tcpCloseWaitTimeout"`
 }
 
+// KubeProxyWinkernelConfiguration contains Windows/HNS settings for
+// the Kubernetes proxy server.
+type KubeProxyWinkernelConfiguration struct {
+	// networkName is the name of the network kube-proxy will use
+	// to create endpoints and policies
+	NetworkName string `json:"networkName"`
+	// sourceVip is the IP address of the source VIP endoint used for
+	// NAT when loadbalancing
+	SourceVip string `json:"sourceVip"`
+	// enableDSR tells kube-proxy whether HNS policies should be created
+	// with DSR
+	EnableDSR bool `json:"enableDSR"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeProxyConfiguration contains everything necessary to configure the
@@ -136,6 +150,8 @@ type KubeProxyConfiguration struct {
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
 	NodePortAddresses []string `json:"nodePortAddresses"`
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'

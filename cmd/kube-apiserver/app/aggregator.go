@@ -70,7 +70,6 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		aggregatorscheme.Scheme,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -259,6 +258,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v2alpha1"}:                       {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1beta1"}:          {group: 17300, version: 9},
 	{Group: "networking.k8s.io", Version: "v1"}:                 {group: 17200, version: 15},
+	{Group: "networking.k8s.io", Version: "v1beta1"}:            {group: 17200, version: 9},
 	{Group: "policy", Version: "v1beta1"}:                       {group: 17100, version: 9},
 	{Group: "rbac.authorization.k8s.io", Version: "v1"}:         {group: 17000, version: 15},
 	{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}:    {group: 17000, version: 12},
@@ -270,6 +270,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:         {group: 16700, version: 9},
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:      {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}: {group: 16700, version: 12},
+	{Group: "scheduling.k8s.io", Version: "v1"}:                 {group: 16600, version: 15},
 	{Group: "scheduling.k8s.io", Version: "v1beta1"}:            {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:           {group: 16600, version: 9},
 	{Group: "coordination.k8s.io", Version: "v1"}:               {group: 16500, version: 15},
