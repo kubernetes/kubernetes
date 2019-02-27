@@ -250,11 +250,12 @@ function Disable-WindowsDefender {
 
 # Creates directories where other functions in this module will read and write
 # data.
+# Note: C:\tmp is required for running certain kubernetes tests.
 function Create-Directories {
   Log-Output "Creating ${env:K8S_DIR} and its subdirectories."
   ForEach ($dir in ("${env:K8S_DIR}", "${env:NODE_DIR}", "${env:LOGS_DIR}",
     "${env:CNI_DIR}", "${env:CNI_CONFIG_DIR}", "${env:MANIFESTS_DIR}",
-    "${env:PKI_DIR}")) {
+    "${env:PKI_DIR}"), "C:\tmp") {
     mkdir -Force $dir
   }
 }
