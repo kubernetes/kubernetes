@@ -376,14 +376,12 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		By("creating the pod with failed condition")
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		Expect(err).ToNot(HaveOccurred(), "while creating pod")
-
-		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
-
 		var podClient *framework.PodClient
 		podClient = f.PodClient()
+		pod = podClient.Create(pod)
+
+		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
 		By("updating the pod")
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -470,10 +468,12 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		By("creating the pod")
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		var podClient *framework.PodClient
+		podClient = f.PodClient()
+		pod = podClient.Create(pod)
 
 		By("waiting for pod running")
-		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		Expect(err).NotTo(HaveOccurred(), "while waiting for pod to be running")
 
 		By("creating a file in subpath")
@@ -491,9 +491,6 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		By("updating the annotation value")
-		var podClient *framework.PodClient
-		podClient = f.PodClient()
-
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.ObjectMeta.Annotations["mysubpath"] = "mynewpath"
 		})
@@ -609,16 +606,14 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 		// Start pod
 		By(fmt.Sprintf("Creating pod %s", pod.Name))
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		Expect(err).ToNot(HaveOccurred(), "while creating pod")
+		var podClient *framework.PodClient
+		podClient = f.PodClient()
+		pod = podClient.Create(pod)
 		defer func() {
 			framework.DeletePodWithWait(f, f.ClientSet, pod)
 		}()
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+		err := framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
 		Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
-
-		var podClient *framework.PodClient
-		podClient = f.PodClient()
 
 		By("updating the pod")
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -645,14 +640,15 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	Expect(err).ToNot(HaveOccurred(), "while creating pod")
+	var podClient *framework.PodClient
+	podClient = f.PodClient()
+	pod = podClient.Create(pod)
 
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
 
-	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+	err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 }
 
