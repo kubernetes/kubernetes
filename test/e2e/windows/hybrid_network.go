@@ -71,9 +71,9 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 })
 
 var (
-	duration      = "10s"
-	poll_interval = "1s"
-	timeout       = 10 // seconds
+	duration     = "10s"
+	pollInterval = "1s"
+	timeout      = 10 // seconds
 )
 
 func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
@@ -81,7 +81,7 @@ func assertConsistentConnectivity(f *framework.Framework, podName string, os str
 		By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		_, _, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
 		return err
-	}, duration, poll_interval).ShouldNot(HaveOccurred())
+	}, duration, pollInterval).ShouldNot(HaveOccurred())
 }
 
 func linuxCheck(address string, port int) []string {
