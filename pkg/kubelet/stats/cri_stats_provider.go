@@ -165,7 +165,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			klog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
+			klog.V(5).Infof("Unable to find cadvisor stats for %q", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
 		}
