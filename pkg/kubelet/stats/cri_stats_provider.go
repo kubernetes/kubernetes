@@ -545,6 +545,9 @@ func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.Containe
 	}
 
 	nanoSeconds := stats.Cpu.Timestamp - cached.Timestamp
+	if nanoSeconds == 0 {
+		nanoSeconds = 1
+	}
 	usageNanoCores := (stats.Cpu.UsageCoreNanoSeconds.Value - cached.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
 	return &usageNanoCores
 }
