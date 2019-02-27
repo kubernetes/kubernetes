@@ -20,6 +20,7 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
+        "//cmd/kubeadm/app/phases/copycerts:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",

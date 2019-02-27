@@ -39,7 +39,7 @@ var (
 		kubeadm join phase preflight --config kubeadm-config.yml
 		`)
 
-	notReadyToJoinControPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
+	notReadyToJoinControlPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
 		One or more conditions for hosting a new control plane instance is not satisfied.
 
 		{{.Error}}
@@ -105,14 +105,15 @@ func runPreflight(c workflow.RunData) error {
 	if j.Cfg().ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
-		if err := checkIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration); err != nil {
+		hasCertificateKey := len(j.CertificateKey()) > 0
+		if err := checkIfReadyForAdditionalControlPlane(&initCfg.ClusterConfiguration, hasCertificateKey); err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
 			}
 
 			var msg bytes.Buffer
-			notReadyToJoinControPlaneTemp.Execute(&msg, ctx)
+			notReadyToJoinControlPlaneTemp.Execute(&msg, ctx)
 			return errors.New(msg.String())
 		}
 
@@ -134,15 +135,17 @@ func runPreflight(c workflow.RunData) error {
 
 // checkIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to preflight
-func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration) error {
+func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
 		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
-	// checks if the certificates that must be equal across contolplane instances are provided
-	if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
-		return err
+	if !hasCertificateKey {
+		// checks if the certificates that must be equal across controlplane instances are provided
+		if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
+			return err
+		}
 	}
 
 	return nil
