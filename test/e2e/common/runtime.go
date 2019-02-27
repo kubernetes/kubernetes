@@ -372,6 +372,12 @@ while true; do sleep 1; done
 				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
 				imagePullTest(image, true, v1.PodRunning, false, false)
 			})
+
+			It("should be able to pull from private registry with secret [NodeConformance]", func() {
+				framework.SkipUnlessNodeOSDistroIs("windows")
+				image := "gcr.io/authenticated-image-pulling/windows-nanoserver:v1"
+				imagePullTest(image, true, v1.PodRunning, false, true)
+			})
 		})
 	})
 })
