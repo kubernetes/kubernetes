@@ -25,7 +25,7 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -47,24 +47,24 @@ const (
 )
 
 var _ = instrumentation.SIGDescribe("[Feature:PrometheusMonitoring] Prometheus", func() {
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessPrometheusMonitoringIsEnabled()
 	})
 
 	f := framework.NewDefaultFramework("prometheus-monitoring")
-	It("should scrape container metrics from all nodes.", func() {
+	ginkgo.It("should scrape container metrics from all nodes.", func() {
 		expectedNodes, err := getAllNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		retryUntilSucceeds(func() error {
 			return validateMetricAvailableForAllNodes(f.ClientSet, `container_cpu_usage_seconds_total`, expectedNodes)
 		}, prometheusTestTimeout)
 	})
-	It("should successfully scrape all targets", func() {
+	ginkgo.It("should successfully scrape all targets", func() {
 		retryUntilSucceeds(func() error {
 			return validateAllActiveTargetsAreHealthy(f.ClientSet)
 		}, prometheusTestTimeout)
 	})
-	It("should contain correct container CPU metric.", func() {
+	ginkgo.It("should contain correct container CPU metric.", func() {
 		query := prometheusCPUQuery(f.Namespace.Name, "prometheus-cpu-consumer", prometheusRate)
 		consumer := consumeCPUResources(f, "prometheus-cpu-consumer", targetCPUUsage*1000)
 		defer consumer.CleanUp()
@@ -72,7 +72,7 @@ var _ = instrumentation.SIGDescribe("[Feature:PrometheusMonitoring] Prometheus",
 			return validateQueryReturnsCorrectValues(f.ClientSet, query, targetCPUUsage, 3, prometheusMetricErrorTolerance)
 		}, prometheusTestTimeout)
 	})
-	It("should scrape metrics from annotated pods.", func() {
+	ginkgo.It("should scrape metrics from annotated pods.", func() {
 		query := prometheusPodCustomMetricQuery(f.Namespace.Name, "prometheus-custom-pod-metric")
 		consumer := exportCustomMetricFromPod(f, "prometheus-custom-pod-metric", customMetricValue)
 		defer consumer.CleanUp()
@@ -80,7 +80,7 @@ var _ = instrumentation.SIGDescribe("[Feature:PrometheusMonitoring] Prometheus",
 			return validateQueryReturnsCorrectValues(f.ClientSet, query, customMetricValue, 1, prometheusMetricErrorTolerance)
 		}, prometheusTestTimeout)
 	})
-	It("should scrape metrics from annotated services.", func() {
+	ginkgo.It("should scrape metrics from annotated services.", func() {
 		query := prometheusServiceCustomMetricQuery(f.Namespace.Name, "prometheus-custom-service-metric")
 		consumer := exportCustomMetricFromService(f, "prometheus-custom-service-metric", customMetricValue)
 		defer consumer.CleanUp()
@@ -251,10 +251,13 @@ type promTargetsResponse struct {
 	Data   TargetDiscovery `json:"data"`
 }
 
+// TargetDiscovery has all the active targets.
 type TargetDiscovery struct {
 	ActiveTargets  []*Target        `json:"activeTargets"`
 	DroppedTargets []*DroppedTarget `json:"droppedTargets"`
 }
+
+// Target has the information for one target.
 type Target struct {
 	DiscoveredLabels map[string]string `json:"discoveredLabels"`
 	Labels           map[string]string `json:"labels"`
@@ -266,17 +269,20 @@ type Target struct {
 	Health     TargetHealth `json:"health"`
 }
 
+// DroppedTarget has the information for one target that was dropped during relabelling.
 type DroppedTarget struct {
 	// Labels before any processing.
 	DiscoveredLabels map[string]string `json:"discoveredLabels"`
 }
 
+// The possible health states of a target based on the last performed scrape.
 const (
 	HealthUnknown TargetHealth = "unknown"
 	HealthGood    TargetHealth = "up"
 	HealthBad     TargetHealth = "down"
 )
 
+// TargetHealth describes the health state of a target.
 type TargetHealth string
 
 func queryPrometheus(c clientset.Interface, query string, start, end time.Time, step time.Duration) (model.Value, error) {

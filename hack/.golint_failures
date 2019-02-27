@@ -646,7 +646,6 @@ test/e2e/framework
 test/e2e/framework/providers/gce
 test/e2e/framework/providers/kubemark
 test/e2e/instrumentation/logging
-test/e2e/instrumentation/monitoring
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
 test/e2e/network
