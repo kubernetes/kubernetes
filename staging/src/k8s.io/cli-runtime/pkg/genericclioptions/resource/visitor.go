@@ -39,6 +39,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/kustomize"
+	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
 const (
@@ -517,6 +519,24 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
 	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
+	return v.StreamVisitor.Visit(fn)
+}
+
+// KustomizeVisitor is wrapper around a StreamVisitor, to handle Kustomization directories
+type KustomizeVisitor struct {
+	Path string
+	*StreamVisitor
+}
+
+// Visit in a KustomizeVisitor gets the output of Kustomize build and save it in the Streamvisitor
+func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
+	fSys := fs.MakeRealFS()
+	var out bytes.Buffer
+	err := kustomize.RunKustomizeBuild(&out, fSys, v.Path)
+	if err != nil {
+		return err
+	}
+	v.StreamVisitor.Reader = bytes.NewReader(out.Bytes())
 	return v.StreamVisitor.Visit(fn)
 }
 

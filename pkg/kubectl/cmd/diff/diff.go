@@ -118,7 +118,6 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
-	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }
@@ -394,6 +393,11 @@ func isConflict(err error) bool {
 
 func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+
+	err = o.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
 
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)

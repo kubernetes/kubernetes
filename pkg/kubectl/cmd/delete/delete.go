@@ -71,6 +71,9 @@ var (
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
+		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		kubectl delete -k dir
+
 		# Delete a pod based on the type and name in the JSON passed into stdin.
 		cat pod.json | kubectl delete -f -
 
@@ -120,7 +123,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
-		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use:                   "delete ([-f FILENAME] | [-k DIRECTORY] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
