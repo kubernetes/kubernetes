@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -337,5 +338,10 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 
 func (expc *expandController) GetCSIClient() csiclientset.Interface {
 	// No volume plugin in expand controller needs csi.storage.k8s.io
+	return nil
+}
+
+func (expc *expandController) GetSubpather() subpath.Interface {
+	// not needed for expand controller
 	return nil
 }

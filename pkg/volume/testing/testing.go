@@ -42,6 +42,7 @@ import (
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -71,6 +72,7 @@ type fakeVolumeHost struct {
 	exec       mount.Exec
 	nodeLabels map[string]string
 	nodeName   string
+	subpather  subpath.Interface
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
@@ -101,6 +103,7 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
+	host.subpather = &subpath.FakeSubpath{}
 	return host
 }
 
@@ -147,6 +150,10 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
+}
+
+func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
+	return f.subpather
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {

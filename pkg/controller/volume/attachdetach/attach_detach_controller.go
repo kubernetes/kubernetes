@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -767,4 +768,9 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 
 func (adc *attachDetachController) GetCSIClient() csiclient.Interface {
 	return adc.csiClient
+}
+
+func (adc *attachDetachController) GetSubpather() subpath.Interface {
+	// Subpaths not needed in attachdetach controller
+	return nil
 }

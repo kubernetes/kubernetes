@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 // VolumeHost interface implementation for PersistentVolumeController.
@@ -134,5 +135,10 @@ func (ctrl *PersistentVolumeController) GetEventRecorder() record.EventRecorder 
 
 func (ctrl *PersistentVolumeController) GetCSIClient() csiclientset.Interface {
 	// No volume plugin needs csi.storage.k8s.io client in PV controller.
+	return nil
+}
+
+func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
+	// No volume plugin needs Subpaths in PV controller.
 	return nil
 }
