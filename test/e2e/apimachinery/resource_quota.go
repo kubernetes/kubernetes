@@ -664,7 +664,51 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
+	It("Should be able to update and delete ResourceQuota.", func() {
+		client := f.ClientSet
+		ns := f.Namespace.Name
 
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := &v1.ResourceQuota{
+			Spec: v1.ResourceQuotaSpec{
+				Hard: v1.ResourceList{},
+			},
+		}
+		resourceQuota.ObjectMeta.Name = quotaName
+		resourceQuota.Spec.Hard[v1.ResourceCPU] = resource.MustParse("1")
+		resourceQuota.Spec.Hard[v1.ResourceMemory] = resource.MustParse("500Mi")
+		_, err := createResourceQuota(client, ns, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Getting a ResourceQuota")
+		resourceQuotaResult, err := client.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(Equal(resource.MustParse("1")))
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(Equal(resource.MustParse("500Mi")))
+
+		By("Updating a ResourceQuota")
+		resourceQuota.Spec.Hard[v1.ResourceCPU] = resource.MustParse("2")
+		resourceQuota.Spec.Hard[v1.ResourceMemory] = resource.MustParse("1Gi")
+		resourceQuotaResult, err = client.CoreV1().ResourceQuotas(ns).Update(resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
+
+		By("Verifying a ResourceQuota was modified")
+		resourceQuotaResult, err = client.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+		Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
+
+		By("Deleting a ResourceQuota")
+		err = deleteResourceQuota(client, ns, quotaName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying the deleted ResourceQuota")
+		_, err = client.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+		Expect(errors.IsNotFound(err)).To(Equal(true))
+	})
 })
 
 var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
