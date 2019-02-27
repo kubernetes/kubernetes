@@ -117,7 +117,7 @@ func (o *PauseOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 func (o *PauseOptions) Validate() error {
-	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
 	return nil

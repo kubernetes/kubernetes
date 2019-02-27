@@ -304,7 +304,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*core
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+		serviceAccount, err := s.client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 		if err == nil {
 			return serviceAccount, nil
 		}

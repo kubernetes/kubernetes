@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
@@ -882,10 +883,10 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), 10250}},
+		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), ports.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
-		PortOpenCheck{port: 10251},
-		PortOpenCheck{port: 10252},
+		PortOpenCheck{port: ports.InsecureSchedulerPort},
+		PortOpenCheck{port: ports.InsecureKubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
@@ -1037,7 +1038,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		HostnameCheck{nodeName: cfg.GetNodeName()},
 		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: 10250})
+		PortOpenCheck{port: ports.KubeletPort})
 	return checks
 }
 

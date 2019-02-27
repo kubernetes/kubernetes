@@ -216,7 +216,7 @@ func (p *podNodeSelector) ValidateInitialization() error {
 }
 
 func (p *podNodeSelector) defaultGetNamespace(name string) (*corev1.Namespace, error) {
-	namespace, err := p.client.Core().Namespaces().Get(name, metav1.GetOptions{})
+	namespace, err := p.client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("namespace %s does not exist", name)
 	}

@@ -1,7 +1,4 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
-  bindPort: 6443
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 bootstrapTokens:
 - groups:
   - system:bootstrappers:kubeadm:default-node-token
@@ -11,43 +8,36 @@ bootstrapTokens:
   - signing
   - authentication
 kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
+  bindPort: 6443
 nodeRegistration:
-  criSocket: /var/run/dockershim.sock
-  name: master-1
+  criSocket: /var/run/criruntime.sock
+  name: control-plane-1
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
-apiServerExtraArgs:
-  authorization-mode: Node,RBAC,Webhook
-apiServerExtraVolumes:
-- hostPath: /host/read-only
-  mountPath: /mount/read-only
-  name: ReadOnlyVolume
-- hostPath: /host/writable
-  mountPath: /mount/writable
-  name: WritableVolume
-  writable: true
-apiVersion: kubeadm.k8s.io/v1alpha3
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
-certificatesDir: /etc/kubernetes/pki
+apiServer:
+  timeoutForControlPlane: 4m0s
+apiVersion: kubeadm.k8s.io/v1beta1
+certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
+controllerManager: {}
+dns:
+  type: CoreDNS
 etcd:
   local:
     dataDir: /var/lib/etcd
-    image: ""
-imageRepository: k8s.gcr.io
+imageRepository: my-company.com
 kind: ClusterConfiguration
-kubernetesVersion: v1.12.2
+kubernetesVersion: v1.13.0
 networking:
-  dnsDomain: cluster.local
-  podSubnet: ""
-  serviceSubnet: 10.96.0.0/12
-unifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2"
+  dnsDomain: cluster.global
+  podSubnet: 10.148.0.0/16
+  serviceSubnet: 10.196.0.0/12
+scheduler: {}
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
@@ -57,7 +47,7 @@ clientConnection:
   contentType: application/vnd.kubernetes.protobuf
   kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
   qps: 5
-clusterCIDR: ""
+clusterCIDR: 10.148.0.0/16
 configSyncPeriod: 15m0s
 conntrack:
   max: null
@@ -66,9 +56,6 @@ conntrack:
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
 enableProfiling: false
-featureGates:
-  ServiceNodeExclusion: true
-  SupportIPVSProxyMode: true
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
@@ -83,7 +70,7 @@ ipvs:
   syncPeriod: 30s
 kind: KubeProxyConfiguration
 metricsBindAddress: 127.0.0.1:10249
-mode: iptables
+mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
@@ -94,7 +81,7 @@ winkernel:
   networkName: ""
   sourceVip: ""
 ---
-address: 1.2.3.4
+address: 0.0.0.0
 apiVersion: kubelet.config.k8s.io/v1beta1
 authentication:
   anonymous:
@@ -112,14 +99,14 @@ authorization:
 cgroupDriver: cgroupfs
 cgroupsPerQOS: true
 clusterDNS:
-- 10.96.0.10
-clusterDomain: cluster.local
+- 10.192.0.10
+clusterDomain: cluster.global
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
-cpuCFSQuotaPeriod: 0s
+cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
@@ -132,6 +119,7 @@ evictionHard:
   imagefs.available: 15%
   memory.available: 100Mi
   nodefs.available: 10%
+  nodefs.inodesFree: 5%
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s

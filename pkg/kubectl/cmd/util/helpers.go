@@ -291,8 +291,8 @@ func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples", msg, cmd.CommandPath())
 }
 
-func IsFilenameSliceEmpty(filenames []string) bool {
-	return len(filenames) == 0
+func IsFilenameSliceEmpty(filenames []string, directory string) bool {
+	return len(filenames) == 0 && directory == ""
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -382,6 +382,7 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
+	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
@@ -392,6 +393,11 @@ func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 		annotations = append(annotations, strings.TrimLeft(ext, "."))
 	}
 	flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
+}
+
+// AddKustomizeFlag adds kustomize flag to a command
+func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
+	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.

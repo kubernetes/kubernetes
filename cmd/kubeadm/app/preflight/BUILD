@@ -23,6 +23,7 @@ go_library(
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//cmd/kubeadm/app/util/system:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/ipvs:go_default_library",

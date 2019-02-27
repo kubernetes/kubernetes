@@ -198,7 +198,7 @@ func (o *SetImageOptions) Validate() error {
 	if o.All && len(o.Selector) > 0 {
 		errors = append(errors, fmt.Errorf("cannot set --all and --selector at the same time"))
 	}
-	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
 	if len(o.ContainerImages) < 1 {

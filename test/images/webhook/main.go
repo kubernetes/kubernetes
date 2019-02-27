@@ -91,6 +91,10 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	}
 }
 
+func serveAlwaysAllowDelayFiveSeconds(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, alwaysAllowDelayFiveSeconds)
+}
+
 func serveAlwaysDeny(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, alwaysDeny)
 }
@@ -132,10 +136,12 @@ func serveCRD(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	klog.InitFlags(nil)
 	var config Config
 	config.addFlags()
 	flag.Parse()
 
+	http.HandleFunc("/always-allow-delay-5s", serveAlwaysAllowDelayFiveSeconds)
 	http.HandleFunc("/always-deny", serveAlwaysDeny)
 	http.HandleFunc("/add-label", serveAddLabel)
 	http.HandleFunc("/pods", servePods)

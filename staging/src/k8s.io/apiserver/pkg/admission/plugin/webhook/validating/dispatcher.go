@@ -115,7 +115,11 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
-	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
+	r := client.Post().Context(ctx).Body(&request)
+	if h.TimeoutSeconds != nil {
+		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
+	}
+	if err := r.Do().Into(response); err != nil {
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 

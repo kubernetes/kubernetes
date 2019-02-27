@@ -173,6 +173,21 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			normalizeOutputFunc: noopNormalization,
 		},
 		{
+			name:    "RetryWatcher survives closed watches",
+			succeed: true,
+			secret:  newTestSecret("secret-02"),
+			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error, func()) {
+				lw := &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return getWatchFunc(c, secret)(options)
+					},
+				}
+				w, err := watchtools.NewRetryWatcher(secret.ResourceVersion, lw)
+				return w, err, func() { <-w.Done() }
+			},
+			normalizeOutputFunc: noopNormalization,
+		},
+		{
 			name:    "InformerWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-03"),

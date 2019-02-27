@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package uploadcerts
+package copycerts
 
 import (
 	"encoding/hex"
@@ -28,9 +28,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
+	certutil "k8s.io/client-go/util/cert"
+	keyutil "k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -92,7 +95,7 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 		return err
 	}
 
-	secretData, err := getSecretData(cfg, decodedKey)
+	secretData, err := getDataFromDisk(cfg, decodedKey)
 	if err != nil {
 		return err
 	}
@@ -169,7 +172,7 @@ func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
 	return cryptoutil.EncryptBytes(cert, key)
 }
 
-func certsToUpload(cfg *kubeadmapi.InitConfiguration) map[string]string {
+func certsToTransfer(cfg *kubeadmapi.InitConfiguration) map[string]string {
 	certsDir := cfg.CertificatesDir
 	certs := map[string]string{
 		kubeadmconstants.CACertName:                   path.Join(certsDir, kubeadmconstants.CACertName),
@@ -191,15 +194,85 @@ func certsToUpload(cfg *kubeadmapi.InitConfiguration) map[string]string {
 	return certs
 }
 
-func getSecretData(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string][]byte, error) {
+func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string][]byte, error) {
 	secretData := map[string][]byte{}
-	for certName, certPath := range certsToUpload(cfg) {
+	for certName, certPath := range certsToTransfer(cfg) {
 		cert, err := loadAndEncryptCert(certPath, key)
 		if err == nil || (err != nil && os.IsNotExist(err)) {
-			secretData[strings.Replace(certName, "/", "-", -1)] = cert
+			secretData[certOrKeyNameToSecretName(certName)] = cert
 		} else {
 			return nil, err
 		}
 	}
 	return secretData, nil
+}
+
+// DownloadCerts downloads the certificates needed to join a new control plane.
+func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
+	fmt.Printf("[download-certs] downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+
+	decodedKey, err := hex.DecodeString(key)
+	if err != nil {
+		return errors.Wrap(err, "error decoding certificate key")
+	}
+
+	secret, err := getSecret(client)
+	if err != nil {
+		return errors.Wrap(err, "error downloading the secret")
+	}
+
+	secretData, err := getDataFromSecret(secret, decodedKey)
+	if err != nil {
+		return errors.Wrap(err, "error decoding secret data with provided key")
+	}
+
+	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
+		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
+		if !found {
+			return errors.New("couldn't find required certificate or key in Secret")
+		}
+		if err := writeCertOrKey(certOrKeyPath, certOrKeyData); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
+	if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
+		return keyutil.WriteKey(certOrKeyPath, certOrKeyData)
+	} else if _, err := certutil.ParseCertsPEM(certOrKeyData); err == nil {
+		return certutil.WriteCert(certOrKeyPath, certOrKeyData)
+	}
+	return errors.New("unknown data found in Secret entry")
+}
+
+func getSecret(client clientset.Interface) (*v1.Secret, error) {
+	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+		}
+		return nil, err
+	}
+	return secret, nil
+}
+
+func getDataFromSecret(secret *v1.Secret, key []byte) (map[string][]byte, error) {
+	secretData := map[string][]byte{}
+	for certName, encryptedCert := range secret.Data {
+		cert, err := cryptoutil.DecryptBytes(encryptedCert, key)
+		if err != nil {
+			// If any of the decrypt operations fail do not return a partial result,
+			// return an empty result immediately
+			return map[string][]byte{}, err
+		}
+		secretData[certName] = cert
+	}
+	return secretData, nil
+}
+
+func certOrKeyNameToSecretName(certOrKeyName string) string {
+	return strings.Replace(certOrKeyName, "/", "-", -1)
 }

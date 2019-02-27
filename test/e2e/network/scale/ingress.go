@@ -62,7 +62,7 @@ var (
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {
 	Clientset     clientset.Interface
-	Jig           *ingress.IngressTestJig
+	Jig           *ingress.TestJig
 	GCEController *gce.GCEIngressController
 	CloudConfig   framework.CloudConfig
 	Logger        ingress.TestLogger

@@ -24,9 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -123,7 +122,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			Expect(err).To(BeNil())
-			_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
+			_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
 			Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
 		})
 	})
@@ -136,7 +135,7 @@ func getNextReadyConditionHeartbeatTime(clientSet clientset.Interface, nodeName 
 		if err != nil {
 			return err
 		}
-		_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
+		_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
 		Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
 		newHeartbeatTime = readyCondition.LastHeartbeatTime
 		if prevHeartbeatTime.Before(&newHeartbeatTime) {

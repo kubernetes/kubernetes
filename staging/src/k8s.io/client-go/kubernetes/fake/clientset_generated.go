@@ -142,18 +142,8 @@ func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.
 	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
 }
 
-// Admissionregistration retrieves the AdmissionregistrationV1beta1Client
-func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
-	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
-}
-
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
-	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
-}
-
-// Apps retrieves the AppsV1Client
-func (c *Clientset) Apps() appsv1.AppsV1Interface {
 	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
 }
 
@@ -172,18 +162,8 @@ func (c *Clientset) AuditregistrationV1alpha1() auditregistrationv1alpha1.Auditr
 	return &fakeauditregistrationv1alpha1.FakeAuditregistrationV1alpha1{Fake: &c.Fake}
 }
 
-// Auditregistration retrieves the AuditregistrationV1alpha1Client
-func (c *Clientset) Auditregistration() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface {
-	return &fakeauditregistrationv1alpha1.FakeAuditregistrationV1alpha1{Fake: &c.Fake}
-}
-
 // AuthenticationV1 retrieves the AuthenticationV1Client
 func (c *Clientset) AuthenticationV1() authenticationv1.AuthenticationV1Interface {
-	return &fakeauthenticationv1.FakeAuthenticationV1{Fake: &c.Fake}
-}
-
-// Authentication retrieves the AuthenticationV1Client
-func (c *Clientset) Authentication() authenticationv1.AuthenticationV1Interface {
 	return &fakeauthenticationv1.FakeAuthenticationV1{Fake: &c.Fake}
 }
 
@@ -197,11 +177,6 @@ func (c *Clientset) AuthorizationV1() authorizationv1.AuthorizationV1Interface {
 	return &fakeauthorizationv1.FakeAuthorizationV1{Fake: &c.Fake}
 }
 
-// Authorization retrieves the AuthorizationV1Client
-func (c *Clientset) Authorization() authorizationv1.AuthorizationV1Interface {
-	return &fakeauthorizationv1.FakeAuthorizationV1{Fake: &c.Fake}
-}
-
 // AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
 func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface {
 	return &fakeauthorizationv1beta1.FakeAuthorizationV1beta1{Fake: &c.Fake}
@@ -209,11 +184,6 @@ func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1b
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
-	return &fakeautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
-}
-
-// Autoscaling retrieves the AutoscalingV1Client
-func (c *Clientset) Autoscaling() autoscalingv1.AutoscalingV1Interface {
 	return &fakeautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
@@ -232,11 +202,6 @@ func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
 	return &fakebatchv1.FakeBatchV1{Fake: &c.Fake}
 }
 
-// Batch retrieves the BatchV1Client
-func (c *Clientset) Batch() batchv1.BatchV1Interface {
-	return &fakebatchv1.FakeBatchV1{Fake: &c.Fake}
-}
-
 // BatchV1beta1 retrieves the BatchV1beta1Client
 func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
 	return &fakebatchv1beta1.FakeBatchV1beta1{Fake: &c.Fake}
@@ -252,11 +217,6 @@ func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta
 	return &fakecertificatesv1beta1.FakeCertificatesV1beta1{Fake: &c.Fake}
 }
 
-// Certificates retrieves the CertificatesV1beta1Client
-func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interface {
-	return &fakecertificatesv1beta1.FakeCertificatesV1beta1{Fake: &c.Fake}
-}
-
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
 func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
 	return &fakecoordinationv1beta1.FakeCoordinationV1beta1{Fake: &c.Fake}
@@ -267,18 +227,8 @@ func (c *Clientset) CoordinationV1() coordinationv1.CoordinationV1Interface {
 	return &fakecoordinationv1.FakeCoordinationV1{Fake: &c.Fake}
 }
 
-// Coordination retrieves the CoordinationV1Client
-func (c *Clientset) Coordination() coordinationv1.CoordinationV1Interface {
-	return &fakecoordinationv1.FakeCoordinationV1{Fake: &c.Fake}
-}
-
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
-}
-
-// Core retrieves the CoreV1Client
-func (c *Clientset) Core() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
@@ -287,28 +237,13 @@ func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
 }
 
-// Events retrieves the EventsV1beta1Client
-func (c *Clientset) Events() eventsv1beta1.EventsV1beta1Interface {
-	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
-}
-
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return &fakeextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
 }
 
-// Extensions retrieves the ExtensionsV1beta1Client
-func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
-	return &fakeextensionsv1beta1.FakeExtensionsV1beta1{Fake: &c.Fake}
-}
-
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
-	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
-}
-
-// Networking retrieves the NetworkingV1Client
-func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
 	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
 }
 
@@ -322,18 +257,8 @@ func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
 	return &fakepolicyv1beta1.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
-// Policy retrieves the PolicyV1beta1Client
-func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
-	return &fakepolicyv1beta1.FakePolicyV1beta1{Fake: &c.Fake}
-}
-
 // RbacV1 retrieves the RbacV1Client
 func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
-	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
-}
-
-// Rbac retrieves the RbacV1Client
-func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
 	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
 }
 
@@ -362,18 +287,8 @@ func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
 	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
 }
 
-// Scheduling retrieves the SchedulingV1Client
-func (c *Clientset) Scheduling() schedulingv1.SchedulingV1Interface {
-	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
-}
-
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client
 func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
-	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
-}
-
-// Settings retrieves the SettingsV1alpha1Client
-func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
 	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
 }
 
@@ -384,11 +299,6 @@ func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 
 // StorageV1 retrieves the StorageV1Client
 func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
-	return &fakestoragev1.FakeStorageV1{Fake: &c.Fake}
-}
-
-// Storage retrieves the StorageV1Client
-func (c *Clientset) Storage() storagev1.StorageV1Interface {
 	return &fakestoragev1.FakeStorageV1{Fake: &c.Fake}
 }
 

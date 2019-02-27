@@ -665,9 +665,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
-		eventClient.Core(),
+		eventClient.CoreV1(),
 		testScaleClient,
-		testClient.Autoscaling(),
+		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		metricsClient,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),

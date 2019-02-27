@@ -30,7 +30,7 @@ import (
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.MasterHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}{{if .UploadCerts}} --certificate-key {{.CertificateKey}}{{end}}`,
+	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}{{if .UploadCerts}} --certificate-key {{.CertificateKey}}{{end}}`,
 ))
 
 // GetJoinCommand returns the kubeadm join command for a given token and
@@ -71,11 +71,11 @@ func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCer
 	}
 
 	ctx := map[string]interface{}{
-		"Token":          token,
-		"CAPubKeyPins":   publicKeyPins,
-		"MasterHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
-		"UploadCerts":    uploadCerts,
-		"CertificateKey": key,
+		"Token":                token,
+		"CAPubKeyPins":         publicKeyPins,
+		"ControlPlaneHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
+		"UploadCerts":          uploadCerts,
+		"CertificateKey":       key,
 	}
 
 	if skipTokenPrint {

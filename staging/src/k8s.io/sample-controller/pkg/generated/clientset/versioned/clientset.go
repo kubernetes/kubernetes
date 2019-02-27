@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	SamplecontrollerV1alpha1() samplecontrollerv1alpha1.SamplecontrollerV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Samplecontroller() samplecontrollerv1alpha1.SamplecontrollerV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // SamplecontrollerV1alpha1 retrieves the SamplecontrollerV1alpha1Client
 func (c *Clientset) SamplecontrollerV1alpha1() samplecontrollerv1alpha1.SamplecontrollerV1alpha1Interface {
-	return c.samplecontrollerV1alpha1
-}
-
-// Deprecated: Samplecontroller retrieves the default version of SamplecontrollerClient.
-// Please explicitly pick a version.
-func (c *Clientset) Samplecontroller() samplecontrollerv1alpha1.SamplecontrollerV1alpha1Interface {
 	return c.samplecontrollerV1alpha1
 }
 

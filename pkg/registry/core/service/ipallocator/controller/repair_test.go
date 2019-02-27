@@ -56,7 +56,7 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
 	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), cidr, ipregistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "192.168.1.0/24"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.Core(), fakeClient.Core(), cidr, ipregistry)
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), cidr, ipregistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.RunOnce(); err != nil {
@@ -170,7 +170,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), cidr, ipregistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}

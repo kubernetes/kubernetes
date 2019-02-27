@@ -130,6 +130,7 @@ type statefulSetStatusStrategy struct {
 	statefulSetStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = statefulSetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status

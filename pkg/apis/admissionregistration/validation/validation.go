@@ -171,6 +171,9 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
 	}
+	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
+	}
 
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)

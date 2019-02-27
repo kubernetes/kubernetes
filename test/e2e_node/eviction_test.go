@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -37,6 +36,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -682,7 +682,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 // Returns TRUE if the node has the node condition, FALSE otherwise
 func hasNodeCondition(f *framework.Framework, expectedNodeCondition v1.NodeConditionType) bool {
 	localNodeStatus := getLocalNode(f).Status
-	_, actualNodeCondition := nodeutil.GetNodeCondition(&localNodeStatus, expectedNodeCondition)
+	_, actualNodeCondition := testutils.GetNodeCondition(&localNodeStatus, expectedNodeCondition)
 	Expect(actualNodeCondition).NotTo(BeNil())
 	return actualNodeCondition.Status == v1.ConditionTrue
 }

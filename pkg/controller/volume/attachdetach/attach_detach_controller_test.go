@@ -156,7 +156,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	stopCh := make(chan struct{})
 
-	pods, err := fakeKubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	pods, err := fakeKubeClient.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
@@ -166,7 +166,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podInformer.GetIndexer().Add(&podToAdd)
 		podsNum++
 	}
-	nodes, err := fakeKubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := fakeKubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}

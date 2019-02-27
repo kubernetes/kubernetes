@@ -223,6 +223,21 @@ __EOF__
   # cleanup
   kubectl delete -f hack/testdata/service-revision2.yaml "${kube_flags[@]}"
 
+  ## kubectl apply -k somedir
+  kubectl apply -k hack/testdata/kustomize
+  kube::test::get_object_assert 'configmap test-the-map' "{{${id_field}}}" 'test-the-map'
+  kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
+  kube::test::get_object_assert 'service test-the-service' "{{${id_field}}}" 'test-the-service'
+  # cleanup
+  kubectl delete -k hack/testdata/kustomize
+
+  ## kubectl apply --kustomize somedir
+  kubectl apply --kustomize hack/testdata/kustomize
+  kube::test::get_object_assert 'configmap test-the-map' "{{${id_field}}}" 'test-the-map'
+  kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
+  kube::test::get_object_assert 'service test-the-service' "{{${id_field}}}" 'test-the-service'
+  # cleanup
+  kubectl delete --kustomize hack/testdata/kustomize
 
   set +o nounset
   set +o errexit

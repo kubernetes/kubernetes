@@ -28,6 +28,7 @@ import (
 // JoinData is the interface to use for join phases.
 // The "joinData" type from "cmd/join.go" must satisfy this interface.
 type JoinData interface {
+	CertificateKey() string
 	Cfg() *kubeadmapi.JoinConfiguration
 	KubeConfigPath() string
 	TLSBootstrapCfg() (*clientcmdapi.Config, error)

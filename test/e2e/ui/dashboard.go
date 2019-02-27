@@ -28,12 +28,12 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Kubernetes Dashboard", func() {
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
 		framework.SkipIfProviderIs("gke")
 	})
@@ -49,17 +49,17 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 
 	f := framework.NewDefaultFramework(uiServiceName)
 
-	It("should check that the kubernetes-dashboard instance is alive", func() {
-		By("Checking whether the kubernetes-dashboard service exists.")
+	ginkgo.It("should check that the kubernetes-dashboard instance is alive", func() {
+		ginkgo.By("Checking whether the kubernetes-dashboard service exists.")
 		err := framework.WaitForService(f.ClientSet, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Checking to make sure the kubernetes-dashboard pods are running")
+		ginkgo.By("Checking to make sure the kubernetes-dashboard pods are running")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
 		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, uiNamespace, selector)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Checking to make sure we get a response from the kubernetes-dashboard.")
+		ginkgo.By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
 			var status int
 			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
@@ -90,6 +90,6 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 			// Don't return err here as it aborts polling.
 			return status == http.StatusOK, nil
 		})
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 })

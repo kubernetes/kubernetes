@@ -121,4 +121,7 @@ const (
 
 	// UploadCerts flag instruct kubeadm to upload certificates
 	UploadCerts = "experimental-upload-certs"
+
+	// CertificateKey flag sets the key used to encrypt and decrypt certificate secrets
+	CertificateKey = "certificate-key"
 )

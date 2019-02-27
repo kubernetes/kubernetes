@@ -89,7 +89,7 @@ func (p *Provision) Admit(a admission.Attributes, o admission.ObjectInterfaces) 
 		Status: corev1.NamespaceStatus{},
 	}
 
-	_, err = p.client.Core().Namespaces().Create(namespace)
+	_, err = p.client.CoreV1().Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}

@@ -62,11 +62,8 @@ type GroupVersions struct {
 
 // GroupVersionInfo contains all the info around a group version.
 type GroupVersionInfo struct {
-	Group   Group
-	Version Version
-	// If a user calls a group client without specifying the version (e.g.,
-	// c.Core(), instead of c.CoreV1()), the default version will be returned.
-	IsDefaultVersion     bool
+	Group                Group
+	Version              Version
 	PackageAlias         string
 	GroupGoName          string
 	LowerCaseGroupGoName string

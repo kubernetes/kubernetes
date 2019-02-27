@@ -153,7 +153,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	if kubeClient == nil {
 		return nil, fmt.Errorf("failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.Core().Endpoints(epNamespace).Get(epName, metav1.GetOptions{})
+	ep, err := kubeClient.CoreV1().Endpoints(epNamespace).Get(epName, metav1.GetOptions{})
 
 	if err != nil {
 		klog.Errorf("failed to get endpoint %s: %v", epName, err)

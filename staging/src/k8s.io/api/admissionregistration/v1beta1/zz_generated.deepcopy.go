@@ -257,6 +257,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		*out = new(SideEffectClass)
 		**out = **in
 	}
+	if in.TimeoutSeconds != nil {
+		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

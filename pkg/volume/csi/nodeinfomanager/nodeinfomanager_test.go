@@ -605,7 +605,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		}
 
 		// Assert
-		nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
+		nodeInfo, err := csiClient.CsiV1alpha1().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("error getting CSINodeInfo: %v", err)
 			continue
@@ -1018,7 +1018,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			}
 
 			/* CSINodeInfo validation */
-			nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
+			nodeInfo, err := csiClient.CsiV1alpha1().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("error getting CSINodeInfo: %v", err)
 				continue
