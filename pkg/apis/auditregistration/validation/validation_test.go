@@ -133,16 +133,16 @@ func TestValidatePolicy(t *testing.T) {
 	}
 }
 
-func TestValidateEventVersion(t *testing.T) {
-	errs := ValidateEventVersion([]string{}, field.NewPath("eventVersion"))
+func TestValidateEventVersions(t *testing.T) {
+	errs := ValidateEventVersions([]string{}, field.NewPath("eventVersions"))
 	require.Len(t, errs, 0)
-	errs = ValidateEventVersion([]string{"v1"}, field.NewPath("eventVersion"))
+	errs = ValidateEventVersions([]string{"v1"}, field.NewPath("eventVersions"))
 	require.Len(t, errs, 0)
-	errs = ValidateEventVersion([]string{"unknown"}, field.NewPath("eventVersion"))
+	errs = ValidateEventVersions([]string{"unknown"}, field.NewPath("eventVersions"))
 	require.Len(t, errs, 1)
-	errs = ValidateEventVersion([]string{"v1", "unknown"}, field.NewPath("eventVersion"))
+	errs = ValidateEventVersions([]string{"v1", "unknown"}, field.NewPath("eventVersions"))
 	require.Len(t, errs, 0)
-	errs = ValidateEventVersion([]string{"unknown", "v1"}, field.NewPath("eventVersion"))
+	errs = ValidateEventVersions([]string{"unknown", "v1"}, field.NewPath("eventVersions"))
 	require.Len(t, errs, 0)
 }
 

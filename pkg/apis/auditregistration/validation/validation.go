@@ -51,7 +51,7 @@ func ValidateWebhook(w auditregistration.Webhook, fldPath *field.Path) field.Err
 		allErrs = append(allErrs, ValidateWebhookThrottleConfig(w.Throttle, fldPath.Child("throttle"))...)
 	}
 
-	allErrs = append(allErrs, ValidateEventVersion(w.EventVersions, fldPath.Child("eventVersions"))...)
+	allErrs = append(allErrs, ValidateEventVersions(w.EventVersions, fldPath.Child("eventVersions"))...)
 
 	cc := w.ClientConfig
 	switch {
@@ -65,8 +65,8 @@ func ValidateWebhook(w auditregistration.Webhook, fldPath *field.Path) field.Err
 	return allErrs
 }
 
-// ValidateEventVersion validates that at least one of the event versions given is supported
-func ValidateEventVersion(eventVersions []string, fldPath *field.Path) field.ErrorList {
+// ValidateEventVersions validates that at least one of the event versions given is supported
+func ValidateEventVersions(eventVersions []string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(eventVersions) == 0 {
 		return allErrs
