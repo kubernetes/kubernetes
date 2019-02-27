@@ -19,7 +19,6 @@ package common
 import (
 	"fmt"
 	"path"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -124,120 +123,127 @@ while true; do sleep 1; done
 					Eventually(terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(BeFalse())
 				}
 			})
+		})
 
+		Context("on terminated container", func() {
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
-			for _, testCase := range []struct {
-				name      string
-				container v1.Container
-				phase     v1.PodPhase
-				message   gomegatypes.GomegaMatcher
-			}{
-				{
-					name: "if TerminationMessagePath is set [NodeConformance]",
-					container: v1.Container{
-						Image:                  framework.BusyBoxImage,
-						Command:                []string{"/bin/sh", "-c"},
-						Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
-						TerminationMessagePath: "/dev/termination-log",
-						SecurityContext: &v1.SecurityContext{
-							RunAsUser: &rootUser,
-						},
-					},
-					phase:   v1.PodSucceeded,
-					message: Equal("DONE"),
-				},
 
-				{
-					name: "if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]",
-					container: v1.Container{
-						Image:                  framework.BusyBoxImage,
-						Command:                []string{"/bin/sh", "-c"},
-						Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
-						TerminationMessagePath: "/dev/termination-custom-log",
-						SecurityContext: &v1.SecurityContext{
-							RunAsUser: &nonRootUser,
-						},
-					},
-					phase:   v1.PodSucceeded,
-					message: Equal("DONE"),
-				},
+			// Create and then terminate the container under defined PodPhase to verify if termination message matches the expected output. Lastly delete the created container.
+			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
+				container.Name = "termination-message-container"
+				c := ConformanceContainer{
+					PodClient:     f.PodClient(),
+					Container:     container,
+					RestartPolicy: v1.RestartPolicyNever,
+				}
 
-				{
-					name: "from log output if TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
-					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo -n DONE; /bin/false"},
-						TerminationMessagePath:   "/dev/termination-log",
-						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
-					},
-					phase:   v1.PodFailed,
-					message: Equal("DONE"),
-				},
+				By("create the container")
+				c.Create()
+				defer c.Delete()
 
-				{
-					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
-					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo DONE; /bin/true"},
-						TerminationMessagePath:   "/dev/termination-log",
-						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
-					},
-					phase:   v1.PodSucceeded,
-					message: Equal(""),
-				},
+				By(fmt.Sprintf("wait for the container to reach %s", expectedPhase))
+				Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(Equal(expectedPhase))
 
-				{
-					name: "from file when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
-					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
-						TerminationMessagePath:   "/dev/termination-log",
-						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
-					},
-					phase:   v1.PodSucceeded,
-					message: Equal("OK"),
-				},
-			} {
-				testCase := testCase
-				It(fmt.Sprintf("should report termination message %s [LinuxOnly]", testCase.name), func() {
-					// Cannot mount files in Windows Containers.
-					testCase.container.Name = "termination-message-container"
-					c := ConformanceContainer{
-						PodClient:     f.PodClient(),
-						Container:     testCase.container,
-						RestartPolicy: v1.RestartPolicyNever,
-					}
+				By("get the container status")
+				status, err := c.GetStatus()
+				Expect(err).NotTo(HaveOccurred())
 
-					By("create the container")
-					c.Create()
-					defer c.Delete()
+				By("the container should be terminated")
+				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
 
-					By(fmt.Sprintf("wait for the container to reach %s", testCase.phase))
-					Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(Equal(testCase.phase))
+				By("the termination message should be set")
+				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				Expect(status.State.Terminated.Message).Should(expectedMsg)
 
-					By("get the container status")
-					status, err := c.GetStatus()
-					Expect(err).NotTo(HaveOccurred())
-
-					By("the container should be terminated")
-					Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
-
-					By("the termination message should be set")
-					Expect(status.State.Terminated.Message).Should(testCase.message)
-
-					By("delete the container")
-					Expect(c.Delete()).To(Succeed())
-				})
+				By("delete the container")
+				Expect(c.Delete()).To(Succeed())
 			}
+
+			It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
+				// Cannot mount files in Windows Containers.
+				container := v1.Container{
+					Image:                  framework.BusyBoxImage,
+					Command:                []string{"/bin/sh", "-c"},
+					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
+					TerminationMessagePath: "/dev/termination-log",
+					SecurityContext: &v1.SecurityContext{
+						RunAsUser: &rootUser,
+					},
+				}
+				matchTerminationMessage(container, v1.PodSucceeded, Equal("DONE"))
+			})
+
+			It("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
+				// Cannot mount files in Windows Containers.
+				container := v1.Container{
+					Image:                  framework.BusyBoxImage,
+					Command:                []string{"/bin/sh", "-c"},
+					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
+					TerminationMessagePath: "/dev/termination-custom-log",
+					SecurityContext: &v1.SecurityContext{
+						RunAsUser: &nonRootUser,
+					},
+				}
+				matchTerminationMessage(container, v1.PodSucceeded, Equal("DONE"))
+			})
+
+			It("should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+				// Cannot mount files in Windows Containers.
+				container := v1.Container{
+					Image:                    framework.BusyBoxImage,
+					Command:                  []string{"/bin/sh", "-c"},
+					Args:                     []string{"/bin/echo -n DONE; /bin/false"},
+					TerminationMessagePath:   "/dev/termination-log",
+					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+				}
+				matchTerminationMessage(container, v1.PodFailed, Equal("DONE"))
+			})
+
+			It("should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+				// Cannot mount files in Windows Containers.
+				container := v1.Container{
+					Image:                    framework.BusyBoxImage,
+					Command:                  []string{"/bin/sh", "-c"},
+					Args:                     []string{"/bin/echo DONE; /bin/true"},
+					TerminationMessagePath:   "/dev/termination-log",
+					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+				}
+				matchTerminationMessage(container, v1.PodSucceeded, Equal(""))
+			})
+
+			It("should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+				// Cannot mount files in Windows Containers.
+				container := v1.Container{
+					Image:                    framework.BusyBoxImage,
+					Command:                  []string{"/bin/sh", "-c"},
+					Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
+					TerminationMessagePath:   "/dev/termination-log",
+					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+				}
+				matchTerminationMessage(container, v1.PodSucceeded, Equal("OK"))
+			})
 		})
 
 		Context("when running a container with a new image", func() {
-			// The service account only has pull permission
-			auth := `
+
+			// Images used for ConformanceContainer are not added into NodeImageWhiteList, because this test is
+			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
+			// is v1.PullAlways, so it won't be blocked by framework image white list check.
+			imagePullTest := func(image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool) {
+				container := ConformanceContainer{
+					PodClient: f.PodClient(),
+					Container: v1.Container{
+						Name:            "image-pull-test",
+						Image:           image,
+						Command:         []string{"/bin/sh", "-c", "while true; do sleep 1; done"},
+						ImagePullPolicy: v1.PullAlways,
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				}
+				if hasSecret {
+					// The service account only has pull permission
+					auth := `
 {
 	"auths": {
 		"https://gcr.io": {
@@ -246,154 +252,116 @@ while true; do sleep 1; done
 		}
 	}
 }`
-			secret := &v1.Secret{
-				Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
-				Type: v1.SecretTypeDockerConfigJson,
-			}
-			// The following images are not added into NodeImageWhiteList, because this test is
-			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image white list check.
-			for _, testCase := range []struct {
-				description string
-				image       string
-				secret      bool
-				phase       v1.PodPhase
-				waiting     bool
-			}{
-				{
-					description: "should not be able to pull image from invalid registry",
-					image:       "invalid.com/invalid/alpine:3.1",
-					phase:       v1.PodPending,
-					waiting:     true,
-				},
-				{
-					description: "should not be able to pull non-existing image from gcr.io",
-					image:       "k8s.gcr.io/invalid-image:invalid-tag",
-					phase:       v1.PodPending,
-					waiting:     true,
-				},
-				{
-					// TODO(claudiub): Add a Windows equivalent test.
-					description: "should be able to pull image from gcr.io [LinuxOnly]",
-					image:       "gcr.io/google-containers/debian-base:0.4.1",
-					phase:       v1.PodRunning,
-					waiting:     false,
-				},
-				{
-					description: "should be able to pull image from docker hub [LinuxOnly]",
-					image:       "alpine:3.7",
-					phase:       v1.PodRunning,
-					waiting:     false,
-				},
-				{
-					description: "should be able to pull image from docker hub [WindowsOnly]",
-					image:       "e2eteam/busybox:1.29",
-					phase:       v1.PodRunning,
-					waiting:     false,
-				},
-				{
-					description: "should not be able to pull from private registry without secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
-					phase:       v1.PodPending,
-					waiting:     true,
-				},
-				{
-					description: "should be able to pull from private registry with secret [LinuxOnly]",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
-					secret:      true,
-					phase:       v1.PodRunning,
-					waiting:     false,
-				},
-			} {
-				testCase := testCase
-				It(testCase.description+" [NodeConformance]", func() {
-					if strings.Contains(testCase.description, "[WindowsOnly]") {
-						framework.SkipUnlessNodeOSDistroIs("windows")
+
+					secret := &v1.Secret{
+						Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
+						Type: v1.SecretTypeDockerConfigJson,
 					}
-					name := "image-pull-test"
-					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-					container := ConformanceContainer{
-						PodClient: f.PodClient(),
-						Container: v1.Container{
-							Name:    name,
-							Image:   testCase.image,
-							Command: command,
-							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
-							ImagePullPolicy: v1.PullAlways,
-						},
-						RestartPolicy: v1.RestartPolicyNever,
+					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
+					By("create image pull secret")
+					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+					Expect(err).NotTo(HaveOccurred())
+					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+					container.ImagePullSecrets = []string{secret.Name}
+				}
+				// checkContainerStatus checks whether the container status matches expectation.
+				checkContainerStatus := func() error {
+					status, err := container.GetStatus()
+					if err != nil {
+						return fmt.Errorf("failed to get container status: %v", err)
 					}
-					if testCase.secret {
-						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
-						By("create image pull secret")
-						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
-						Expect(err).NotTo(HaveOccurred())
-						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
-						container.ImagePullSecrets = []string{secret.Name}
+					// We need to check container state first. The default pod status is pending, If we check pod phase first,
+					// and the expected pod phase is Pending, the container status may not even show up when we check it.
+					// Check container state
+					if !expectedPullStatus {
+						if status.State.Running == nil {
+							return fmt.Errorf("expected container state: Running, got: %q",
+								GetContainerState(status.State))
+						}
 					}
-					// checkContainerStatus checks whether the container status matches expectation.
-					checkContainerStatus := func() error {
-						status, err := container.GetStatus()
-						if err != nil {
-							return fmt.Errorf("failed to get container status: %v", err)
+					if expectedPullStatus {
+						if status.State.Waiting == nil {
+							return fmt.Errorf("expected container state: Waiting, got: %q",
+								GetContainerState(status.State))
 						}
-						// We need to check container state first. The default pod status is pending, If we check
-						// pod phase first, and the expected pod phase is Pending, the container status may not
-						// even show up when we check it.
-						// Check container state
-						if !testCase.waiting {
-							if status.State.Running == nil {
-								return fmt.Errorf("expected container state: Running, got: %q",
-									GetContainerState(status.State))
-							}
+						reason := status.State.Waiting.Reason
+						if reason != images.ErrImagePull.Error() &&
+							reason != images.ErrImagePullBackOff.Error() {
+							return fmt.Errorf("unexpected waiting reason: %q", reason)
 						}
-						if testCase.waiting {
-							if status.State.Waiting == nil {
-								return fmt.Errorf("expected container state: Waiting, got: %q",
-									GetContainerState(status.State))
-							}
-							reason := status.State.Waiting.Reason
-							if reason != images.ErrImagePull.Error() &&
-								reason != images.ErrImagePullBackOff.Error() {
-								return fmt.Errorf("unexpected waiting reason: %q", reason)
-							}
-						}
-						// Check pod phase
-						phase, err := container.GetPhase()
-						if err != nil {
-							return fmt.Errorf("failed to get pod phase: %v", err)
-						}
-						if phase != testCase.phase {
-							return fmt.Errorf("expected pod phase: %q, got: %q", testCase.phase, phase)
-						}
-						return nil
 					}
-					// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this
-					// less flaky.
-					const flakeRetry = 3
-					for i := 1; i <= flakeRetry; i++ {
-						var err error
-						By("create the container")
-						container.Create()
-						By("check the container status")
-						for start := time.Now(); time.Since(start) < ContainerStatusRetryTimeout; time.Sleep(ContainerStatusPollInterval) {
-							if err = checkContainerStatus(); err == nil {
-								break
-							}
-						}
-						By("delete the container")
-						container.Delete()
-						if err == nil {
+					// Check pod phase
+					phase, err := container.GetPhase()
+					if err != nil {
+						return fmt.Errorf("failed to get pod phase: %v", err)
+					}
+					if phase != expectedPhase {
+						return fmt.Errorf("expected pod phase: %q, got: %q", expectedPhase, phase)
+					}
+					return nil
+				}
+
+				// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this less flaky.
+				const flakeRetry = 3
+				for i := 1; i <= flakeRetry; i++ {
+					var err error
+					By("create the container")
+					container.Create()
+					By("check the container status")
+					for start := time.Now(); time.Since(start) < ContainerStatusRetryTimeout; time.Sleep(ContainerStatusPollInterval) {
+						if err = checkContainerStatus(); err == nil {
 							break
 						}
-						if i < flakeRetry {
-							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
-						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
-						}
 					}
-				})
+					By("delete the container")
+					container.Delete()
+					if err == nil {
+						break
+					}
+					if i < flakeRetry {
+						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+					} else {
+						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+					}
+				}
 			}
+
+			It("should not be able to pull image from invalid registry [NodeConformance]", func() {
+				image := "invalid.com/invalid/alpine:3.1"
+				imagePullTest(image, false, v1.PodPending, true)
+			})
+
+			It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
+				image := "k8s.gcr.io/invalid-image:invalid-tag"
+				imagePullTest(image, false, v1.PodPending, true)
+			})
+
+			// TODO(claudiub): Add a Windows equivalent test.
+			It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
+				image := "gcr.io/google-containers/debian-base:0.4.1"
+				imagePullTest(image, false, v1.PodRunning, false)
+			})
+
+			It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
+				image := "alpine:3.7"
+				imagePullTest(image, false, v1.PodRunning, false)
+			})
+
+			It("should be able to pull image from docker hub [WindowsOnly] [NodeConformance]", func() {
+				framework.SkipUnlessNodeOSDistroIs("windows")
+				image := "e2eteam/busybox:1.29"
+				imagePullTest(image, false, v1.PodRunning, false)
+			})
+
+			It("should not be able to pull from private registry without secret [NodeConformance]", func() {
+				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
+				imagePullTest(image, false, v1.PodPending, true)
+			})
+
+			It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
+				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
+				imagePullTest(image, true, v1.PodRunning, false)
+			})
 		})
 	})
 })
