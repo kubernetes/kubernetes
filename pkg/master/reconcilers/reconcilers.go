@@ -38,7 +38,7 @@ type EndpointReconciler interface {
 	ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error
 	// RemoveEndpoints removes this apiserver's lease.
 	RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error
-	// StopReonciling turns any later ReconcileEndpoints call into a noop.
+	// StopReconciling turns any later ReconcileEndpoints call into a noop.
 	StopReconciling()
 }
 

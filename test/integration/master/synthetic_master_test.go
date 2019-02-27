@@ -103,8 +103,16 @@ func TestKubernetesService(t *testing.T) {
 	_, _, closeFn := framework.RunAMaster(config)
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
-	if _, err := coreClient.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil {
-		t.Fatalf("Expected kubernetes service to exists, got: %v", err)
+	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		if _, err := coreClient.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Expected kubernetes service to exist, got: %v", err)
 	}
 }
 
