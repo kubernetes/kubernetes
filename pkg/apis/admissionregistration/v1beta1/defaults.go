@@ -40,4 +40,8 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 		unknown := admissionregistrationv1beta1.SideEffectClassUnknown
 		obj.SideEffects = &unknown
 	}
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = new(int32)
+		*obj.TimeoutSeconds = 30
+	}
 }
