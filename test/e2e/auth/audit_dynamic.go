@@ -45,7 +45,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		framework.SkipUnlessProviderIs("gce")
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
+	// TODO(@pbarker): Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
 	It("should dynamically audit API calls [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 
@@ -179,7 +179,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			events []utils.AuditEvent
 		}{
 			// Create, get, update, patch, delete, list, watch pods.
-			// TODO: dedup this with the main audit test once policy functionality is available
+			// TODO(@pbarker): dedupe this with the main audit test once policy functionality is available
 			// https://github.com/kubernetes/kubernetes/issues/70818
 			{
 				func() {
