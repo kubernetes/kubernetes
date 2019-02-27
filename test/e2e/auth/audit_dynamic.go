@@ -370,13 +370,13 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 				return false, err
 			}
 			reader := strings.NewReader(logs)
-			missing, err := utils.CheckAuditLines(reader, expectedEvents, auditv1.SchemeGroupVersion)
+			missingReport, err := utils.CheckAuditLines(reader, expectedEvents, auditv1.SchemeGroupVersion)
 			if err != nil {
 				framework.Logf("Failed to observe audit events: %v", err)
-			} else if len(missing) > 0 {
-				framework.Logf("Events %#v not found!", missing)
+			} else if len(missingReport.MissingEvents) > 0 {
+				framework.Logf(missingReport.String())
 			}
-			return len(missing) == 0, nil
+			return len(missingReport.MissingEvents) == 0, nil
 		})
 		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
 		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete("test", &metav1.DeleteOptions{})
