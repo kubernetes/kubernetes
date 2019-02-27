@@ -18,11 +18,13 @@ package portforward
 
 import (
 	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
@@ -37,6 +39,37 @@ type fakeDialer struct {
 func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	d.dialed = true
 	return d.conn, d.negotiatedProtocol, d.err
+}
+
+type fakeConnection struct {
+	closed    bool
+	closeChan chan bool
+}
+
+func newFakeConnection() httpstream.Connection {
+	return &fakeConnection{
+		closeChan: make(chan bool),
+	}
+}
+
+func (c *fakeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	return nil, nil
+}
+
+func (c *fakeConnection) Close() error {
+	if !c.closed {
+		c.closed = true
+		close(c.closeChan)
+	}
+	return nil
+}
+
+func (c *fakeConnection) CloseChan() <-chan bool {
+	return c.closeChan
+}
+
+func (c *fakeConnection) SetIdleTimeout(timeout time.Duration) {
+	// no-op
 }
 
 func TestParsePortsAndNew(t *testing.T) {
@@ -308,5 +341,48 @@ func TestGetListener(t *testing.T) {
 		}
 		listener.Close()
 
+	}
+}
+
+func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
+	dialer := &fakeDialer{
+		conn: newFakeConnection(),
+	}
+
+	stopChan := make(chan struct{})
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	defer func() {
+		close(stopChan)
+
+		forwardErr := <-errChan
+		if forwardErr != nil {
+			t.Fatalf("ForwardPorts returned error: %s", forwardErr)
+		}
+	}()
+
+	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+
+	if err != nil {
+		t.Fatalf("error while calling New: %s", err)
+	}
+
+	go func() {
+		errChan <- pf.ForwardPorts()
+		close(errChan)
+	}()
+
+	<-pf.Ready
+
+	ports, err := pf.GetPorts()
+
+	if len(ports) != 1 {
+		t.Fatalf("expected 1 port, got %d", len(ports))
+	}
+
+	port := ports[0]
+	if port.Local == 0 {
+		t.Fatalf("local port is 0, expected != 0")
 	}
 }
