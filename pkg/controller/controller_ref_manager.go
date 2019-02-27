@@ -209,9 +209,6 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.
 // the patching fails.
 func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	if err := m.CanAdopt(); err != nil {
-		if err == utilerrors.ErrUIDNotMatch {
-			return err
-		}
 		return fmt.Errorf("can't adopt Pod %v/%v (%v): %v", pod.Namespace, pod.Name, pod.UID, err)
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
@@ -375,9 +372,6 @@ func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.Repl
 func RecheckDeletionTimestamp(getObject func() (metav1.Object, error)) func() error {
 	return func() error {
 		obj, err := getObject()
-		if err == utilerrors.ErrUIDNotMatch {
-			return err
-		}
 		if err != nil {
 			return fmt.Errorf("can't recheck DeletionTimestamp: %v", err)
 		}

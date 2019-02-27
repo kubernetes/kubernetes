@@ -41,7 +41,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -584,8 +583,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	//Do a full fetch here.
 	//The cache may be out of date via race condition #69376
 	fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
-	if fresh.UID != rs.UID {
-		fmt.Printf("Found Mismatched UIDs: %v != %v\n", fresh.UID, rs.UID)
+	if errors.IsNotFound(err) || fresh.UID != rs.UID {
 		klog.V(4).Infof("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
@@ -616,11 +614,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
 	filteredPods, err = rsc.claimPods(rs, selector, filteredPods)
-	if err == utilerrors.ErrUIDNotMatch {
-		klog.V(4).Infof("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)
-		rsc.expectations.DeleteExpectations(key)
-		return nil
-	}
 	if err != nil {
 		return err
 	}
@@ -655,9 +648,6 @@ func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.
 		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
-		}
-		if fresh.UID != rs.UID {
-			return nil, utilerrors.ErrUIDNotMatch
 		}
 		return fresh, nil
 	})
