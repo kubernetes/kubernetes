@@ -1104,23 +1104,32 @@ var _ testsuites.InlineVolumeTestDriver = &gcePdDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
-// InitGceDriver returns gcePdDriver that implements TestDriver interface
+// InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() testsuites.TestDriver {
+	var supportedTypes sets.String
+	var capFsGroup bool
+	if framework.NodeOSDistroIs("windows") {
+		supportedTypes = sets.NewString("ntfs")
+		capFsGroup = false
+	} else {
+		supportedTypes = sets.NewString(
+			"", // Default fsType
+			"ext2",
+			"ext3",
+			"ext4",
+			"xfs",
+		)
+		capFsGroup = true
+	}
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "gcepd",
-			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedFsType: sets.NewString(
-				"", // Default fsType
-				"ext2",
-				"ext3",
-				"ext4",
-				"xfs",
-			),
+			Name:                 "gcepd",
+			MaxFileSize:          testpatterns.FileSizeMedium,
+			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
-				testsuites.CapFsGroup:     true,
+				testsuites.CapFsGroup:     capFsGroup,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
@@ -1134,6 +1143,9 @@ func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
+	if pattern.FeatureTag == "sig-windows" {
+		framework.SkipUnlessNodeOSDistroIs("windows")
+	}
 }
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1183,11 +1195,18 @@ func (h *gcePdDriver) GetClaimSize() string {
 }
 
 func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	return &testsuites.PerTestConfig{
+	config := &testsuites.PerTestConfig{
 		Driver:    g,
 		Prefix:    "gcepd",
 		Framework: f,
-	}, func() {}
+	}
+	if framework.NodeOSDistroIs("windows") {
+		config.ClientNodeSelector = map[string]string{
+			"beta.kubernetes.io/os": "windows",
+		}
+	}
+	return config, func() {}
+
 }
 
 func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {

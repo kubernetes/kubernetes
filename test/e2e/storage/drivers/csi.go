@@ -347,6 +347,9 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	if pattern.FsType == "xfs" {
 		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
+	if pattern.FeatureTag == "sig-windows" {
+		framework.Skipf("Skipping tests for windows since CSI does not support it yet")
+	}
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -460,6 +463,9 @@ func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPa
 	framework.SkipUnlessProviderIs("gce", "gke")
 	if pattern.FsType == "xfs" {
 		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
+	if pattern.FeatureTag == "sig-windows" {
+		framework.Skipf("Skipping tests for windows since CSI does not support it yet")
 	}
 }
 
