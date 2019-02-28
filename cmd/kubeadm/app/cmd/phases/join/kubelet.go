@@ -64,10 +64,11 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.CfgPath,
 			options.NodeCRISocket,
 			options.NodeName,
-			options.TLSBootstrapToken,
+			options.FileDiscovery,
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
 			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
 			options.TokenStr,
 		},
 	}
