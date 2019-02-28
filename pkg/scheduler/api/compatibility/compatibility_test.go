@@ -1061,6 +1061,147 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				}},
 			},
 		},
+		"1.13": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MatchNodeSelector"},
+			{"name": "PodFitsResources"},
+			{"name": "PodFitsHostPorts"},
+			{"name": "HostName"},
+			{"name": "NoDiskConflict"},
+			{"name": "NoVolumeZoneConflict"},
+			{"name": "PodToleratesNodeTaints"},
+			{"name": "CheckNodeMemoryPressure"},
+			{"name": "CheckNodeDiskPressure"},
+			{"name": "CheckNodePIDPressure"},
+			{"name": "CheckNodeCondition"},
+			{"name": "MaxEBSVolumeCount"},
+			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
+			{"name": "MaxCSIVolumeCountPred"},
+			{"name": "MatchInterPodAffinity"},
+			{"name": "GeneralPredicates"},
+			{"name": "CheckVolumeBinding"},
+			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+			{"name": "EqualPriority",   "weight": 2},
+			{"name": "ImageLocalityPriority",   "weight": 2},
+			{"name": "LeastRequestedPriority",   "weight": 2},
+			{"name": "BalancedResourceAllocation",   "weight": 2},
+			{"name": "SelectorSpreadPriority",   "weight": 2},
+			{"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+			{"name": "NodeAffinityPriority",   "weight": 2},
+			{"name": "TaintTolerationPriority",   "weight": 2},
+			{"name": "InterPodAffinityPriority",   "weight": 2},
+			{"name": "MostRequestedPriority",   "weight": 2},
+			{
+				"name": "RequestedToCapacityRatioPriority",
+				"weight": 2,
+				"argument": {
+				"requestedToCapacityRatioArguments": {
+					"shape": [
+						{"utilization": 0,  "score": 0},
+						{"utilization": 50, "score": 7}
+					]
+				}
+			}
+		},
+		{
+			"name": "ResourceBinPackingPriority",
+			"weight": 2,
+			"argument": {
+				"resourceBinPacking": { 
+					"resources": [ 
+						{ "resource": "intel.com/foo" }
+					]
+			 }
+			}
+		}
+		],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true,
+			"managedResources": [{"name":"example.com/foo","ignoredByScheduler":true}],
+			"ignorable":true
+		  }]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "PodToleratesNodeTaints"},
+					{Name: "CheckNodeMemoryPressure"},
+					{Name: "CheckNodeDiskPressure"},
+					{Name: "CheckNodePIDPressure"},
+					{Name: "CheckNodeCondition"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
+					{Name: "MaxCSIVolumeCountPred"},
+					{Name: "MatchInterPodAffinity"},
+					{Name: "GeneralPredicates"},
+					{Name: "CheckVolumeBinding"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "EqualPriority", Weight: 2},
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
+					{Name: "NodeAffinityPriority", Weight: 2},
+					{Name: "TaintTolerationPriority", Weight: 2},
+					{Name: "InterPodAffinityPriority", Weight: 2},
+					{Name: "MostRequestedPriority", Weight: 2},
+					{
+						Name:   "RequestedToCapacityRatioPriority",
+						Weight: 2,
+						Argument: &schedulerapi.PriorityArgument{
+							RequestedToCapacityRatioArguments: &schedulerapi.RequestedToCapacityRatioArguments{
+								UtilizationShape: []schedulerapi.UtilizationShapePoint{
+									{Utilization: 0, Score: 0},
+									{Utilization: 50, Score: 7},
+								}},
+						},
+					},
+					{
+						Name:   "ResourceBinPackingPriority",
+						Weight: 2,
+						Argument: &schedulerapi.PriorityArgument{
+							ResourceBinPacking: &schedulerapi.ResourceBinPacking{Resources: []schedulerapi.Resources{{Resource: v1.ResourceName("intel.com/foo")}}},
+						},
+					},
+				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+					Ignorable:        true,
+				}},
+			},
+		},
 	}
 
 	registeredPredicates := sets.NewString(factory.ListRegisteredFitPredicates()...)

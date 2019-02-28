@@ -94,4 +94,7 @@ func init() {
 
 	// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
 	factory.RegisterPriorityFunction2(priorities.ImageLocalityPriority, priorities.ImageLocalityPriorityMap, nil, 1)
+
+	//Optional, resource bin packing allows bin packing for extended resources as well
+	factory.RegisterPriorityFunction2(priorities.ResourceBinPackingPriority, priorities.ResourceBinPackingPriorityDefault().ResourceBinPackingPriorityMap, nil, 1)
 }

@@ -51,4 +51,6 @@ const (
 	ImageLocalityPriority = "ImageLocalityPriority"
 	// ResourceLimitsPriority defines the nodes of prioritizer function ResourceLimitsPriority.
 	ResourceLimitsPriority = "ResourceLimitsPriority"
+	// ResourceBinPackingPriority defines  the name of prioritizer function ResourceBinPacking.
+	ResourceBinPackingPriority = "ResourceBinPackingPriority"
 )
