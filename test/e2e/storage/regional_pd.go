@@ -27,7 +27,7 @@ import (
 	"encoding/json"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +50,7 @@ const (
 	pvDeletionTimeout       = 3 * time.Minute
 	statefulSetReadyTimeout = 3 * time.Minute
 	taintKeyPrefix          = "zoneTaint_"
+	repdMinSize             = "200Gi"
 )
 
 var _ = utils.SIGDescribe("Regional PD", func() {
@@ -105,8 +106,8 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"zones":            strings.Join(cloudZones, ","),
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5Gi",
-			expectedSize: "2Gi",
+			claimSize:    repdMinSize,
+			expectedSize: repdMinSize,
 			pvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
@@ -123,8 +124,8 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5Gi",
-			expectedSize: "2Gi",
+			claimSize:    repdMinSize,
+			expectedSize: repdMinSize,
 			pvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
@@ -304,7 +305,7 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string) {
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
+		claimSize:    repdMinSize,
 		delayBinding: true,
 	}
 
@@ -331,8 +332,8 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
-		expectedSize: "2Gi",
+		claimSize:    repdMinSize,
+		expectedSize: repdMinSize,
 	}
 
 	suffix := "topo-regional"
@@ -353,7 +354,7 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
+		claimSize:    repdMinSize,
 		delayBinding: true,
 	}
 
