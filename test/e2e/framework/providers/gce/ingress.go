@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
@@ -60,8 +60,8 @@ const (
 	nameLenLimit = 62
 )
 
-// GCEIngressController manages implementation details of Ingress on GCE/GKE.
-type GCEIngressController struct {
+// IngressController manages implementation details of Ingress on GCE/GKE.
+type IngressController struct {
 	Ns           string
 	rcPath       string
 	UID          string
@@ -72,13 +72,14 @@ type GCEIngressController struct {
 	Cloud        framework.CloudConfig
 }
 
-func (cont *GCEIngressController) CleanupGCEIngressController() error {
-	return cont.CleanupGCEIngressControllerWithTimeout(framework.LoadBalancerCleanupTimeout)
+// CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout
+func (cont *IngressController) CleanupIngressController() error {
+	return cont.CleanupIngressControllerWithTimeout(framework.LoadBalancerCleanupTimeout)
 }
 
-// CleanupGCEIngressControllerWithTimeout calls the GCEIngressController.Cleanup(false)
-// followed with deleting the static ip, and then a final GCEIngressController.Cleanup(true)
-func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout time.Duration) error {
+// CleanupIngressControllerWithTimeout calls the IngressController.Cleanup(false)
+// followed with deleting the static ip, and then a final IngressController.Cleanup(true)
+func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.Duration) error {
 	pollErr := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		if err := cont.Cleanup(false); err != nil {
 			framework.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
@@ -89,11 +90,11 @@ func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout
 
 	// Always try to cleanup even if pollErr == nil, because the cleanup
 	// routine also purges old leaked resources based on creation timestamp.
-	By("Performing final delete of any remaining resources")
+	ginkgo.By("Performing final delete of any remaining resources")
 	if cleanupErr := cont.Cleanup(true); cleanupErr != nil {
-		By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
+		ginkgo.By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
 	} else {
-		By("No resources leaked.")
+		ginkgo.By("No resources leaked.")
 	}
 
 	// Static-IP allocated on behalf of the test, never deleted by the
@@ -109,7 +110,7 @@ func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout
 	}); ipErr != nil {
 		// If this is a persistent error, the suite will fail when we run out
 		// of quota anyway.
-		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
+		ginkgo.By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
 	}
 
 	// Logging that the GLBC failed to cleanup GCE resources on ingress deletion
@@ -120,7 +121,7 @@ func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout
 	return nil
 }
 
-func (cont *GCEIngressController) getL7AddonUID() (string, error) {
+func (cont *IngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
 	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
 	if err != nil {
@@ -132,7 +133,8 @@ func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	return "", fmt.Errorf("Could not find cluster UID for L7 addon pod")
 }
 
-func (cont *GCEIngressController) ListGlobalForwardingRules() []*compute.ForwardingRule {
+// ListGlobalForwardingRules returns a list of global forwarding rules
+func (cont *IngressController) ListGlobalForwardingRules() []*compute.ForwardingRule {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	fwdList := []*compute.ForwardingRule{}
 	l, err := gceCloud.ListGlobalForwardingRules()
@@ -145,7 +147,7 @@ func (cont *GCEIngressController) ListGlobalForwardingRules() []*compute.Forward
 	return fwdList
 }
 
-func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
+func (cont *IngressController) deleteForwardingRule(del bool) string {
 	msg := ""
 	fwList := []compute.ForwardingRule{}
 	for _, regex := range []string{fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter), fmt.Sprintf("%vfws-.*%v.*", k8sPrefix, clusterDelimiter)} {
@@ -167,14 +169,15 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 	return msg
 }
 
-func (cont *GCEIngressController) GetGlobalAddress(ipName string) *compute.Address {
+// GetGlobalAddress returns the global address by name.
+func (cont *IngressController) GetGlobalAddress(ipName string) *compute.Address {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	ip, err := gceCloud.GetGlobalAddress(ipName)
 	framework.ExpectNoError(err)
 	return ip
 }
 
-func (cont *GCEIngressController) deleteAddresses(del bool) string {
+func (cont *IngressController) deleteAddresses(del bool) string {
 	msg := ""
 	ipList := []compute.Address{}
 	regex := fmt.Sprintf("%vfw-.*%v.*", k8sPrefix, clusterDelimiter)
@@ -194,7 +197,8 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 	return msg
 }
 
-func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpProxy {
+// ListTargetHTTPProxies lists all target HTTP proxies in the project
+func (cont *IngressController) ListTargetHTTPProxies() []*compute.TargetHttpProxy {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpList := []*compute.TargetHttpProxy{}
 	l, err := gceCloud.ListTargetHTTPProxies()
@@ -207,7 +211,8 @@ func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpP
 	return tpList
 }
 
-func (cont *GCEIngressController) ListTargetHttpsProxies() []*compute.TargetHttpsProxy {
+// ListTargetHTTPSProxies lists all target HTTPS proxies
+func (cont *IngressController) ListTargetHTTPSProxies() []*compute.TargetHttpsProxy {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpsList := []*compute.TargetHttpsProxy{}
 	l, err := gceCloud.ListTargetHTTPSProxies()
@@ -220,7 +225,7 @@ func (cont *GCEIngressController) ListTargetHttpsProxies() []*compute.TargetHttp
 	return tpsList
 }
 
-func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
+func (cont *IngressController) deleteTargetProxy(del bool) string {
 	msg := ""
 	tpList := []compute.TargetHttpProxy{}
 	regex := fmt.Sprintf("%vtp-.*%v.*", k8sPrefix, clusterDelimiter)
@@ -255,7 +260,8 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 	return msg
 }
 
-func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
+// ListURLMaps lists all URL maps
+func (cont *IngressController) ListURLMaps() []*compute.UrlMap {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	umList := []*compute.UrlMap{}
 	l, err := gceCloud.ListURLMaps()
@@ -268,7 +274,7 @@ func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
 	return umList
 }
 
-func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
+func (cont *IngressController) deleteURLMap(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	umList, err := gceCloud.ListURLMaps()
 	if err != nil {
@@ -297,7 +303,8 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) ListGlobalBackendServices() []*compute.BackendService {
+// ListGlobalBackendServices lists all global backend services
+func (cont *IngressController) ListGlobalBackendServices() []*compute.BackendService {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList := []*compute.BackendService{}
 	l, err := gceCloud.ListGlobalBackendServices()
@@ -310,7 +317,7 @@ func (cont *GCEIngressController) ListGlobalBackendServices() []*compute.Backend
 	return beList
 }
 
-func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
+func (cont *IngressController) deleteBackendService(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
@@ -340,7 +347,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
+func (cont *IngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	hcList, err := gceCloud.ListHTTPHealthChecks()
 	if err != nil {
@@ -369,7 +376,8 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) ListSslCertificates() []*compute.SslCertificate {
+// ListSslCertificates lists all SSL certificates
+func (cont *IngressController) ListSslCertificates() []*compute.SslCertificate {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	sslList := []*compute.SslCertificate{}
 	l, err := gceCloud.ListSslCertificates()
@@ -382,7 +390,7 @@ func (cont *GCEIngressController) ListSslCertificates() []*compute.SslCertificat
 	return sslList
 }
 
-func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
+func (cont *IngressController) deleteSSLCertificate(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	sslList, err := gceCloud.ListSslCertificates()
 	if err != nil {
@@ -410,7 +418,8 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) ListInstanceGroups() []*compute.InstanceGroup {
+// ListInstanceGroups lists all instance groups
+func (cont *IngressController) ListInstanceGroups() []*compute.InstanceGroup {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	igList := []*compute.InstanceGroup{}
 	l, err := gceCloud.ListInstanceGroups(cont.Cloud.Zone)
@@ -423,7 +432,7 @@ func (cont *GCEIngressController) ListInstanceGroups() []*compute.InstanceGroup 
 	return igList
 }
 
-func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
+func (cont *IngressController) deleteInstanceGroup(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	// TODO: E2E cloudprovider has only 1 zone, but the cluster can have many.
 	// We need to poll on all IGs across all zones.
@@ -454,7 +463,7 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) deleteNetworkEndpointGroup(del bool) (msg string) {
+func (cont *IngressController) deleteNetworkEndpointGroup(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	// TODO: E2E cloudprovider has only 1 zone, but the cluster can have many.
 	// We need to poll on all NEGs across all zones.
@@ -491,7 +500,7 @@ func (cont *GCEIngressController) deleteNetworkEndpointGroup(del bool) (msg stri
 // controller's UID, or the creationTimestamp exceeds the maxAge and del is set
 // to true. Always returns false if the name doesn't match that we expect for
 // Ingress cloud resources.
-func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp string, delOldResources bool) bool {
+func (cont *IngressController) canDelete(resourceName, creationTimestamp string, delOldResources bool) bool {
 	// ignore everything not created by an ingress controller.
 	splitName := strings.Split(resourceName, clusterDelimiter)
 	if !strings.HasPrefix(resourceName, k8sPrefix) || len(splitName) != 2 {
@@ -518,13 +527,13 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 
 // isOwned returns true if the resourceName ends in a suffix matching this
 // controller UID.
-func (cont *GCEIngressController) isOwned(resourceName string) bool {
+func (cont *IngressController) isOwned(resourceName string) bool {
 	return cont.canDelete(resourceName, "", false)
 }
 
 // canDeleteNEG returns true if either the name contains this controller's UID,
 // or the creationTimestamp exceeds the maxAge and del is set to true.
-func (cont *GCEIngressController) canDeleteNEG(resourceName, creationTimestamp string, delOldResources bool) bool {
+func (cont *IngressController) canDeleteNEG(resourceName, creationTimestamp string, delOldResources bool) bool {
 	if !strings.HasPrefix(resourceName, "k8s") {
 		return false
 	}
@@ -553,31 +562,31 @@ func canDeleteWithTimestamp(resourceName, creationTimestamp string) bool {
 	return false
 }
 
-// GetFirewallRuleName returns the name of the firewall used for the GCEIngressController.
-func (cont *GCEIngressController) GetFirewallRuleName() string {
+// GetFirewallRuleName returns the name of the firewall used for the IngressController.
+func (cont *IngressController) GetFirewallRuleName() string {
 	return fmt.Sprintf("%vfw-l7%v%v", k8sPrefix, clusterDelimiter, cont.UID)
 }
 
-// GetFirewallRule returns the firewall used by the GCEIngressController.
+// GetFirewallRule returns the firewall used by the IngressController.
 // Causes a fatal error incase of an error.
 // TODO: Rename this to GetFirewallRuleOrDie and similarly rename all other
 // methods here to be consistent with rest of the code in this repo.
-func (cont *GCEIngressController) GetFirewallRule() *compute.Firewall {
+func (cont *IngressController) GetFirewallRule() *compute.Firewall {
 	fw, err := cont.GetFirewallRuleOrError()
 	framework.ExpectNoError(err)
 	return fw
 }
 
-// GetFirewallRule returns the firewall used by the GCEIngressController.
+// GetFirewallRuleOrError returns the firewall used by the IngressController.
 // Returns an error if that fails.
 // TODO: Rename this to GetFirewallRule when the above method with that name is renamed.
-func (cont *GCEIngressController) GetFirewallRuleOrError() (*compute.Firewall, error) {
+func (cont *IngressController) GetFirewallRuleOrError() (*compute.Firewall, error) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	fwName := cont.GetFirewallRuleName()
 	return gceCloud.GetFirewall(fwName)
 }
 
-func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
+func (cont *IngressController) deleteFirewallRule(del bool) (msg string) {
 	fwList := []compute.Firewall{}
 	regex := fmt.Sprintf("%vfw-l7%v.*", k8sPrefix, clusterDelimiter)
 	gcloudComputeResourceList("firewall-rules", regex, cont.Cloud.ProjectID, &fwList)
@@ -596,22 +605,22 @@ func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
 	return msg
 }
 
-func (cont *GCEIngressController) isHTTPErrorCode(err error, code int) bool {
+func (cont *IngressController) isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
 }
 
 // BackendServiceUsingNEG returns true only if all global backend service with matching nodeports pointing to NEG as backend
-func (cont *GCEIngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) (bool, error) {
+func (cont *IngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) (bool, error) {
 	return cont.backendMode(svcPorts, "networkEndpointGroups")
 }
 
 // BackendServiceUsingIG returns true only if all global backend service with matching svcPorts pointing to IG as backend
-func (cont *GCEIngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) (bool, error) {
+func (cont *IngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) (bool, error) {
 	return cont.backendMode(svcPorts, "instanceGroups")
 }
 
-func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort, keyword string) (bool, error) {
+func (cont *IngressController) backendMode(svcPorts map[string]v1.ServicePort, keyword string) (bool, error) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
@@ -641,7 +650,7 @@ func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort
 				strings.Contains(bs.Name, negHash) {
 				match = true
 				bsMatch = bs
-				matchingBackendService += 1
+				matchingBackendService++
 				break
 			}
 		}
@@ -673,7 +682,7 @@ func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort
 // Cleanup cleans up cloud resources.
 // If del is false, it simply reports existing resources without deleting them.
 // If dle is true, it deletes resources it finds acceptable (see canDelete func).
-func (cont *GCEIngressController) Cleanup(del bool) error {
+func (cont *IngressController) Cleanup(del bool) error {
 	// Ordering is important here because we cannot delete resources that other
 	// resources hold references to.
 	errMsg := cont.deleteForwardingRule(del)
@@ -699,8 +708,8 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 	return fmt.Errorf(errMsg)
 }
 
-// Init initializes the GCEIngressController with an UID
-func (cont *GCEIngressController) Init() error {
+// Init initializes the IngressController with an UID
+func (cont *IngressController) Init() error {
 	uid, err := cont.getL7AddonUID()
 	if err != nil {
 		return err
@@ -719,7 +728,7 @@ func (cont *GCEIngressController) Init() error {
 // CreateStaticIP allocates a random static ip with the given name. Returns a string
 // representation of the ip. Caller is expected to manage cleanup of the ip by
 // invoking deleteStaticIPs.
-func (cont *GCEIngressController) CreateStaticIP(name string) string {
+func (cont *IngressController) CreateStaticIP(name string) string {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	addr := &compute.Address{Name: name}
 	if err := gceCloud.ReserveGlobalAddress(addr); err != nil {
@@ -745,7 +754,7 @@ func (cont *GCEIngressController) CreateStaticIP(name string) string {
 
 // deleteStaticIPs delets all static-ips allocated through calls to
 // CreateStaticIP.
-func (cont *GCEIngressController) deleteStaticIPs() error {
+func (cont *IngressController) deleteStaticIPs() error {
 	if cont.staticIPName != "" {
 		if err := GcloudComputeResourceDelete("addresses", cont.staticIPName, cont.Cloud.ProjectID, "--global"); err == nil {
 			cont.staticIPName = ""

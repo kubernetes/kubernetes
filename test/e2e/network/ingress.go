@@ -83,13 +83,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
 	Describe("GCE [Slow] [Feature:Ingress]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -111,7 +111,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -125,7 +125,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should create ingress with given static-ip", func() {
-			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
+			// ip released when the rest of lb resources are deleted in CleanupIngressController
 			ip := gceController.CreateStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
 			executeStaticIPHttpsOnlyTest(f, jig, ns, ip)
@@ -401,17 +401,17 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// Verify that the controller does not create any other resource except instance group.
 			// TODO(59778): Check GCE resources specific to this ingress instead of listing all resources.
-			if len(gceController.ListUrlMaps()) != 0 {
-				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListUrlMaps())
+			if len(gceController.ListURLMaps()) != 0 {
+				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListURLMaps())
 			}
 			if len(gceController.ListGlobalForwardingRules()) != 0 {
 				framework.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
 			}
-			if len(gceController.ListTargetHttpProxies()) != 0 {
-				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			if len(gceController.ListTargetHTTPProxies()) != 0 {
+				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
-			if len(gceController.ListTargetHttpsProxies()) != 0 {
-				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			if len(gceController.ListTargetHTTPSProxies()) != 0 {
+				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListSslCertificates()) != 0 {
 				framework.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
@@ -466,13 +466,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	Describe("GCE [Slow] [Feature:NEG]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -494,7 +494,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -808,7 +808,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 		var ipName, ipAddress string
 
 		// Platform specific setup
@@ -817,7 +817,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.Class = ingress.MulticlusterIngressClassValue
 			jig.PollInterval = 5 * time.Second
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -828,7 +828,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// TODO(https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/19):
 			// Kubemci should reserve a static ip if user has not specified one.
 			ipName = "kubemci-" + string(uuid.NewUUID())
-			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
+			// ip released when the rest of lb resources are deleted in CleanupIngressController
 			ipAddress = gceController.CreateStaticIP(ipName)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
 		})
@@ -846,7 +846,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -1118,7 +1118,7 @@ func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get %s or %s, response body: %s", version, scheme, resp))
 }
 
-func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.GCEIngressController, ns, name string, negs int) {
+func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
 	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
 		svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
