@@ -779,10 +779,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		return nil, fmt.Errorf("mount propagation feature gate has been deprecated and will be removed in 1.14")
-	}
-
 	klet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
