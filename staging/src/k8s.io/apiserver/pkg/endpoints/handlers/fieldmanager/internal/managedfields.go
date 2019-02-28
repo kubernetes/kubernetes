@@ -146,6 +146,10 @@ func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedF
 		}
 		encodedManagedFields = append(encodedManagedFields, *v)
 	}
+	return sortEncodedManagedFields(encodedManagedFields)
+}
+
+func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (sortedManagedFields []metav1.ManagedFieldsEntry, err error) {
 	return encodedManagedFields, nil
 }
 

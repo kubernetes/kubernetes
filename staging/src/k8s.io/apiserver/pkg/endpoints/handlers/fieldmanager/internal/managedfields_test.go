@@ -198,3 +198,33 @@ time: "2001-02-03T04:05:06Z"
 		})
 	}
 }
+
+func TestSortEncodedManagedFields(t *testing.T) {
+	tests := []struct {
+		name          string
+		managedFields []metav1.ManagedFieldsEntry
+		expected      []metav1.ManagedFieldsEntry
+	}{
+		{
+			name: "remains untouched",
+			managedFields: []metav1.ManagedFieldsEntry{
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: &metav1.Time{}},
+			},
+			expected: []metav1.ManagedFieldsEntry{
+				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: &metav1.Time{}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sorted, err := sortEncodedManagedFields(test.managedFields)
+			if err != nil {
+				t.Fatalf("did not expect error when sorting but got: %v", err)
+			}
+			if !reflect.DeepEqual(sorted, test.expected) {
+				t.Fatalf("expected:\n%v\nbut got:\n%v", test.expected, sorted)
+			}
+		})
+	}
+}
