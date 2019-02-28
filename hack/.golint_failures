@@ -522,8 +522,6 @@ staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
-staging/src/k8s.io/apiserver/pkg/storage/errors
-staging/src/k8s.io/apiserver/pkg/storage/etcd
 staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest
 staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics
 staging/src/k8s.io/apiserver/pkg/storage/etcd/testing

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package etcd provides conversion of etcd errors to API errors.
+// Package storage provides conversion of storage errors to API errors.
 package storage // import "k8s.io/apiserver/pkg/storage/errors"
