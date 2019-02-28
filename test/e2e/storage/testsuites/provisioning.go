@@ -18,7 +18,6 @@ package testsuites
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -180,7 +179,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 			framework.Skipf("need more than one node - skipping")
 		}
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			PVMultiNodeCheck(l.cs, claim, volume, NodeSelection{Name: l.config.ClientNodeName})
+			PVMultiNodeCheck(l.cs, claim, volume, framework.NodeSelection{Name: l.config.ClientNodeName})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -214,62 +213,14 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		dc := l.config.Framework.DynamicClient
 		vsc := sDriver.GetSnapshotClass(l.config)
-		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
+		dataSource, cleanupFunc := prepareDataSourceForProvisioning(framework.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 			By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: l.config.ClientNodeName})
-		}
-		l.testCase.TestDynamicProvisioning()
-	})
-
-	It("should allow concurrent writes on the same node", func() {
-		if !dInfo.Capabilities[CapMultiPODs] {
-			framework.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
-		}
-
-		init()
-		defer cleanup()
-
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			// We start two pods concurrently on the same node,
-			// using the same PVC. Both wait for other to create a
-			// file before returning. The pods are forced onto the
-			// same node via pod affinity.
-			wg := sync.WaitGroup{}
-			wg.Add(2)
-			firstPodName := "pvc-tester-first"
-			secondPodName := "pvc-tester-second"
-			run := func(podName, command string) {
-				defer GinkgoRecover()
-				defer wg.Done()
-				node := NodeSelection{
-					Name: l.config.ClientNodeName,
-				}
-				if podName == secondPodName {
-					node.Affinity = &v1.Affinity{
-						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										// Set by RunInPodWithVolume.
-										"app": firstPodName,
-									},
-								},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
-						},
-					}
-				}
-				RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, podName, command, node)
-			}
-			go run(firstPodName, "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
-			go run(secondPodName, "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
-			wg.Wait()
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, framework.NodeSelection{Name: l.config.ClientNodeName})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -384,7 +335,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 // persistent across pods.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node NodeSelection) {
+func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node framework.NodeSelection) {
 	By(fmt.Sprintf("checking the created volume is writable and has the PV's mount options on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
 	// We give the first pod the secondary responsibility of checking the volume has
@@ -408,7 +359,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 
 	By(fmt.Sprintf("checking the created volume is readable and retains data on the same node %q", actualNodeName))
 	command = "grep 'hello world' /mnt/test/data"
-	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, NodeSelection{Name: actualNodeName})
+	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, framework.NodeSelection{Name: actualNodeName})
 }
 
 // PVMultiNodeCheck checks that a PV retains data when moved between nodes.
@@ -425,7 +376,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 // persistent across pods and across nodes.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node NodeSelection) {
+func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node framework.NodeSelection) {
 	Expect(node.Name).To(Equal(""), "this test only works when not locked onto a single node")
 
 	var pod *v1.Pod
@@ -446,30 +397,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 
 	// Add node-anti-affinity.
 	secondNode := node
-	if secondNode.Affinity == nil {
-		secondNode.Affinity = &v1.Affinity{}
-	}
-	if secondNode.Affinity.NodeAffinity == nil {
-		secondNode.Affinity.NodeAffinity = &v1.NodeAffinity{}
-	}
-	if secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
-	}
-	secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-		v1.NodeSelectorTerm{
-			// https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity warns
-			// that "the value of kubernetes.io/hostname may be the same as the Node name in some environments and a different value in other environments".
-			// So this might be cleaner:
-			// MatchFields: []v1.NodeSelectorRequirement{
-			// 	{Key: "name", Operator: v1.NodeSelectorOpNotIn, Values: []string{actualNodeName}},
-			// },
-			// However, "name", "Name", "ObjectMeta.Name" all got rejected with "not a valid field selector key".
-
-			MatchExpressions: []v1.NodeSelectorRequirement{
-				{Key: "kubernetes.io/hostname", Operator: v1.NodeSelectorOpNotIn, Values: []string{actualNodeName}},
-			},
-		})
-
+	framework.SetAntiAffinity(&secondNode, actualNodeName)
 	By(fmt.Sprintf("checking the created volume is readable and retains data on another node %+v", secondNode))
 	command = "grep 'hello world' /mnt/test/data"
 	if framework.NodeOSDistroIs("windows") {
@@ -573,17 +501,9 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	return pvs, node
 }
 
-// NodeSelection specifies where to run a pod, using a combination of fixed node name,
-// node selector and/or affinity.
-type NodeSelection struct {
-	Name     string
-	Selector map[string]string
-	Affinity *v1.Affinity
-}
-
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 // It starts, checks, collects output and stops it.
-func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node NodeSelection) {
+func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node framework.NodeSelection) {
 	pod := StartInPodWithVolume(c, ns, claimName, podName, command, node)
 	defer StopPod(c, pod)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
@@ -591,7 +511,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command s
 
 // StartInPodWithVolume starts a command in a pod with given claim mounted to /mnt directory
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node NodeSelection) *v1.Pod {
+func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node framework.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -664,7 +584,7 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 }
 
 func prepareDataSourceForProvisioning(
-	node NodeSelection,
+	node framework.NodeSelection,
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,

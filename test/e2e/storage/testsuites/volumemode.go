@@ -182,9 +182,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
+				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, l.config.ClientNodeName, framework.PodStartTimeout)
+					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
@@ -213,9 +213,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
+				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, l.config.ClientNodeName, framework.PodStartTimeout)
+					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
@@ -273,9 +273,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating pod")
-				pod, err := framework.CreateSecPodWithNodeName(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
+				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
-					nil, l.config.ClientNodeName, framework.PodStartTimeout)
+					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
