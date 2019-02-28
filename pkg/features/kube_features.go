@@ -134,13 +134,6 @@ const (
 	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 
-	// owner: @jsafrane
-	// GA: v1.12
-	//
-	// Note: This feature gate is unconditionally enabled in v1.13 and will be removed in v1.14.
-	// Enable mount propagation of volumes.
-	MountPropagation utilfeature.Feature = "MountPropagation"
-
 	// owner: @sjenning
 	// alpha: v1.11
 	//
@@ -443,7 +436,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.GA},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
-	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.14
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
