@@ -226,11 +226,13 @@ type ExpandableVolumePlugin interface {
 	RequiresFSResize() bool
 }
 
-// FSResizableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
+// NodeExpandableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
 // that require extra steps on nodes for expansion to complete
-type FSResizableVolumePlugin interface {
+type NodeExpandableVolumePlugin interface {
 	ExpandableVolumePlugin
-	ExpandFS(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) error
+	// NodeExpand expands volume on given deviceMountPath and returns true if resize is successful.
+	// devicePath can be set to empty string if unavailable.
+	NodeExpand(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) (bool, error)
 }
 
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
@@ -951,26 +953,26 @@ func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugi
 	return nil, nil
 }
 
-// FindFSResizablePluginBySpec fetches a persistent volume plugin by spec
-func (pm *VolumePluginMgr) FindFSResizablePluginBySpec(spec *Spec) (FSResizableVolumePlugin, error) {
+// FindNodeExpandablePluginBySpec fetches a persistent volume plugin by spec
+func (pm *VolumePluginMgr) FindNodeExpandablePluginBySpec(spec *Spec) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 	return nil, nil
 }
 
 // FindFSResizablePluginByName fetches a persistent volume plugin by name
-func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (FSResizableVolumePlugin, error) {
+func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
 	}
 
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 
