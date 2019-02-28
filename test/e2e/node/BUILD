@@ -10,6 +10,7 @@ go_library(
         "kubelet.go",
         "kubelet_perf.go",
         "mount_propagation.go",
+        "node_problem_detector.go",
         "pod_gc.go",
         "pods.go",
         "pre_stop.go",
