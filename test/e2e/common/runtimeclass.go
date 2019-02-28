@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package common
 
 import (
 	"fmt"
@@ -34,7 +34,13 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("RuntimeClass", func() {
+const (
+	// PreconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
+	// preconfigured in the test environment.
+	PreconfiguredRuntimeHandler = "test-handler"
+)
+
+var _ = Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
@@ -48,6 +54,16 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := createRuntimeClassPod(f, rcName)
 		expectSandboxFailureEvent(f, pod, handler)
+	})
+
+	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
+	It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
+		// The built-in docker runtime does not support configuring runtime handlers.
+		framework.SkipIfContainerRuntimeIs("docker")
+
+		rcName := createRuntimeClass(f, "preconfigured-handler", PreconfiguredRuntimeHandler)
+		pod := createRuntimeClassPod(f, rcName)
+		expectPodSuccess(f, pod)
 	})
 
 	It("should reject a Pod requesting a deleted RuntimeClass", func() {
@@ -74,8 +90,6 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pod := createRuntimeClassPod(f, rcName)
 		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
 	})
-
-	// TODO(tallclair): Test an actual configured non-default runtimeHandler.
 })
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
