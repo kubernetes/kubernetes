@@ -232,14 +232,18 @@ func (r *genericVolumeTestResource) cleanupResource() {
 		case testpatterns.DynamicPV:
 			By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
-			if r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
+			if r.pv != nil && r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
 				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
 					r.pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
-			err := framework.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
-			framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
-			err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name)
+			if r.pvc != nil {
+				err := framework.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
+				framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
+				if r.pv != nil {
+					err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
+					framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name)
+				}
+			}
 		default:
 			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
 		}
