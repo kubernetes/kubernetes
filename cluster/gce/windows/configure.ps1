@@ -91,6 +91,7 @@ try {
   # then put these calls into a loop over a list of XYZ-psm1 keys.
   FetchAndImport-ModuleFromMetadata 'k8s-node-setup-psm1' 'k8s-node-setup.psm1'
 
+  Dump-DebugInfoToConsole
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
   Disable-WindowsDefender

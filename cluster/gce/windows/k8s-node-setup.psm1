@@ -128,6 +128,19 @@ function Add_GceMetadataServerRoute {
   }
 }
 
+# Writes debugging information, such as Windows version and patch info, to the
+# console.
+function Dump-DebugInfoToConsole {
+  Try {
+    $version = "$([System.Environment]::OSVersion.Version | Out-String)"
+    $hotfixes = "$(Get-Hotfix | Out-String)"
+    $image = "$(Get-InstanceMetadata 'image' | Out-String)"
+    Log-Output "Windows version:`n$version"
+    Log-Output "Installed hotfixes:`n$hotfixes"
+    Log-Output "GCE Windows image:`n$image"
+  } Catch { }
+}
+
 # Fetches the kube-env from the instance metadata.
 #
 # Returns: a PowerShell Hashtable object containing the key-value pairs from
