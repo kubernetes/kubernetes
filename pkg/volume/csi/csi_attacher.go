@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,7 +86,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		},
 	}
 
-	_, err = c.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = c.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	alreadyExist := false
 	if err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -135,7 +135,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
@@ -148,7 +148,7 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 		return attachID, nil
 	}
 
-	watcher, err := c.k8s.StorageV1beta1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
 		return "", fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
@@ -238,7 +238,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 
 		attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(nodeName))
 		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
-		attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
 			attached[spec] = false
 			klog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
@@ -417,7 +417,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 		attachID = getAttachmentName(volID, driverName, string(nodeName))
 	}
 
-	if err := c.k8s.StorageV1beta1().VolumeAttachments().Delete(attachID, nil); err != nil {
+	if err := c.k8s.StorageV1().VolumeAttachments().Delete(attachID, nil); err != nil {
 		if apierrs.IsNotFound(err) {
 			// object deleted or never existed, done
 			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
@@ -443,7 +443,7 @@ func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) err
 
 func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) error {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			//object deleted or never existed, done
@@ -460,7 +460,7 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 		return errors.New(detachErr.Message)
 	}
 
-	watcher, err := c.k8s.StorageV1beta1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}

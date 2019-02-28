@@ -638,7 +638,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 	attachID := getAttachmentName(handle, driver, nodeName)
 
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-	attachment, err := client.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attachment, err := client.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		return nil, err // This err already has enough context ("VolumeAttachment xyz not found")
 	}

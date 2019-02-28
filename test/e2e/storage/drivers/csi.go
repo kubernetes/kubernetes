@@ -38,6 +38,7 @@ package drivers
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
@@ -171,13 +172,14 @@ type mockCSIDriver struct {
 	manifests      []string
 	podInfoVersion *string
 	attachable     bool
+	attachLimit    int
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
-func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfoVersion *string) testsuites.TestDriver {
+func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfoVersion *string, attachLimit int) testsuites.TestDriver {
 	driverManifests := []string{
 		"test/e2e/testing-manifests/storage-csi/cluster-driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
@@ -213,6 +215,7 @@ func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfoVersion *st
 		manifests:      driverManifests,
 		podInfoVersion: podInfoVersion,
 		attachable:     driverAttachable,
+		attachLimit:    attachLimit,
 	}
 }
 
@@ -254,6 +257,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
 	if !m.attachable {
 		containerArgs = append(containerArgs, "--disable-attach")
+	}
+
+	if m.attachLimit > 0 {
+		containerArgs = append(containerArgs, "--attach-limit", strconv.Itoa(m.attachLimit))
 	}
 
 	// TODO (?): the storage.csi.image.version and storage.csi.image.registry

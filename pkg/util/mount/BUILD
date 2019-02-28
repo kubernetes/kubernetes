@@ -80,8 +80,6 @@ go_test(
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],

@@ -95,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/nsenter"
@@ -364,6 +365,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	}
 
 	mounter := mount.New(s.ExperimentalMounterPath)
+	subpather := subpath.New(mounter)
 	var pluginRunner = exec.New()
 	if s.Containerized {
 		klog.V(2).Info("Running kubelet in containerized mode")
@@ -372,6 +374,8 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 			return nil, err
 		}
 		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
+		// NSenter only valid on Linux
+		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
 		// an exec interface which can use nsenter for flex plugin calls
 		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
 		if err != nil {
@@ -399,6 +403,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		CSIClient:           nil,
 		EventClient:         nil,
 		Mounter:             mounter,
+		Subpather:           subpather,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       ProbeVolumePlugins(),

@@ -135,7 +135,7 @@ func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) 
 }
 
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	// TODO(random-liu): Do this in cloud init after we remove containervm test.
 	if err := setupCNI(host, workspace); err != nil {
@@ -164,8 +164,8 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, host, results, junitFilePrefix, imageDesc, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, host, results, junitFilePrefix, imageDesc, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }

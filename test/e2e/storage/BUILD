@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "csi_mock_volume.go",
         "csi_volumes.go",
         "detach_mounted.go",
         "empty_dir_wrapper.go",
