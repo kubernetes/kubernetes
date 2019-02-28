@@ -27,7 +27,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -76,39 +75,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
-			var userVersion string
-			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
-			kubeadmutil.CheckErr(err)
-
-			// Ensure the user is root
-			klog.V(1).Infof("running preflight checks")
-			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
-			kubeadmutil.CheckErr(err)
-
-			// If the version is specified in config file, pick up that value.
-			if flags.cfgPath != "" {
-				// Note that cfg isn't preserved here, it's just an one-off to populate userVersion based on --config
-				cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
-				kubeadmutil.CheckErr(err)
-
-				if cfg.KubernetesVersion != "" {
-					userVersion = cfg.KubernetesVersion
-				}
-			}
-
-			// If the new version is already specified in config file, version arg is optional.
-			if userVersion == "" {
-				err = cmdutil.ValidateExactArgNumber(args, []string{"version"})
-				kubeadmutil.CheckErr(err)
-			}
-
-			// If option was specified in both args and config file, args will overwrite the config file.
-			if len(args) == 1 {
-				userVersion = args[0]
-			}
-
-			err = assertVersionStringIsEmpty(userVersion)
+			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
 			kubeadmutil.CheckErr(err)
 
 			err = runApply(flags, userVersion)
@@ -223,14 +190,6 @@ func runApply(flags *applyFlags, userVersion string) error {
 	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", cfg.KubernetesVersion)
 	fmt.Println("")
 	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
-
-	return nil
-}
-
-func assertVersionStringIsEmpty(version string) error {
-	if len(version) == 0 {
-		return errors.New("version string can't be empty")
-	}
 
 	return nil
 }
