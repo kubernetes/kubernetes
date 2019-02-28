@@ -95,6 +95,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -232,6 +233,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -589,6 +591,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}

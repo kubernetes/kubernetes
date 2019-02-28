@@ -188,7 +188,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
 			if pvSource != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false)
+				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false, pattern.VolMode)
 			}
 			r.volType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
@@ -205,7 +205,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 
 			if r.sc != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
-					f, dInfo.Name, claimSize, r.sc, false, nil)
+					f, dInfo.Name, claimSize, r.sc, false, pattern.VolMode)
 			}
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
@@ -269,6 +269,7 @@ func createVolumeSourceWithPVCPV(
 	pvSource *v1.PersistentVolumeSource,
 	volumeNodeAffinity *v1.VolumeNodeAffinity,
 	readOnly bool,
+	volMode v1.PersistentVolumeMode,
 ) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", name),
@@ -276,8 +277,14 @@ func createVolumeSourceWithPVCPV(
 		PVSource:         *pvSource,
 		NodeAffinity:     volumeNodeAffinity,
 	}
+
 	pvcConfig := framework.PersistentVolumeClaimConfig{
 		StorageClassName: &f.Namespace.Name,
+	}
+
+	if volMode != "" {
+		pvConfig.VolumeMode = &volMode
+		pvcConfig.VolumeMode = &volMode
 	}
 
 	framework.Logf("Creating PVC and PV")
@@ -302,7 +309,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	claimSize string,
 	sc *storagev1.StorageClass,
 	readOnly bool,
-	volMode *v1.PersistentVolumeMode,
+	volMode v1.PersistentVolumeMode,
 ) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
@@ -310,8 +317,8 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	By("creating a claim")
 	pvc := getClaim(claimSize, ns)
 	pvc.Spec.StorageClassName = &sc.Name
-	if volMode != nil {
-		pvc.Spec.VolumeMode = volMode
+	if volMode != "" {
+		pvc.Spec.VolumeMode = &volMode
 	}
 
 	var err error

@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "base.go",
         "driveroperations.go",
+        "multivolume.go",
         "provisioning.go",
         "snapshottable.go",
         "subpath.go",
@@ -28,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -121,6 +121,8 @@ const (
 	// - https://github.com/container-storage-interface/spec/issues/178
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
+
+	CapRWX Capability = "RWX" // support ReadWriteMany access modes
 )
 
 // DriverInfo represents static information about a TestDriver.
