@@ -613,6 +613,69 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
+
+	Context("Pods sharing a single local PV [Serial]", func() {
+		var (
+			pv *v1.PersistentVolume
+		)
+
+		BeforeEach(func() {
+			localVolume := &localTestVolume{
+				node:            config.node0,
+				hostDir:         "/tmp",
+				localVolumeType: DirectoryLocalVolumeType,
+			}
+			pvConfig := makeLocalPVConfig(config, localVolume)
+			var err error
+			pv, err = framework.CreatePV(config.client, framework.MakePersistentVolume(pvConfig))
+			framework.ExpectNoError(err)
+		})
+
+		AfterEach(func() {
+			if pv == nil {
+				return
+			}
+			By(fmt.Sprintf("Clean PV %s", pv.Name))
+			err := config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		It("all pods should be running", func() {
+			var (
+				pvc   *v1.PersistentVolumeClaim
+				pods  = map[string]*v1.Pod{}
+				count = 50
+				err   error
+			)
+			pvc = framework.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
+			By(fmt.Sprintf("Create a PVC %s", pvc.Name))
+			pvc, err = framework.CreatePVC(config.client, config.ns, pvc)
+			framework.ExpectNoError(err)
+			By(fmt.Sprintf("Create %d pods to use this PVC", count))
+			for i := 0; i < count; i++ {
+				pod := framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, false, "", false, false, selinuxLabel, nil)
+				pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				pods[pod.Name] = pod
+			}
+			By("Wait for all pods are running")
+			err = wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
+				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				runningPods := 0
+				for _, pod := range podsList.Items {
+					switch pod.Status.Phase {
+					case v1.PodRunning:
+						runningPods++
+					}
+				}
+				return runningPods == count, nil
+			})
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
 })
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
