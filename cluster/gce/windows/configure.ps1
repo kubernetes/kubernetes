@@ -111,6 +111,7 @@ try {
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
+  InstallAndStart-LoggingAgent
 
   Create-DockerRegistryKey
   DownloadAndInstall-KubernetesBinaries
