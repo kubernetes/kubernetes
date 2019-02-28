@@ -19,6 +19,7 @@ package get
 import (
 	"bytes"
 	encjson "encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -35,18 +37,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -54,11 +60,18 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
+const (
+	pollInterval        = 10 * time.Millisecond
+	pollTimeout         = 15 * time.Second
+	pollBestEffortDelay = 100 * time.Millisecond
+)
+
 var (
 	openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
 
 	grace              = int64(30)
 	enableServiceLinks = corev1.DefaultEnableServiceLinks
+	pollKubectlTimeout = fmt.Sprint(pollTimeout + pollBestEffortDelay + 10*time.Second)
 )
 
 func testComponentStatusData() *corev1.ComponentStatusList {
@@ -759,8 +772,8 @@ func TestGetMixedGenericObjects(t *testing.T) {
 			case "/namespaces/test/pods":
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, structuredObj)}, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
@@ -810,8 +823,8 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
@@ -1170,6 +1183,11 @@ func watchTestData() ([]corev1.Pod, []watch.Event) {
 
 func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
+	for i := range pods {
+		pods[i].Labels = map[string]string{
+			"a": "b",
+		}
+	}
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -1185,28 +1203,53 @@ func TestWatchLabelSelector(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
-				}
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods...)...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		labelSelector := action.(clienttesting.ListAction).GetListRestrictions().Labels.String()
+		if labelSelector != "a=b" {
+			t.Errorf("bad label selector: %q", labelSelector)
+		}
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		labelSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Labels.String()
+		if labelSelector != "a=b" {
+			t.Errorf("bad label selector: %q", labelSelector)
+		}
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("selector", "a=b")
-	cmd.Run(cmd, []string{"pods"})
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{"pods"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 bar    0/0              0          <unknown>
@@ -1214,6 +1257,13 @@ foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1236,28 +1286,52 @@ func TestWatchFieldSelector(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
-				}
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
+				t.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods...)...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		fieldSelector := action.(clienttesting.ListAction).GetListRestrictions().Fields.String()
+		if fieldSelector != "a=b" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		fieldSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String()
+		if fieldSelector != "a=b" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("field-selector", "a=b")
-	cmd.Run(cmd, []string{"pods"})
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{"pods"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 bar    0/0              0          <unknown>
@@ -1265,6 +1339,13 @@ foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1283,31 +1364,60 @@ func TestWatchResource(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
-			case "/namespaces/test/pods":
-				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
-				}
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods[1])...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		fieldSelector := action.(clienttesting.ListAction).GetListRestrictions().Fields.String()
+		if fieldSelector != "metadata.name=foo" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		fieldSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String()
+		if fieldSelector != "metadata.name=foo" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Run(cmd, []string{"pods", "foo"})
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{"pods", "foo"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1315,6 +1425,18 @@ foo    0/0              0          <unknown>
 
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
+	// We need to rename the pods to match, so fakes work correctly
+	for i := range pods {
+		if pods[i].Name == "foo" {
+			pods[i].Name = "busybox1"
+		}
+	}
+	for i := range events {
+		p := events[i].Object.(*corev1.Pod)
+		if p.Name == "foo" {
+			p.Name = "busybox1"
+		}
+	}
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -1324,34 +1446,63 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
-			case "/namespaces/test/replicationcontrollers/cassandra":
+			case "/namespaces/test/pods/busybox1":
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
-			case "/namespaces/test/replicationcontrollers":
-				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
-				}
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods[1])...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		fieldSelector := action.(clienttesting.ListAction).GetListRestrictions().Fields.String()
+		if fieldSelector != "metadata.name=busybox1" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		fieldSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String()
+		if fieldSelector != "metadata.name=busybox1" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
-	cmd.Run(cmd, []string{})
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/kubectl/busybox-pod.yaml")
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{})
 
-	expected := `NAME   READY   STATUS   RESTARTS   AGE
-foo    0/0              0          <unknown>
-foo    0/0              0          <unknown>
-foo    0/0              0          <unknown>
+	expected := `NAME       READY   STATUS   RESTARTS   AGE
+busybox1   0/0              0          <unknown>
+busybox1   0/0              0          <unknown>
+busybox1   0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1370,30 +1521,56 @@ func TestWatchOnlyResource(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
-			case "/namespaces/test/pods":
-				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
-				}
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods[1])...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		t.Errorf("watch only should not call dynamic client's List method")
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		fieldSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String()
+		if fieldSelector != "metadata.name=foo" {
+			t.Errorf("bad field selector: %q", fieldSelector)
+		}
+
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods", "foo"})
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{"pods", "foo"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1422,23 +1599,55 @@ func TestWatchOnlyList(t *testing.T) {
 				}
 				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
-				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
-				return nil, nil
+				t.Errorf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, errors.New("internal error")
 			}
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, toUnstructured(podsToObjects(pods[1])...)...)
+	tf.FakeDynamicClient.PrependReactor("list", "*", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		t.Errorf("watch only should not call dynamic client's List method")
+		return false, nil, nil
+	})
+	tf.FakeDynamicClient.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		fieldSelector := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String()
+		if fieldSelector != "" {
+			t.Errorf("bad field selector: %q\n", fieldSelector)
+		}
+
+		evs := events[2:]
+		ch := make(chan watch.Event, len(evs))
+		for _, e := range evs {
+			ch <- e
+		}
+		return true, watch.NewProxyWatcher(ch), nil
+	})
+
+	buf := &cmdtesting.ThreadsafeBuffer{}
+	streams := genericclioptions.IOStreams{
+		In:     &bytes.Buffer{},
+		Out:    buf,
+		ErrOut: &bytes.Buffer{},
+	}
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods"})
+	cmd.Flags().Set("timeout", pollKubectlTimeout)
+	go cmd.RunE(cmd, []string{"pods"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
 foo    0/0              0          <unknown>
 `
+	_ = wait.PollImmediate(pollInterval, pollTimeout, func() (done bool, err error) {
+		return expected == buf.String(), nil
+	})
+
+	// Best effort to make sure no more data are printed
+	time.Sleep(pollBestEffortDelay)
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -1451,4 +1660,27 @@ func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 		enc.Encode(&events[i])
 	}
 	return json.Framer.NewFrameReader(ioutil.NopCloser(buf))
+}
+
+func podsToObjects(pods ...corev1.Pod) []runtime.Object {
+	var objects []runtime.Object
+	for i := range pods {
+		objects = append(objects, &pods[i])
+	}
+
+	return objects
+}
+
+func toUnstructured(objects ...runtime.Object) []runtime.Object {
+	var unstructuredObjects []runtime.Object
+	for i := range objects {
+		var unstructured metav1unstructured.Unstructured
+		err := scheme.Scheme.Convert(objects[i], &unstructured, nil)
+		if err != nil {
+			panic(err)
+		}
+		unstructuredObjects = append(unstructuredObjects, &unstructured)
+	}
+
+	return unstructuredObjects
 }

@@ -292,7 +292,7 @@ run_non_native_resource_tests() {
   # Start watcher in background with process substitution,
   # so we can read from stdout asynchronously.
   kube::log::status "Testing CustomResource watching"
-  exec 3< <(kubectl "${kube_flags[@]}" get bars --request-timeout=1m --watch-only -o name & echo $! ; wait)
+  exec 3< <(kubectl "${kube_flags[@]}" get bars --timeout=1m --watch-only -o name & echo $! ; wait)
   local watch_pid
   read <&3 watch_pid
 

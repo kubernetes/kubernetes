@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
@@ -32,15 +33,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -65,6 +69,7 @@ type GetOptions struct {
 	Watch     bool
 	WatchOnly bool
 	ChunkSize int64
+	Timeout   time.Duration
 
 	LabelSelector     string
 	FieldSelector     string
@@ -160,11 +165,26 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate(cmd))
-			cmdutil.CheckErr(o.Run(f, cmd, args))
+			cmdutil.CheckErr(cmd.RunE(cmd, args))
 		},
-		SuggestFor: []string{"list", "ps"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := o.Complete(f, cmd, args)
+			if err != nil {
+				return err
+			}
+			err = o.Validate(cmd)
+			if err != nil {
+				return err
+			}
+			err = o.Run(f, cmd, args)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		SuggestFor:    []string{"list", "ps"},
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	o.PrintFlags.AddFlags(cmd)
@@ -172,6 +192,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmd.Flags().Int64Var(&o.ChunkSize, "chunk-size", o.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -638,79 +659,81 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	// watching from resourceVersion 0, starts the watch at ~now and
-	// will return an initial watch event.  Starting form ~now, rather
-	// the rv of the object will insure that we start the watch from
-	// inside the watch window, which the rv of the object might not be.
-	rv := "0"
-	isList := meta.IsListType(obj)
-	if isList {
-		// the resourceVersion of list objects is ~now but won't return
-		// an initial watch event
-		rv, err = meta.NewAccessor().ResourceVersion(obj)
-		if err != nil {
-			return err
-		}
-	}
-
 	writer := utilprinters.GetNewTabWriter(o.Out)
 
-	// print the current object
-	if !o.WatchOnly {
-		var objsToPrint []runtime.Object
+	isList := meta.IsListType(obj)
+
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
+	fs, err := fields.ParseSelector(o.FieldSelector)
+	if err != nil {
+		return fmt.Errorf("failed to parse field selector %q, %v", o.FieldSelector, err)
+	}
+
+	optionsModifier := func(options *metav1.ListOptions) {
+		options.LabelSelector = o.LabelSelector
 
 		if isList {
-			objsToPrint, _ = meta.ExtractList(obj)
+			options.FieldSelector = o.FieldSelector
 		} else {
-			objsToPrint = append(objsToPrint, obj)
-		}
-		for _, objToPrint := range objsToPrint {
-			if o.IsHumanReadablePrinter {
-				// printing always takes the internal version, but the watch event uses externals
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
-			}
-			if err := printer.PrintObj(objToPrint, writer); err != nil {
-				return fmt.Errorf("unable to output the provided object: %v", err)
+			if fs.Empty() {
+				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", info.Name).String()
+			} else {
+				options.FieldSelector = fields.AndSelectors(
+					fs,
+					fields.OneTermEqualSelector("metadata.name", info.Name),
+				).String()
 			}
 		}
-		writer.Flush()
 	}
 
 	// print watched changes
-	w, err := r.Watch(rv)
-	if err != nil {
-		return err
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
+			optionsModifier(&options)
+			return dynamic.Resource(info.ResourceMapping().Resource).Namespace(info.Namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			optionsModifier(&options)
+			return dynamic.Resource(info.ResourceMapping().Resource).Namespace(info.Namespace).Watch(options)
+		},
 	}
 
-	first := true
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	intr := interrupt.New(nil, cancel)
-	intr.Run(func() error {
-		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
-			if !isList && first {
-				// drop the initial watch event in the single resource case
-				first = false
-				return false, nil
-			}
+	conditionFunc := func(e watch.Event) (bool, error) {
+		// printing always takes the internal version, but the watch event uses externals
+		// TODO fix printing to use server-side or be version agnostic
+		objToPrint := e.Object
+		if o.IsHumanReadablePrinter {
+			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+			objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
+		}
+		if err := printer.PrintObj(objToPrint, writer); err != nil {
+			return false, err
+		}
+		writer.Flush()
+		return false, nil
+	}
 
-			// printing always takes the internal version, but the watch event uses externals
-			// TODO fix printing to use server-side or be version agnostic
-			objToPrint := e.Object
-			if o.IsHumanReadablePrinter {
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
-			}
-			if err := printer.PrintObj(objToPrint, writer); err != nil {
-				return false, err
-			}
-			writer.Flush()
-			return false, nil
-		})
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+
+	intr := interrupt.New(nil, cancel)
+	err = intr.Run(func() error {
+		var err error
+		if o.WatchOnly {
+			_, err = watchtools.Until(ctx, info.ResourceVersion, lw, conditionFunc)
+		} else {
+			_, err = watchtools.ListWatchUntil(ctx, lw, conditionFunc)
+		}
 		return err
 	})
-	return nil
+	if err == wait.ErrWaitTimeout {
+		return nil
+	}
+	return err
 }
 
 // attemptToConvertToInternal tries to convert to an internal type, but returns the original if it can't

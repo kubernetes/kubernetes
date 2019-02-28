@@ -139,9 +139,9 @@ run_kubectl_get_tests() {
   kubectl create cm one "${kube_flags[@]}"
   kubectl create cm two "${kube_flags[@]}"
   kubectl create cm three "${kube_flags[@]}"
-  output_message=$(kubectl get configmap --chunk-size=1 --watch --request-timeout=1s 2>&1 "${kube_flags[@]}")
+  output_message=$(kubectl get configmap --watch --timeout=1s 2>&1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" "watch is only supported on individual resources"
-  output_message=$(kubectl get configmap --chunk-size=1 --watch-only --request-timeout=1s 2>&1 "${kube_flags[@]}")
+  output_message=$(kubectl get configmap --watch-only --timeout=1s 2>&1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" "watch is only supported on individual resources"
 
   ### Test --allow-missing-template-keys
@@ -173,16 +173,16 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
 
   ### Test kubectl get watch
-  output_message=$(kubectl get pods -w --request-timeout=1 "${kube_flags[@]}")
+  output_message=$(kubectl get pods -w --timeout=1s "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'STATUS'    # headers
   kube::test::if_has_string "${output_message}" 'valid-pod' # pod details
-  output_message=$(kubectl get pods/valid-pod -o name -w --request-timeout=1 "${kube_flags[@]}")
+  output_message=$(kubectl get pods/valid-pod -o name -w --timeout=1s "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS' # no headers
   kube::test::if_has_string     "${output_message}" 'pod/valid-pod' # resource name
-  output_message=$(kubectl get pods/valid-pod -o yaml -w --request-timeout=1 "${kube_flags[@]}")
+  output_message=$(kubectl get pods/valid-pod -o yaml -w --timeout=1s "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS'          # no headers
   kube::test::if_has_string     "${output_message}" 'name: valid-pod' # yaml
-  output_message=$(! kubectl get pods/invalid-pod -w --request-timeout=1 "${kube_flags[@]}" 2>&1)
+  output_message=$(! kubectl get pods/invalid-pod -w --timeout=1s "${kube_flags[@]}" 2>&1)
   kube::test::if_has_string "${output_message}" '"invalid-pod" not found'
 
   # cleanup
