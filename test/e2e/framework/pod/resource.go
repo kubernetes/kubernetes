@@ -688,3 +688,17 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 	}
 	return
 }
+
+// PatchContainerImages replaces the specified Container Registry with a custom
+// one provided via the KUBE_TEST_REPO_LIST env variable
+func PatchContainerImages(containers []v1.Container) error {
+	var err error
+	for _, c := range containers {
+		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

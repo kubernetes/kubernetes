@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -31,9 +32,11 @@ type RegistryList struct {
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
+	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
 	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
+	QuayK8sCSI              string `yaml:"quayK8sCSI"`
 }
 
 // Config holds an images registry, name, and version
@@ -65,9 +68,11 @@ func initReg() RegistryList {
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
 		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
+		QuayK8sCSI:              "quay.io/k8scsi",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -93,8 +98,10 @@ var (
 	e2eGcRegistry           = "gcr.io/kubernetes-e2e-test-images"
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
+	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
+	quayK8sCSI              = registry.QuayK8sCSI
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -271,4 +278,39 @@ func (i *Config) GetE2EImage() string {
 // GetPauseImageName returns the pause image name with proper version
 func GetPauseImageName() string {
 	return GetE2EImage(Pause)
+}
+
+// ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one
+func ReplaceRegistryInImageURL(imageURL string) (string, error) {
+	parts := strings.Split(imageURL, "/")
+	countParts := len(parts)
+	registryAndUser := strings.Join(parts[:countParts-1], "/")
+
+	switch registryAndUser {
+	case "gcr.io/kubernetes-e2e-test-images":
+		registryAndUser = e2eRegistry
+	case "k8s.gcr.io":
+		registryAndUser = gcRegistry
+	case "gcr.io/k8s-authenticated-test":
+		registryAndUser = PrivateRegistry
+	case "gcr.io/google-samples":
+		registryAndUser = sampleRegistry
+	case "gcr.io/gke-release":
+		registryAndUser = gcrReleaseRegistry
+	case "docker.io/library":
+		registryAndUser = dockerLibraryRegistry
+	case "quay.io/k8scsi":
+		registryAndUser = quayK8sCSI
+	default:
+		if countParts == 1 {
+			// We assume we found an image from docker hub library
+			// e.g. openjdk -> docker.io/library/openjdk
+			registryAndUser = dockerLibraryRegistry
+			break
+		}
+
+		return "", fmt.Errorf("Registry: %s is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters", registryAndUser)
+	}
+
+	return fmt.Sprintf("%s/%s", registryAndUser, parts[countParts-1]), nil
 }
