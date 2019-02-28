@@ -153,8 +153,15 @@ if [ ${remote} = true ] ; then
   exit $?
 
 else
-  # Refresh sudo credentials for local run
-  if ! ping -c 1 -q metadata.google.internal &> /dev/null; then
+  # Refresh sudo credentials if needed
+  if ping -c 1 -q metadata.google.internal &> /dev/null; then
+    echo "Running on CGE, not asking for sudo credentials"
+  elif sudo --non-interactive "$(which /bin/bash)" -c true 2> /dev/null; then
+    # if we can run bash without a password, it's a pretty safe bet that either
+    # we can run any commant without a password, or that sudo credentials
+    # are already cached - and they've just been re-cached
+    echo "No need to refresh sudo credentials"
+  else
     echo "Updating sudo credentials"
     sudo -v || exit 1
   fi

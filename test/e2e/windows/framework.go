@@ -16,8 +16,22 @@ limitations under the License.
 
 package windows
 
-import "github.com/onsi/ginkgo"
+import (
+	. "github.com/onsi/ginkgo"
+	"k8s.io/kubernetes/test/e2e/framework"
+)
+
+// it seems we can't use k8s.io/kubernetes/test/utils/image.GetPauseImageName() as it does not
+// contain a windows image?
+const winPauseImageName = "kubeletwin/pause:latest"
 
 func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-windows] "+text, body)
+	return Describe("[sig-windows] "+text, func() {
+		BeforeEach(func() {
+			// all tests in this package are Windows specific
+			framework.SkipUnlessNodeOSDistroIs("windows")
+		})
+
+		body()
+	})
 }
