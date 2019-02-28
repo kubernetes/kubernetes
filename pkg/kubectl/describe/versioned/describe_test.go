@@ -2506,6 +2506,9 @@ Items:
 Kind:	Test
 Metadata:
   Creation Timestamp:	2017-04-01T00:00:00Z
+  Labels:
+    controller-tools.k8s.io:	1
+    deployment.kubernetes.io/revision:	1
   Name:	MyName
   Namespace:	MyNamespace
   Resource Version:	123
@@ -2542,8 +2545,12 @@ URL:	http://localhost
 			"dummy1":     "present",
 			"dummy2":     "present",
 			"metadata": map[string]interface{}{
-				"name":              "MyName",
-				"namespace":         "MyNamespace",
+				"name":      "MyName",
+				"namespace": "MyNamespace",
+				"labels": map[string]interface{}{
+					"deployment.kubernetes.io/revision": "1",
+					"controller-tools.k8s.io":           "1",
+				},
 				"creationTimestamp": "2017-04-01T00:00:00Z",
 				"resourceVersion":   123,
 				"uid":               "00000000-0000-0000-0000-000000000001",

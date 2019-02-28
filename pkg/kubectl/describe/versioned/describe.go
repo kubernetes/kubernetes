@@ -301,9 +301,16 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 	}
 }
 
-func smartLabelFor(field string) string {
-	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+var commonAcronyms = []string{"API", "URL", "UID", "OSB", "GUID"}
 
+func smartLabelFor(field string) string {
+	// majority of labels and annotations have .io, for example:
+	// controller-tools.k8s.io, failure-domain.beta.kubernetes.io/zone,
+	// deployment.kubernetes.io/revision.
+	// None of these should be camel cased
+	if strings.Contains(field, ".io") {
+		return field
+	}
 	parts := camelcase.Split(field)
 	result := make([]string, 0, len(parts))
 	for _, part := range parts {
