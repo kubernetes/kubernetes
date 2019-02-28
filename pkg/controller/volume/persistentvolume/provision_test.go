@@ -421,6 +421,17 @@ func TestProvisionSync(t *testing.T) {
 			[]string{"Warning ProvisioningFailed Mount options"},
 			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
+		{
+			// No provisioning due to CSI migration + normal event with external provisioner
+			"11-21 - external provisioner for CSI migration",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
+			claimWithAnnotation(annStorageProvisioner, "vendor.com/MockCSIPlugin",
+				newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
+		},
 	}
 	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
 }
