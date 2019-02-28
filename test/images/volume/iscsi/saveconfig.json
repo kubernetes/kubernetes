@@ -2,12 +2,32 @@
   "fabric_modules": [],
   "storage_objects": [
     {
+      "alua_tpgs": [
+        {
+          "alua_access_state": 0,
+          "alua_access_status": 0,
+          "alua_access_type": 3,
+          "alua_support_active_nonoptimized": 1,
+          "alua_support_active_optimized": 1,
+          "alua_support_offline": 1,
+          "alua_support_standby": 1,
+          "alua_support_transitioning": 1,
+          "alua_support_unavailable": 1,
+          "alua_write_metadata": 0,
+          "implicit_trans_secs": 0,
+          "name": "default_tg_pt_gp",
+          "nonop_delay_msecs": 100,
+          "preferred": 0,
+          "tg_pt_gp_id": 0,
+          "trans_delay_msecs": 0
+        }
+      ],
       "attributes": {
         "block_size": 512,
         "emulate_3pc": 1,
         "emulate_caw": 1,
-        "emulate_dpo": 0,
-        "emulate_fua_read": 0,
+        "emulate_dpo": 1,
+        "emulate_fua_read": 1,
         "emulate_fua_write": 1,
         "emulate_model_alias": 1,
         "emulate_rest_reord": 0,
@@ -25,16 +45,75 @@
         "optimal_sectors": 16384,
         "pi_prot_format": 0,
         "pi_prot_type": 0,
+        "pi_prot_verify": 0,
         "queue_depth": 128,
         "unmap_granularity": 1,
-        "unmap_granularity_alignment": 0
+        "unmap_granularity_alignment": 0,
+        "unmap_zeroes_data": 0
       },
-      "dev": "block",
-      "name": "block",
+      "dev": "/block1",
+      "name": "block1",
       "plugin": "fileio",
       "size": 126877696,
       "write_back": true,
-      "wwn": "521c57aa-9d9b-4e5d-ab1a-527487f92a33"
+      "wwn": "a247ca3b-5b56-4bd5-ab86-9ff1a29571de"
+    },
+    {
+      "alua_tpgs": [
+        {
+          "alua_access_state": 0,
+          "alua_access_status": 0,
+          "alua_access_type": 3,
+          "alua_support_active_nonoptimized": 1,
+          "alua_support_active_optimized": 1,
+          "alua_support_offline": 1,
+          "alua_support_standby": 1,
+          "alua_support_transitioning": 1,
+          "alua_support_unavailable": 1,
+          "alua_write_metadata": 0,
+          "implicit_trans_secs": 0,
+          "name": "default_tg_pt_gp",
+          "nonop_delay_msecs": 100,
+          "preferred": 0,
+          "tg_pt_gp_id": 0,
+          "trans_delay_msecs": 0
+        }
+      ],
+      "attributes": {
+        "block_size": 512,
+        "emulate_3pc": 1,
+        "emulate_caw": 1,
+        "emulate_dpo": 1,
+        "emulate_fua_read": 1,
+        "emulate_fua_write": 1,
+        "emulate_model_alias": 1,
+        "emulate_rest_reord": 0,
+        "emulate_tas": 1,
+        "emulate_tpu": 0,
+        "emulate_tpws": 0,
+        "emulate_ua_intlck_ctrl": 0,
+        "emulate_write_cache": 1,
+        "enforce_pr_isids": 1,
+        "force_pr_aptpl": 0,
+        "is_nonrot": 0,
+        "max_unmap_block_desc_count": 1,
+        "max_unmap_lba_count": 8192,
+        "max_write_same_len": 4096,
+        "optimal_sectors": 16384,
+        "pi_prot_format": 0,
+        "pi_prot_type": 0,
+        "pi_prot_verify": 0,
+        "queue_depth": 128,
+        "unmap_granularity": 1,
+        "unmap_granularity_alignment": 0,
+        "unmap_zeroes_data": 0
+      },
+      "dev": "/block0",
+      "name": "block0",
+      "plugin": "fileio",
+      "size": 126877696,
+      "write_back": true,
+      "wwn": "724e365c-12ba-446a-9039-682eb1c38466"
     }
   ],
   "targets": [
@@ -49,17 +128,28 @@
             "default_erl": 0,
             "demo_mode_discovery": 1,
             "demo_mode_write_protect": 0,
+            "fabric_prot_type": 0,
             "generate_node_acls": 1,
+            "login_keys_workaround": 1,
             "login_timeout": 15,
             "netif_timeout": 2,
             "prod_mode_write_protect": 0,
-            "t10_pi": 0
+            "t10_pi": 0,
+            "tpg_enabled_sendtargets": 1
           },
           "enable": true,
           "luns": [
             {
+              "alias": "e3cb93d9cc",
+              "alua_tg_pt_gp_name": "default_tg_pt_gp",
+              "index": 1,
+              "storage_object": "/backstores/fileio/block1"
+            },
+            {
+              "alias": "9d57499d14",
+              "alua_tg_pt_gp_name": "default_tg_pt_gp",
               "index": 0,
-              "storage_object": "/backstores/fileio/block"
+              "storage_object": "/backstores/fileio/block0"
             }
           ],
           "node_acls": [],
@@ -73,7 +163,7 @@
             "ErrorRecoveryLevel": "0",
             "FirstBurstLength": "65536",
             "HeaderDigest": "CRC32C,None",
-            "IFMarkInt": "2048~65535",
+            "IFMarkInt": "Reject",
             "IFMarker": "No",
             "ImmediateData": "Yes",
             "InitialR2T": "Yes",
@@ -82,7 +172,7 @@
             "MaxOutstandingR2T": "1",
             "MaxRecvDataSegmentLength": "8192",
             "MaxXmitDataSegmentLength": "262144",
-            "OFMarkInt": "2048~65535",
+            "OFMarkInt": "Reject",
             "OFMarker": "No",
             "TargetAlias": "LIO Target"
           },
@@ -90,6 +180,7 @@
             {
               "ip_address": "0.0.0.0",
               "iser": false,
+              "offload": false,
               "port": 3260
             }
           ],

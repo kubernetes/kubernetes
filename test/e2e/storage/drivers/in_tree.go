@@ -323,6 +323,7 @@ func (v *glusterVolume) DeleteVolume() {
 // The iscsiadm utility and iscsi target kernel modules must be installed on all nodes.
 type iSCSIDriver struct {
 	driverInfo testsuites.DriverInfo
+	lun        int32
 }
 type iSCSIVolume struct {
 	serverPod *v1.Pod
@@ -375,10 +376,11 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 			TargetPortal: iv.serverIP + ":3260",
 			// from test/images/volume/iscsi/initiatorname.iscsi
 			IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
-			Lun:      0,
+			Lun:      i.lun % 2,
 			ReadOnly: readOnly,
 		},
 	}
+	i.lun++
 	if fsType != "" {
 		volSource.ISCSI.FSType = fsType
 	}
@@ -393,10 +395,11 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
 			TargetPortal: iv.serverIP + ":3260",
 			IQN:          "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
-			Lun:          0,
+			Lun:          i.lun % 2,
 			ReadOnly:     readOnly,
 		},
 	}
+	i.lun++
 	if fsType != "" {
 		pvSource.ISCSI.FSType = fsType
 	}
