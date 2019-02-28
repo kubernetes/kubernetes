@@ -126,7 +126,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
-	klog.V(1).Infof("[kubelet-start] Stopping the kubelet")
+	klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
@@ -143,7 +143,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infof("[kubelet-start] Starting the kubelet")
+	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -161,7 +161,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 		return err
 	}
 
-	klog.V(1).Infof("[kubelet-start] preserving the crisocket information for the node")
+	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "error uploading crisocket")
 	}

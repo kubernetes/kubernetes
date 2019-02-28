@@ -114,8 +114,8 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 func runApply(flags *applyFlags, userVersion string) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	klog.V(1).Infof("[upgrade/apply] verifying health of cluster")
-	klog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
+	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
+	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
 	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 	}
 
 	// Validate requested and validate actual version
-	klog.V(1).Infof("[upgrade/apply] validating requested and actual version")
+	klog.V(1).Infoln("[upgrade/apply] validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&cfg.ClusterConfiguration); err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 	}
 
 	// Enforce the version skew policies
-	klog.V(1).Infof("[upgrade/version] enforcing version skew policies")
+	klog.V(1).Infoln("[upgrade/version] enforcing version skew policies")
 	if err := EnforceVersionPolicies(cfg.KubernetesVersion, newK8sVersion, flags, versionGetter); err != nil {
 		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
@@ -159,7 +159,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	klog.V(1).Infof("[upgrade/apply] creating prepuller")
+	klog.V(1).Infoln("[upgrade/apply] creating prepuller")
 	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
 	componentsToPrepull := constants.ControlPlaneComponents
 	if cfg.Etcd.External == nil && flags.etcdUpgrade {
@@ -170,13 +170,13 @@ func runApply(flags *applyFlags, userVersion string) error {
 	}
 
 	// Now; perform the upgrade procedure
-	klog.V(1).Infof("[upgrade/apply] performing upgrade")
+	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// Upgrade RBAC rules and addons.
-	klog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
+	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}

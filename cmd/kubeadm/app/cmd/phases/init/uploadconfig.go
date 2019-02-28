@@ -106,7 +106,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 		return err
 	}
 
-	klog.V(1).Infof("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
+	klog.V(1).Infoln("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
 		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
 	}
@@ -120,12 +120,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return err
 	}
 
-	klog.V(1).Infof("[upload-config] Uploading the kubelet component config to a ConfigMap")
+	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infof("[upload-config] Preserving the CRISocket information for the control-plane node")
+	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
 	}

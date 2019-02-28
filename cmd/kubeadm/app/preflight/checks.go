@@ -409,7 +409,7 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("checking whether the given node name is reachable using net.LookupHost")
+	klog.V(1).Infoln("checking whether the given node name is reachable using net.LookupHost")
 	errorList = []error{}
 	warnings = []error{}
 	addr, err := net.LookupHost(hc.nodeName)
@@ -436,7 +436,7 @@ func (hst HTTPProxyCheck) Name() string {
 
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating if the connectivity type is via proxy or direct")
+	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
 	req, err := http.NewRequest("GET", u, nil)
