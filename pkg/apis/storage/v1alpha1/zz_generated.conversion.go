@@ -23,9 +23,11 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -155,6 +157,7 @@ func Convert_storage_VolumeAttachmentList_To_v1alpha1_VolumeAttachmentList(in *s
 
 func autoConvert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(in *v1alpha1.VolumeAttachmentSource, out *storage.VolumeAttachmentSource, s conversion.Scope) error {
 	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
+	out.InlineCSIVolumeSource = (*core.CSIPersistentVolumeSource)(unsafe.Pointer(in.InlineCSIVolumeSource))
 	return nil
 }
 
@@ -165,6 +168,7 @@ func Convert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(i
 
 func autoConvert_storage_VolumeAttachmentSource_To_v1alpha1_VolumeAttachmentSource(in *storage.VolumeAttachmentSource, out *v1alpha1.VolumeAttachmentSource, s conversion.Scope) error {
 	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
+	out.InlineCSIVolumeSource = (*v1.CSIPersistentVolumeSource)(unsafe.Pointer(in.InlineCSIVolumeSource))
 	return nil
 }
 

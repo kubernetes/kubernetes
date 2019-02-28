@@ -465,6 +465,7 @@ func Convert_storage_VolumeAttachmentList_To_v1beta1_VolumeAttachmentList(in *st
 
 func autoConvert_v1beta1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(in *v1beta1.VolumeAttachmentSource, out *storage.VolumeAttachmentSource, s conversion.Scope) error {
 	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
+	out.InlineCSIVolumeSource = (*core.CSIPersistentVolumeSource)(unsafe.Pointer(in.InlineCSIVolumeSource))
 	return nil
 }
 
@@ -475,6 +476,7 @@ func Convert_v1beta1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(in
 
 func autoConvert_storage_VolumeAttachmentSource_To_v1beta1_VolumeAttachmentSource(in *storage.VolumeAttachmentSource, out *v1beta1.VolumeAttachmentSource, s conversion.Scope) error {
 	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
+	out.InlineCSIVolumeSource = (*v1.CSIPersistentVolumeSource)(unsafe.Pointer(in.InlineCSIVolumeSource))
 	return nil
 }
 
