@@ -64,8 +64,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 // runPlan takes care of outputting available versions to upgrade to for the user
 func runPlan(flags *planFlags, userVersion string) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
-	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
-	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
+	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
+	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
 	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func runPlan(flags *planFlags, userVersion string) error {
 	}
 
 	// Compute which upgrade possibilities there are
-	klog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
+	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
 	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, cfg.DNS.Type, client)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
