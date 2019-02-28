@@ -203,6 +203,11 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
+// ConditionWithContextFunc returns true if the condition is satisfied, or an error
+// if the loop should be aborted. The context is provided to condition function to allow
+// it to react to context.Done().
+type ConditionWithContextFunc func(context.Context) (done bool, err error)
+
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
 	// The initial duration.
@@ -269,6 +274,43 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 			break
 		}
 		time.Sleep(backoff.Step())
+	}
+	return ErrWaitTimeout
+}
+
+// ExponentialBackoffWithContext repeats a condition check with exponential backoff.
+//
+// It checks the condition up to Steps times, increasing the wait by multiplying
+// the previous duration by Factor.
+//
+// If the context.Done() channel is closed, this function will stop repeating the condition
+// check and return ErrWaitTimeout error.
+//
+// If Jitter is greater than zero, a random amount of each duration is added
+// (between duration and duration*(1+jitter)).
+//
+// If the condition never returns true, ErrWaitTimeout is returned. All other
+// errors terminate immediately.
+func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
+	for backoff.Steps > 0 {
+		select {
+		case <-ctx.Done():
+			return ErrWaitTimeout
+		default:
+		}
+		if ok, err := condition(ctx); err != nil || ok {
+			return err
+		}
+		if backoff.Steps == 1 {
+			break
+		}
+		timer := time.NewTimer(backoff.Step())
+		select {
+		case <-timer.C:
+			continue
+		case <-ctx.Done():
+			return ErrWaitTimeout
+		}
 	}
 	return ErrWaitTimeout
 }

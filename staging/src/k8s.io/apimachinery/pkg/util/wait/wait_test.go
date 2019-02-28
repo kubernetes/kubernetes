@@ -280,6 +280,33 @@ func TestExponentialBackoff(t *testing.T) {
 	}
 }
 
+func TestExponentialBackoffWithContext(t *testing.T) {
+	opts := Backoff{Factor: 1.0, Steps: 3}
+
+	// waits up to steps
+	ctx := context.TODO()
+	i := 0
+	err := ExponentialBackoffWithContext(ctx, opts, func(ctx context.Context) (bool, error) {
+		i++
+		return false, nil
+	})
+	if err != ErrWaitTimeout || i != opts.Steps {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// return early on context deadline
+	ctx, cancel := context.WithTimeout(context.TODO(), 200*time.Millisecond)
+	defer cancel()
+	i = 0
+	err = ExponentialBackoffWithContext(ctx, opts, func(ctx context.Context) (bool, error) {
+		time.Sleep(100 * time.Millisecond)
+		return false, nil
+	})
+	if err != ErrWaitTimeout {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestPoller(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)
