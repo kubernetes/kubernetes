@@ -122,8 +122,6 @@
 ./test/images/volume/nfs/run_nfs.sh
 ./test/images/volume/rbd/bootstrap.sh
 ./test/images/volume/rbd/create_block.sh
-./test/images/volume/rbd/mon.sh
-./test/images/volume/rbd/osd.sh
 ./third_party/forked/shell2junit/sh2ju.sh
 ./third_party/intemp/intemp.sh
 ./third_party/multiarch/qemu-user-static/register/qemu-binfmt-conf.sh
