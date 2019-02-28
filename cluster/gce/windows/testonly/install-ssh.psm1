@@ -22,6 +22,12 @@
   clusters. DO NOT USE THIS MODULE FOR PRODUCTION.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 Import-Module -Force C:\common.psm1
 
 $OPENSSH_ROOT = 'C:\Program Files\OpenSSH'

@@ -17,6 +17,12 @@
   Top-level script that runs on Windows nodes to join them to the K8s cluster.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 $ErrorActionPreference = 'Stop'
 
 # Turn on tracing to debug
