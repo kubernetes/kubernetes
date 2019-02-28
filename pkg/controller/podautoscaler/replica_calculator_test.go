@@ -339,8 +339,8 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
-	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
-
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient, mapper)
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	informer := informerFactory.Core().V1().Pods()
 

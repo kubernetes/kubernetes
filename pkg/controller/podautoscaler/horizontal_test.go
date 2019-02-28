@@ -26,7 +26,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -617,6 +617,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
 	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient := tc.prepareTestClient(t)
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 	if tc.testClient != nil {
 		testClient = tc.testClient
 	}
@@ -636,6 +637,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		testMetricsClient.MetricsV1beta1(),
 		testCMClient,
 		testEMClient,
+		mapper,
 	)
 
 	eventClient := &fake.Clientset{}

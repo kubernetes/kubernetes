@@ -24,6 +24,7 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,10 +38,10 @@ const (
 	metricServerDefaultMetricWindow = time.Minute
 )
 
-func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient) MetricsClient {
+func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient, mapper apimeta.RESTMapper) MetricsClient {
 	return &restMetricsClient{
 		&resourceMetricsClient{resourceClient},
-		&customMetricsClient{customClient},
+		&customMetricsClient{customClient, mapper},
 		&externalMetricsClient{externalClient},
 	}
 }
@@ -105,6 +106,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 // using data from the custom metrics API.
 type customMetricsClient struct {
 	client customclient.CustomMetricsClient
+	mapper apimeta.RESTMapper
 }
 
 // GetRawMetric gets the given metric (and an associated oldest timestamp)
@@ -145,7 +147,8 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	gvk := schema.FromAPIVersionAndKind(objectRef.APIVersion, objectRef.Kind)
 	var metricValue *customapi.MetricValue
 	var err error
-	if gvk.Kind == "Namespace" && gvk.Group == "" {
+	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if mapping.Scope.Name() == apimeta.RESTScopeNameRoot {
 		// handle namespace separately
 		// NB: we ignore namespace name here, since CrossVersionObjectReference isn't
 		// supposed to allow you to escape your namespace
