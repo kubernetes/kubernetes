@@ -140,7 +140,7 @@ type joinData struct {
 	skipTokenPrint        bool
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
-	clientSets            map[string]*clientset.Clientset
+	clientSet             *clientset.Clientset
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
 	certificateKey        string
@@ -178,7 +178,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 				}
 
 				ctx := map[string]string{
-					"KubeConfigPath": data.KubeConfigPath(),
+					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
 				joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
@@ -385,7 +385,6 @@ func newJoinData(cmd *cobra.Command, args []string, options *joinOptions, out io
 
 	return &joinData{
 		cfg:                   cfg,
-		clientSets:            map[string]*clientset.Clientset{},
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
 		certificateKey:        options.certificateKey,
@@ -400,11 +399,6 @@ func (j *joinData) CertificateKey() string {
 // Cfg returns the JoinConfiguration.
 func (j *joinData) Cfg() *kubeadmapi.JoinConfiguration {
 	return j.cfg
-}
-
-// KubeConfigPath returns the default kubeconfig path.
-func (j *joinData) KubeConfigPath() string {
-	return kubeadmconstants.GetAdminKubeConfigPath()
 }
 
 // TLSBootstrapCfg returns the cluster-info (kubeconfig).
@@ -432,15 +426,17 @@ func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
 	return initCfg, err
 }
 
-func (j *joinData) ClientSetFromFile(path string) (*clientset.Clientset, error) {
-	if client, ok := j.clientSets[path]; ok {
-		return client, nil
+// ClientSet returns the ClientSet for accessing the cluster with the identity defined in admin.conf.
+func (j *joinData) ClientSet() (*clientset.Clientset, error) {
+	if j.clientSet != nil {
+		return j.clientSet, nil
 	}
+	path := kubeadmconstants.GetAdminKubeConfigPath()
 	client, err := kubeconfigutil.ClientSetFromFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "[join] couldn't create Kubernetes client")
 	}
-	j.clientSets[path] = client
+	j.clientSet = client
 	return client, nil
 }
 
