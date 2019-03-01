@@ -95,6 +95,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	// Allocate a static-ip for the Ingress, this IP is cleaned up via CleanupGCEIngressController
 	t.ipName = fmt.Sprintf("%s-static-ip", ns.Name)
 	t.ip = t.gceController.CreateStaticIP(t.ipName)
+
 	// Create a working basic Ingress
 	ginkgo.By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
 	jig.CreateIngress(filepath.Join(ingress.GCEIngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
