@@ -1242,9 +1242,9 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 	if err != nil {
 		return false, err
 	}
-	if !found {
-		// Fall through with claim = nil
-	} else {
+
+	// Fall through with claim = nil if not found
+	if found {
 		var ok bool
 		claim, ok = obj.(*v1.PersistentVolumeClaim)
 		if !ok {
