@@ -135,7 +135,7 @@ function Add_GceMetadataServerRoute {
 function Fetch-KubeEnv {
   # Testing / debugging:
   # First:
-  #   ${kube_env} = Get-InstanceMetadataValue 'kube-env'
+  #   ${kube_env} = Get-InstanceMetadataAttribute 'kube-env'
   # or:
   #   ${kube_env} = [IO.File]::ReadAllText(".\kubeEnv.txt")
   # ${kube_env_table} = ConvertFrom-Yaml ${kube_env}
@@ -143,7 +143,7 @@ function Fetch-KubeEnv {
   # ${kube_env_table}.GetType()
 
   # The type of kube_env is a powershell String.
-  $kube_env = Get-InstanceMetadataValue 'kube-env'
+  $kube_env = Get-InstanceMetadataAttribute 'kube-env'
   $kube_env_table = ConvertFrom-Yaml ${kube_env}
   return ${kube_env_table}
 }
@@ -882,7 +882,7 @@ function Configure-Kubelet {
   # The Kubelet config is built by build-kubelet-config() in
   # cluster/gce/util.sh, and stored in the metadata server under the
   # 'kubelet-config' key.
-  $kubelet_config = Get-InstanceMetadataValue 'kubelet-config'
+  $kubelet_config = Get-InstanceMetadataAttribute 'kubelet-config'
   Set-Content ${env:KUBELET_CONFIG} $kubelet_config
   Log-Output "Kubelet config:`n$(Get-Content -Raw ${env:KUBELET_CONFIG})"
 }
