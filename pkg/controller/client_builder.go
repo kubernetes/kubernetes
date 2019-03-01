@@ -189,7 +189,9 @@ func (b SAControllerClientBuilder) getOrCreateServiceAccount(name string) (*v1.S
 	// Create the namespace if we can't verify it exists.
 	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
 	if _, err := b.CoreClient.Namespaces().Get(b.Namespace, metav1.GetOptions{}); err != nil {
-		b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: b.Namespace}})
+		if _, err = b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: b.Namespace}}); err != nil {
+			klog.Warningf("create non-exist namespace %s failed:%v", b.Namespace, err)
+		}
 	}
 
 	// Create the service account
