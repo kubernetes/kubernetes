@@ -22,6 +22,12 @@ import (
 	"os"
 	"testing"
 
+	// Never, ever remove the line with "/ginkgo". Without it,
+	// the ginkgo test runner will not detect that this
+	// directory contains a Ginkgo test suite.
+	// See https://github.com/kubernetes/kubernetes/issues/74827
+	// "github.com/onsi/ginkgo"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
