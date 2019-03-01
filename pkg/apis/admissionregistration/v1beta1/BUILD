@@ -22,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
