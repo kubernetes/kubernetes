@@ -71,6 +71,10 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.Type != "" {
 		out.Type = spec.StringOrArray([]string{in.Type})
 	}
+	if in.Nullable {
+		// by validation, in.Type is either "object" or "array"
+		out.Type = append(out.Type, "null")
+	}
 	out.Format = in.Format
 	out.Title = in.Title
 	out.Maximum = in.Maximum

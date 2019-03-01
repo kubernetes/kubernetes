@@ -143,5 +143,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				c.Fuzz(&obj.Property)
 			}
 		},
+		func(obj *int64, c fuzz.Continue) {
+			// JSON only supports 53 bits because everything is a float
+			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
+		},
 	}
 }
