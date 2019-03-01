@@ -669,12 +669,4 @@ test/e2e_node/environment
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/e2e_node/services
-test/integration
-test/integration/auth
-test/integration/evictions
-test/integration/framework
-test/integration/master
-test/integration/replicaset
-test/integration/replicationcontroller
-test/integration/scheduler
 test/utils

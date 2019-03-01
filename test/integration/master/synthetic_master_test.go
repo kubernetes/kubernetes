@@ -353,7 +353,7 @@ func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	resp.Body.Close()
 }
 
-var hpaV1 string = `
+var hpaV1 = `
 {
   "apiVersion": "autoscaling/v1",
   "kind": "HorizontalPodAutoscaler",
@@ -374,7 +374,7 @@ var hpaV1 string = `
 }
 `
 
-var deploymentExtensions string = `
+var deploymentExtensions = `
 {
   "apiVersion": "extensions/v1beta1",
   "kind": "Deployment",
@@ -401,7 +401,7 @@ var deploymentExtensions string = `
 }
 `
 
-var deploymentApps string = `
+var deploymentApps = `
 {
   "apiVersion": "apps/v1",
   "kind": "Deployment",
