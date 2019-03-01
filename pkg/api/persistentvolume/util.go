@@ -28,12 +28,6 @@ func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Persist
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVSpec) {
 		pvSpec.VolumeMode = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		// if this is a new PV, or the old PV didn't already have the CSI field, clear it
-		if oldPVSpec == nil || oldPVSpec.PersistentVolumeSource.CSI == nil {
-			pvSpec.PersistentVolumeSource.CSI = nil
-		}
-	}
 }
 
 func volumeModeInUse(oldPVSpec *api.PersistentVolumeSpec) bool {
