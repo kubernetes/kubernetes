@@ -229,6 +229,34 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			expectedError: `clientConfig.service.path: Invalid value: "foo/": must start with a '/'`,
 		},
 		{
+			name: "invalid port >65535",
+			config: auditregistration.Webhook{
+				ClientConfig: auditregistration.WebhookClientConfig{
+					Service: &auditregistration.ServiceReference{
+						Namespace: "ns",
+						Name:      "n",
+						Path:      strPtr("foo/"),
+						Port:      65536,
+					},
+				},
+			},
+			expectedError: `Invalid value: 65536: port must be a valid number between 1 and 65535, inclusive`,
+		},
+		{
+			name: "invalid port 0",
+			config: auditregistration.Webhook{
+				ClientConfig: auditregistration.WebhookClientConfig{
+					Service: &auditregistration.ServiceReference{
+						Namespace: "ns",
+						Name:      "n",
+						Path:      strPtr("foo/"),
+						Port:      0,
+					},
+				},
+			},
+			expectedError: `Invalid value: 0: port must be a valid number between 1 and 65535, inclusive`,
+		},
+		{
 			name: "path accepts slash",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{

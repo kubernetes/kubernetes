@@ -580,6 +580,42 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
 		},
 		{
+			name: "invalid port 0",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("https://apis/foo.bar"),
+								Port:      0,
+							},
+						},
+					},
+				}, true),
+			expectedError: `Invalid value: 0: port must be a valid number between 1 and 65535, inclusive`,
+		},
+		{
+			name: "invalid port >65535",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("https://apis/foo.bar"),
+								Port:      65536,
+							},
+						},
+					},
+				}, true),
+			expectedError: `Invalid value: 65536: port must be a valid number between 1 and 65535, inclusive`,
+		},
+		{
 			name: "timeout seconds cannot be greater than 30",
 			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
 				{
