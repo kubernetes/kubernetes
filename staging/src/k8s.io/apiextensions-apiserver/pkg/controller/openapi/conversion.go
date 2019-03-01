@@ -62,12 +62,11 @@ func ConvertJSONSchemaPropsToOpenAPIv2Schema(in *apiextensions.JSONSchemaProps) 
 			}
 		}
 
-		if len(p.Type) > 1 {
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R272
-			// We also set Properties to null to enforce parseArbitrary at https://github.com/kubernetes/kube-openapi/blob/814a8073653e40e0e324205d093770d4e7bb811f/pkg/util/proto/document.go#L247
+		switch {
+		case len(p.Type) == 2 && (p.Type[0] == "null" || p.Type[1] == "null"):
+			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-ce77fea74b9dd098045004410023e0c3R219
 			p.Type = nil
-			p.Properties = nil
-		} else if len(p.Type) == 1 {
+		case len(p.Type) == 1:
 			switch p.Type[0] {
 			case "null":
 				// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-ce77fea74b9dd098045004410023e0c3R219
@@ -80,7 +79,12 @@ func ConvertJSONSchemaPropsToOpenAPIv2Schema(in *apiextensions.JSONSchemaProps) 
 					p.Items = nil
 				}
 			}
-		} else {
+		case len(p.Type) > 1:
+			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R272
+			// We also set Properties to null to enforce parseArbitrary at https://github.com/kubernetes/kube-openapi/blob/814a8073653e40e0e324205d093770d4e7bb811f/pkg/util/proto/document.go#L247
+			p.Type = nil
+			p.Properties = nil
+		default:
 			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R248
 			p.Properties = nil
 		}
