@@ -46,6 +46,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	seed := rand.Int63()
+	t.Logf("seed: %d", seed)
 	fuzzerFuncs := fuzzer.MergeFuzzerFuncs(apiextensionsfuzzer.Funcs)
 	f := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
 
@@ -90,7 +91,7 @@ func TestRoundTrip(t *testing.T) {
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal, internalRoundTripped) {
-			t.Fatalf("expected\n\t%#v, got \n\t%#v", internal, internalRoundTripped)
+			t.Fatalf("%d: expected\n\t%#v, got \n\t%#v", i, internal, internalRoundTripped)
 		}
 	}
 }
@@ -213,6 +214,26 @@ func TestNullable(t *testing.T) {
 				},
 			},
 			map[string]interface{}{},
+		}, false},
+		{"nullable and no type against non-nil", args{
+			apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable: true,
+					},
+				},
+			},
+			map[string]interface{}{"field": 42},
+		}, false},
+		{"nullable and no type against nil", args{
+			apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Nullable: true,
+					},
+				},
+			},
+			map[string]interface{}{"field": nil},
 		}, false},
 	}
 	for _, tt := range tests {

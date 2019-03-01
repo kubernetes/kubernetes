@@ -1259,24 +1259,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			wantError: false,
 		},
 		{
-			name: "nullable with wrong type",
-			input: apiextensions.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					Properties: map[string]apiextensions.JSONSchemaProps{
-						"string": {
-							Type:     "string",
-							Nullable: true,
-						},
-					},
-				},
-			},
-			wantError: true,
-		},
-		{
-			name: "nullable with right types",
+			name: "nullable with types",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Properties: map[string]apiextensions.JSONSchemaProps{
@@ -1286,6 +1272,14 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 						},
 						"array": {
 							Type:     "array",
+							Nullable: true,
+						},
+						"number": {
+							Type:     "number",
+							Nullable: true,
+						},
+						"string": {
+							Type:     "string",
 							Nullable: true,
 						},
 					},

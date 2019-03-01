@@ -647,9 +647,6 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 	if schema.Type == "null" {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "type cannot be set to null, use nullable as an alternative"))
 	}
-	if schema.Nullable && schema.Type != "object" && schema.Type != "array" {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nullable"), "nullable can only be set for object and array types"))
-	}
 
 	if schema.Items != nil && len(schema.Items.JSONSchemas) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "items must be a schema object and not an array"))
