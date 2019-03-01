@@ -54,7 +54,7 @@ const (
 
 var _ = utils.SIGDescribe("CSI mock volume", func() {
 	type testParameters struct {
-		attachable      bool
+		disableAttach   bool
 		attachLimit     int
 		registerDriver  bool
 		podInfoVersion  *string
@@ -88,7 +88,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		csics := f.CSIClientSet
 		var err error
 
-		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, tp.attachable, tp.podInfoVersion, tp.attachLimit)
+		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, !tp.disableAttach, tp.podInfoVersion, tp.attachLimit)
 		config, testCleanup := m.driver.PrepareTest(f)
 		m.testCleanups = append(m.testCleanups, testCleanup)
 		m.config = config
@@ -189,31 +189,29 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
 		tests := []struct {
-			name             string
-			driverAttachable bool
-			deployDriverCRD  bool
+			name            string
+			disableAttach   bool
+			deployDriverCRD bool
 		}{
 			{
-				name:             "should not require VolumeAttach for drivers without attachment",
-				driverAttachable: false,
-				deployDriverCRD:  true,
+				name:            "should not require VolumeAttach for drivers without attachment",
+				disableAttach:   true,
+				deployDriverCRD: true,
 			},
 			{
-				name:             "should require VolumeAttach for drivers with attachment",
-				driverAttachable: true,
-				deployDriverCRD:  true,
+				name:            "should require VolumeAttach for drivers with attachment",
+				deployDriverCRD: true,
 			},
 			{
-				name:             "should preserve attachment policy when no CSIDriver present",
-				driverAttachable: true,
-				deployDriverCRD:  false,
+				name:            "should preserve attachment policy when no CSIDriver present",
+				deployDriverCRD: false,
 			},
 		}
 		for _, t := range tests {
 			test := t
 			It(t.name, func() {
 				var err error
-				init(testParameters{registerDriver: test.deployDriverCRD, attachable: test.driverAttachable})
+				init(testParameters{registerDriver: test.deployDriverCRD, disableAttach: test.disableAttach})
 				defer cleanup()
 
 				_, claim, pod := createPod()
@@ -230,14 +228,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				_, err = m.cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
-						if test.driverAttachable {
+						if !test.disableAttach {
 							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 						}
 					} else {
 						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
 					}
 				}
-				if !test.driverAttachable {
+				if test.disableAttach {
 					Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
 				}
 			})
@@ -319,7 +317,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 
 			var err error
-			init(testParameters{attachable: true, nodeSelectorKey: "node-attach-limit-csi", attachLimit: 2})
+			init(testParameters{nodeSelectorKey: "node-attach-limit-csi", attachLimit: 2})
 			defer cleanup()
 			nodeName := m.config.ClientNodeName
 			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))
