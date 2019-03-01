@@ -17,20 +17,50 @@ limitations under the License.
 package hostport
 
 type fakeInitSystem struct {
-	fakeActiveSystemdResolved bool
+	fakeSystemdResolved bool
 }
 
 func NewFakeInitSystem() *fakeInitSystem {
-	return &fakeInitSystem{fakeActiveSystemdResolved: false}
+	return &fakeInitSystem{
+		fakeSystemdResolved: false,
+	}
 }
 
 func NewFakeInitSystemWithSystemdResolved() *fakeInitSystem {
-	return &fakeInitSystem{fakeActiveSystemdResolved: true}
+	return &fakeInitSystem{
+		fakeSystemdResolved: true,
+	}
+}
+
+func (f *fakeInitSystem) ServiceExists(service string) bool {
+	if service == "systemd-resolved" {
+		return f.fakeSystemdResolved
+	}
+	return false
 }
 
 func (f *fakeInitSystem) ServiceIsActive(service string) bool {
 	if service == "systemd-resolved" {
-		return f.fakeActiveSystemdResolved
+		return f.fakeSystemdResolved
 	}
 	return false
+}
+
+func (f *fakeInitSystem) ServiceIsEnabled(service string) bool {
+	if service == "systemd-resolved" {
+		return f.fakeSystemdResolved
+	}
+	return false
+}
+
+func (f *fakeInitSystem) ServiceRestart(service string) error {
+	return nil
+}
+
+func (f *fakeInitSystem) ServiceStart(service string) error {
+	return nil
+}
+
+func (f *fakeInitSystem) ServiceStop(service string) error {
+	return nil
 }

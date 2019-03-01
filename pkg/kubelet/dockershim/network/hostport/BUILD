@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "fake_initsystem.go",
         "fake_iptables.go",
         "hostport.go",
         "hostport_manager.go",
@@ -18,6 +19,7 @@ go_library(
     deps = [
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/conntrack:go_default_library",
+        "//pkg/util/initsystem:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
