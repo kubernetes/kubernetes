@@ -117,7 +117,7 @@ func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
 }
 
 func TestPriorityQueue_Add(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	if err := q.Add(&medPriorityPod); err != nil {
 		t.Errorf("add failed: %v", err)
 	}
@@ -188,7 +188,7 @@ func (*fakeFramework) GetWaitingPod(uid types.UID) framework.WaitingPod {
 }
 
 func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
-	q := NewPriorityQueue(nil, &fakeFramework{})
+	q := NewPriorityQueue(nil, nil, &fakeFramework{})
 	if err := q.Add(&medPriorityPod); err != nil {
 		t.Errorf("add failed: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 }
 
 func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	addOrUpdateUnschedulablePod(q, &highPriNominatedPod)
 	q.AddIfNotPresent(&highPriNominatedPod) // Must not add anything.
 	q.AddIfNotPresent(&medPriorityPod)
@@ -236,7 +236,7 @@ func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 }
 
 func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Add(&highPriNominatedPod)
 	q.AddUnschedulableIfNotPresent(&highPriNominatedPod, q.SchedulingCycle()) // Must not add anything.
 	q.AddUnschedulableIfNotPresent(&unschedulablePod, q.SchedulingCycle())
@@ -268,7 +268,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 // current scheduling cycle will be put back to activeQueue if we were trying
 // to schedule them when we received move request.
 func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
 	for i := 0; i < totalNum; i++ {
@@ -331,7 +331,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 }
 
 func TestPriorityQueue_Pop(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -348,7 +348,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 }
 
 func TestPriorityQueue_Update(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Update(nil, &highPriorityPod)
 	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&highPriorityPod)); !exists {
 		t.Errorf("Expected %v to be added to activeQ.", highPriorityPod.Name)
@@ -384,7 +384,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 }
 
 func TestPriorityQueue_Delete(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Update(&highPriorityPod, &highPriNominatedPod)
 	q.Add(&unschedulablePod)
 	if err := q.Delete(&highPriNominatedPod); err != nil {
@@ -408,7 +408,7 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Add(&medPriorityPod)
 	addOrUpdateUnschedulablePod(q, &unschedulablePod)
 	addOrUpdateUnschedulablePod(q, &highPriorityPod)
@@ -454,7 +454,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 		Spec: v1.PodSpec{NodeName: "machine1"},
 	}
 
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Add(&medPriorityPod)
 	// Add a couple of pods to the unschedulableQ.
 	addOrUpdateUnschedulablePod(q, &unschedulablePod)
@@ -475,7 +475,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 }
 
 func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Add(&medPriorityPod)
 	q.Add(&unschedulablePod)
 	q.Add(&highPriorityPod)
@@ -500,7 +500,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 		return pendingSet
 	}
 
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	q.Add(&medPriorityPod)
 	addOrUpdateUnschedulablePod(q, &unschedulablePod)
 	addOrUpdateUnschedulablePod(q, &highPriorityPod)
@@ -516,7 +516,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 }
 
 func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	if err := q.Add(&medPriorityPod); err != nil {
 		t.Errorf("add failed: %v", err)
 	}
@@ -742,7 +742,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 	}{
 		{
 			name:        "PriorityQueue close",
-			q:           NewPriorityQueue(nil, nil),
+			q:           NewPriorityQueue(nil, nil, nil),
 			expectedErr: fmt.Errorf(queueClosed),
 		},
 	}
@@ -771,7 +771,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 // ensures that an unschedulable pod does not block head of the queue when there
 // are frequent events that move pods to the active queue.
 func TestRecentlyTriedPodsGoBack(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	// Add a few pods to priority queue.
 	for i := 0; i < 5; i++ {
 		p := v1.Pod{
@@ -825,7 +825,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 // This behavior ensures that an unschedulable pod does not block head of the queue when there
 // are frequent events that move pods to the active queue.
 func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 
 	// Add an unschedulable pod to a priority queue.
 	// This makes a situation that the pod was tried to schedule
@@ -916,7 +916,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 // TestHighPriorityBackoff tests that a high priority pod does not block
 // other pods if it is unschedulable
 func TestHighProirotyBackoff(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 
 	midPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -979,7 +979,7 @@ func TestHighProirotyBackoff(t *testing.T) {
 // TestHighProirotyFlushUnschedulableQLeftover tests that pods will be moved to
 // activeQ after one minutes if it is in unschedulableQ
 func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueue(nil, nil, nil)
 	midPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-midpod",
@@ -1162,7 +1162,7 @@ func TestPodTimestamp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClock(nil, nil, clock.NewFakeClock(timestamp), nil)
 			var podInfoList []*framework.PodInfo
 
 			for i, op := range test.operations {
@@ -1292,7 +1292,7 @@ func TestPendingPodsMetric(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClock(nil, nil, clock.NewFakeClock(timestamp), nil)
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)

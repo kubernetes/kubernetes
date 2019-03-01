@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue/equivalence"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -88,8 +89,8 @@ type SchedulingQueue interface {
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(stop <-chan struct{}, fwk framework.Framework) SchedulingQueue {
-	return NewPriorityQueue(stop, fwk)
+func NewSchedulingQueue(equivClass *equivalence.EquivClass, stop <-chan struct{}, fwk framework.Framework) SchedulingQueue {
+	return NewPriorityQueue(equivClass, stop, fwk)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -132,6 +133,8 @@ type PriorityQueue struct {
 	// cycle will be put back to activeQueue if we were trying to schedule them
 	// when we received move request.
 	moveRequestCycle int64
+	// equivClass is the pointer to equivalence.EquivClass.
+	equivClass *equivalence.EquivClass
 
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
@@ -160,12 +163,12 @@ func activeQComp(podInfo1, podInfo2 interface{}) bool {
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
+func NewPriorityQueue(equivClass *equivalence.EquivClass, stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
+	return NewPriorityQueueWithClock(equivClass, stop, util.RealClock{}, fwk)
 }
 
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
+func NewPriorityQueueWithClock(equivClass *equivalence.EquivClass, stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
 	comp := activeQComp
 	if fwk != nil {
 		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
@@ -186,6 +189,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk frame
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
+		equivClass:       equivClass,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = util.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -462,6 +466,11 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 			// If the pod is updated reset backoff
 			p.clearPodBackoff(newPod)
 			p.unschedulableQ.delete(usPodInfo.Pod)
+			if p.equivClass != nil {
+				if equivHash := equivalence.GetEquivHash(newPod); equivHash != "" {
+					p.equivClass.Delete(equivalence.GetEquivHash(newPod))
+				}
+			}
 			err := p.activeQ.Add(newPodInfo)
 			if err == nil {
 				p.cond.Broadcast()
@@ -532,6 +541,9 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 		}
 	}
 	p.unschedulableQ.clear()
+	if p.equivClass != nil {
+		p.equivClass.Clear()
+	}
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
@@ -550,6 +562,11 @@ func (p *PriorityQueue) movePodsToActiveQueue(podInfoList []*framework.PodInfo) 
 			}
 		}
 		p.unschedulableQ.delete(pod)
+		if p.equivClass != nil {
+			if equivHash := equivalence.GetEquivHash(pod); equivHash != "" {
+				p.equivClass.Delete(equivHash)
+			}
+		}
 	}
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()

@@ -56,6 +56,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue/equivalence"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -81,6 +82,9 @@ type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
+
+	// EquivalenceClass is the pointer to equivalence.EquivClass.
+	EquivalenceClass *equivalence.EquivClass
 
 	NodeLister algorithm.NodeLister
 	Algorithm  core.ScheduleAlgorithm
@@ -208,6 +212,8 @@ type configFactory struct {
 	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
+	equivClass *equivalence.EquivClass
+
 	// Disable pod preemption or not.
 	disablePreemption bool
 
@@ -235,6 +241,7 @@ type ConfigFactoryArgs struct {
 	StorageClassInformer           storageinformers.StorageClassInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
+	EnableEquivalenceClass         bool
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
@@ -257,6 +264,12 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 
+	var equivClass *equivalence.EquivClass
+	if args.EnableEquivalenceClass {
+		equivClass = equivalence.New()
+		klog.Info("Created equivalence class")
+	}
+
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
 	if args.StorageClassInformer != nil {
@@ -265,7 +278,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
+		podQueue:                       internalqueue.NewSchedulingQueue(equivClass, stopEverything, framework),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -280,6 +293,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
 		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
+		equivClass:                     equivClass,
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 		bindTimeoutSeconds:             args.BindTimeoutSeconds,
@@ -453,6 +467,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
+		c.equivClass,
 		c.podQueue,
 		predicateFuncs,
 		predicateMetaProducer,
@@ -469,7 +484,8 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	)
 
 	return &Config{
-		SchedulerCache: c.schedulerCache,
+		SchedulerCache:   c.schedulerCache,
+		EquivalenceClass: c.equivClass,
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodeLister{c.nodeLister},
 		Algorithm:           algo,

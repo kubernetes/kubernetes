@@ -257,7 +257,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer close(stopCh)
 
 	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+	queue := internalqueue.NewPriorityQueueWithClock(nil, stopCh, clock.NewFakeClock(timestamp), nil)
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
 
@@ -493,6 +493,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		disablePodPreemption,
+		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
 		stopCh,

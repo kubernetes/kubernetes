@@ -537,6 +537,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			queue := internalqueue.NewSchedulingQueue(nil, nil)
 			scheduler := NewGenericScheduler(
 				cache,
+				nil,
 				queue,
 				test.predicates,
 				predicates.EmptyPredicateMetadataProducer,

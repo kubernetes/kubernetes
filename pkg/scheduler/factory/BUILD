@@ -21,6 +21,7 @@ go_library(
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
+        "//pkg/scheduler/internal/queue/equivalence:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
