@@ -394,10 +394,11 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 			outMetrics[cpuMetricIndex] = out.Spec.Metrics[0]
 		}
 		for i, metric := range otherMetrics {
+			outIndex := i
 			if out.Spec.Metrics != nil && i >= cpuMetricIndex {
-				i = i + 1
+				outIndex++
 			}
-			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &outMetrics[i], s); err != nil {
+			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &outMetrics[outIndex], s); err != nil {
 				return err
 			}
 		}
