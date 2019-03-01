@@ -70,7 +70,6 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			// true on HA clusters.
 			totalTrials    = 200
 			parallelTrials = 15
-			minSampleSize  = 100
 
 			// Acceptable failure ratio for getting service latencies.
 			acceptableFailureRatio = .05
@@ -89,13 +88,6 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		dSorted := durations(d)
 		sort.Sort(dSorted)
 		n := len(dSorted)
-		if n < minSampleSize {
-			failing.Insert(fmt.Sprintf("Did not get a good sample size: %v", dSorted))
-		}
-		if n < 2 {
-			failing.Insert("Less than two runs succeeded; aborting.")
-			framework.Failf(strings.Join(failing.List(), "\n"))
-		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
 			if est >= n {
