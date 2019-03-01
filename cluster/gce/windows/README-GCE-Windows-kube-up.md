@@ -1,5 +1,11 @@
 # Starting a Windows Kubernetes cluster on GCE using kube-up
 
+## IMPORTANT PLEASE NOTE!
+Any time the file structure in the `windows` directory changes, `windows/BUILD`
+and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+We HIGHLY recommend not changing the file structure, because consumers of
+Kubernetes releases depend on the release structure remaining stable.
+
 ## Bring up the cluster
 
 Prerequisites: a Google Cloud Platform project.
@@ -185,3 +191,4 @@ These steps are based on
       user@kubernetes-minion-windows-group-mk0p:C:\\etc\\kubernetes\\logs \
       kubetest-logs/
     ```
+

@@ -142,7 +142,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 	// Only clear etcd data when using local etcd.
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 
-	klog.V(1).Infof("[reset] checking for etcd config")
+	klog.V(1).Infoln("[reset] checking for etcd config")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		dirsToClean = append(dirsToClean, etcdDataDir)
@@ -157,7 +157,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 	}
 
 	// Try to stop the kubelet service
-	klog.V(1).Infof("[reset] getting init system")
+	klog.V(1).Infoln("[reset] getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		klog.Warningln("[reset] the kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")

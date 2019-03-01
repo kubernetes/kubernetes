@@ -18,6 +18,12 @@
   and scripts for configuring Windows nodes.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 # Disable progress bar to increase download speed.
 $ProgressPreference = 'SilentlyContinue'
 
@@ -65,14 +71,13 @@ function ShouldWrite-File {
 
 # Returns the GCE instance metadata value for $Key. If the key is not present
 # in the instance metadata returns $Default if set, otherwise returns $null.
-function Get-InstanceMetadataValue {
+function Get-InstanceMetadata {
   param (
     [parameter(Mandatory=$true)] [string]$Key,
     [parameter(Mandatory=$false)] [string]$Default
   )
 
-  $url = ("http://metadata.google.internal/computeMetadata/v1/instance/" +
-          "attributes/$Key")
+  $url = "http://metadata.google.internal/computeMetadata/v1/instance/$Key"
   try {
     $client = New-Object Net.WebClient
     $client.Headers.Add('Metadata-Flavor', 'Google')
@@ -87,6 +92,18 @@ function Get-InstanceMetadataValue {
       return $null
     }
   }
+}
+
+# Returns the GCE instance metadata value for $Key where key is an "attribute"
+# of the instance. If the key is not present in the instance metadata returns
+# $Default if set, otherwise returns $null.
+function Get-InstanceMetadataAttribute {
+  param (
+    [parameter(Mandatory=$true)] [string]$Key,
+    [parameter(Mandatory=$false)] [string]$Default
+  )
+
+  return Get-InstanceMetadata "attributes/$Key" $Default
 }
 
 function Validate-SHA1 {

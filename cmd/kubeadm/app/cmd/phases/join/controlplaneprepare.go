@@ -41,9 +41,11 @@ func NewControlPlanePreparePhase() workflow.Phase {
 		Short: "Prepares the machine for serving a control plane.",
 		Phases: []workflow.Phase{
 			{
-				Name:           "all",
-				Short:          "Prepares the machine for serving a control plane.",
-				InheritFlags:   getControlPlanePreparePhaseFlags(),
+				Name:  "all",
+				Short: "Prepares the machine for serving a control plane.",
+				InheritFlags: append(getControlPlanePreparePhaseFlags(),
+					options.CertificateKey,
+				),
 				RunAllSiblings: true,
 			},
 			newControlPlanePrepareDownloadCertsSubphase(),
@@ -61,10 +63,12 @@ func getControlPlanePreparePhaseFlags() []string {
 		options.CfgPath,
 		options.ControlPlane,
 		options.NodeName,
+		options.FileDiscovery,
 		options.TokenDiscovery,
 		options.TokenDiscoveryCAHash,
 		options.TokenDiscoverySkipCAHash,
-		options.CertificateKey,
+		options.TLSBootstrapToken,
+		options.TokenStr,
 	}
 }
 
@@ -74,10 +78,9 @@ func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 		Short: fmt.Sprintf("Download certificates from %s", kubeadmconstants.KubeadmCertsSecret),
 		Long:  cmdutil.MacroCommandLongDescription,
 		Run:   runControlPlanePrepareDownloadCertsPhaseLocal,
-		InheritFlags: []string{
-			options.CfgPath,
+		InheritFlags: append(getControlPlanePreparePhaseFlags(),
 			options.CertificateKey,
-		},
+		),
 	}
 }
 

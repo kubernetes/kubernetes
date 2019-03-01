@@ -58,7 +58,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
-		klog.V(1).Infof("Stopping the kubelet")
+		klog.V(1).Infoln("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
@@ -76,7 +76,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		klog.V(1).Infof("Starting the kubelet")
+		klog.V(1).Infoln("Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 

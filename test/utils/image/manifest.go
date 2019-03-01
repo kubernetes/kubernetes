@@ -28,6 +28,7 @@ import (
 type RegistryList struct {
 	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
 	E2eRegistry           string `yaml:"e2eRegistry"`
+	EtcdRegistry          string `yaml:"etcdRegistry"`
 	GcRegistry            string `yaml:"gcRegistry"`
 	PrivateRegistry       string `yaml:"privateRegistry"`
 	SampleRegistry        string `yaml:"sampleRegistry"`
@@ -59,6 +60,7 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		DockerLibraryRegistry: "docker.io/library",
 		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
+		EtcdRegistry:          "quay.io/coreos",
 		GcRegistry:            "k8s.gcr.io",
 		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
 		SampleRegistry:        "gcr.io/google-samples",
@@ -84,6 +86,7 @@ var (
 	registry              = initReg()
 	dockerLibraryRegistry = registry.DockerLibraryRegistry
 	e2eRegistry           = registry.E2eRegistry
+	etcdRegistry          = registry.EtcdRegistry
 	gcRegistry            = registry.GcRegistry
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
@@ -103,6 +106,7 @@ var (
 	Dnsutils                 = Config{e2eRegistry, "dnsutils", "1.1"}
 	EchoServer               = Config{e2eRegistry, "echoserver", "2.2"}
 	EntrypointTester         = Config{e2eRegistry, "entrypoint-tester", "1.0"}
+	Etcd                     = Config{etcdRegistry, "etcd", "v3.3.10"}
 	Fakegitserver            = Config{e2eRegistry, "fakegitserver", "1.0"}
 	GBFrontend               = Config{sampleRegistry, "gb-frontend", "v6"}
 	GBRedisSlave             = Config{sampleRegistry, "gb-redisslave", "v3"}

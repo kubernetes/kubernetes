@@ -50,7 +50,7 @@ func runUploadCerts(c workflow.RunData) error {
 	}
 
 	if !data.UploadCerts() {
-		klog.V(1).Infof("[upload-certs] Skipping certs upload")
+		klog.V(1).Infoln("[upload-certs] Skipping certs upload")
 		return nil
 	}
 	client, err := data.Client()

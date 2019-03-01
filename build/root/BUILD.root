@@ -38,6 +38,7 @@ gcs_upload(
         ":_binary-artifacts-and-hashes",
         "//build/release-tars:release-tars-and-hashes",
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes",
+        "//cluster/gce/windows:gcs-release-artifacts-and-hashes",
     ],
     tags = ["manual"],
     # Use for_platforms to format the upload path based on the configured
@@ -53,6 +54,7 @@ gcs_upload(
     upload_paths = select(for_platforms(for_all = {
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce/gci:gcs-release-artifacts-and-hashes": "extra/gce",
+        "//cluster/gce/windows:gcs-release-artifacts-and-hashes": "extra/gce/windows",
         "//:_binary-artifacts-and-hashes": "bin/{OS}/{ARCH}",
     })),
 )

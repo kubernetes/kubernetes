@@ -99,6 +99,13 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					},
 				},
+				InitContainers: []v1.Container{
+					{
+						Name:    "init1",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/true"},
+					},
+				},
 			},
 		}
 
@@ -152,6 +159,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		// verify the env is the same
 		if !reflect.DeepEqual(pip.Spec.Env, pod.Spec.Containers[0].Env) {
 			framework.Failf("env of pod container does not match the env of the pip: expected %#v, got: %#v", pip.Spec.Env, pod.Spec.Containers[0].Env)
+		}
+		if !reflect.DeepEqual(pip.Spec.Env, pod.Spec.InitContainers[0].Env) {
+			framework.Failf("env of pod init container does not match the env of the pip: expected %#v, got: %#v", pip.Spec.Env, pod.Spec.InitContainers[0].Env)
 		}
 	})
 
@@ -208,6 +218,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 						Env:   []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
 					},
 				},
+				InitContainers: []v1.Container{
+					{
+						Name:    "init1",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Env:     []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
+						Command: []string{"/bin/true"},
+					},
+				},
 			},
 		}
 
@@ -262,6 +280,10 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if !reflect.DeepEqual(originalPod.Spec.Containers[0].Env, pod.Spec.Containers[0].Env) {
 			framework.Failf("env of pod container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.Containers[0].Env, pod.Spec.Containers[0].Env)
 		}
+		if !reflect.DeepEqual(originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env) {
+			framework.Failf("env of pod init container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env)
+		}
+
 	})
 })
 
