@@ -117,7 +117,7 @@ func newTester() tester {
 	return tester{os.Stat, exec.LookPath, build.Default.GOPATH, wait}
 }
 
-// Try to find kubetest, either GOPATH/bin/kubetest or PATH
+// lookKubetest try to find kubetest, either GOPATH/bin/kubetest or PATH
 func (t tester) lookKubetest() (string, error) {
 	// Check for kubetest in GOPATH/bin
 	if t.goPath != "" {
