@@ -2653,4 +2653,121 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 	}
 }
 
+func TestUnsafeConvertMetricsOrder(t *testing.T) {
+	namespace := "test-namespace"
+	hpaName := "test-hpa"
+	resourceName := "test-rc"
+	resourceApiVersion := "v1"
+	resourceKind := "ReplicationController"
+	minReplicas := int32(1)
+	maxReplicas := int32(10)
+	memoryUtilization := int32(90)
+	cpuUtilization := int32(80)
+	podsAverageValue := resource.MustParse("15.0")
+	objectTargetAverageValue := resource.MustParse("20.0")
+	objectDefaultValue := resource.MustParse("0")
+
+	// test hpa v2 metric order: memory,pods,cpu,object
+	originHpav2 := autoscalingv2.HorizontalPodAutoscaler{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "HorizontalPodAutoscaler",
+			APIVersion: "autoscaling/v2beta2",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hpaName,
+			Namespace: namespace,
+			SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				Kind:       resourceName,
+				Name:       resourceKind,
+				APIVersion: resourceApiVersion,
+			},
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxReplicas,
+			Metrics: []autoscalingv2.MetricSpec{
+				{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricSource{
+						Name: v1.ResourceMemory,
+						Target: autoscalingv2.MetricTarget{
+							Type:               autoscalingv2.UtilizationMetricType,
+							AverageUtilization: &memoryUtilization,
+						},
+					},
+				},
+				{
+					Type: autoscalingv2.PodsMetricSourceType,
+					Pods: &autoscalingv2.PodsMetricSource{
+						Metric: autoscalingv2.MetricIdentifier{
+							Name: "qps",
+						},
+						Target: autoscalingv2.MetricTarget{
+							Type:         autoscalingv2.AverageValueMetricType,
+							AverageValue: &podsAverageValue,
+						},
+					},
+				},
+				{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricSource{
+						Name: v1.ResourceCPU,
+						Target: autoscalingv2.MetricTarget{
+							Type:               autoscalingv2.UtilizationMetricType,
+							AverageUtilization: &cpuUtilization,
+						},
+					},
+				},
+				{
+					Type: autoscalingv2.ObjectMetricSourceType,
+					Object: &autoscalingv2.ObjectMetricSource{
+						DescribedObject: autoscalingv2.CrossVersionObjectReference{
+							APIVersion: "apps/v1",
+							Kind:       "Deployment",
+							Name:       "some-deployment",
+						},
+						Metric: autoscalingv2.MetricIdentifier{
+							Name: "qps",
+						},
+						Target: autoscalingv2.MetricTarget{
+							Type:         autoscalingv2.AverageValueMetricType,
+							Value:        &objectDefaultValue,
+							AverageValue: &objectTargetAverageValue,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// convert to v1
+	hpav1Raw, err := unsafeConvertToVersionVia(&originHpav2, autoscalingv1.SchemeGroupVersion)
+	assert.NoError(t, err)
+	hpav1 := hpav1Raw.(*autoscalingv1.HorizontalPodAutoscaler)
+	// check cpu metric index is 2
+	assert.Equal(t, "2", hpav1.Annotations[autoscaling.CPUMetricIndexAnnotation])
+
+	// convert back to v2
+	hpav2Raw, err := unsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
+	assert.NoError(t, err)
+	recoverHpav2 := hpav2Raw.(*autoscalingv2.HorizontalPodAutoscaler)
+
+	// check metric size
+	assert.Equal(t, 4, len(recoverHpav2.Spec.Metrics))
+	// check Metrics[0]: cpu
+	assert.Equal(t, autoscalingv2.ResourceMetricSourceType, recoverHpav2.Spec.Metrics[0].Type)
+	assert.Equal(t, v1.ResourceMemory, recoverHpav2.Spec.Metrics[0].Resource.Name)
+	// check Metrics[1]: pods
+	assert.Equal(t, autoscalingv2.PodsMetricSourceType, recoverHpav2.Spec.Metrics[1].Type)
+	// check Metrics[2]: cpu
+	assert.Equal(t, autoscalingv2.ResourceMetricSourceType, recoverHpav2.Spec.Metrics[2].Type)
+	assert.Equal(t, v1.ResourceCPU, recoverHpav2.Spec.Metrics[2].Resource.Name)
+	// check Metrics[3]: object
+	assert.Equal(t, autoscalingv2.ObjectMetricSourceType, recoverHpav2.Spec.Metrics[3].Type)
+
+	// check cpu metric index has been removed in annotation
+	assert.Equal(t, 0, len(recoverHpav2.Annotations))
+}
+
 // TODO: add more tests
