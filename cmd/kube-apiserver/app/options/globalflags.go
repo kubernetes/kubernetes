@@ -22,8 +22,8 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 
 	// ensure libs have a chance to globally register their flags
-	_ "k8s.io/apiserver/pkg/admission"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	_ "k8s.io/apiserver/pkg/admission"                // for admission
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers" // for providers
 )
 
 // AddCustomGlobalFlags explicitly registers flags that internal packages register
