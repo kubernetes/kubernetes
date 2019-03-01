@@ -57,7 +57,7 @@ func TestValidatePathSegmentName(t *testing.T) {
 		},
 		// Make sure non-ascii characters are tolerated
 		"valid extended charset": {
-			Name:        "Iñtërnâtiônàlizætiøn",
+			Name:        "Internationalization",
 			Prefix:      false,
 			ExpectedMsg: "",
 		},
