@@ -14,7 +14,7 @@ subjects:
   name: heapster
   namespace: kube-system
 ---
-# Heapster's pod_nanny monitors the heapster deployment & its pod(s), and scales
+# Heapster's pod_nanny monitor the heapster's deployment & its pod(s), and scales
 # the resources of the deployment if necessary.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
