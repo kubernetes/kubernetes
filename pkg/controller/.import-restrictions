@@ -101,13 +101,18 @@
         "github.com/google/gofuzz",
         "github.com/prometheus/client_golang/prometheus",
         "github.com/robfig/cron",
+        "github.com/spf13/afero",
         "github.com/spf13/pflag",
         "github.com/stretchr/testify/assert",
         "github.com/stretchr/testify/require",
         "github.com/google/gofuzz",
         "github.com/golang/protobuf/ptypes/wrappers",
         "github.com/golang/protobuf/proto",
-        "github.com/container-storage-interface/spec/lib/go/csi"
+        "github.com/container-storage-interface/spec/lib/go/csi",
+        "github.com/gogo/protobuf/gogoproto",
+        "github.com/gogo/protobuf/proto",
+        "github.com/fsnotify/fsnotify",
+        "github.com/pkg/errors"
       ]
     },
     {
@@ -224,6 +229,7 @@
         "k8s.io/kubernetes/pkg/kubelet/events",
         "k8s.io/kubernetes/pkg/kubelet/types",
         "k8s.io/kubernetes/pkg/kubelet/util/format",
+        "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher",
         "k8s.io/kubernetes/pkg/quota",
         "k8s.io/kubernetes/pkg/registry/core/secret",
         "k8s.io/kubernetes/pkg/scheduler/algorithm",
@@ -254,6 +260,7 @@
         "k8s.io/kubernetes/pkg/scheduler/api",
         "k8s.io/kubernetes/pkg/scheduler/util",
         "k8s.io/kubernetes/pkg/security/apparmor",
+        "k8s.io/kubernetes/pkg/util/filesystem",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
         "k8s.io/kubernetes/pkg/scheduler/volumebinder",
