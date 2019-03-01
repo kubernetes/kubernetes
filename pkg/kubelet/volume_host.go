@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 // NewInitializedVolumePluginMgr returns a new instance of
@@ -124,6 +125,10 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 
 func (kvh *kubeletVolumeHost) GetCSIClient() csiclientset.Interface {
 	return kvh.kubelet.csiClient
+}
+
+func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
+	return kvh.kubelet.subpather
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

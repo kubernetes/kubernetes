@@ -53,6 +53,7 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/system:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
             "//vendor/github.com/opencontainers/selinux/go-selinux/label:go_default_library",
+            "//vendor/github.com/pkg/errors:go_default_library",
             "//vendor/github.com/sirupsen/logrus:go_default_library",
             "//vendor/github.com/syndtr/gocapability/capability:go_default_library",
             "//vendor/github.com/vishvananda/netlink:go_default_library",

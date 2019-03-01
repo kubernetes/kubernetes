@@ -2,7 +2,7 @@
 
 The container image described here runs the IS benchmark from the
 [NAS parallel benchmark suite.](https://www.nas.nasa.gov/publications/npb.html)
-This image is used as a workload in in node performance testing. 
+This image is used as a workload in in node performance testing.
 
 ## How to release:
 ```

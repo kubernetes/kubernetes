@@ -30,6 +30,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -257,4 +258,18 @@ func TestWatchAddAfterStop(t *testing.T) {
 	if err != nil {
 		t.Errorf("test resource creation failed: %v", err)
 	}
+}
+
+func TestPatchWithMissingObject(t *testing.T) {
+	nodesResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}
+
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	reaction := ObjectReaction(o)
+	action := NewRootPatchSubresourceAction(nodesResource, "node-1", types.StrategicMergePatchType, []byte(`{}`))
+	handled, node, err := reaction(action)
+	assert.True(t, handled)
+	assert.Nil(t, node)
+	assert.EqualError(t, err, `nodes "node-1" not found`)
 }

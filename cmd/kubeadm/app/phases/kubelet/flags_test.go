@@ -18,11 +18,12 @@ package kubelet
 
 import (
 	"context"
-	"errors"
 	"io"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"

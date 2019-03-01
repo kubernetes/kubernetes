@@ -148,7 +148,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 
 // Validate makes sure all the provided values for command-line options are valid
 func (o *RolloutStatusOptions) Validate() error {
-	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
 

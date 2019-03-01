@@ -17,15 +17,12 @@ limitations under the License.
 package master
 
 import (
-	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -48,20 +45,8 @@ func TestGroupVersions(t *testing.T) {
 		t.Errorf("No additional unnamespaced groups should be created")
 	}
 
-	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsAllGroups() {
-		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
-			t.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group)
-		}
-	}
-}
-
-func TestTypeTags(t *testing.T) {
-	for gvk, knownType := range legacyscheme.Scheme.AllKnownTypes() {
-		if gvk.Version == runtime.APIVersionInternal {
-			ensureNoTags(t, gvk, knownType, nil)
-		} else {
-			ensureTags(t, gvk, knownType, nil)
-		}
+	if err := apinamingtest.VerifyGroupNames(legacyscheme.Scheme, legacyUnsuffixedGroups); err != nil {
+		t.Errorf("%v", err)
 	}
 }
 
@@ -87,100 +72,14 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.Status{}):               true,
 }
 
-func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type) {
-	if _, ok := typesAllowedTags[tp]; ok {
-		return
-	}
-
-	parents = append(parents, tp)
-
-	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
-		ensureNoTags(t, gvk, tp.Elem(), parents)
-
-	case reflect.String, reflect.Bool, reflect.Float32, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uintptr, reflect.Uint32, reflect.Uint64, reflect.Interface:
-		// no-op
-
-	case reflect.Struct:
-		for i := 0; i < tp.NumField(); i++ {
-			f := tp.Field(i)
-			if f.PkgPath != "" {
-				continue // Ignore unexported fields
-			}
-			jsonTag := f.Tag.Get("json")
-			protoTag := f.Tag.Get("protobuf")
-			if len(jsonTag) > 0 || len(protoTag) > 0 {
-				t.Errorf("Internal types should not have json or protobuf tags. %#v has tag on field %v: %v", gvk, f.Name, f.Tag)
-				for i, tp := range parents {
-					t.Logf("%s%v:", strings.Repeat("  ", i), tp)
-				}
-			}
-
-			ensureNoTags(t, gvk, f.Type, parents)
-		}
-
-	default:
-		t.Errorf("Unexpected type %v in %#v", tp.Kind(), gvk)
-		for i, tp := range parents {
-			t.Logf("%s%v:", strings.Repeat("  ", i), tp)
-		}
-	}
-}
-
-var (
-	marshalerType   = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
-	unmarshalerType = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
-)
-
 // These fields are limited exceptions to the standard JSON naming structure.
 // Additions should only be made if a non-standard field name was released and cannot be changed for compatibility reasons.
 var allowedNonstandardJSONNames = map[reflect.Type]string{
 	reflect.TypeOf(v1.DaemonEndpoint{}): "Port",
 }
 
-func ensureTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type) {
-	// This type handles its own encoding/decoding and doesn't need json tags
-	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PtrTo(tp).Implements(unmarshalerType)) {
-		return
-	}
-
-	parents = append(parents, tp)
-
-	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
-		ensureTags(t, gvk, tp.Elem(), parents)
-
-	case reflect.String, reflect.Bool, reflect.Float32, reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uintptr, reflect.Uint32, reflect.Uint64, reflect.Interface:
-		// no-op
-
-	case reflect.Struct:
-		for i := 0; i < tp.NumField(); i++ {
-			f := tp.Field(i)
-			jsonTag := f.Tag.Get("json")
-			if len(jsonTag) == 0 {
-				t.Errorf("External types should have json tags. %#v tags on field %v are: %s", gvk, f.Name, f.Tag)
-				for i, tp := range parents {
-					t.Logf("%s%v", strings.Repeat("  ", i), tp)
-				}
-			}
-
-			jsonTagName := strings.Split(jsonTag, ",")[0]
-			if len(jsonTagName) > 0 && (jsonTagName[0] < 'a' || jsonTagName[0] > 'z') && jsonTagName != "-" && allowedNonstandardJSONNames[tp] != jsonTagName {
-				t.Errorf("External types should have json names starting with lowercase letter. %#v has json tag on field %v with name %s", gvk, f.Name, jsonTagName)
-				t.Log(tp)
-				t.Log(allowedNonstandardJSONNames[tp])
-				for i, tp := range parents {
-					t.Logf("%s%v", strings.Repeat("  ", i), tp)
-				}
-			}
-
-			ensureTags(t, gvk, f.Type, parents)
-		}
-
-	default:
-		t.Errorf("Unexpected type %v in %#v", tp.Kind(), gvk)
-		for i, tp := range parents {
-			t.Logf("%s%v:", strings.Repeat("  ", i), tp)
-		}
+func TestTypeTags(t *testing.T) {
+	if err := apinamingtest.VerifyTagNaming(legacyscheme.Scheme, typesAllowedTags, allowedNonstandardJSONNames); err != nil {
+		t.Errorf("%v", err)
 	}
 }

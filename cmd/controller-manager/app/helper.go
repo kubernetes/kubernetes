@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -52,4 +53,27 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 	}
 
 	return nil
+}
+
+// IsControllerEnabled check if a specified controller enabled or not.
+func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers []string) bool {
+	hasStar := false
+	for _, ctrl := range controllers {
+		if ctrl == name {
+			return true
+		}
+		if ctrl == "-"+name {
+			return false
+		}
+		if ctrl == "*" {
+			hasStar = true
+		}
+	}
+	// if we get here, there was no explicit choice
+	if !hasStar {
+		// nothing on by default
+		return false
+	}
+
+	return !disabledByDefaultControllers.Has(name)
 }

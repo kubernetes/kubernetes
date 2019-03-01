@@ -15,6 +15,13 @@ spec:
     plural:   runtimeclasses
     singular: runtimeclass
     kind:     RuntimeClass
+  additionalPrinterColumns:
+  - name: Runtime-Handler
+    type: string
+    JSONPath: .spec.runtimeHandler
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
   scope: Cluster
   validation:
     openAPIV3Schema:

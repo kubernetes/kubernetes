@@ -392,7 +392,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.Core())
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -510,7 +510,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.Core())
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -593,7 +593,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range create_tests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
-		master.ServiceClient = fakeClient.Core()
+		master.ServiceClient = fakeClient.CoreV1()
 		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
@@ -875,7 +875,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range reconcile_tests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.ServiceClient = fakeClient.Core()
+		master.ServiceClient = fakeClient.CoreV1()
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -934,7 +934,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range non_reconcile_tests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.ServiceClient = fakeClient.Core()
+		master.ServiceClient = fakeClient.CoreV1()
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)

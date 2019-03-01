@@ -24,15 +24,12 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -334,26 +331,5 @@ func TestDelayBinding(t *testing.T) {
 		if shouldDelay != test.shouldDelay {
 			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
 		}
-	}
-}
-
-func TestDelayBindingDisabled(t *testing.T) {
-	// When volumeScheduling feature gate is disabled, should always be immediate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
-
-	client := &fake.Clientset{}
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	classInformer := informerFactory.Storage().V1().StorageClasses()
-	ctrl := &PersistentVolumeController{
-		classLister: classInformer.Lister(),
-	}
-
-	name := "volumeScheduling-feature-disabled"
-	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode, false))
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if shouldDelay {
-		t.Errorf("Test %q returned true, expected false", name)
 	}
 }

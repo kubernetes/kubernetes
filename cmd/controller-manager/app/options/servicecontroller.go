@@ -24,7 +24,7 @@ import (
 
 // ServiceControllerOptions holds the ServiceController options.
 type ServiceControllerOptions struct {
-	ConcurrentServiceSyncs int32
+	*kubectrlmgrconfig.ServiceControllerConfiguration
 }
 
 // AddFlags adds flags related to ServiceController for controller manager to the specified FlagSet.

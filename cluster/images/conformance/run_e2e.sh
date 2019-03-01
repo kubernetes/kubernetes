@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2018 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,6 +44,10 @@ ginkgo_args=(
     "--skip=${E2E_SKIP}"
     "--noColor=true"
 )
+
+if [[ -n ${E2E_DRYRUN:-} ]]; then
+    ginkgo_args+=("--dryRun=true")
+fi
 
 case ${E2E_PARALLEL} in
     'y'|'Y')           ginkgo_args+=("--nodes=25") ;;

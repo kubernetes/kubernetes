@@ -23,10 +23,11 @@ import (
 	"path/filepath"
 	"time"
 
-	pkgerrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/errors"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
@@ -48,7 +49,7 @@ import (
 var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
-// Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
+// Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
 func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
@@ -60,8 +61,8 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
-		errs = append(errs, pkgerrors.Wrap(err, "error creating kubelet configuration ConfigMap"))
+	if err := kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
+		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
@@ -73,7 +74,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// --cri-socket.
 	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		errs = append(errs, pkgerrors.Wrap(err, "error uploading crisocket"))
+		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
@@ -107,21 +108,21 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Upgrade kube-dns/CoreDNS and kube-proxy
-	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
+	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
 	}
 	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client, dryRun); err != nil {
+	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
+	if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
 		errs = append(errs, err)
 	}
-	return errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(errs)
 }
 
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, dryRun bool) error {
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
 		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
 		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
@@ -138,7 +139,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration,
 				return err
 			}
 			if dnsDeployment.Status.ReadyReplicas == 0 {
-				return pkgerrors.New("the DNS deployment isn't ready yet")
+				return errors.New("the DNS deployment isn't ready yet")
 			}
 		}
 
@@ -158,7 +159,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
 		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
-		return pkgerrors.Wrap(err, "[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key")
+		return errors.Wrap(err, "[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key")
 	}
 
 	if !shouldBackup {
@@ -196,7 +197,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
 		// again.
 		if !(apierrors.IsNotFound(err) && dryRun) {
-			errs = append(errs, pkgerrors.Wrap(err, "error downloading kubelet configuration from the ConfigMap"))
+			errs = append(errs, errors.Wrap(err, "error downloading kubelet configuration from the ConfigMap"))
 		}
 	}
 
@@ -206,18 +207,18 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	envFilePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
 	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
-		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-		// as we handle that ourselves in the markmaster phase
-		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(cfg, false, kubeletDir); err != nil {
-			errs = append(errs, pkgerrors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
+		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
+		// as we handle that ourselves in the mark-control-plane phase
+		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
+			errs = append(errs, errors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
 
 		if dryRun { // Print what contents would be written
 			dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		}
 	}
-	return errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(errs)
 }
 
 // getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
@@ -233,7 +234,7 @@ func getKubeletDir(dryRun bool) (string, error) {
 func backupAPIServerCertAndKey(certAndKeyDir string) error {
 	subDir := filepath.Join(certAndKeyDir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {
-		return pkgerrors.Wrapf(err, "failed to created backup directory %s", subDir)
+		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
 	}
 
 	filesToMove := map[string]string{
@@ -263,7 +264,7 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 			errs = append(errs, err)
 		}
 	}
-	return pkgerrors.Errorf("couldn't move these files: %v. Got errors: %v", files, errors.NewAggregate(errs))
+	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }
 
 // shouldBackupAPIServerCertAndKey checks if the cert of kube-apiserver will be expired in 180 days.
@@ -271,10 +272,10 @@ func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
 	apiServerCert := filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName)
 	certs, err := certutil.CertsFromFile(apiServerCert)
 	if err != nil {
-		return false, pkgerrors.Wrapf(err, "couldn't load the certificate file %s", apiServerCert)
+		return false, errors.Wrapf(err, "couldn't load the certificate file %s", apiServerCert)
 	}
 	if len(certs) == 0 {
-		return false, pkgerrors.New("no certificate data found")
+		return false, errors.New("no certificate data found")
 	}
 
 	if time.Now().Sub(certs[0].NotBefore) > expiry {

@@ -12,6 +12,7 @@ go_library(
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+        "test_server.go",
         "util.go",
     ],
     data = [
@@ -19,8 +20,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/framework",
     deps = [
+        "//cmd/kube-apiserver/app:go_default_library",
+        "//cmd/kube-apiserver/app/options:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -57,11 +60,13 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 

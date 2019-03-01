@@ -1,6 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load(
+    "//build:go.bzl",
+    go_test = "go_test_conditional_pure",
+)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -56,7 +60,6 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/api/v1/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -67,6 +70,7 @@ go_library(
             "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
             "//test/e2e/perftype:go_default_library",
             "//test/e2e_node/perftype:go_default_library",
+            "//test/utils:go_default_library",
             "//vendor/github.com/google/cadvisor/client/v2:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
@@ -97,6 +101,7 @@ go_test(
         "mirror_pod_test.go",
         "node_container_manager_test.go",
         "node_perf_test.go",
+        "pids_test.go",
         "pods_container_manager_test.go",
         "resource_usage_test.go",
         "restart_test.go",
@@ -105,10 +110,10 @@ go_test(
         "summary_test.go",
         "volume_manager_test.go",
     ],
+    out = "e2e_node.test",
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//pkg/api/v1/node:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
@@ -118,9 +123,11 @@ go_test(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
+        "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
+        "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
@@ -129,7 +136,7 @@ go_test(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -149,6 +156,7 @@ go_test(
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e_node/perf/workloads:go_default_library",
         "//test/e2e_node/services:go_default_library",
+        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
@@ -162,11 +170,11 @@ go_test(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//cmd/kubeadm/app/util/system:go_default_library",
+            "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
             "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-            "//test/utils:go_default_library",
             "//vendor/github.com/kardianos/osext:go_default_library",
             "//vendor/github.com/onsi/ginkgo/config:go_default_library",
             "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
@@ -174,15 +182,6 @@ go_test(
         ],
         "//conditions:default": [],
     }),
-)
-
-genrule(
-    name = "gen_e2e_node.test",
-    testonly = 1,
-    srcs = [":go_default_test"],
-    outs = ["e2e_node.test"],
-    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
-    output_to_bindir = 1,
 )
 
 filegroup(
@@ -204,6 +203,7 @@ filegroup(
         "//test/e2e_node/runner/local:all-srcs",
         "//test/e2e_node/runner/remote:all-srcs",
         "//test/e2e_node/services:all-srcs",
+        "//test/e2e_node/system:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

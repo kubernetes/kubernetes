@@ -26,9 +26,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -37,14 +37,14 @@ import (
 type createAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
-	authPath          flag.StringFlag
-	clientCertificate flag.StringFlag
-	clientKey         flag.StringFlag
-	token             flag.StringFlag
-	username          flag.StringFlag
-	password          flag.StringFlag
-	embedCertData     flag.Tristate
-	authProvider      flag.StringFlag
+	authPath          cliflag.StringFlag
+	clientCertificate cliflag.StringFlag
+	clientKey         cliflag.StringFlag
+	token             cliflag.StringFlag
+	username          cliflag.StringFlag
+	password          cliflag.StringFlag
+	embedCertData     cliflag.Tristate
+	authProvider      cliflag.StringFlag
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string

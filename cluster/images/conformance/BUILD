@@ -12,7 +12,7 @@ container_layer(
     directory = "/usr/local/bin",
     files = [
         "//cmd/kubectl",
-        "//test/e2e:e2e.test",
+        "//test/e2e:e2e.test_binary",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
 )
@@ -47,7 +47,6 @@ container_image(
 container_bundle(
     name = "conformance",
     images = {"k8s.gcr.io/conformance-amd64:{STABLE_DOCKER_TAG}": "conformance-internal"},
-    stamp = True,
 )
 
 filegroup(

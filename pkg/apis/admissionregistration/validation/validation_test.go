@@ -24,214 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
-func getInitializerConfiguration(initializers []admissionregistration.Initializer) *admissionregistration.InitializerConfiguration {
-	return &admissionregistration.InitializerConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "config",
-		},
-		Initializers: initializers,
-	}
-}
-
-func TestValidateInitializerConfiguration(t *testing.T) {
-	tests := []struct {
-		name          string
-		config        *admissionregistration.InitializerConfiguration
-		expectedError string
-	}{
-		{
-			name: "0 rule is valid",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-					},
-				}),
-		},
-		{
-			name: "all initializers must have a fully qualified name",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-					},
-					{
-						Name: "k8s.io",
-					},
-					{
-						Name: "",
-					},
-				}),
-			expectedError: `initializers[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, initializers[2].name: Required value`,
-		},
-		{
-			name: "APIGroups must not be empty or nil",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a"},
-							},
-							{
-								APIGroups:   nil,
-								APIVersions: []string{"a"},
-								Resources:   []string{"a"},
-							},
-						},
-					},
-				}),
-			expectedError: `initializers[0].rules[0].apiGroups: Required value, initializers[0].rules[1].apiGroups: Required value`,
-		},
-		{
-			name: "APIVersions must not be empty or nil",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{},
-								Resources:   []string{"a"},
-							},
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: nil,
-								Resources:   []string{"a"},
-							},
-						},
-					},
-				}),
-			expectedError: `initializers[0].rules[0].apiVersions: Required value, initializers[0].rules[1].apiVersions: Required value`,
-		},
-		{
-			name: "Resources must not be empty or nil",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   []string{},
-							},
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   nil,
-							},
-						},
-					},
-				}),
-			expectedError: `initializers[0].rules[0].resources: Required value, initializers[0].rules[1].resources: Required value`,
-		},
-		{
-			name: "\"\" is a valid APIGroup",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a", ""},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a"},
-							},
-						},
-					},
-				}),
-		},
-		{
-			name: "\"\" is NOT a valid APIVersion",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a", ""},
-								Resources:   []string{"a"},
-							},
-						},
-					},
-				}),
-			expectedError: "apiVersions[1]: Required value",
-		},
-		{
-			name: "\"\" is NOT a valid Resource",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a", ""},
-							},
-						},
-					},
-				}),
-			expectedError: "resources[1]: Required value",
-		},
-		{
-			name: "wildcard cannot be mixed with other strings for APIGroups or APIVersions or Resources",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a", "*"},
-								APIVersions: []string{"a", "*"},
-								Resources:   []string{"a", "*"},
-							},
-						},
-					},
-				}),
-			expectedError: `[initializers[0].rules[0].apiGroups: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API groups, initializers[0].rules[0].apiVersions: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API versions, initializers[0].rules[0].resources: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other resources]`,
-		},
-		{
-			name: "Subresource not allowed",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						Rules: []admissionregistration.Rule{
-							{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a/b"},
-							},
-						},
-					},
-				}),
-			expectedError: ` "a/b": must not specify subresources`,
-		},
-	}
-
-	for _, test := range tests {
-		errs := ValidateInitializerConfiguration(test.config)
-		err := errs.ToAggregate()
-		if err != nil {
-			if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-				t.Errorf("test case %s, expected to contain %s, got %s", test.name, e, a)
-			}
-		} else {
-			if test.expectedError != "" {
-				t.Errorf("test case %s, unexpected no error, expected to contain %s", test.name, test.expectedError)
-			}
-		}
-	}
-}
-
 func strPtr(s string) *string { return &s }
+
+func int32Ptr(i int32) *int32 { return &i }
 
 func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
 	return &admissionregistration.ValidatingWebhookConfiguration{
@@ -750,6 +545,63 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				}),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
+		},
+		{
+			name: "timeout seconds cannot be greater than 30",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(31),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: 31: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "timeout seconds cannot be smaller than 1",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(0),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: 0: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "timeout seconds must be positive",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(-1),
+					},
+				}),
+			expectedError: `webhooks[0].timeoutSeconds: Invalid value: -1: the timeout value must be between 1 and 30 seconds`,
+		},
+		{
+			name: "valid timeout seconds",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:           "webhook.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(1),
+					},
+					{
+						Name:           "webhook2.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(15),
+					},
+					{
+						Name:           "webhook3.k8s.io",
+						ClientConfig:   validClientConfig,
+						TimeoutSeconds: int32Ptr(30),
+					},
+				}),
 		},
 	}
 	for _, test := range tests {

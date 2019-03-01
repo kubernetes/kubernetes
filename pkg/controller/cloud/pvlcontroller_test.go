@@ -27,13 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	sets "k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
@@ -132,13 +128,6 @@ func TestCreatePatch(t *testing.T) {
 	ignoredPV := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "noncloud",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -151,13 +140,6 @@ func TestCreatePatch(t *testing.T) {
 	awsPV := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awsPV",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -193,7 +175,7 @@ func TestCreatePatch(t *testing.T) {
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -208,7 +190,7 @@ func TestCreatePatch(t *testing.T) {
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1", "2", "3"},
 						},
@@ -220,13 +202,6 @@ func TestCreatePatch(t *testing.T) {
 	awsPVWithAffinity := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awsPV",
-			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{
-					{
-						Name: initializerName,
-					},
-				},
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -330,7 +305,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val3"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -344,7 +319,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val4", "val5"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1"},
 						},
@@ -369,7 +344,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val3"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"1", "2", "3"},
 						},
@@ -383,7 +358,7 @@ func TestCreatePatch(t *testing.T) {
 							Values:   []string{"val5", "val4"},
 						},
 						{
-							Key:      kubeletapis.LabelZoneFailureDomain,
+							Key:      v1.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{"3", "2", "1"},
 						},
@@ -393,7 +368,7 @@ func TestCreatePatch(t *testing.T) {
 		},
 	}
 
-	zones, _ := volumeutil.ZonesToSet("1,2,3")
+	zones, _ := volumehelpers.ZonesToSet("1,2,3")
 	testCases := map[string]struct {
 		vol              v1.PersistentVolume
 		labels           map[string]string
@@ -431,27 +406,26 @@ func TestCreatePatch(t *testing.T) {
 		},
 		"cloudprovider singlezone": {
 			vol:              awsPV,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: "1"},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: "1"},
 			expectedAffinity: &expectedAffinityZone1MergedWithAWSPV,
 		},
 		"cloudprovider singlezone pre-existing affinity non-conflicting": {
 			vol:              awsPVWithAffinity,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: "1"},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: "1"},
 			expectedAffinity: &expectedAffinityZone1MergedWithAWSPVWithAffinity,
 		},
 		"cloudprovider multizone": {
 			vol:              awsPV,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: volumeutil.ZonesSetToLabelValue(zones)},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: volumehelpers.ZonesSetToLabelValue(zones)},
 			expectedAffinity: &expectedAffinityZonesMergedWithAWSPV,
 		},
 		"cloudprovider multizone pre-existing affinity non-conflicting": {
 			vol:              awsPVWithAffinity,
-			labels:           map[string]string{kubeletapis.LabelZoneFailureDomain: volumeutil.ZonesSetToLabelValue(zones)},
+			labels:           map[string]string{v1.LabelZoneFailureDomain: volumehelpers.ZonesSetToLabelValue(zones)},
 			expectedAffinity: &expectedAffinityZonesMergedWithAWSPVWithAffinity,
 		},
 	}
 
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	for d, tc := range testCases {
 		cloud := &fakecloud.FakeCloud{}
 		client := fake.NewSimpleClientset()
@@ -462,9 +436,12 @@ func TestCreatePatch(t *testing.T) {
 		}
 		obj := &v1.PersistentVolume{}
 		json.Unmarshal(patch, obj)
-		if obj.ObjectMeta.Initializers != nil {
-			t.Errorf("%s: initializer wasn't removed: %v", d, obj.ObjectMeta.Initializers)
-		}
+
+		// TODO: check if object was marked as initialized
+		// if ... object was not marked as initialized ... {
+		// 	t.Errorf("%s: wasn't marked as initialized: %#v", d, obj)
+		// }
+
 		if tc.labels == nil {
 			continue
 		}
@@ -495,32 +472,25 @@ func TestAddLabelsToVolume(t *testing.T) {
 
 	testCases := map[string]struct {
 		vol                       v1.PersistentVolume
-		initializers              *metav1.Initializers
 		shouldLabelAndSetAffinity bool
 	}{
 		"PV without initializer": {
 			vol:                       pv,
-			initializers:              nil,
 			shouldLabelAndSetAffinity: false,
 		},
-		"PV with initializer to remove": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
-			shouldLabelAndSetAffinity: true,
-		},
-		"PV with other initializers only": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}}},
-			shouldLabelAndSetAffinity: false,
-		},
-		"PV with other initializers first": {
-			vol:                       pv,
-			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}, {Name: initializerName}}},
-			shouldLabelAndSetAffinity: false,
-		},
+		// "PV with initializer to remove": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: true,
+		// },
+		// "PV with other initializers only": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: false,
+		// },
+		// "PV with other initializers first": {
+		// 	vol:                       pv,
+		// 	shouldLabelAndSetAffinity: false,
+		// },
 	}
-
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	for d, tc := range testCases {
 		labeledCh := make(chan bool, 1)
@@ -556,7 +526,6 @@ func TestAddLabelsToVolume(t *testing.T) {
 			VolumeLabelMap: map[string]map[string]string{"awsPV": {"a": "1"}},
 		}
 		pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
-		tc.vol.ObjectMeta.Initializers = tc.initializers
 		pvlController.addLabelsAndAffinityToVolume(&tc.vol)
 
 		select {

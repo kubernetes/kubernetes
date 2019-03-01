@@ -29,8 +29,6 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,13 +42,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
 const (
-	ApplyAnnotationsFlag     = "save-config"
-	DefaultErrorExitCode     = 1
-	IncludeUninitializedFlag = "include-uninitialized"
+	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
 )
 
 type debugError interface {
@@ -293,8 +291,8 @@ func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples", msg, cmd.CommandPath())
 }
 
-func IsFilenameSliceEmpty(filenames []string) bool {
-	return len(filenames) == 0
+func IsFilenameSliceEmpty(filenames []string, directory string) bool {
+	return len(filenames) == 0 && directory == ""
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -384,6 +382,7 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
+	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
@@ -396,13 +395,24 @@ func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 	flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }
 
+// AddKustomizeFlag adds kustomize flag to a command
+func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
+	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
+}
+
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddServerSideApplyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+}
+
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool(IncludeUninitializedFlag, false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -471,6 +481,14 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 		}
 	}
 	return nil
+}
+
+func GetServerSideApplyFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "server-side")
+}
+
+func GetForceConflictsFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "force-conflicts")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
@@ -592,28 +610,6 @@ func ManualStrip(file []byte) []byte {
 		}
 	}
 	return stripped
-}
-
-// ShouldIncludeUninitialized identifies whether to include uninitialized objects.
-// includeUninitialized is the default value.
-// Assume we can parse `all` and `selector` from cmd.
-func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) bool {
-	shouldIncludeUninitialized := includeUninitialized
-	if cmd.Flags().Lookup("all") != nil && GetFlagBool(cmd, "all") {
-		// include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=false
-		shouldIncludeUninitialized = true
-	}
-	if cmd.Flags().Lookup("selector") != nil && GetFlagString(cmd, "selector") != "" {
-		// does not include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=true
-		shouldIncludeUninitialized = false
-	}
-	if cmd.Flags().Changed(IncludeUninitializedFlag) {
-		// get explicit value
-		shouldIncludeUninitialized = GetFlagBool(cmd, IncludeUninitializedFlag)
-	}
-	return shouldIncludeUninitialized
 }
 
 // ScaleClientFunc provides a ScalesGetter

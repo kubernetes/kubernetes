@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // deploymentStrategy implements behavior for Deployments.
@@ -73,13 +74,15 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
-	pod.DropDisabledAlphaFields(&deployment.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
-	return validation.ValidateDeployment(deployment)
+	allErrs := validation.ValidateDeployment(deployment)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&deployment.Spec.Template, nil, field.NewPath("spec.template"))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -97,8 +100,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
-	pod.DropDisabledAlphaFields(&newDeployment.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldDeployment.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation
@@ -114,6 +116,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
 	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template, field.NewPath("spec.template"))...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -142,6 +145,7 @@ type deploymentStatusStrategy struct {
 	deploymentStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = deploymentStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status

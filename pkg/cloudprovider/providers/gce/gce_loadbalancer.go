@@ -24,16 +24,16 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	utilnet "k8s.io/utils/net"
 )
 
 type cidrs struct {
-	ipn   netsets.IPNet
+	ipn   utilnet.IPNetSet
 	isSet bool
 }
 
@@ -44,7 +44,7 @@ var (
 func init() {
 	var err error
 	// LB L7 proxies and all L3/4/7 health checkers have client addresses within these known CIDRs.
-	lbSrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
+	lbSrcRngsFlag.ipn, err = utilnet.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
 	if err != nil {
 		panic("Incorrect default GCE L7 source ranges")
 	}
@@ -64,7 +64,7 @@ func (c *cidrs) Set(value string) error {
 	// On first Set(), clear the original defaults
 	if !c.isSet {
 		c.isSet = true
-		c.ipn = make(netsets.IPNet)
+		c.ipn = make(utilnet.IPNetSet)
 	} else {
 		return fmt.Errorf("GCE LB CIDRs have already been set")
 	}

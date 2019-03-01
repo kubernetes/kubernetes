@@ -487,7 +487,7 @@ func TestTLSConfig(t *testing.T) {
 			// Allow all and see if we get an error.
 			service.Allow()
 
-			err = wh.Validate(attr)
+			err = wh.Validate(attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -509,7 +509,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if err := wh.Validate(attr); err == nil {
+			if err := wh.Validate(attr, nil); err == nil {
 				t.Errorf("%s: incorrectly admitted with DenyAll policy", tt.test)
 			}
 		})
@@ -526,7 +526,7 @@ type webhookCacheTestCase struct {
 func testWebhookCacheCases(t *testing.T, serv *mockService, wh *Plugin, attr admission.Attributes, tests []webhookCacheTestCase) {
 	for _, test := range tests {
 		serv.statusCode = test.statusCode
-		err := wh.Validate(attr)
+		err := wh.Validate(attr, nil)
 		authorized := err == nil
 
 		if test.expectedErr && err == nil {
@@ -759,7 +759,7 @@ func TestContainerCombinations(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
-			err = wh.Validate(attr)
+			err = wh.Validate(attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission: %s", tt.test)
@@ -855,7 +855,7 @@ func TestDefaultAllow(t *testing.T) {
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 
-			err = wh.Validate(attr)
+			err = wh.Validate(attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -963,7 +963,7 @@ func TestAnnotationFiltering(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
-			err = wh.Validate(attr)
+			err = wh.Validate(attr, nil)
 			if err != nil {
 				t.Errorf("expected successful admission")
 			}
@@ -1055,7 +1055,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 
-			err = wh.Validate(attr)
+			err = wh.Validate(attr, nil)
 			if !reflect.DeepEqual(annotations, tt.expectedAnnotations) {
 				t.Errorf("got audit annotations: %v; want: %v", annotations, tt.expectedAnnotations)
 			}

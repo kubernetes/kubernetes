@@ -114,8 +114,9 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	if iSpec := config.GetImage(); iSpec != nil {
 		image = iSpec.Image
 	}
+	containerName := makeContainerName(sandboxConfig, config)
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: makeContainerName(sandboxConfig, config),
+		Name: containerName,
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Entrypoint: dockerstrslice.StrSlice(config.Command),
@@ -162,15 +163,25 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
-	createResp, err := ds.client.CreateContainer(createConfig)
+	cleanupInfo, err := ds.applyPlatformSpecificDockerConfig(r, &createConfig)
 	if err != nil {
-		createResp, err = recoverFromCreationConflictIfNeeded(ds.client, createConfig, err)
+		return nil, err
+	}
+	defer func() {
+		for _, err := range ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo) {
+			klog.Warningf("error when cleaning up after container %v's creation: %v", containerName, err)
+		}
+	}()
+
+	createResp, createErr := ds.client.CreateContainer(createConfig)
+	if createErr != nil {
+		createResp, createErr = recoverFromCreationConflictIfNeeded(ds.client, createConfig, createErr)
 	}
 
 	if createResp != nil {
 		return &runtimeapi.CreateContainerResponse{ContainerId: createResp.ID}, nil
 	}
-	return nil, err
+	return nil, createErr
 }
 
 // getContainerLogPath returns the container log path specified by kubelet and the real

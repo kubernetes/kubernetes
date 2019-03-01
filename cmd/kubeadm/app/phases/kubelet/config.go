@@ -23,13 +23,13 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -50,9 +50,9 @@ func WriteConfigToDisk(kubeletConfig *kubeletconfig.KubeletConfiguration, kubele
 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func CreateConfigMap(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func CreateConfigMap(cfg *kubeletconfig.KubeletConfiguration, k8sVersionStr string, client clientset.Interface) error {
 
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	k8sVersion, err := version.ParseSemantic(k8sVersionStr)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func CreateConfigMap(cfg *kubeadmapi.InitConfiguration, client clientset.Interfa
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion)
 	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
 
-	kubeletBytes, err := getConfigBytes(cfg.ComponentConfigs.Kubelet)
+	kubeletBytes, err := getConfigBytes(cfg)
 	if err != nil {
 		return err
 	}

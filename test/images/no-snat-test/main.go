@@ -25,8 +25,8 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 )
 
 // ip = target for /whoami query
@@ -52,7 +52,7 @@ func main() {
 	m := newMasqTester()
 	m.AddFlags(pflag.CommandLine)
 
-	flag.InitFlags()
+	cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

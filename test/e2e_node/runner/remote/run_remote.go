@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/test/e2e_node/remote"
+	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
@@ -61,7 +62,8 @@ var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
-var systemSpecName = flag.String("system-spec-name", "", "The name of the system spec used for validating the image in the node conformance test. The specs are at k8s.io/kubernetes/cmd/kubeadm/app/util/system/specs/. If unspecified, the default built-in spec (system.DefaultSpec) will be used.")
+var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -441,7 +443,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs)
 	return &TestResult{
 		output: output,
 		err:    err,

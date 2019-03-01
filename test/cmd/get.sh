@@ -202,6 +202,29 @@ run_kubectl_get_tests() {
   # cleanup
   kubectl delete pods redis-master valid-pod "${kube_flags[@]}"
 
+  ### Test 'kubectl get -k <dir>' prints all the items built from a kustomization directory
+  # Pre-condition: no ConfigMap, Deployment, Service exist
+  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl apply -k hack/testdata/kustomize
+  # Post-condition: test-the-map, test-the-deployment, test-the-service exist
+
+  # Check that all items in the list are printed
+  output_message=$(kubectl get -k hack/testdata/kustomize -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "test-the-map"
+  kube::test::if_has_string "${output_message}" "test-the-deployment"
+  kube::test::if_has_string "${output_message}" "test-the-service"
+
+  # cleanup
+  kubectl delete -k hack/testdata/kustomize
+
+  # Check that all items in the list are deleted
+  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+
   set +o nounset
   set +o errexit
 }
@@ -333,8 +356,12 @@ run_kubectl_all_namespace_tests() {
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-1
   kubectl create "${kube_flags[@]}" namespace all-ns-test-2
   kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-2
-  # Ensure listing across namespaces displays the namespace
+  # Ensure listing across namespaces displays the namespace (--all-namespaces)
   output_message=$(kubectl get serviceaccounts --all-namespaces "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "all-ns-test-1"
+  kube::test::if_has_string "${output_message}" "all-ns-test-2"
+  # Ensure listing across namespaces displays the namespace (-A)
+  output_message=$(kubectl get serviceaccounts -A "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" "all-ns-test-1"
   kube::test::if_has_string "${output_message}" "all-ns-test-2"
   # Clean up

@@ -10,6 +10,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checks.go",
+        "checks_darwin.go",
+        "checks_linux.go",
         "checks_unix.go",
         "checks_windows.go",
         "utils.go",
@@ -21,6 +23,7 @@ go_library(
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//cmd/kubeadm/app/util/system:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/ipvs:go_default_library",
@@ -33,7 +36,12 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//cmd/kubeadm/app/util:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -45,11 +53,11 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/github.com/lithammer/dedent:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],

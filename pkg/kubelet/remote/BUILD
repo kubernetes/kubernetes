@@ -45,7 +45,6 @@ go_test(
     name = "go_default_test",
     srcs = ["remote_runtime_test.go"],
     embed = [":go_default_library"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/testing:go_default_library",

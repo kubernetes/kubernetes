@@ -282,6 +282,30 @@ func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
+type errorRestMapper struct {
+	meta.RESTMapper
+	err error
+}
+
+func (l *errorRestMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, l.err
+}
+
+func newDefaultBuilderWithMapperError(fakeClientFn FakeClientFunc, err error) *Builder {
+	return NewFakeBuilder(
+		fakeClientFn,
+		func() (meta.RESTMapper, error) {
+			return &errorRestMapper{
+				RESTMapper: testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+				err:        err,
+			}, nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
+}
+
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	b := newDefaultBuilder().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../artifacts/kitten-rc.yaml"}})
@@ -347,6 +371,62 @@ func createTestDir(t *testing.T, path string) {
 func writeTestFile(t *testing.T, path string, contents string) {
 	if err := ioutil.WriteFile(path, []byte(contents), 0644); err != nil {
 		t.Fatalf("error creating test file %#v", err)
+	}
+}
+
+func TestFilenameOptionsValidate(t *testing.T) {
+	testcases := []struct {
+		filenames []string
+		kustomize string
+		recursive bool
+		errExp    bool
+		msgExp    string
+	}{
+		{
+			filenames: []string{"file"},
+			kustomize: "dir",
+			errExp:    true,
+			msgExp:    "only one of -f or -k can be specified",
+		},
+		{
+			kustomize: "dir",
+			recursive: true,
+			errExp:    true,
+			msgExp:    "the -k flag can't be used with -f or -R",
+		},
+		{
+			filenames: []string{"file"},
+			errExp:    false,
+		},
+		{
+			filenames: []string{"dir"},
+			recursive: true,
+			errExp:    false,
+		},
+		{
+			kustomize: "dir",
+			errExp:    false,
+		},
+	}
+	for _, testcase := range testcases {
+		o := &FilenameOptions{
+			Kustomize: testcase.kustomize,
+			Filenames: testcase.filenames,
+			Recursive: testcase.recursive,
+		}
+		errs := o.validate()
+		if testcase.errExp {
+			if len(errs) == 0 {
+				t.Fatalf("expected error not happened")
+			}
+			if errs[0].Error() != testcase.msgExp {
+				t.Fatalf("expected %s, but got %#v", testcase.msgExp, errs[0])
+			}
+		} else {
+			if len(errs) > 0 {
+				t.Fatalf("Unexpected error %#v", errs)
+			}
+		}
 	}
 }
 
@@ -486,6 +566,160 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("unexpected responses: %#v", test.Infos)
+	}
+}
+
+func setupKustomizeDirectory() (string, error) {
+	path, err := ioutil.TempDir("/tmp", "")
+	if err != nil {
+		return "", err
+	}
+
+	contents := map[string]string{
+		"configmap.yaml": `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: the-map
+data:
+  altGreeting: "Good Morning!"
+  enableRisky: "false"
+`,
+		"deployment.yaml": `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: the-deployment
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        deployment: hello
+    spec:
+      containers:
+      - name: the-container
+        image: monopole/hello:1
+        command: ["/hello",
+                  "--port=8080",
+                  "--enableRiskyFeature=$(ENABLE_RISKY)"]
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ALT_GREETING
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: altGreeting
+        - name: ENABLE_RISKY
+          valueFrom:
+            configMapKeyRef:
+              name: the-map
+              key: enableRisky
+`,
+		"service.yaml": `
+kind: Service
+apiVersion: v1
+metadata:
+  name: the-service
+spec:
+  selector:
+    deployment: hello
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 8666
+    targetPort: 8080
+`,
+		"kustomization.yaml": `
+nameprefix: test-
+resources:
+- deployment.yaml
+- service.yaml
+- configmap.yaml
+`,
+	}
+
+	for filename, content := range contents {
+		err = ioutil.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
+		if err != nil {
+			return "", err
+		}
+	}
+	return path, nil
+}
+
+func TestKustomizeDirectoryBuilder(t *testing.T) {
+	dir, err := setupKustomizeDirectory()
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	tests := []struct {
+		directory     string
+		expectErr     bool
+		errMsg        string
+		number        int
+		expectedNames []string
+	}{
+		{
+			directory: "../../../artifacts/guestbook",
+			expectErr: true,
+			errMsg:    "No kustomization file found",
+		},
+		{
+			directory:     dir,
+			expectErr:     false,
+			expectedNames: []string{"test-the-map", "test-the-deployment", "test-the-service"},
+		},
+		{
+			directory: filepath.Join(dir, "kustomization.yaml"),
+			expectErr: true,
+			errMsg:    "must be a directory to be a root",
+		},
+		{
+			directory: "../../../artifacts/kustomization/should-not-load.yaml",
+			expectErr: true,
+			errMsg:    "must be a directory to be a root",
+		},
+	}
+	for _, tt := range tests {
+		b := newDefaultBuilder().
+			FilenameParam(false, &FilenameOptions{Kustomize: tt.directory}).
+			NamespaceParam("test").DefaultNamespace()
+		test := &testVisitor{}
+		err := b.Do().Visit(test.Handle)
+		if tt.expectErr {
+			if err == nil {
+				t.Fatalf("expected error unhappened")
+			}
+			if !strings.Contains(err.Error(), tt.errMsg) {
+				t.Fatalf("expected %s but got %s", tt.errMsg, err.Error())
+			}
+		} else {
+			if err != nil || len(test.Infos) < tt.number {
+				t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+			}
+			contained := func(name string) bool {
+				for _, info := range test.Infos {
+					if info.Name == name && info.Namespace == "test" && info.Object != nil {
+						return true
+					}
+				}
+				return false
+			}
+
+			allFound := true
+			for _, name := range tt.expectedNames {
+				if !contained(name) {
+					allFound = false
+				}
+			}
+			if !allFound {
+				t.Errorf("unexpected responses: %#v", test.Infos)
+			}
+		}
 	}
 }
 
@@ -631,6 +865,49 @@ func TestResourceByName(t *testing.T) {
 	}
 	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
+
+func TestRestMappingErrors(t *testing.T) {
+	pods, _ := testData()
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+	})).NamespaceParam("test")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	b.ResourceTypeOrNameArgs(true, "foo", "bar")
+
+	// ensure that requesting a resource we _know_ not to exist results in an expected *meta.NoKindMatchError
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil {
+		if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\"") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	expectedErr := fmt.Errorf("expected error")
+	b = newDefaultBuilderWithMapperError(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+	}), expectedErr).NamespaceParam("test")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	// ensure we request a resource we know not to exist. This way, we
+	// end up taking the codepath we want to test in the resource builder
+	b.ResourceTypeOrNameArgs(true, "foo", "bar")
+
+	// ensure that receiving an error for any reason other than a non-existent resource is returned as-is
+	err = b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil && !strings.Contains(err.Error(), expectedErr.Error()) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

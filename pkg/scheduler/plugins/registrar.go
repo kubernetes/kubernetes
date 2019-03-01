@@ -58,7 +58,7 @@ func NewDefaultPluginSet(ctx *plugins.PluginContext, schedulerCache *cache.Cache
 	return &defaultRegistrar
 }
 
-func (r DefaultPluginSet) registerReservePlugins() {
+func (r *DefaultPluginSet) registerReservePlugins() {
 	r.reservePlugins = []plugins.ReservePlugin{
 		// Init functions of all reserve plugins go here. They are called in the
 		// same order that they are registered.
@@ -67,7 +67,7 @@ func (r DefaultPluginSet) registerReservePlugins() {
 	}
 }
 
-func (r DefaultPluginSet) registerPrebindPlugins() {
+func (r *DefaultPluginSet) registerPrebindPlugins() {
 	r.prebindPlugins = []plugins.PrebindPlugin{
 		// Init functions of all prebind plugins go here. They are called in the
 		// same order that they are registered.

@@ -22,7 +22,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/admissionregistration/initializerconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/mutatingwebhookconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/rest:all-srcs",
         "//pkg/registry/admissionregistration/validatingwebhookconfiguration:all-srcs",
@@ -73,8 +72,8 @@ filegroup(
         "//pkg/registry/events/event:all-srcs",
         "//pkg/registry/events/rest:all-srcs",
         "//pkg/registry/extensions/controller/storage:all-srcs",
-        "//pkg/registry/extensions/ingress:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
+        "//pkg/registry/networking/ingress:all-srcs",
         "//pkg/registry/networking/networkpolicy:all-srcs",
         "//pkg/registry/networking/rest:all-srcs",
         "//pkg/registry/policy/poddisruptionbudget:all-srcs",

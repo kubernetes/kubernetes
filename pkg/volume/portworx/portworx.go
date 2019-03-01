@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -58,7 +58,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(portworxVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(portworxVolumePluginName), volName)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {
@@ -93,6 +93,10 @@ func (plugin *portworxVolumePlugin) GetVolumeName(spec *volume.Spec) (string, er
 func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PortworxVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
+}
+
+func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *portworxVolumePlugin) RequiresRemount() bool {

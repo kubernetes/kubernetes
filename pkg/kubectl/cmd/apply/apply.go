@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -65,17 +66,18 @@ type ApplyOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	Selector                   string
-	DryRun                     bool
-	ServerDryRun               bool
-	Prune                      bool
-	PruneResources             []pruneResource
-	cmdBaseName                string
-	All                        bool
-	Overwrite                  bool
-	OpenAPIPatch               bool
-	PruneWhitelist             []string
-	ShouldIncludeUninitialized bool
+	ServerSideApply bool
+	ForceConflicts  bool
+	Selector        string
+	DryRun          bool
+	ServerDryRun    bool
+	Prune           bool
+	PruneResources  []pruneResource
+	cmdBaseName     string
+	All             bool
+	Overwrite       bool
+	OpenAPIPatch    bool
+	PruneWhitelist  []string
 
 	Validator       validation.Schema
 	Builder         *resource.Builder
@@ -112,6 +114,9 @@ var (
 	applyExample = templates.Examples(i18n.T(`
 		# Apply the configuration in pod.json to a pod.
 		kubectl apply -f ./pod.json
+
+		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		kubectl apply -k dir/
 
 		# Apply the JSON passed into stdin to a pod.
 		cat pod.json | kubectl apply -f -
@@ -150,7 +155,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
-		Use:                   "apply -f FILENAME",
+		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
 		Long:                  applyLong,
@@ -168,7 +173,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.MarkFlagRequired("filename")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmdutil.AddValidateFlags(cmd)
@@ -177,8 +181,9 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
-	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
+	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -189,7 +194,17 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 }
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
+
+	if o.DryRun && o.ServerSideApply {
+		return fmt.Errorf("--dry-run doesn't work with --server-side")
+	}
 
 	if o.DryRun && o.ServerDryRun {
 		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
@@ -224,7 +239,10 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	o.ShouldIncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, o.Prune)
+	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -295,6 +313,16 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
+func isIncompatibleServerError(err error) bool {
+	// 415: Unsupported media type means we're talking to a server which doesn't
+	// support server-side apply.
+	if _, ok := err.(*errors.StatusError); !ok {
+		// Non-StatusError means the error isn't because the server is incompatible.
+		return false
+	}
+	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
+}
+
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
@@ -315,7 +343,6 @@ func (o *ApplyOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		LabelSelectorParam(o.Selector).
-		IncludeUninitialized(o.ShouldIncludeUninitialized).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -357,6 +384,50 @@ func (o *ApplyOptions) Run() error {
 
 		if err := o.Recorder.Record(info.Object); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		if o.ServerSideApply {
+			// Send the full object to be applied on the server side.
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+			if err != nil {
+				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
+			}
+			options := metav1.PatchOptions{
+				Force: &o.ForceConflicts,
+			}
+			if o.ServerDryRun {
+				options.DryRun = []string{metav1.DryRunAll}
+			}
+			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+				&options,
+			)
+			if err == nil {
+				info.Refresh(obj, true)
+				metadata, err := meta.Accessor(info.Object)
+				if err != nil {
+					return err
+				}
+				visitedUids.Insert(string(metadata.GetUID()))
+				count++
+				if len(output) > 0 && !shortOutput {
+					objs = append(objs, info.Object)
+					return nil
+				}
+				printer, err := o.ToPrinter("serverside-applied")
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(info.Object, o.Out)
+			} else if !isIncompatibleServerError(err) {
+				return err
+			}
+			// If we're talking to a server which does not implement server-side apply,
+			// continue with the client side apply after this block.
+			klog.Warningf("serverside-apply incompatible server: %v", err)
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -535,13 +606,13 @@ func (o *ApplyOptions) Run() error {
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, o.ShouldIncludeUninitialized); err != nil {
+			if err := p.prune(n, m); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, o.ShouldIncludeUninitialized); err != nil {
+		if err := p.prune(metav1.NamespaceNone, m); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -576,12 +647,11 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
 			{"batch", "v1beta1", "CronJob", true},
-			{"extensions", "v1beta1", "DaemonSet", true},
-			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
-			{"extensions", "v1beta1", "ReplicaSet", true},
-			{"apps", "v1beta1", "StatefulSet", true},
-			{"apps", "v1beta1", "Deployment", true},
+			{"apps", "v1", "DaemonSet", true},
+			{"apps", "v1", "Deployment", true},
+			{"apps", "v1", "ReplicaSet", true},
+			{"apps", "v1", "StatefulSet", true},
 		}
 	}
 
@@ -618,13 +688,12 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUninitialized bool) error {
+func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
 		List(metav1.ListOptions{
-			LabelSelector:        p.labelSelector,
-			FieldSelector:        p.fieldSelector,
-			IncludeUninitialized: includeUninitialized,
+			LabelSelector: p.labelSelector,
+			FieldSelector: p.fieldSelector,
 		})
 	if err != nil {
 		return err
@@ -845,7 +914,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	options := metav1.UpdateOptions{}
+	options := metav1.PatchOptions{}
 	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}

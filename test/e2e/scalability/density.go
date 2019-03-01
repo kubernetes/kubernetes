@@ -500,8 +500,9 @@ var _ = SIGDescribe("Density", func() {
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
-		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue()
-		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value()
+		// Compute node capacity, leaving some slack for addon pods.
+		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
+		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value() - 100*1024*1024
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all

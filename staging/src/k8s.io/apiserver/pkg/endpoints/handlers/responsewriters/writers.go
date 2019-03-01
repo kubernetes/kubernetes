@@ -101,6 +101,10 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 	}
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(statusCode)
+	// Flush headers, if possible
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 	writer := w.(io.Writer)
 	if flush {
 		writer = flushwriter.Wrap(w)

@@ -52,6 +52,9 @@ type Network struct {
 	// Human-readable name for the network. Might not be unique.
 	Name string `json:"name"`
 
+	// Description for the network
+	Description string `json:"description"`
+
 	// The administrative state of network. If false (down), the network does not
 	// forward packets.
 	AdminStateUp bool `json:"admin_state_up"`
@@ -76,6 +79,9 @@ type Network struct {
 	// Availability zone hints groups network nodes that run services like DHCP, L3, FW, and others.
 	// Used to make network resources highly available.
 	AvailabilityZoneHints []string `json:"availability_zone_hints"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 // NetworkPage is the page returned by a pager when traversing over a

@@ -19,7 +19,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -47,6 +47,7 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/openapi:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/crdserverscheme:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:all-srcs",

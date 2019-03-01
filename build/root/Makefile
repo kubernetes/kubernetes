@@ -291,7 +291,6 @@ test-cmd:
 	@echo "$$TEST_CMD_HELP_INFO"
 else
 test-cmd: generated_files
-	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
 endif
 
@@ -568,13 +567,11 @@ bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 # //hack:verify-all is a manual target.
-# We don't want to build any of the release artifacts when running tests.
 # Some things in vendor don't build due to empty target lists for cross-platform rules.
 bazel-test:
 	bazel test --config=unit -- \
 	  //... \
 	  //hack:verify-all \
-	  -//build/... \
 	  -//vendor/...
 endif
 

@@ -103,6 +103,8 @@ build() {
 }
 
 docker_version_check() {
+  # The reason for this version check is even though "docker manifest" command is available in 18.03, it does
+  # not work properly in that version. So we insist on 18.06.0 or higher.
   docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
   if [[ ${docker_version} != 18.06.0 && ${docker_version} < 18.06.0 ]]; then
     echo "Minimum docker version 18.06.0 is required for creating and pushing manifest images[found: ${docker_version}]"
@@ -125,6 +127,8 @@ push() {
 
   kube::util::ensure-gnu-sed
 
+  # The manifest command is still experimental as of Docker 18.09.2
+  export DOCKER_CLI_EXPERIMENTAL="enabled"
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo $archs | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
   docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}

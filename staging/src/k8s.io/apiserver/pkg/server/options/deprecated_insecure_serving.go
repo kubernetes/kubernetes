@@ -69,11 +69,13 @@ func (s *DeprecatedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+	// Though this flag is deprecated, we discovered security concerns over how to do health checks without it e.g. #43784
 	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
 	fs.Lookup("insecure-bind-address").Hidden = false
 
 	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
 		"The port on which to serve unsecured, unauthenticated access.")
+	// Though this flag is deprecated, we discovered security concerns over how to do health checks without it e.g. #43784
 	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
 	fs.Lookup("insecure-port").Hidden = false
 }
@@ -94,7 +96,7 @@ func (s *DeprecatedInsecureServingOptions) AddUnqualifiedFlags(fs *pflag.FlagSet
 	fs.Lookup("port").Hidden = false
 }
 
-// ApplyTo adds DeprecatedInsecureServingOptions to the insecureserverinfo amd kube-controller manager configuration.
+// ApplyTo adds DeprecatedInsecureServingOptions to the insecureserverinfo and kube-controller manager configuration.
 // Note: the double pointer allows to set the *DeprecatedInsecureServingInfo to nil without referencing the struct hosting this pointer.
 func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecureServingInfo) error {
 	if s == nil {
@@ -130,7 +132,8 @@ func (o *DeprecatedInsecureServingOptions) WithLoopback() *DeprecatedInsecureSer
 }
 
 // DeprecatedInsecureServingOptionsWithLoopback adds loopback functionality to the DeprecatedInsecureServingOptions.
-// DEPRECATED: all insecure serving options are removed in a future version
+// DEPRECATED: all insecure serving options will be removed in a future version, however note that
+// there are security concerns over how health checks can work here - see e.g. #43784
 type DeprecatedInsecureServingOptionsWithLoopback struct {
 	*DeprecatedInsecureServingOptions
 }

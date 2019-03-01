@@ -87,8 +87,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
-        "//staging/src/k8s.io/client-go/util/integer:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//vendor/k8s.io/utils/integer:go_default_library",
     ],
 )
 
@@ -107,6 +107,7 @@ filegroup(
         "//pkg/kubectl/apps:all-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/describe:all-srcs",
+        "//pkg/kubectl/drain:all-srcs",
         "//pkg/kubectl/explain:all-srcs",
         "//pkg/kubectl/generate:all-srcs",
         "//pkg/kubectl/generated:all-srcs",

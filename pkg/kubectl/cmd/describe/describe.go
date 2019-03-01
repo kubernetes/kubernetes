@@ -79,9 +79,8 @@ type DescribeOptions struct {
 
 	BuilderArgs []string
 
-	EnforceNamespace     bool
-	AllNamespaces        bool
-	IncludeUninitialized bool
+	EnforceNamespace bool
+	AllNamespaces    bool
 
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
@@ -115,7 +114,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 	usage := "containing the resource to describe"
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
@@ -132,7 +131,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		o.EnforceNamespace = false
 	}
 
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 	}
 
@@ -144,9 +143,6 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.NewBuilder = f.NewBuilder
 
-	// include the uninitialized objects by default
-	// unless user explicitly set --include-uninitialized=false
-	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, true)
 	return nil
 }
 
@@ -161,7 +157,6 @@ func (o *DescribeOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		Flatten().
 		Do()

@@ -211,7 +211,7 @@ func TestAdmission(t *testing.T) {
 			false, // dryRun
 			nil,   // userInfo
 		)
-		err := ctrl.Admit(attrs)
+		err := ctrl.Admit(attrs, nil)
 		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)

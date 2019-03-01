@@ -32,17 +32,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
-
-	"k8s.io/klog"
 )
 
 const (
@@ -71,6 +73,11 @@ const (
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -101,12 +108,18 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.triggerTimeTracker = NewTriggerTimeTracker()
+	e.eventBroadcaster = broadcaster
+	e.eventRecorder = recorder
+
 	return e
 }
 
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
-	client clientset.Interface
+	client           clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	// serviceLister is able to list/get services and is populated by the shared informer passed to
 	// NewEndpointController.
@@ -138,6 +151,10 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
+	// annotation.
+	triggerTimeTracker *TriggerTimeTracker
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -399,6 +416,7 @@ func (e *EndpointController) syncService(key string) error {
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
+		e.triggerTimeTracker.DeleteEndpoints(namespace, name)
 		return nil
 	}
 
@@ -427,9 +445,15 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
+	// We call ComputeEndpointsLastChangeTriggerTime here to make sure that the state of the trigger
+	// time tracker gets updated even if the sync turns out to be no-op and we don't update the
+	// endpoints object.
+	endpointsLastChangeTriggerTime := e.triggerTimeTracker.
+		ComputeEndpointsLastChangeTriggerTime(namespace, name, service, pods)
+
 	subsets := []v1.EndpointSubset{}
-	var totalReadyEps int = 0
-	var totalNotReadyEps int = 0
+	var totalReadyEps int
+	var totalNotReadyEps int
 
 	for _, pod := range pods {
 		if len(pod.Status.PodIP) == 0 {
@@ -506,6 +530,13 @@ func (e *EndpointController) syncService(key string) error {
 		newEndpoints.Annotations = make(map[string]string)
 	}
 
+	if !endpointsLastChangeTriggerTime.IsZero() {
+		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
+			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
+	} else { // No new trigger time, clear the annotation.
+		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
+	}
+
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
@@ -522,6 +553,13 @@ func (e *EndpointController) syncService(key string) error {
 			// Given the frequency of 1, we log at a lower level.
 			klog.V(5).Infof("Forbidden from creating endpoints: %v", err)
 		}
+
+		if createEndpoints {
+			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToCreateEndpoint", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
+		} else {
+			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
+		}
+
 		return err
 	}
 	return nil
@@ -559,8 +597,8 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
-	var readyEps int = 0
-	var notReadyEps int = 0
+	var readyEps int
+	var notReadyEps int
 	ports := []v1.EndpointPort{}
 	if epp != nil {
 		ports = append(ports, *epp)

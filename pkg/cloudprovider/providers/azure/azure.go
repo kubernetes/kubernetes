@@ -31,14 +31,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/version"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"k8s.io/klog"
@@ -47,17 +47,21 @@ import (
 
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
-	CloudProviderName            = "azure"
-	rateLimitQPSDefault          = 1.0
-	rateLimitBucketDefault       = 5
-	backoffRetriesDefault        = 6
-	backoffExponentDefault       = 1.5
-	backoffDurationDefault       = 5 // in seconds
-	backoffJitterDefault         = 1.0
-	maximumLoadBalancerRuleCount = 148 // According to Azure LB rule default limit
+	CloudProviderName      = "azure"
+	rateLimitQPSDefault    = 1.0
+	rateLimitBucketDefault = 5
+	backoffRetriesDefault  = 6
+	backoffExponentDefault = 1.5
+	backoffDurationDefault = 5 // in seconds
+	backoffJitterDefault   = 1.0
+	// According to https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#load-balancer.
+	maximumLoadBalancerRuleCount = 250
 
 	vmTypeVMSS     = "vmss"
 	vmTypeStandard = "standard"
+
+	backoffModeDefault = "default"
+	backoffModeV2      = "v2"
 
 	loadBalancerSkuBasic    = "basic"
 	loadBalancerSkuStandard = "standard"
@@ -115,6 +119,12 @@ type Config struct {
 	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration" yaml:"cloudProviderBackoffDuration"`
 	// Backoff jitter
 	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
+	// Backoff mode, options are v2 and default.
+	// * default means two-layer backoff retrying, one in the cloud provider and the other in the Azure SDK.
+	// * v2 means only backoff in the Azure SDK is used. In such mode, CloudProviderBackoffDuration and
+	//   CloudProviderBackoffJitter are omitted.
+	// "default" will be used if not specified.
+	CloudProviderBackoffMode string `json:"cloudProviderBackoffMode" yaml:"cloudProviderBackoffMode"`
 	// Enable rate limiting
 	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
 	// Rate limit QPS (Read)
@@ -161,6 +171,7 @@ type Cloud struct {
 	VirtualMachinesClient   VirtualMachinesClient
 	StorageAccountClient    StorageAccountClient
 	DisksClient             DisksClient
+	SnapshotsClient         *compute.SnapshotsClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
 	metadata                *InstanceMetadataService
@@ -268,27 +279,74 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitBucketWrite)
 	}
 
+	// Conditionally configure resource request backoff
+	resourceRequestBackoff := wait.Backoff{
+		Steps: 1,
+	}
+	if config.CloudProviderBackoff {
+		// Assign backoff defaults if no configuration was passed in
+		if config.CloudProviderBackoffRetries == 0 {
+			config.CloudProviderBackoffRetries = backoffRetriesDefault
+		}
+		if config.CloudProviderBackoffDuration == 0 {
+			config.CloudProviderBackoffDuration = backoffDurationDefault
+		}
+		if config.CloudProviderBackoffExponent == 0 {
+			config.CloudProviderBackoffExponent = backoffExponentDefault
+		} else if config.shouldOmitCloudProviderBackoff() {
+			klog.Warning("Azure cloud provider config 'cloudProviderBackoffExponent' has been deprecated for 'v2' backoff mode. 2 is always used as the backoff exponent.")
+		}
+		if config.CloudProviderBackoffJitter == 0 {
+			config.CloudProviderBackoffJitter = backoffJitterDefault
+		} else if config.shouldOmitCloudProviderBackoff() {
+			klog.Warning("Azure cloud provider config 'cloudProviderBackoffJitter' has been deprecated for 'v2' backoff mode.")
+		}
+
+		if !config.shouldOmitCloudProviderBackoff() {
+			resourceRequestBackoff = wait.Backoff{
+				Steps:    config.CloudProviderBackoffRetries,
+				Factor:   config.CloudProviderBackoffExponent,
+				Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
+				Jitter:   config.CloudProviderBackoffJitter,
+			}
+		}
+		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+			config.CloudProviderBackoffRetries,
+			config.CloudProviderBackoffExponent,
+			config.CloudProviderBackoffDuration,
+			config.CloudProviderBackoffJitter)
+	} else {
+		// CloudProviderBackoffRetries will be set to 1 by default as the requirements of Azure SDK.
+		config.CloudProviderBackoffRetries = 1
+		config.CloudProviderBackoffDuration = backoffDurationDefault
+	}
+
 	// Do not add master nodes to standard LB by default.
 	if config.ExcludeMasterFromStandardLB == nil {
 		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
 	}
 
 	azClientConfig := &azClientConfig{
-		subscriptionID:          config.SubscriptionID,
-		resourceManagerEndpoint: env.ResourceManagerEndpoint,
-		servicePrincipalToken:   servicePrincipalToken,
-		rateLimiterReader:       operationPollRateLimiter,
-		rateLimiterWriter:       operationPollRateLimiterWrite,
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              operationPollRateLimiter,
+		rateLimiterWriter:              operationPollRateLimiterWrite,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
 	}
 	az := Cloud{
-		Config:             *config,
-		Environment:        *env,
-		nodeZones:          map[string]sets.String{},
-		nodeResourceGroups: map[string]string{},
-		unmanagedNodes:     sets.NewString(),
-		routeCIDRs:         map[string]string{},
+		Config:                 *config,
+		Environment:            *env,
+		nodeZones:              map[string]sets.String{},
+		nodeResourceGroups:     map[string]string{},
+		unmanagedNodes:         sets.NewString(),
+		routeCIDRs:             map[string]string{},
+		resourceRequestBackoff: resourceRequestBackoff,
 
 		DisksClient:                     newAzDisksClient(azClientConfig),
+		SnapshotsClient:                 newSnapshotsClient(azClientConfig),
 		RoutesClient:                    newAzRoutesClient(azClientConfig),
 		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
 		InterfacesClient:                newAzInterfacesClient(azClientConfig),
@@ -302,34 +360,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
 		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 		FileClient:                      &azureFileClient{env: *env},
-	}
-
-	// Conditionally configure resource request backoff
-	if az.CloudProviderBackoff {
-		// Assign backoff defaults if no configuration was passed in
-		if az.CloudProviderBackoffRetries == 0 {
-			az.CloudProviderBackoffRetries = backoffRetriesDefault
-		}
-		if az.CloudProviderBackoffExponent == 0 {
-			az.CloudProviderBackoffExponent = backoffExponentDefault
-		}
-		if az.CloudProviderBackoffDuration == 0 {
-			az.CloudProviderBackoffDuration = backoffDurationDefault
-		}
-		if az.CloudProviderBackoffJitter == 0 {
-			az.CloudProviderBackoffJitter = backoffJitterDefault
-		}
-		az.resourceRequestBackoff = wait.Backoff{
-			Steps:    az.CloudProviderBackoffRetries,
-			Factor:   az.CloudProviderBackoffExponent,
-			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
-			Jitter:   az.CloudProviderBackoffJitter,
-		}
-		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
-			az.CloudProviderBackoffRetries,
-			az.CloudProviderBackoffExponent,
-			az.CloudProviderBackoffDuration,
-			az.CloudProviderBackoffJitter)
 	}
 
 	az.metadata, err = NewInstanceMetadataService(metadataURL)
@@ -460,22 +490,8 @@ func initDiskControllers(az *Cloud) error {
 		cloud:                 az,
 	}
 
-	// BlobDiskController: contains the function needed to
-	// create/attach/detach/delete blob based (unmanaged disks)
-	blobController, err := newBlobDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
-	}
-
-	// ManagedDiskController: contains the functions needed to
-	// create/attach/detach/delete managed disks
-	managedController, err := newManagedDiskController(common)
-	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
-	}
-
-	az.BlobDiskController = blobController
-	az.ManagedDiskController = managedController
+	az.BlobDiskController = &BlobDiskController{common: common}
+	az.ManagedDiskController = &ManagedDiskController{common: common}
 	az.controllerCommon = common
 
 	return nil
@@ -493,8 +509,8 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
-				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelZoneFailureDomain] ==
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -528,7 +544,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if prevNode != nil {
 		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
@@ -551,7 +567,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if newNode != nil {
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()

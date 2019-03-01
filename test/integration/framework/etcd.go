@@ -35,7 +35,7 @@ var etcdURL = ""
 
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
-Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions.
+Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions.
 
 You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
@@ -106,6 +106,8 @@ func startEtcd() (func(), error) {
 		GetEtcdURL(),
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
+		"--log-package-levels",
+		"*=DEBUG",
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

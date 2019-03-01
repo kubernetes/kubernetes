@@ -17,6 +17,7 @@ limitations under the License.
 package versioned
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -152,6 +153,7 @@ func handleDockerCfgJSONContent(username, password, email, server string) ([]byt
 		Username: username,
 		Password: password,
 		Email:    email,
+		Auth:     encodeDockerConfigFieldAuth(username, password),
 	}
 
 	dockerCfgJSON := DockerConfigJSON{
@@ -159,6 +161,11 @@ func handleDockerCfgJSONContent(username, password, email, server string) ([]byt
 	}
 
 	return json.Marshal(dockerCfgJSON)
+}
+
+func encodeDockerConfigFieldAuth(username, password string) string {
+	fieldValue := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(fieldValue))
 }
 
 // DockerConfigJSON represents a local docker auth config file
@@ -175,7 +182,8 @@ type DockerConfigJSON struct {
 type DockerConfig map[string]DockerConfigEntry
 
 type DockerConfigEntry struct {
-	Username string
-	Password string
-	Email    string
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Auth     string `json:"auth,omitempty"`
 }

@@ -143,10 +143,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		loadBalancer = createResponse.LoadBalancers[0]
 
 		// Create Target Groups
-		addTagsInput := &elbv2.AddTagsInput{
-			ResourceArns: []*string{},
-			Tags:         []*elbv2.Tag{},
-		}
+		resourceArns := make([]*string, 0, len(mappings))
 
 		for i := range mappings {
 			// It is easier to keep track of updates by having possibly
@@ -155,20 +152,28 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			if err != nil {
 				return nil, fmt.Errorf("Error creating listener: %q", err)
 			}
-			addTagsInput.ResourceArns = append(addTagsInput.ResourceArns, targetGroupArn)
+			resourceArns = append(resourceArns, targetGroupArn)
 
 		}
 
 		// Add tags to targets
+		targetGroupTags := make([]*elbv2.Tag, 0, len(tags))
+
 		for k, v := range tags {
-			addTagsInput.Tags = append(addTagsInput.Tags, &elbv2.Tag{
+			targetGroupTags = append(targetGroupTags, &elbv2.Tag{
 				Key: aws.String(k), Value: aws.String(v),
 			})
 		}
-		if len(addTagsInput.ResourceArns) > 0 && len(addTagsInput.Tags) > 0 {
-			_, err = c.elbv2.AddTags(addTagsInput)
-			if err != nil {
-				return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+		if len(resourceArns) > 0 && len(targetGroupTags) > 0 {
+			// elbv2.AddTags doesn't allow to tag multiple resources at once
+			for _, arn := range resourceArns {
+				_, err = c.elbv2.AddTags(&elbv2.AddTagsInput{
+					ResourceArns: []*string{arn},
+					Tags:         targetGroupTags,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+				}
 			}
 		}
 	} else {
@@ -310,6 +315,64 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				if err != nil {
 					return nil, fmt.Errorf("Error adding tags after modifying load balancer targets: %q", err)
 				}
+			}
+		}
+
+		desiredLoadBalancerAttributes := map[string]string{}
+		// Default values to ensured a remove annotation reverts back to the default
+		desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "false"
+
+		// Determine if cross zone load balancing enabled/disabled has been specified
+		crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
+		if crossZoneLoadBalancingEnabledAnnotation != "" {
+			crossZoneEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+					ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
+					crossZoneLoadBalancingEnabledAnnotation,
+				)
+			}
+
+			if crossZoneEnabled {
+				desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "true"
+			}
+		}
+
+		// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
+		// that cannot be specified at the time of creation and can only be modified after the fact,
+		// e.g. idle connection timeout.
+		describeAttributesRequest := &elbv2.DescribeLoadBalancerAttributesInput{
+			LoadBalancerArn: loadBalancer.LoadBalancerArn,
+		}
+		describeAttributesOutput, err := c.elbv2.DescribeLoadBalancerAttributes(describeAttributesRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve load balancer attributes during attribute sync: %q", err)
+		}
+
+		changedAttributes := []*elbv2.LoadBalancerAttribute{}
+
+		// Identify to be changed attributes
+		for _, foundAttribute := range describeAttributesOutput.Attributes {
+			if targetValue, ok := desiredLoadBalancerAttributes[*foundAttribute.Key]; ok {
+				if targetValue != *foundAttribute.Value {
+					changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+						Key:   foundAttribute.Key,
+						Value: aws.String(targetValue),
+					})
+				}
+			}
+		}
+
+		// Update attributes requiring changes
+		if len(changedAttributes) > 0 {
+			klog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
+
+			_, err = c.elbv2.ModifyLoadBalancerAttributes(&elbv2.ModifyLoadBalancerAttributesInput{
+				LoadBalancerArn: loadBalancer.LoadBalancerArn,
+				Attributes:      changedAttributes,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
 			}
 		}
 
@@ -587,7 +650,7 @@ func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName str
 	return response
 }
 
-func (c *Cloud) getVpcCidrBlock() (*string, error) {
+func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 	vpcs, err := c.ec2.DescribeVpcs(&ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(c.vpcID)},
 	})
@@ -597,7 +660,12 @@ func (c *Cloud) getVpcCidrBlock() (*string, error) {
 	if len(vpcs.Vpcs) != 1 {
 		return nil, fmt.Errorf("Error querying VPC for ELB, got %d vpcs for %s", len(vpcs.Vpcs), c.vpcID)
 	}
-	return vpcs.Vpcs[0].CidrBlock, nil
+
+	cidrBlocks := make([]string, 0, len(vpcs.Vpcs[0].CidrBlockAssociationSet))
+	for _, cidr := range vpcs.Vpcs[0].CidrBlockAssociationSet {
+		cidrBlocks = append(cidrBlocks, aws.StringValue(cidr.CidrBlock))
+	}
+	return cidrBlocks, nil
 }
 
 // abstraction for updating SG rules
@@ -805,12 +873,12 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 }
 
 // Add SG rules for a given NLB
-func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[awsInstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
+func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[InstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
 
-	vpcCidr, err := c.getVpcCidrBlock()
+	vpcCidrBlocks, err := c.getVpcCidrBlocks()
 	if err != nil {
 		return err
 	}
@@ -895,7 +963,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 	}
 
 	// Run once for health check traffic
-	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, []string{aws.StringValue(vpcCidr)}, false)
+	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, vpcCidrBlocks, false)
 	if err != nil {
 		return err
 	}
@@ -1322,7 +1390,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
-func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[awsInstanceID]*ec2.Instance) error {
+func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[InstanceID]*ec2.Instance) error {
 	expected := sets.NewString()
 	for id := range instanceIDs {
 		expected.Insert(string(id))
@@ -1499,7 +1567,7 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 // findInstancesForELB gets the EC2 instances corresponding to the Nodes, for setting up an ELB
 // We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
 // and we ignore instances which are not found
-func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[awsInstanceID]*ec2.Instance, error) {
+func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[InstanceID]*ec2.Instance, error) {
 	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
 	instanceIDs := mapToAWSInstanceIDsTolerant(nodes)
 

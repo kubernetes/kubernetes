@@ -42,8 +42,7 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Long:                  "Delete the specified cluster from the kubeconfig",
 		Example:               deleteClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := runDeleteCluster(out, configAccess, cmd)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
 		},
 	}
 

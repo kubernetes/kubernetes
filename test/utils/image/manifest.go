@@ -28,6 +28,7 @@ import (
 type RegistryList struct {
 	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
 	E2eRegistry           string `yaml:"e2eRegistry"`
+	EtcdRegistry          string `yaml:"etcdRegistry"`
 	GcRegistry            string `yaml:"gcRegistry"`
 	PrivateRegistry       string `yaml:"privateRegistry"`
 	SampleRegistry        string `yaml:"sampleRegistry"`
@@ -59,6 +60,7 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		DockerLibraryRegistry: "docker.io/library",
 		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
+		EtcdRegistry:          "quay.io/coreos",
 		GcRegistry:            "k8s.gcr.io",
 		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
 		SampleRegistry:        "gcr.io/google-samples",
@@ -84,6 +86,7 @@ var (
 	registry              = initReg()
 	dockerLibraryRegistry = registry.DockerLibraryRegistry
 	e2eRegistry           = registry.E2eRegistry
+	etcdRegistry          = registry.EtcdRegistry
 	gcRegistry            = registry.GcRegistry
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
@@ -93,15 +96,17 @@ var (
 // Preconfigured image configs
 var (
 	CRDConversionWebhook     = Config{e2eRegistry, "crd-conversion-webhook", "1.13rev2"}
-	AdmissionWebhook         = Config{e2eRegistry, "webhook", "1.13v1"}
+	AdmissionWebhook         = Config{e2eRegistry, "webhook", "1.14v1"}
 	APIServer                = Config{e2eRegistry, "sample-apiserver", "1.10"}
 	AppArmorLoader           = Config{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = Config{dockerLibraryRegistry, "busybox", "1.29"}
-	CheckMetadataConcealment = Config{e2eRegistry, "metadata-concealment", "1.1.1"}
+	CheckMetadataConcealment = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	CudaVectorAdd            = Config{e2eRegistry, "cuda-vector-add", "1.0"}
+	CudaVectorAdd2           = Config{e2eRegistry, "cuda-vector-add", "2.0"}
 	Dnsutils                 = Config{e2eRegistry, "dnsutils", "1.1"}
 	EchoServer               = Config{e2eRegistry, "echoserver", "2.2"}
 	EntrypointTester         = Config{e2eRegistry, "entrypoint-tester", "1.0"}
+	Etcd                     = Config{etcdRegistry, "etcd", "v3.3.10"}
 	Fakegitserver            = Config{e2eRegistry, "fakegitserver", "1.0"}
 	GBFrontend               = Config{sampleRegistry, "gb-frontend", "v6"}
 	GBRedisSlave             = Config{sampleRegistry, "gb-redisslave", "v3"}
@@ -128,7 +133,7 @@ var (
 	Porter              = Config{e2eRegistry, "porter", "1.0"}
 	PortForwardTester   = Config{e2eRegistry, "port-forward-tester", "1.0"}
 	Redis               = Config{e2eRegistry, "redis", "1.0"}
-	ResourceConsumer    = Config{e2eRegistry, "resource-consumer", "1.4"}
+	ResourceConsumer    = Config{e2eRegistry, "resource-consumer", "1.5"}
 	ResourceController  = Config{e2eRegistry, "resource-consumer/controller", "1.0"}
 	ServeHostname       = Config{e2eRegistry, "serve-hostname", "1.1"}
 	TestWebserver       = Config{e2eRegistry, "test-webserver", "1.0"}

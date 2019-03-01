@@ -29,11 +29,7 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ExampleV1() examplev1.ExampleV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Example() examplev1.ExampleV1Interface
 	SecondExampleV1() secondexamplev1.SecondExampleV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	SecondExample() secondexamplev1.SecondExampleV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -49,20 +45,8 @@ func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
 	return c.exampleV1
 }
 
-// Deprecated: Example retrieves the default version of ExampleClient.
-// Please explicitly pick a version.
-func (c *Clientset) Example() examplev1.ExampleV1Interface {
-	return c.exampleV1
-}
-
 // SecondExampleV1 retrieves the SecondExampleV1Client
 func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
-	return c.secondExampleV1
-}
-
-// Deprecated: SecondExample retrieves the default version of SecondExampleClient.
-// Please explicitly pick a version.
-func (c *Clientset) SecondExample() secondexamplev1.SecondExampleV1Interface {
 	return c.secondExampleV1
 }
 

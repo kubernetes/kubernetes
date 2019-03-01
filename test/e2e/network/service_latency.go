@@ -71,6 +71,9 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			totalTrials    = 200
 			parallelTrials = 15
 			minSampleSize  = 100
+
+			// Acceptable failure ratio for getting service latencies.
+			acceptableFailureRatio = .05
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
@@ -79,7 +82,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		defer func() { f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
-		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
+		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
 		}
@@ -123,7 +126,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	})
 })
 
-func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
+func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,
@@ -180,7 +183,11 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 		}
 	}
 	if errCount != 0 {
-		return output, fmt.Errorf("got %v errors", errCount)
+		framework.Logf("Got %d errors out of %d tries", errCount, total)
+		errRatio := float32(errCount) / float32(total)
+		if errRatio > acceptableFailureRatio {
+			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
+		}
 	}
 	return output, nil
 }

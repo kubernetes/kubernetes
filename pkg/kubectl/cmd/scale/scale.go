@@ -228,7 +228,7 @@ func (o *ScaleOptions) RunScale() error {
 			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
 			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.parent)
 
-			if err := ScaleJob(info, o.clientSet.Batch(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
+			if err := ScaleJob(info, o.clientSet.BatchV1(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
 				return err
 			}
 

@@ -17,22 +17,19 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/utils/exec"
-
-	"os"
-
 	"fmt"
+	"os"
 	"path/filepath"
-	"sync"
-
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 type flexVolumeProber struct {
@@ -142,7 +139,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		probeEvent.Plugin = plugin
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
-		driverName := utilstrings.UnescapePluginName(driverDirName)
+		driverName := utilstrings.UnescapeQualifiedName(driverDirName)
 		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
 
 	} else {

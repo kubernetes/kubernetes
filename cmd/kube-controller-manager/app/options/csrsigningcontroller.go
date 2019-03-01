@@ -19,7 +19,6 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -35,9 +34,7 @@ const (
 
 // CSRSigningControllerOptions holds the CSRSigningController options.
 type CSRSigningControllerOptions struct {
-	ClusterSigningDuration metav1.Duration
-	ClusterSigningKeyFile  string
-	ClusterSigningCertFile string
+	*kubectrlmgrconfig.CSRSigningControllerConfiguration
 }
 
 // AddFlags adds flags related to CSRSigningController for controller manager to the specified FlagSet.

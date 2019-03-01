@@ -25,7 +25,9 @@ build the image on Minikube:
     docker build -t in-cluster .
 
 If you are not using Minikube, you should build this image and push it to a registry
-that your Kubernetes cluster can pull from. If you have RBAC enabled, use the following
+that your Kubernetes cluster can pull from.
+
+If you have RBAC enabled on your cluster, use the following
 snippet to create role binding which will grant the default service account view
 permissions.
 

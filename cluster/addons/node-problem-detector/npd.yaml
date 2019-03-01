@@ -23,7 +23,7 @@ subjects:
   name: node-problem-detector
   namespace: kube-system
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: npd-v0.4.1
@@ -34,6 +34,10 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: node-problem-detector
+      version: v0.4.1
   template:
     metadata:
       labels:

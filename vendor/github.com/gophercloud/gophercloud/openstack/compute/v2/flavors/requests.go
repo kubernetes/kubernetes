@@ -52,6 +52,14 @@ type ListOpts struct {
 	MinDisk int `q:"minDisk"`
 	MinRAM  int `q:"minRam"`
 
+	// SortDir allows to select sort direction.
+	// It can be "asc" or "desc" (default).
+	SortDir string `q:"sort_dir"`
+
+	// SortKey allows to sort by one of the flavors attributes.
+	// Default is flavorid.
+	SortKey string `q:"sort_key"`
+
 	// Marker and Limit control paging.
 	// Marker instructs List where to start listing from.
 	Marker string `q:"marker"`

@@ -34,7 +34,7 @@ const (
 	SignalNodeFsInodesFree Signal = "nodefs.inodesFree"
 	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images and container writable layers.
 	SignalImageFsAvailable Signal = "imagefs.available"
-	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writeable layers.
+	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writable layers.
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
@@ -63,6 +63,7 @@ var OpForSignal = map[Signal]ThresholdOperator{
 	SignalNodeFsInodesFree:  OpLessThan,
 	SignalImageFsAvailable:  OpLessThan,
 	SignalImageFsInodesFree: OpLessThan,
+	SignalPIDAvailable:      OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity

@@ -19,20 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // HPAControllerOptions holds the HPAController options.
 type HPAControllerOptions struct {
-	HorizontalPodAutoscalerUseRESTClients               bool
-	HorizontalPodAutoscalerTolerance                    float64
-	HorizontalPodAutoscalerDownscaleStabilizationWindow metav1.Duration
-	HorizontalPodAutoscalerDownscaleForbiddenWindow     metav1.Duration
-	HorizontalPodAutoscalerUpscaleForbiddenWindow       metav1.Duration
-	HorizontalPodAutoscalerSyncPeriod                   metav1.Duration
-	HorizontalPodAutoscalerCPUInitializationPeriod      metav1.Duration
-	HorizontalPodAutoscalerInitialReadinessDelay        metav1.Duration
+	*kubectrlmgrconfig.HPAControllerConfiguration
 }
 
 // AddFlags adds flags related to HPAController for controller manager to the specified FlagSet.

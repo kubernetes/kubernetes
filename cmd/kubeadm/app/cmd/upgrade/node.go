@@ -43,17 +43,17 @@ var (
 	upgradeNodeConfigLongDesc = normalizer.LongDesc(`
 		Downloads the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the --kubelet-version parameter to determine
-		what the _desired_ kubelet version is. Give 
+		what the _desired_ kubelet version is. Give
 		`)
 
-	upgradeNodeConfigExample = normalizer.Examples(`
+	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm upgrade node config --kubelet-version v1.13.0
+		kubeadm upgrade node config --kubelet-version %s
 
 		# Simulates the downloading of the kubelet configuration from the ConfigMap in the cluster with a specific desired
 		# version. Does not change any state locally on the node.
-		kubeadm upgrade node config --kubelet-version v1.13.0 --dry-run
-		`)
+		kubeadm upgrade node config --kubelet-version %[1]s --dry-run
+		`, constants.CurrentKubernetesVersion))
 )
 
 type nodeUpgradeFlags struct {
@@ -229,7 +229,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 
 	// Fetches the cluster configuration
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "", false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", false)
 	if err != nil {
 		return errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

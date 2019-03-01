@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
@@ -46,7 +47,7 @@ func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, relevantHooks []*v1beta1.Webhook) error {
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, len(relevantHooks))
 	wg.Add(len(relevantHooks))
@@ -114,7 +115,11 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
-	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
+	r := client.Post().Context(ctx).Body(&request)
+	if h.TimeoutSeconds != nil {
+		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
+	}
+	if err := r.Do().Into(response); err != nil {
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 

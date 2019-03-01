@@ -550,10 +550,6 @@ items:
     - /healthz
     - /openapi
     - /openapi/*
-    - /swagger-2.0.0.pb-v1
-    - /swagger.json
-    - /swaggerapi
-    - /swaggerapi/*
     - /version
     - /version/
     verbs:
@@ -660,6 +656,12 @@ items:
     - authentication.k8s.io
     resources:
     - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
     verbs:
     - create
   - apiGroups:
@@ -796,6 +798,18 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -971,6 +985,16 @@ items:
     - volumeattachments
     verbs:
     - get
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

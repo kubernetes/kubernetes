@@ -73,12 +73,11 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	labelSelector        *string
-	fieldSelector        *string
-	selectAll            bool
-	includeUninitialized bool
-	limitChunks          int64
-	requestTransforms    []RequestTransform
+	labelSelector     *string
+	fieldSelector     *string
+	selectAll         bool
+	limitChunks       int64
+	requestTransforms []RequestTransform
 
 	resources []string
 
@@ -131,7 +130,26 @@ func IsUsageError(err error) bool {
 
 type FilenameOptions struct {
 	Filenames []string
+	Kustomize string
 	Recursive bool
+}
+
+func (o *FilenameOptions) validate() []error {
+	var errs []error
+	if len(o.Filenames) > 0 && len(o.Kustomize) > 0 {
+		errs = append(errs, fmt.Errorf("only one of -f or -k can be specified"))
+	}
+	if len(o.Kustomize) > 0 && o.Recursive {
+		errs = append(errs, fmt.Errorf("the -k flag can't be used with -f or -R"))
+	}
+	return errs
+}
+
+func (o *FilenameOptions) RequireFilenameOrKustomize() error {
+	if len(o.Filenames) == 0 && len(o.Kustomize) == 0 {
+		return fmt.Errorf("must specify one of -f and -k")
+	}
+	return nil
 }
 
 type resourceTuple struct {
@@ -196,6 +214,10 @@ func (b *Builder) AddError(err error) *Builder {
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
 func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *FilenameOptions) *Builder {
+	if errs := filenameOptions.validate(); len(errs) > 0 {
+		b.errs = append(b.errs, errs...)
+		return b
+	}
 	recursive := filenameOptions.Recursive
 	paths := filenameOptions.Filenames
 	for _, s := range paths {
@@ -215,6 +237,10 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 			}
 			b.Path(recursive, s)
 		}
+	}
+	if filenameOptions.Kustomize != "" {
+		b.paths = append(b.paths, &KustomizeVisitor{filenameOptions.Kustomize,
+			NewStreamVisitor(nil, b.mapper, filenameOptions.Kustomize, b.schema)})
 	}
 
 	if enforceNamespace {
@@ -438,12 +464,6 @@ func (b *Builder) FieldSelectorParam(s string) *Builder {
 // ExportParam accepts the export boolean for these resources
 func (b *Builder) ExportParam(export bool) *Builder {
 	b.export = export
-	return b
-}
-
-// IncludeUninitialized accepts the include-uninitialized boolean for these resources
-func (b *Builder) IncludeUninitialized(includeUninitialized bool) *Builder {
-	b.includeUninitialized = includeUninitialized
 	return b
 }
 
@@ -715,12 +735,12 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
 		// announce that a resource type could not be found.
-		// if the error is a URL error, then we had trouble doing discovery, so we should return the original
-		// error since it may help a user diagnose what is actually wrong
-		if _, ok := err.(*url.Error); ok {
-			return nil, err
+		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
+		// so we should return the original error since it may help a user diagnose what is actually wrong
+		if meta.IsNoMatchError(err) {
+			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
 		}
-		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+		return nil, err
 	}
 
 	return mapping, nil
@@ -844,7 +864,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

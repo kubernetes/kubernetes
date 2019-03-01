@@ -211,10 +211,18 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1
+		gvr("coordination.k8s.io", "v1", "leases"): {
+			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1",
+			ExpectedGVK:      gvkP("coordination.k8s.io", "v1beta1", "Lease"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
 		gvr("coordination.k8s.io", "v1beta1", "leases"): {
-			Stub:             `{"metadata": {"name": "lease1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
-			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/lease1",
+			Stub:             `{"metadata": {"name": "leasev1beta1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/leasev1beta1",
 		},
 		// --
 
@@ -258,6 +266,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
+		gvr("networking.k8s.io", "v1beta1", "ingresses"): {
+			Stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
+			ExpectedEtcdPath: "/registry/ingress/etcdstoragepathtestnamespace/ingress2",
+			ExpectedGVK:      gvkP("extensions", "v1beta1", "Ingress"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/networking/v1
 		gvr("networking.k8s.io", "v1", "networkpolicies"): {
 			Stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
@@ -280,7 +296,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1alpha1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va1"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv1"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -288,6 +304,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1beta1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv2"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va2",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -295,7 +312,6 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va3",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
 		},
 		// --
 
@@ -386,11 +402,6 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
-		gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"): {
-			Stub:             `{"metadata":{"name":"ic1"},"initializers":[{"name":"initializer.k8s.io","rules":[{"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
-			ExpectedEtcdPath: "/registry/initializerconfigurations/ic1",
-		},
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
@@ -414,6 +425,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("scheduling.k8s.io", "v1beta1", "priorityclasses"): {
 			Stub:             `{"metadata":{"name":"pc2"},"Value":1000}`,
 			ExpectedEtcdPath: "/registry/priorityclasses/pc2",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1
+		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
+			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,
+			ExpectedEtcdPath: "/registry/priorityclasses/pc3",
+			ExpectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
 		},
 		// --
 

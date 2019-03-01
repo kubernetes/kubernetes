@@ -15,9 +15,7 @@ package prometheus
 
 import (
 	"bufio"
-	"bytes"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -41,19 +39,10 @@ const (
 	acceptEncodingHeader  = "Accept-Encoding"
 )
 
-var bufPool sync.Pool
-
-func getBuf() *bytes.Buffer {
-	buf := bufPool.Get()
-	if buf == nil {
-		return &bytes.Buffer{}
-	}
-	return buf.(*bytes.Buffer)
-}
-
-func giveBuf(buf *bytes.Buffer) {
-	buf.Reset()
-	bufPool.Put(buf)
+var gzipPool = sync.Pool{
+	New: func() interface{} {
+		return gzip.NewWriter(nil)
+	},
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is
@@ -61,67 +50,48 @@ func giveBuf(buf *bytes.Buffer) {
 // name).
 //
 // Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead
-// (which is not instrumented, but can be instrumented with the tooling provided
-// in package promhttp).
+// InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
 	return InstrumentHandler("prometheus", UninstrumentedHandler())
 }
 
 // UninstrumentedHandler returns an HTTP handler for the DefaultGatherer.
 //
-// Deprecated: Use promhttp.Handler instead. See there for further documentation.
+// Deprecated: Use promhttp.HandlerFor(DefaultGatherer, promhttp.HandlerOpts{})
+// instead. See there for further documentation.
 func UninstrumentedHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
 		mfs, err := DefaultGatherer.Gather()
 		if err != nil {
-			http.Error(w, "An error has occurred during metrics collection:\n\n"+err.Error(), http.StatusInternalServerError)
+			httpError(rsp, err)
 			return
 		}
 
 		contentType := expfmt.Negotiate(req.Header)
-		buf := getBuf()
-		defer giveBuf(buf)
-		writer, encoding := decorateWriter(req, buf)
-		enc := expfmt.NewEncoder(writer, contentType)
-		var lastErr error
+		header := rsp.Header()
+		header.Set(contentTypeHeader, string(contentType))
+
+		w := io.Writer(rsp)
+		if gzipAccepted(req.Header) {
+			header.Set(contentEncodingHeader, "gzip")
+			gz := gzipPool.Get().(*gzip.Writer)
+			defer gzipPool.Put(gz)
+
+			gz.Reset(w)
+			defer gz.Close()
+
+			w = gz
+		}
+
+		enc := expfmt.NewEncoder(w, contentType)
+
 		for _, mf := range mfs {
 			if err := enc.Encode(mf); err != nil {
-				lastErr = err
-				http.Error(w, "An error has occurred during metrics encoding:\n\n"+err.Error(), http.StatusInternalServerError)
+				httpError(rsp, err)
 				return
 			}
 		}
-		if closer, ok := writer.(io.Closer); ok {
-			closer.Close()
-		}
-		if lastErr != nil && buf.Len() == 0 {
-			http.Error(w, "No metrics encoded, last error:\n\n"+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		header := w.Header()
-		header.Set(contentTypeHeader, string(contentType))
-		header.Set(contentLengthHeader, fmt.Sprint(buf.Len()))
-		if encoding != "" {
-			header.Set(contentEncodingHeader, encoding)
-		}
-		w.Write(buf.Bytes())
 	})
-}
-
-// decorateWriter wraps a writer to handle gzip compression if requested.  It
-// returns the decorated writer and the appropriate "Content-Encoding" header
-// (which is empty if no compression is enabled).
-func decorateWriter(request *http.Request, writer io.Writer) (io.Writer, string) {
-	header := request.Header.Get(acceptEncodingHeader)
-	parts := strings.Split(header, ",")
-	for _, part := range parts {
-		part := strings.TrimSpace(part)
-		if part == "gzip" || strings.HasPrefix(part, "gzip;") {
-			return gzip.NewWriter(writer), "gzip"
-		}
-	}
-	return writer, ""
 }
 
 var instLabels = []string{"method", "code"}
@@ -140,16 +110,6 @@ var now nower = nowFunc(func() time.Time {
 	return time.Now()
 })
 
-func nowSeries(t ...time.Time) nower {
-	return nowFunc(func() time.Time {
-		defer func() {
-			t = t[1:]
-		}()
-
-		return t[0]
-	})
-}
-
 // InstrumentHandler wraps the given HTTP handler for instrumentation. It
 // registers four metric collectors (if not already done) and reports HTTP
 // metrics to the (newly or already) registered collectors: http_requests_total
@@ -160,21 +120,14 @@ func nowSeries(t ...time.Time) nower {
 // (label name "method") and HTTP status code (label name "code").
 //
 // Deprecated: InstrumentHandler has several issues. Use the tooling provided in
-// package promhttp instead. The issues are the following:
-//
-// - It uses Summaries rather than Histograms. Summaries are not useful if
-// aggregation across multiple instances is required.
-//
-// - It uses microseconds as unit, which is deprecated and should be replaced by
-// seconds.
-//
-// - The size of the request is calculated in a separate goroutine. Since this
-// calculator requires access to the request header, it creates a race with
-// any writes to the header performed during request handling.
-// httputil.ReverseProxy is a prominent example for a handler
-// performing such writes.
-//
-// - It has additional issues with HTTP/2, cf.
+// package promhttp instead. The issues are the following: (1) It uses Summaries
+// rather than Histograms. Summaries are not useful if aggregation across
+// multiple instances is required. (2) It uses microseconds as unit, which is
+// deprecated and should be replaced by seconds. (3) The size of the request is
+// calculated in a separate goroutine. Since this calculator requires access to
+// the request header, it creates a race with any writes to the header performed
+// during request handling.  httputil.ReverseProxy is a prominent example for a
+// handler performing such writes. (4) It has additional issues with HTTP/2, cf.
 // https://github.com/prometheus/client_golang/issues/272.
 func InstrumentHandler(handlerName string, handler http.Handler) http.HandlerFunc {
 	return InstrumentHandlerFunc(handlerName, handler.ServeHTTP)
@@ -318,7 +271,7 @@ func InstrumentHandlerFuncWithOpts(opts SummaryOpts, handlerFunc func(http.Respo
 }
 
 func computeApproximateRequestSize(r *http.Request) <-chan int {
-	// Get URL length in current go routine for avoiding a race condition.
+	// Get URL length in current goroutine for avoiding a race condition.
 	// HandlerFunc that runs in parallel may modify the URL.
 	s := 0
 	if r.URL != nil {
@@ -353,10 +306,9 @@ func computeApproximateRequestSize(r *http.Request) <-chan int {
 type responseWriterDelegator struct {
 	http.ResponseWriter
 
-	handler, method string
-	status          int
-	written         int64
-	wroteHeader     bool
+	status      int
+	written     int64
+	wroteHeader bool
 }
 
 func (r *responseWriterDelegator) WriteHeader(code int) {
@@ -521,4 +473,32 @@ func sanitizeCode(s int) string {
 	default:
 		return strconv.Itoa(s)
 	}
+}
+
+// gzipAccepted returns whether the client will accept gzip-encoded content.
+func gzipAccepted(header http.Header) bool {
+	a := header.Get(acceptEncodingHeader)
+	parts := strings.Split(a, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "gzip" || strings.HasPrefix(part, "gzip;") {
+			return true
+		}
+	}
+	return false
+}
+
+// httpError removes any content-encoding header and then calls http.Error with
+// the provided error and http.StatusInternalServerErrer. Error contents is
+// supposed to be uncompressed plain text. However, same as with a plain
+// http.Error, any header settings will be void if the header has already been
+// sent. The error message will still be written to the writer, but it will
+// probably be of limited use.
+func httpError(rsp http.ResponseWriter, err error) {
+	rsp.Header().Del(contentEncodingHeader)
+	http.Error(
+		rsp,
+		"An error has occurred while serving metrics:\n\n"+err.Error(),
+		http.StatusInternalServerError,
+	)
 }

@@ -138,7 +138,12 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	deletionOptions := eviction.DeleteOptions
+	if deletionOptions == nil {
+		// default to non-nil to trigger graceful deletion
+		deletionOptions = &metav1.DeleteOptions{}
+	}
+	_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
 	if err != nil {
 		return nil, err
 	}

@@ -59,87 +59,8 @@ rules:
 		"audit.k8s.io/v1":      auditv1.SchemeGroupVersion,
 		"audit.k8s.io/v1beta1": auditv1beta1.SchemeGroupVersion,
 	}
-)
 
-// TestAudit ensures that both v1beta1 and v1 version audit api could work.
-func TestAudit(t *testing.T) {
-	for version := range versions {
-		testAudit(t, version)
-	}
-}
-
-func testAudit(t *testing.T, version string) {
-	// prepare audit policy file
-	auditPolicy := []byte(strings.Replace(auditPolicyPattern, "{version}", version, 1))
-	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
-	if err != nil {
-		t.Fatalf("Failed to create audit policy file: %v", err)
-	}
-	defer os.Remove(policyFile.Name())
-	if _, err := policyFile.Write(auditPolicy); err != nil {
-		t.Fatalf("Failed to write audit policy file: %v", err)
-	}
-	if err := policyFile.Close(); err != nil {
-		t.Fatalf("Failed to close audit policy file: %v", err)
-	}
-
-	// prepare audit log file
-	logFile, err := ioutil.TempFile("", "audit.log")
-	if err != nil {
-		t.Fatalf("Failed to create audit log file: %v", err)
-	}
-	defer os.Remove(logFile.Name())
-
-	// start api server
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil,
-		[]string{
-			"--audit-policy-file", policyFile.Name(),
-			"--audit-log-version", version,
-			"--audit-log-mode", "blocking",
-			"--audit-log-path", logFile.Name()},
-		framework.SharedEtcd())
-	defer result.TearDownFn()
-
-	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	func() {
-		// create, get, watch, update, patch, list and delete configmap.
-		configMap := &apiv1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "audit-configmap",
-			},
-			Data: map[string]string{
-				"map-key": "map-value",
-			},
-		}
-
-		_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(configMap)
-		expectNoError(t, err, "failed to create audit-configmap")
-
-		_, err = kubeclient.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
-		expectNoError(t, err, "failed to get audit-configmap")
-
-		configMapChan, err := kubeclient.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
-		expectNoError(t, err, "failed to create watch for config maps")
-		configMapChan.Stop()
-
-		_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(configMap)
-		expectNoError(t, err, "failed to update audit-configmap")
-
-		_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
-		expectNoError(t, err, "failed to patch configmap")
-
-		_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
-		expectNoError(t, err, "failed to list config maps")
-
-		err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
-		expectNoError(t, err, "failed to delete audit-configmap")
-	}()
-
-	expectedEvents := []utils.AuditEvent{
+	expectedEvents = []utils.AuditEvent{
 		{
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
@@ -238,19 +159,109 @@ func testAudit(t *testing.T, version string) {
 			AuthorizeDecision: "allow",
 		},
 	}
+)
 
+// TestAudit ensures that both v1beta1 and v1 version audit api could work.
+func TestAudit(t *testing.T) {
+	for version := range versions {
+		testAudit(t, version)
+	}
+}
+
+func testAudit(t *testing.T, version string) {
+	// prepare audit policy file
+	auditPolicy := []byte(strings.Replace(auditPolicyPattern, "{version}", version, 1))
+	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create audit policy file: %v", err)
+	}
+	defer os.Remove(policyFile.Name())
+	if _, err := policyFile.Write(auditPolicy); err != nil {
+		t.Fatalf("Failed to write audit policy file: %v", err)
+	}
+	if err := policyFile.Close(); err != nil {
+		t.Fatalf("Failed to close audit policy file: %v", err)
+	}
+
+	// prepare audit log file
+	logFile, err := ioutil.TempFile("", "audit.log")
+	if err != nil {
+		t.Fatalf("Failed to create audit log file: %v", err)
+	}
+	defer os.Remove(logFile.Name())
+
+	// start api server
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		[]string{
+			"--audit-policy-file", policyFile.Name(),
+			"--audit-log-version", version,
+			"--audit-log-mode", "blocking",
+			"--audit-log-path", logFile.Name()},
+		framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// perform configmap operations
+	configMapOperations(t, kubeclient)
+
+	// check for corresponding audit logs
 	stream, err := os.Open(logFile.Name())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer stream.Close()
-	missing, err := utils.CheckAuditLines(stream, expectedEvents, versions[version])
+	missingReport, err := utils.CheckAuditLines(stream, expectedEvents, versions[version])
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(missing) > 0 {
-		t.Errorf("Failed to match all expected events, events %#v not found!", missing)
+	if len(missingReport.MissingEvents) > 0 {
+		t.Errorf(missingReport.String())
 	}
+}
+
+// configMapOperations is a set of known operations perfomed on the configmap type
+// which correspond to the expected events.
+// This is shared by the dynamic test
+func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
+	// create, get, watch, update, patch, list and delete configmap.
+	configMap := &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "audit-configmap",
+		},
+		Data: map[string]string{
+			"map-key": "map-value",
+		},
+	}
+
+	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(configMap)
+	expectNoError(t, err, "failed to create audit-configmap")
+
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+	expectNoError(t, err, "failed to get audit-configmap")
+
+	configMapChan, err := kubeclient.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
+	expectNoError(t, err, "failed to create watch for config maps")
+	for range configMapChan.ResultChan() {
+		// Block until watchOptions.TimeoutSeconds expires.
+		// If the test finishes before watchOptions.TimeoutSeconds expires, the watch audit
+		// event at stage ResponseComplete will not be generated.
+	}
+
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(configMap)
+	expectNoError(t, err, "failed to update audit-configmap")
+
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+	expectNoError(t, err, "failed to patch configmap")
+
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
+	expectNoError(t, err, "failed to list config maps")
+
+	err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+	expectNoError(t, err, "failed to delete audit-configmap")
 }
 
 func expectNoError(t *testing.T, err error, msg string) {

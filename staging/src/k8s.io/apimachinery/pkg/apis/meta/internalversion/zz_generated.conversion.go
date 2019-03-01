@@ -117,7 +117,6 @@ func autoConvert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, 
 	if err := v1.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
-	out.IncludeUninitialized = in.IncludeUninitialized
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))
@@ -133,7 +132,6 @@ func autoConvert_v1_ListOptions_To_internalversion_ListOptions(in *v1.ListOption
 	if err := v1.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
-	out.IncludeUninitialized = in.IncludeUninitialized
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))

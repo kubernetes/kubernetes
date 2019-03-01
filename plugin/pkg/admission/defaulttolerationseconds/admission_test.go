@@ -64,138 +64,6 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
-			description: "pod has alpha tolerations, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "pod has alpha not-ready toleration, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "pod has alpha unreachable toleration, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`" +
-				", the alpha tolerations will not be touched",
-			requestedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-			expectedPod: api.Pod{
-				Spec: api.PodSpec{
-					Tolerations: []api.Toleration{
-						{
-							Key:               schedulerapi.DeprecatedTaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeNotReady,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-						{
-							Key:               schedulerapi.TaintNodeUnreachable,
-							Operator:          api.TolerationOpExists,
-							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
-						},
-					},
-				},
-			},
-		},
-		{
 			description: "pod has tolerations, but none is for taint `not-ready:NoExecute` or `unreachable:NoExecute`, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
@@ -395,7 +263,7 @@ func TestForgivenessAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
+		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil), nil)
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}

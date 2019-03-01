@@ -1,5 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - caseydavenport
 - cmluciano
 - danwinship
 - thockin
+labels:
+- sig/network

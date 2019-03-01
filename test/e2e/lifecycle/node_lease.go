@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:NodeLease][NodeAlphaFeature:NodeLease][Disruptive]", func() {
+var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	f := framework.NewDefaultFramework("node-lease-test")
 	var systemPodsNo int32
 	var c clientset.Interface

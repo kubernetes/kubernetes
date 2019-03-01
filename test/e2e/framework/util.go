@@ -41,7 +41,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
 	"k8s.io/klog"
 
@@ -51,7 +50,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,12 +86,10 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -188,6 +185,9 @@ const (
 	// How long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
+
+	// How long for snapshot to create snapshotContent
+	SnapshotCreateTimeout = 5 * time.Minute
 
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
@@ -286,95 +286,99 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
-func Skipf(format string, args ...interface{}) {
+func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	ginkgowrapper.Skip(nowStamp() + ": " + msg)
+	ginkgowrapper.Skip(msg, caller+1)
+}
+
+func Skipf(format string, args ...interface{}) {
+	skipInternalf(1, format, args...)
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if TestContext.CloudConfig.NumNodes < minNodeCount {
-		Skipf("Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
+		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	if TestContext.CloudConfig.NumNodes > maxNodeCount {
-		Skipf("Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
+		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
 func SkipUnlessAtLeast(value int, minValue int, message string) {
 	if value < minValue {
-		Skipf(message)
+		skipInternalf(1, message)
 	}
 }
 
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
-		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
 	}
 }
 
 func SkipUnlessLocalEphemeralStorageEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		Skipf("Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
 	}
 }
 
 func SkipUnlessSSHKeyPresent() {
 	if _, err := GetSigner(TestContext.Provider); err != nil {
-		Skipf("No SSH Key for provider %s: '%v'", TestContext.Provider, err)
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }
 
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
-		Skipf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
+		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
 	}
 }
 
 func SkipUnlessMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
-		Skipf("Error listing cluster zones")
+		skipInternalf(1, "Error listing cluster zones")
 	}
 	if zones.Len() <= 1 {
-		Skipf("Requires more than one zone")
+		skipInternalf(1, "Requires more than one zone")
 	}
 }
 
 func SkipIfMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
-		Skipf("Error listing cluster zones")
+		skipInternalf(1, "Error listing cluster zones")
 	}
 	if zones.Len() > 1 {
-		Skipf("Requires at most one zone")
+		skipInternalf(1, "Requires at most one zone")
 	}
 }
 
 func SkipUnlessClusterMonitoringModeIs(supportedMonitoring ...string) {
 	if !ClusterMonitoringModeIs(supportedMonitoring...) {
-		Skipf("Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
+		skipInternalf(1, "Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
 	}
 }
 
 func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
 	if !TestContext.EnablePrometheusMonitoring {
-		Skipf("Skipped because prometheus monitoring is not enabled")
+		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
 	}
 }
 
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
-		Skipf("Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
+		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
 	}
 }
 
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
-		Skipf("Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
+		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
 	}
 }
 
@@ -389,21 +393,21 @@ func SkipUnlessSecretExistsAfterWait(c clientset.Interface, name, namespace stri
 		}
 		return true, nil
 	}) != nil {
-		Skipf("Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
+		skipInternalf(1, "Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
 	}
 	Logf("Secret %v in namespace %v found after duration %v", name, namespace, time.Since(start))
 }
 
 func SkipUnlessTaintBasedEvictionsEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
-		Skipf("Only supported when %v feature is enabled", features.TaintBasedEvictions)
+		skipInternalf(1, "Only supported when %v feature is enabled", features.TaintBasedEvictions)
 	}
 }
 
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
-			Skipf("Not supported under container runtime %s", runtime)
+			skipInternalf(1, "Not supported under container runtime %s", runtime)
 		}
 	}
 }
@@ -414,7 +418,7 @@ func RunIfContainerRuntimeIs(runtimes ...string) {
 			return
 		}
 	}
-	Skipf("Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
+	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
 }
 
 func RunIfSystemSpecNameIs(names ...string) {
@@ -423,7 +427,7 @@ func RunIfSystemSpecNameIs(names ...string) {
 			return
 		}
 	}
-	Skipf("Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
 func ProviderIs(providers ...string) bool {
@@ -497,7 +501,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 		Failf("Failed to get server version: %v", err)
 	}
 	if !gte {
-		Skipf("Not supported for server versions before %q", v)
+		skipInternalf(1, "Not supported for server versions before %q", v)
 	}
 }
 
@@ -507,7 +511,7 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
-			Skipf("Could not find %s resource, skipping test: %#v", gvr, err)
+			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
 		}
 		Failf("Unexpected error getting %v: %v", gvr, err)
 	}
@@ -662,7 +666,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{})
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -825,7 +829,7 @@ func LogContainersInPodsWithLabels(c clientset.Interface, ns string, match map[s
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "Failed to get namespace list")
 	var deleted []string
 	var wg sync.WaitGroup
 OUTER:
@@ -1321,6 +1325,7 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface,
 	if err != nil {
 		return false, err
 	}
+	resources = discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"list", "delete"}}, resources)
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	if err != nil {
 		return false, err
@@ -1830,7 +1835,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
@@ -1862,7 +1867,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "Failed to get list of currentPods in namespace: %s", r.ns)
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
 		if !isElementOf(pod.UID, currentPods) {
@@ -1943,7 +1948,7 @@ func SkipUnlessKubectlVersionGTE(v *utilversion.Version) {
 		Failf("Failed to get kubectl version: %v", err)
 	}
 	if !gte {
-		Skipf("Not supported for kubectl versions before %q", v)
+		skipInternalf(1, "Not supported for kubectl versions before %q", v)
 	}
 }
 
@@ -2298,7 +2303,7 @@ func (b kubectlBuilder) ExecOrDie() string {
 		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return str
 }
 
@@ -2493,7 +2498,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to list events in namespace %q", namespace)
 
 	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
@@ -3088,11 +3093,11 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
 		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
@@ -3106,9 +3111,15 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
 	case *extensions.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.ReplicaSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.Deployment:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batch.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
@@ -3129,12 +3140,24 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.ReplicaSet:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.Deployment:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.Deployment:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.DaemonSet:
+		return 0, nil
+	case *apps.DaemonSet:
 		return 0, nil
 	case *batch.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
@@ -3350,10 +3373,6 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
-			// Use the first external IP address we find on the node, and
-			// use at most one per node.
-			// TODO(roberthbailey): Use the "preferred" address for the node, once
-			// such a thing is defined (#2462).
 			if addr.Type == addrType {
 				hosts = append(hosts, addr.Address)
 				break
@@ -3363,126 +3382,8 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	return hosts
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this excludes master node.
-// It returns an error if it can't find an external IP for every node, though it still returns all
-// hosts that it found in that case.
-func NodeSSHHosts(c clientset.Interface) ([]string, error) {
-	nodelist := waitListSchedulableNodesOrDie(c)
-
-	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
-	hosts := NodeAddresses(nodelist, v1.NodeExternalIP)
-
-	// Error if any node didn't have an external IP.
-	if len(hosts) != len(nodelist.Items) {
-		return hosts, fmt.Errorf(
-			"only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
-			len(hosts), len(nodelist.Items), nodelist)
-	}
-
-	sshHosts := make([]string, 0, len(hosts))
-	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
-	}
-	return sshHosts, nil
-}
-
-type SSHResult struct {
-	User   string
-	Host   string
-	Cmd    string
-	Stdout string
-	Stderr string
-	Code   int
-}
-
-// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
-// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
-// cloud providers since it involves ssh.
-func NodeExec(nodeName, cmd string) (SSHResult, error) {
-	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), TestContext.Provider)
-}
-
-// SSH synchronously SSHs to a node running on provider and runs cmd. If there
-// is no error performing the SSH, the stdout, stderr, and exit code are
-// returned.
-func SSH(cmd, host, provider string) (SSHResult, error) {
-	result := SSHResult{Host: host, Cmd: cmd}
-
-	// Get a signer for the provider.
-	signer, err := GetSigner(provider)
-	if err != nil {
-		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
-	}
-
-	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
-	// defaulting here as well for logging clarity.
-	result.User = os.Getenv("KUBE_SSH_USER")
-	if result.User == "" {
-		result.User = os.Getenv("USER")
-	}
-
-	stdout, stderr, code, err := sshutil.RunSSHCommand(cmd, result.User, host, signer)
-	result.Stdout = stdout
-	result.Stderr = stderr
-	result.Code = code
-
-	return result, err
-}
-
-func LogSSHResult(result SSHResult) {
-	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
-	Logf("ssh %s: command:   %s", remote, result.Cmd)
-	Logf("ssh %s: stdout:    %q", remote, result.Stdout)
-	Logf("ssh %s: stderr:    %q", remote, result.Stderr)
-	Logf("ssh %s: exit code: %d", remote, result.Code)
-}
-
-func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult, error) {
-	Logf("Getting external IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
-		}
-	}
-
-	if host == "" {
-		// No external IPs were found, let's try to use internal as plan B
-		for _, a := range node.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				host = net.JoinHostPort(a.Address, sshPort)
-				break
-			}
-		}
-	}
-
-	if host == "" {
-		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
-	}
-
-	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
-	result, err := SSH(cmd, host, provider)
-	LogSSHResult(result)
-
-	if result.Code != 0 || err != nil {
-		return nil, fmt.Errorf("failed running %q: %v (exit code %d, stderr %v)",
-			cmd, err, result.Code, result.Stderr)
-	}
-
-	return &result, nil
-}
-
-func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
-	_, err := IssueSSHCommandWithResult(cmd, provider, node)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// NewHostExecPodSpec returns the pod spec of hostexec pod
-func NewHostExecPodSpec(ns, name string) *v1.Pod {
+// NewExecPodSpec returns the pod spec of hostexec pod
+func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3497,7 +3398,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-			HostNetwork:                   true,
+			HostNetwork:                   hostNetwork,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &immediate,
 		},
@@ -3508,7 +3409,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -3540,7 +3441,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
 func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
+	hostExecPod := NewExecPodSpec(ns, name, true)
 	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
 	ExpectNoError(err)
 	err = WaitForPodRunningInNamespace(client, pod)
@@ -3580,7 +3481,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		tweak(execPod)
 	}
 	created, err := client.CoreV1().Pods(ns).Create(execPod)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
@@ -3591,7 +3492,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return created.Name
 }
 
@@ -3616,55 +3517,13 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 		},
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
-// used to SSH to their nodes.
-func GetSigner(provider string) (ssh.Signer, error) {
-	// Select the key itself to use. When implementing more providers here,
-	// please also add them to any SSH tests that are disabled because of signer
-	// support.
-	keyfile := ""
-	switch provider {
-	case "gce", "gke", "kubemark":
-		keyfile = os.Getenv("GCE_SSH_KEY")
-		if keyfile == "" {
-			keyfile = "google_compute_engine"
-		}
-	case "aws":
-		keyfile = os.Getenv("AWS_SSH_KEY")
-		if keyfile == "" {
-			keyfile = "kube_aws_rsa"
-		}
-	case "local", "vsphere":
-		keyfile = os.Getenv("LOCAL_SSH_KEY")
-		if keyfile == "" {
-			keyfile = "id_rsa"
-		}
-	case "skeleton":
-		keyfile = os.Getenv("KUBE_SSH_KEY")
-		if keyfile == "" {
-			keyfile = "id_rsa"
-		}
-	default:
-		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
-	}
-
-	// Respect absolute paths for keys given by user, fallback to assuming
-	// relative paths are in ~/.ssh
-	if !filepath.IsAbs(keyfile) {
-		keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
-		keyfile = filepath.Join(keydir, keyfile)
-	}
-
-	return sshutil.MakePrivateKeySignerFromFile(keyfile)
+	ExpectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -4149,7 +4008,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 		}
 		return s.RestartCount, nil
 	}
-	return -1, fmt.Errorf("failed to find kube-apiserver container in pod")
+	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
 
 func RestartControllerManager() error {
@@ -4365,26 +4224,20 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tls config: %v", err)
+		return nil, fmt.Errorf("Failed to create tls config: %v", err)
 	}
-	if tlsConfig != nil {
+	if url.Scheme == "https" {
 		url.Scheme = "wss"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":443"
-		}
 	} else {
 		url.Scheme = "ws"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":80"
-		}
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load http headers: %v", err)
+		return nil, fmt.Errorf("Failed to load http headers: %v", err)
 	}
 	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create websocket config: %v", err)
+		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
 	}
 	cfg.Header = headers
 	cfg.TlsConfig = tlsConfig
@@ -4742,6 +4595,8 @@ func CoreDump(dir string) {
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
 	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -5059,7 +4914,7 @@ func GetNodeInternalIP(node *v1.Node) (string, error) {
 		}
 	}
 	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
 }
@@ -5207,7 +5062,7 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get url: %v", err)
+		return nil, fmt.Errorf("Failed to get url: %v", err)
 	}
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
@@ -5216,17 +5071,17 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read html response body: %v", err)
+		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse data to json: %v", err)
+		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
 	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DaemonSet spec: %v", err)
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &controller, nil
 }
@@ -5278,7 +5133,7 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}
@@ -5290,7 +5145,7 @@ func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.
 	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		has, err := NodeHasTaint(c, nodeName, taint)
 		if err != nil {
-			return false, fmt.Errorf("failed to check taint %s on node %s or not", taint.ToString(), nodeName)
+			return false, fmt.Errorf("Failed to check taint %s on node %s or not", taint.ToString(), nodeName)
 		}
 		return has == wantTrue, nil
 	}); err != nil {

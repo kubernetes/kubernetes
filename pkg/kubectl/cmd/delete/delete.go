@@ -71,6 +71,9 @@ var (
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
+		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		kubectl delete -k dir
+
 		# Delete a pod based on the type and name in the JSON passed into stdin.
 		cat pod.json | kubectl delete -f -
 
@@ -93,14 +96,16 @@ var (
 type DeleteOptions struct {
 	resource.FilenameOptions
 
-	LabelSelector   string
-	FieldSelector   string
-	DeleteAll       bool
-	IgnoreNotFound  bool
-	Cascade         bool
-	DeleteNow       bool
-	ForceDeletion   bool
-	WaitForDeletion bool
+	LabelSelector       string
+	FieldSelector       string
+	DeleteAll           bool
+	DeleteAllNamespaces bool
+	IgnoreNotFound      bool
+	Cascade             bool
+	DeleteNow           bool
+	ForceDeletion       bool
+	WaitForDeletion     bool
+	Quiet               bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -118,7 +123,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
-		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use:                   "delete ([-f FILENAME] | [-k DIRECTORY] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
@@ -162,7 +167,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		o.GracePeriod = 1
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := f.NewBuilder().
 		Unstructured().
 		ContinueOnError().
@@ -170,8 +174,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
-		IncludeUninitialized(includeUninitialized).
 		SelectAllParam(o.DeleteAll).
+		AllNamespaces(o.DeleteAllNamespaces).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -313,7 +317,9 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
-	o.PrintObj(info)
+	if !o.Quiet {
+		o.PrintObj(info)
+	}
 	return deleteResponse, nil
 }
 

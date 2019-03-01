@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -88,7 +88,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		"--enable-admission-plugins", "NodeRestriction",
 		// The "default" SA is not installed, causing the ServiceAccount plugin to retry for ~1s per
 		// API request.
-		"--disable-admission-plugins", "ServiceAccount",
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -126,11 +126,11 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	pvName := "mypv"
-	if _, err := superuserClientExternal.StorageV1beta1().VolumeAttachments().Create(&storagev1beta1.VolumeAttachment{
+	if _, err := superuserClientExternal.StorageV1().VolumeAttachments().Create(&storagev1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
-		Spec: storagev1beta1.VolumeAttachmentSpec{
+		Spec: storagev1.VolumeAttachmentSpec{
 			Attacher: "foo",
-			Source:   storagev1beta1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
+			Source:   storagev1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
 			NodeName: "node2",
 		},
 	}); err != nil {
@@ -203,7 +203,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	getVolumeAttachment := func(client externalclientset.Interface) func() error {
 		return func() error {
-			_, err := client.StorageV1beta1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
+			_, err := client.StorageV1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
 			return err
 		}
 	}
@@ -314,6 +314,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	createNode2NormalPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -323,11 +324,13 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2normalpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}
 	createNode2MirrorPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -337,6 +340,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2mirrorpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}

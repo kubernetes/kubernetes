@@ -27,13 +27,13 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
 var (
@@ -563,6 +563,30 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 	return nic, nil
 }
 
+// getScaleSet gets scale set with exponential backoff retry
+func (ss *scaleSet) getScaleSet(service *v1.Service, name string) (compute.VirtualMachineScaleSet, bool, error) {
+	if ss.Config.shouldOmitCloudProviderBackoff() {
+		var result compute.VirtualMachineScaleSet
+		var exists bool
+
+		cached, err := ss.vmssCache.Get(name)
+		if err != nil {
+			ss.Event(service, v1.EventTypeWarning, "GetVirtualMachineScaleSet", err.Error())
+			klog.Errorf("backoff: failure for scale set %q, will retry,err=%v", name, err)
+			return result, false, nil
+		}
+
+		if cached != nil {
+			exists = true
+			result = *(cached.(*compute.VirtualMachineScaleSet))
+		}
+
+		return result, exists, err
+	}
+
+	return ss.getScaleSetWithRetry(service, name)
+}
+
 // getScaleSetWithRetry gets scale set with exponential backoff retry
 func (ss *scaleSet) getScaleSetWithRetry(service *v1.Service, name string) (compute.VirtualMachineScaleSet, bool, error) {
 	var result compute.VirtualMachineScaleSet
@@ -621,6 +645,19 @@ func (ss *scaleSet) getPrimaryIPConfigForScaleSet(config *compute.VirtualMachine
 	return nil, fmt.Errorf("failed to find a primary IP configuration for the scale set %q", scaleSetName)
 }
 
+// createOrUpdateVMSS invokes ss.VirtualMachineScaleSetsClient.CreateOrUpdate with exponential backoff retry.
+func (ss *scaleSet) createOrUpdateVMSS(service *v1.Service, virtualMachineScaleSet compute.VirtualMachineScaleSet) error {
+	if ss.Config.shouldOmitCloudProviderBackoff() {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		resp, err := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, *virtualMachineScaleSet.Name, virtualMachineScaleSet)
+		klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%s): end", *virtualMachineScaleSet.Name)
+		return ss.processHTTPResponse(service, "CreateOrUpdateVMSS", resp, err)
+	}
+
+	return ss.createOrUpdateVMSSWithRetry(service, virtualMachineScaleSet)
+}
+
 // createOrUpdateVMSSWithRetry invokes ss.VirtualMachineScaleSetsClient.CreateOrUpdate with exponential backoff retry.
 func (ss *scaleSet) createOrUpdateVMSSWithRetry(service *v1.Service, virtualMachineScaleSet compute.VirtualMachineScaleSet) error {
 	return wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
@@ -630,6 +667,19 @@ func (ss *scaleSet) createOrUpdateVMSSWithRetry(service *v1.Service, virtualMach
 		klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%s): end", *virtualMachineScaleSet.Name)
 		return ss.processHTTPRetryResponse(service, "CreateOrUpdateVMSS", resp, err)
 	})
+}
+
+// updateVMSSInstances invokes ss.VirtualMachineScaleSetsClient.UpdateInstances with exponential backoff retry.
+func (ss *scaleSet) updateVMSSInstances(service *v1.Service, scaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) error {
+	if ss.Config.shouldOmitCloudProviderBackoff() {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		resp, err := ss.VirtualMachineScaleSetsClient.UpdateInstances(ctx, ss.ResourceGroup, scaleSetName, vmInstanceIDs)
+		klog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%s): end", scaleSetName)
+		return ss.processHTTPResponse(service, "CreateOrUpdateVMSSInstance", resp, err)
+	}
+
+	return ss.updateVMSSInstancesWithRetry(service, scaleSetName, vmInstanceIDs)
 }
 
 // updateVMSSInstancesWithRetry invokes ss.VirtualMachineScaleSetsClient.UpdateInstances with exponential backoff retry.
@@ -687,9 +737,9 @@ func (ss *scaleSet) getNodesScaleSets(nodes []*v1.Node) (map[string]sets.String,
 func (ss *scaleSet) ensureHostsInVMSetPool(service *v1.Service, backendPoolID string, vmSetName string, instanceIDs []string, isInternal bool) error {
 	klog.V(3).Infof("ensuring hosts %q of scaleset %q in LB backendpool %q", instanceIDs, vmSetName, backendPoolID)
 	serviceName := getServiceName(service)
-	virtualMachineScaleSet, exists, err := ss.getScaleSetWithRetry(service, vmSetName)
+	virtualMachineScaleSet, exists, err := ss.getScaleSet(service, vmSetName)
 	if err != nil {
-		klog.Errorf("ss.getScaleSetWithRetry(%s) for service %q failed: %v", vmSetName, serviceName, err)
+		klog.Errorf("ss.getScaleSet(%s) for service %q failed: %v", vmSetName, serviceName, err)
 		return err
 	}
 	if !exists {
@@ -748,19 +798,7 @@ func (ss *scaleSet) ensureHostsInVMSetPool(service *v1.Service, backendPoolID st
 			})
 		primaryIPConfiguration.LoadBalancerBackendAddressPools = &newBackendPools
 
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-		klog.V(3).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate for service (%s): scale set (%s) - updating", serviceName, vmSetName)
-		resp, err := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmSetName, virtualMachineScaleSet)
-		klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", vmSetName)
-		if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-			klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate for service (%s): scale set (%s) - updating, err=%v", serviceName, vmSetName, err)
-			retryErr := ss.createOrUpdateVMSSWithRetry(service, virtualMachineScaleSet)
-			if retryErr != nil {
-				err = retryErr
-				klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate for service (%s) abort backoff: scale set (%s) - updating", serviceName, vmSetName)
-			}
-		}
+		err := ss.createOrUpdateVMSS(service, virtualMachineScaleSet)
 		if err != nil {
 			return err
 		}
@@ -770,18 +808,7 @@ func (ss *scaleSet) ensureHostsInVMSetPool(service *v1.Service, backendPoolID st
 	vmInstanceIDs := compute.VirtualMachineScaleSetVMInstanceRequiredIDs{
 		InstanceIds: &instanceIDs,
 	}
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-	instanceResp, err := ss.VirtualMachineScaleSetsClient.UpdateInstances(ctx, ss.ResourceGroup, vmSetName, vmInstanceIDs)
-	klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", vmSetName)
-	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(instanceResp, err) {
-		klog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances for service (%s): scale set (%s) - updating, err=%v", serviceName, vmSetName, err)
-		retryErr := ss.updateVMSSInstancesWithRetry(service, vmSetName, vmInstanceIDs)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances for service (%s) abort backoff: scale set (%s) - updating", serviceName, vmSetName)
-		}
-	}
+	err = ss.updateVMSSInstances(service, vmSetName, vmInstanceIDs)
 	if err != nil {
 		return err
 	}
@@ -833,9 +860,9 @@ func (ss *scaleSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, bac
 // ensureScaleSetBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified scaleset.
 func (ss *scaleSet) ensureScaleSetBackendPoolDeleted(service *v1.Service, poolID, ssName string) error {
 	klog.V(3).Infof("ensuring backend pool %q deleted from scaleset %q", poolID, ssName)
-	virtualMachineScaleSet, exists, err := ss.getScaleSetWithRetry(service, ssName)
+	virtualMachineScaleSet, exists, err := ss.getScaleSet(service, ssName)
 	if err != nil {
-		klog.Errorf("ss.ensureScaleSetBackendPoolDeleted(%s, %s) getScaleSetWithRetry(%s) failed: %v", poolID, ssName, ssName, err)
+		klog.Errorf("ss.ensureScaleSetBackendPoolDeleted(%s, %s) getScaleSet(%s) failed: %v", poolID, ssName, ssName, err)
 		return err
 	}
 	if !exists {
@@ -879,18 +906,7 @@ func (ss *scaleSet) ensureScaleSetBackendPoolDeleted(service *v1.Service, poolID
 	// Update scale set with backoff.
 	primaryIPConfiguration.LoadBalancerBackendAddressPools = &newBackendPools
 	klog.V(3).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating", ssName)
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-	resp, err := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, ssName, virtualMachineScaleSet)
-	klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", ssName)
-	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating, err=%v", ssName, err)
-		retryErr := ss.createOrUpdateVMSSWithRetry(service, virtualMachineScaleSet)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate abort backoff: scale set (%s) - updating", ssName)
-		}
-	}
+	err = ss.createOrUpdateVMSS(service, virtualMachineScaleSet)
 	if err != nil {
 		return err
 	}
@@ -900,18 +916,7 @@ func (ss *scaleSet) ensureScaleSetBackendPoolDeleted(service *v1.Service, poolID
 	vmInstanceIDs := compute.VirtualMachineScaleSetVMInstanceRequiredIDs{
 		InstanceIds: &instanceIDs,
 	}
-	instanceCtx, instanceCancel := getContextWithCancel()
-	defer instanceCancel()
-	instanceResp, err := ss.VirtualMachineScaleSetsClient.UpdateInstances(instanceCtx, ss.ResourceGroup, ssName, vmInstanceIDs)
-	klog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%q): end", ssName)
-	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(instanceResp, err) {
-		klog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances scale set (%s) - updating, err=%v", ssName, err)
-		retryErr := ss.updateVMSSInstancesWithRetry(service, ssName, vmInstanceIDs)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("VirtualMachineScaleSetsClient.UpdateInstances abort backoff: scale set (%s) - updating", ssName)
-		}
-	}
+	err = ss.updateVMSSInstances(service, ssName, vmInstanceIDs)
 	if err != nil {
 		return err
 	}
@@ -919,17 +924,9 @@ func (ss *scaleSet) ensureScaleSetBackendPoolDeleted(service *v1.Service, poolID
 	// Update virtualMachineScaleSet again. This is a workaround for removing VMSS reference from LB.
 	// TODO: remove this workaround when figuring out the root cause.
 	if len(newBackendPools) == 0 {
-		updateCtx, updateCancel := getContextWithCancel()
-		defer updateCancel()
-		klog.V(3).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating second time", ssName)
-		resp, err = ss.VirtualMachineScaleSetsClient.CreateOrUpdate(updateCtx, ss.ResourceGroup, ssName, virtualMachineScaleSet)
-		klog.V(10).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate(%q): end", ssName)
-		if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-			klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate: scale set (%s) - updating, err=%v", ssName, err)
-			retryErr := ss.createOrUpdateVMSSWithRetry(service, virtualMachineScaleSet)
-			if retryErr != nil {
-				klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate abort backoff: scale set (%s) - updating", ssName)
-			}
+		err = ss.createOrUpdateVMSS(service, virtualMachineScaleSet)
+		if err != nil {
+			klog.V(2).Infof("VirtualMachineScaleSetsClient.CreateOrUpdate abort backoff: scale set (%s) - updating", ssName)
 		}
 	}
 

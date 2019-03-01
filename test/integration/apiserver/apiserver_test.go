@@ -23,11 +23,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,19 +40,23 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	return setupWithResources(t, groupVersions, nil)
+}
+
+func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	if len(groupVersions) > 0 {
+	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := master.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
+		resourceConfig.EnableResources(resources...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
@@ -82,21 +87,18 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 	}
 }
 
-func path(resource, namespace, name string) string {
-	return testapi.Extensions.ResourcePath(resource, namespace, name)
-}
-
-func newRS(namespace string) *v1beta1.ReplicaSet {
-	return &v1beta1.ReplicaSet{
+func newRS(namespace string) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "apiserver-test",
 		},
-		Spec: v1beta1.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "test"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "test"},
@@ -117,7 +119,7 @@ func newRS(namespace string) *v1beta1.ReplicaSet {
 var cascDel = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "orphanDependents": false
 }
 `
@@ -130,7 +132,7 @@ func Test202StatusCode(t *testing.T) {
 	ns := framework.CreateTestingNamespace("status-code", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
@@ -138,7 +140,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), "", 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 2. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it without setting DeleteOptions.
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
@@ -148,7 +150,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), "", 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
@@ -157,7 +159,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), cascDel, 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 200)
 
 	// 4. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server returns 202 in this case.
@@ -167,7 +169,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), cascDel, 202)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
 }
 
 func TestAPIListChunking(t *testing.T) {
@@ -178,7 +180,7 @@ func TestAPIListChunking(t *testing.T) {
 	ns := framework.CreateTestingNamespace("list-paging", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)
@@ -227,7 +229,7 @@ func TestAPIListChunking(t *testing.T) {
 	}
 	var names []string
 	if err := meta.EachListItem(listObj, func(obj runtime.Object) error {
-		rs := obj.(*v1beta1.ReplicaSet)
+		rs := obj.(*apps.ReplicaSet)
 		names = append(names, rs.Name)
 		return nil
 	}); err != nil {

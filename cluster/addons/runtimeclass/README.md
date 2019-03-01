@@ -7,6 +7,6 @@ To enable RuntimeClass, set the feature gate `RuntimeClass=true`, and ensure the
 directory is installed.
 
 For more information, see:
-https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
+https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/runtimeclass/README.md?pixel)]()

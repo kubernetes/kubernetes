@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/pkg/errors"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -99,7 +101,9 @@ type TestContextType struct {
 	ContainerRuntimePidFile     string
 	// SystemdServices are comma separated list of systemd services the test framework
 	// will dump logs for.
-	SystemdServices          string
+	SystemdServices string
+	// DumpSystemdJournal controls whether to dump the full systemd journal.
+	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
 	MasterOSDistro           string
 	NodeOSDistro             string
@@ -189,6 +193,8 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+	// ExtraEnvs is a map of environment names to values.
+	ExtraEnvs map[string]string
 }
 
 type CloudConfig struct {
@@ -243,12 +249,13 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set", defaultHost))
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flag.Var(cliflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
 	flag.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flag.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
@@ -264,7 +271,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
-	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, etc.)")
+	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
 	flag.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
@@ -327,6 +334,7 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 	flag.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
+	flag.Var(cliflag.NewMapStringString(&TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 }
 
 // HandleFlags sets up all flags and parses the command line.
@@ -399,22 +407,33 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
+	// TODO: whether and how long this code is needed is getting discussed
+	// in https://github.com/kubernetes/kubernetes/issues/70194.
+	if TestContext.Provider == "" {
+		// Some users of the e2e.test binary pass --provider=.
+		// We need to support that, changing it would break those usages.
+		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
+		TestContext.Provider = "skeleton"
+	}
+
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
-	if err == nil {
-		return
-	}
-	if !os.IsNotExist(errors.Cause(err)) {
-		Failf("Failed to setup provider config: %v", err)
-	}
-	// We allow unknown provider parameters for historic reasons. At least log a
-	// warning to catch typos.
-	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
-	// - remove the fallback for unknown providers
-	// - proper error message instead of Failf (which panics)
-	klog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
-	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
 	if err != nil {
-		Failf("Failed to setup fallback skeleton provider config: %v", err)
+		if os.IsNotExist(errors.Cause(err)) {
+			// Provide a more helpful error message when the provider is unknown.
+			var providers []string
+			for _, name := range GetProviders() {
+				// The empty string is accepted, but looks odd in the output below unless we quote it.
+				if name == "" {
+					name = `""`
+				}
+				providers = append(providers, name)
+			}
+			sort.Strings(providers)
+			klog.Errorf("Unknown provider %q. The following providers are known: %v", TestContext.Provider, strings.Join(providers, " "))
+		} else {
+			klog.Errorf("Failed to setup provider config for %q: %v", TestContext.Provider, err)
+		}
+		os.Exit(1)
 	}
 }

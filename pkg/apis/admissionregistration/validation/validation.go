@@ -29,26 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
-func ValidateInitializerConfiguration(ic *admissionregistration.InitializerConfiguration) field.ErrorList {
-	allErrors := genericvalidation.ValidateObjectMeta(&ic.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	for i, initializer := range ic.Initializers {
-		allErrors = append(allErrors, validateInitializer(&initializer, field.NewPath("initializers").Index(i))...)
-	}
-	return allErrors
-}
-
-func validateInitializer(initializer *admissionregistration.Initializer, fldPath *field.Path) field.ErrorList {
-	var allErrors field.ErrorList
-	// initlializer.Name must be fully qualified
-	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), initializer.Name)...)
-
-	for i, rule := range initializer.Rules {
-		notAllowSubresources := false
-		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i), notAllowSubresources)...)
-	}
-	return allErrors
-}
-
 func hasWildcard(slice []string) bool {
 	for _, s := range slice {
 		if s == "*" {
@@ -67,7 +47,7 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	// */x
 	resourcesWithWildcardSubresoures := sets.String{}
 	// x/*
-	subResoucesWithWildcardResource := sets.String{}
+	subResourcesWithWildcardResource := sets.String{}
 	// */*
 	hasDoubleWildcard := false
 	// *
@@ -95,14 +75,14 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resSub)))
 		}
-		if _, ok := subResoucesWithWildcardResource[sub]; ok {
+		if _, ok := subResourcesWithWildcardResource[sub]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
 		}
 		if sub == "*" {
 			resourcesWithWildcardSubresoures[res] = struct{}{}
 		}
 		if res == "*" {
-			subResoucesWithWildcardResource[sub] = struct{}{}
+			subResourcesWithWildcardResource[sub] = struct{}{}
 		}
 	}
 	if len(resources) > 1 && hasDoubleWildcard {
@@ -161,10 +141,6 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 	return allErrors
 }
 
-func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.InitializerConfiguration) field.ErrorList {
-	return ValidateInitializerConfiguration(newIC)
-}
-
 func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	for i, hook := range e.Webhooks {
@@ -194,6 +170,9 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	}
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
+	}
+	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
 	}
 
 	if hook.NamespaceSelector != nil {

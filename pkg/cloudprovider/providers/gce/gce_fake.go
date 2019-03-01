@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 // TestClusterValues holds the config values for the fake/test gce cloud object.

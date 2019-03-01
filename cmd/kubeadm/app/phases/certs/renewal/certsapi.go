@@ -31,6 +31,7 @@ import (
 	certstype "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 	csrutil "k8s.io/client-go/util/certificate/csr"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 const certAPIPrefixName = "kubeadm-cert"
@@ -60,7 +61,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		IPAddresses: cfg.AltNames.IPs,
 	}
 
-	key, err := certutil.NewPrivateKey()
+	key, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}

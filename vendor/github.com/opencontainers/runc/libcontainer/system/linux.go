@@ -3,13 +3,12 @@
 package system
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"os/exec"
 	"syscall" // only for exec
 	"unsafe"
 
+	"github.com/opencontainers/runc/libcontainer/user"
 	"golang.org/x/sys/unix"
 )
 
@@ -102,32 +101,41 @@ func Setctty() error {
 }
 
 // RunningInUserNS detects whether we are currently running in a user namespace.
-// Copied from github.com/lxc/lxd/shared/util.go
+// Originally copied from github.com/lxc/lxd/shared/util.go
 func RunningInUserNS() bool {
-	file, err := os.Open("/proc/self/uid_map")
+	uidmap, err := user.CurrentProcessUIDMap()
 	if err != nil {
 		// This kernel-provided file only exists if user namespaces are supported
 		return false
 	}
-	defer file.Close()
+	return UIDMapInUserNS(uidmap)
+}
 
-	buf := bufio.NewReader(file)
-	l, _, err := buf.ReadLine()
-	if err != nil {
-		return false
-	}
-
-	line := string(l)
-	var a, b, c int64
-	fmt.Sscanf(line, "%d %d %d", &a, &b, &c)
+func UIDMapInUserNS(uidmap []user.IDMap) bool {
 	/*
 	 * We assume we are in the initial user namespace if we have a full
 	 * range - 4294967295 uids starting at uid 0.
 	 */
-	if a == 0 && b == 0 && c == 4294967295 {
+	if len(uidmap) == 1 && uidmap[0].ID == 0 && uidmap[0].ParentID == 0 && uidmap[0].Count == 4294967295 {
 		return false
 	}
 	return true
+}
+
+// GetParentNSeuid returns the euid within the parent user namespace
+func GetParentNSeuid() int64 {
+	euid := int64(os.Geteuid())
+	uidmap, err := user.CurrentProcessUIDMap()
+	if err != nil {
+		// This kernel-provided file only exists if user namespaces are supported
+		return euid
+	}
+	for _, um := range uidmap {
+		if um.ID <= euid && euid <= um.ID+um.Count-1 {
+			return um.ParentID + euid - um.ID
+		}
+	}
+	return euid
 }
 
 // SetSubreaper sets the value i as the subreaper setting for the calling process

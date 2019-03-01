@@ -98,6 +98,7 @@ type podDisruptionBudgetStatusStrategy struct {
 	podDisruptionBudgetStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status

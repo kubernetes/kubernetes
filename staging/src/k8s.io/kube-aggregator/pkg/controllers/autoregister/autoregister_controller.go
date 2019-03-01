@@ -39,6 +39,7 @@ import (
 )
 
 const (
+	// AutoRegisterManagedLabel is a label attached to the APIService that identifies how the APIService wants to be synced.
 	AutoRegisterManagedLabel = "kube-aggregator.kubernetes.io/automanaged"
 
 	// manageOnStart is a value for the AutoRegisterManagedLabel that indicates the APIService wants to be synced one time when the controller starts.
@@ -81,6 +82,7 @@ type autoRegisterController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewAutoRegisterController creates a new autoRegisterController.
 func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, apiServiceClient apiregistrationclient.APIServicesGetter) *autoRegisterController {
 	c := &autoRegisterController{
 		apiServiceLister:  apiServiceInformer.Lister(),
@@ -127,6 +129,7 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 	return c
 }
 
+// Run starts the autoregister controller in a loop which syncs API services until stopCh is closed.
 func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
 	// don't let panics crash the process
 	defer utilruntime.HandleCrash()
@@ -267,6 +270,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	return err
 }
 
+// GetAPIServiceToSync gets a single API service to sync.
 func (c *autoRegisterController) GetAPIServiceToSync(name string) *apiregistration.APIService {
 	c.apiServicesToSyncLock.RLock()
 	defer c.apiServicesToSyncLock.RUnlock()
@@ -274,10 +278,12 @@ func (c *autoRegisterController) GetAPIServiceToSync(name string) *apiregistrati
 	return c.apiServicesToSync[name]
 }
 
+// AddAPIServiceToSyncOnStart registers an API service to sync only when the controller starts.
 func (c *autoRegisterController) AddAPIServiceToSyncOnStart(in *apiregistration.APIService) {
 	c.addAPIServiceToSync(in, manageOnStart)
 }
 
+// AddAPIServiceToSync registers an API service to sync continuously.
 func (c *autoRegisterController) AddAPIServiceToSync(in *apiregistration.APIService) {
 	c.addAPIServiceToSync(in, manageContinuously)
 }
@@ -296,6 +302,7 @@ func (c *autoRegisterController) addAPIServiceToSync(in *apiregistration.APIServ
 	c.queue.Add(apiService.Name)
 }
 
+// RemoveAPIServiceToSync deletes a registered APIService.
 func (c *autoRegisterController) RemoveAPIServiceToSync(name string) {
 	c.apiServicesToSyncLock.Lock()
 	defer c.apiServicesToSyncLock.Unlock()

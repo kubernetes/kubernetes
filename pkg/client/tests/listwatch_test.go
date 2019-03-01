@@ -17,6 +17,7 @@ limitations under the License.
 package tests
 
 import (
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -194,11 +195,20 @@ func (w lw) Watch(options metav1.ListOptions) (watch.Interface, error) {
 func TestListWatchUntil(t *testing.T) {
 	fw := watch.NewFake()
 	go func() {
-		var obj *v1.Pod
+		obj := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "2",
+			},
+		}
 		fw.Modify(obj)
 	}()
 	listwatch := lw{
-		list:  &v1.PodList{Items: []v1.Pod{{}}},
+		list: &v1.PodList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "1",
+			},
+			Items: []v1.Pod{{}},
+		},
 		watch: fw,
 	}
 
@@ -213,8 +223,9 @@ func TestListWatchUntil(t *testing.T) {
 		},
 	}
 
-	timeout := 10 * time.Second
-	lastEvent, err := watchtools.ListWatchUntil(timeout, listwatch, conditions...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	lastEvent, err := watchtools.ListWatchUntil(ctx, listwatch, conditions...)
 	if err != nil {
 		t.Fatalf("expected nil error, got %#v", err)
 	}

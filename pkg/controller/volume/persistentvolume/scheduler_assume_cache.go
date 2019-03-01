@@ -42,6 +42,9 @@ type AssumeCache interface {
 	// Get the object by name
 	Get(objName string) (interface{}, error)
 
+	// Get the API object by name
+	GetAPIObj(objName string) (interface{}, error)
+
 	// List all the objects in the cache
 	List(indexObj interface{}) []interface{}
 }
@@ -250,6 +253,17 @@ func (c *assumeCache) Get(objName string) (interface{}, error) {
 	return objInfo.latestObj, nil
 }
 
+func (c *assumeCache) GetAPIObj(objName string) (interface{}, error) {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	objInfo, err := c.getObjInfo(objName)
+	if err != nil {
+		return nil, err
+	}
+	return objInfo.apiObj, nil
+}
+
 func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
@@ -297,7 +311,7 @@ func (c *assumeCache) Assume(obj interface{}) error {
 	}
 
 	if newVersion < storedVersion {
-		return fmt.Errorf("%v %q is out of sync", c.description, name)
+		return fmt.Errorf("%v %q is out of sync (stored: %d, assume: %d)", c.description, name, storedVersion, newVersion)
 	}
 
 	// Only update the cached object
@@ -325,6 +339,7 @@ type PVAssumeCache interface {
 	AssumeCache
 
 	GetPV(pvName string) (*v1.PersistentVolume, error)
+	GetAPIPV(pvName string) (*v1.PersistentVolume, error)
 	ListPVs(storageClassName string) []*v1.PersistentVolume
 }
 
@@ -356,6 +371,18 @@ func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
+func (c *pvAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
+	obj, err := c.GetAPIObj(pvName)
+	if err != nil {
+		return nil, err
+	}
+	pv, ok := obj.(*v1.PersistentVolume)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolume", obj}
+	}
+	return pv, nil
+}
+
 func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
 	objs := c.List(&v1.PersistentVolume{
 		Spec: v1.PersistentVolumeSpec{
@@ -380,6 +407,7 @@ type PVCAssumeCache interface {
 	// GetPVC returns the PVC from the cache with given pvcKey.
 	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
 	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
+	GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
 }
 
 type pvcAssumeCache struct {
@@ -396,6 +424,18 @@ func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error
 		return nil, err
 	}
 
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
+	}
+	return pvc, nil
+}
+
+func (c *pvcAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := c.GetAPIObj(pvcKey)
+	if err != nil {
+		return nil, err
+	}
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}

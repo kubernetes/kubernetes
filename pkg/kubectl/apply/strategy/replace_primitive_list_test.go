@@ -26,7 +26,7 @@ var _ = Describe("Replacing fields of type list with openapi", func() {
 	Context("where the field has been deleted", func() {
 		It("should delete the field if present in recorded and missing from local.", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -38,7 +38,7 @@ spec:
         - b
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -47,7 +47,7 @@ spec:
       - name: container
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -62,7 +62,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -75,7 +75,7 @@ spec:
 
 		It("should delete the field if missing in recorded and set to null in local.", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -84,7 +84,7 @@ spec:
       - name: container
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -95,7 +95,7 @@ spec:
 `)
 
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -109,7 +109,7 @@ spec:
         - "y"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -124,14 +124,14 @@ spec:
 	Context("where the field is has been added", func() {
 		It("should add the field when missing from recorded", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
     spec:
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -144,14 +144,14 @@ spec:
         - c
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
     spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -168,7 +168,7 @@ spec:
 
 		It("should add the field when even when present in recorded", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -181,7 +181,7 @@ spec:
         - c
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -194,14 +194,14 @@ spec:
         - c
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
     spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -218,12 +218,12 @@ spec:
 
 		It("should add the field when the parent field is missing as well", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -236,12 +236,12 @@ spec:
         - c
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -260,7 +260,7 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should replace the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -273,7 +273,7 @@ spec:
         - c
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -286,7 +286,7 @@ spec:
         - f
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 spec:
@@ -302,7 +302,7 @@ spec:
         - "y"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -319,7 +319,7 @@ spec:
 
 		It("should replace the field even if recorded matches", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -332,7 +332,7 @@ spec:
         - f
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -345,7 +345,7 @@ spec:
         - f
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 spec:
@@ -361,7 +361,7 @@ spec:
         - "y"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -378,7 +378,7 @@ spec:
 
 		It("should replace the field even if the only change is ordering", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -391,7 +391,7 @@ spec:
         - f
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -404,7 +404,7 @@ spec:
         - f
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 spec:
@@ -418,7 +418,7 @@ spec:
         - c
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -439,7 +439,7 @@ var _ = Describe("Replacing fields of type list with openapi for the type, but n
 	Context("where a field is has been updated", func() {
 		It("should replace the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -452,7 +452,7 @@ spec:
         - c
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -471,7 +471,7 @@ spec:
         - g
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
 spec:
@@ -503,7 +503,7 @@ spec:
         - m
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:
@@ -530,7 +530,7 @@ var _ = Describe("Replacing fields of type list without openapi", func() {
 	Context("where the field has been deleted", func() {
 		It("should delete the field.", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -539,14 +539,14 @@ spec:
     - b
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
     arguments:
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -570,7 +570,7 @@ spec:
 `)
 
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -587,7 +587,7 @@ spec:
 	Context("where the field is has been added", func() {
 		It("should add the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -598,7 +598,7 @@ spec:
     - "y"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -616,12 +616,12 @@ spec:
     - w
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -643,7 +643,7 @@ spec:
 	Context("where a field is has been updated", func() {
 		It("should replace field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -657,7 +657,7 @@ spec:
     - u
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:
@@ -677,7 +677,7 @@ spec:
     - u
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
 spec:
@@ -698,7 +698,7 @@ spec:
     - "t"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   template:

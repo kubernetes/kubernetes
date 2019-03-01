@@ -100,14 +100,16 @@ func TestGetStaticPodFilepath(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.componentName, func(t *testing.T) {
+			actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -133,14 +135,16 @@ func TestAddSelfHostedPrefix(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := AddSelfHostedPrefix(rt.componentName)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.componentName, func(t *testing.T) {
+			actual := AddSelfHostedPrefix(rt.componentName)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -182,28 +186,30 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
-		if actualError != nil {
-			if rt.expectedError == nil {
-				t.Errorf("failed EtcdSupportedVersion:\n\texpected no error, but got: %v", actualError)
-			} else if actualError.Error() != rt.expectedError.Error() {
-				t.Errorf(
-					"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
-					rt.expectedError,
-					actualError,
-				)
+		t.Run(rt.kubernetesVersion, func(t *testing.T) {
+			actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
+			if actualError != nil {
+				if rt.expectedError == nil {
+					t.Errorf("failed EtcdSupportedVersion:\n\texpected no error, but got: %v", actualError)
+				} else if actualError.Error() != rt.expectedError.Error() {
+					t.Errorf(
+						"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
+						rt.expectedError,
+						actualError,
+					)
+				}
+			} else {
+				if rt.expectedError != nil {
+					t.Errorf("failed EtcdSupportedVersion:\n\texpected error: %v, but got no error", rt.expectedError)
+				} else if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
+					t.Errorf(
+						"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
+						rt.expectedVersion.String(),
+						actualVersion.String(),
+					)
+				}
 			}
-		} else {
-			if rt.expectedError != nil {
-				t.Errorf("failed EtcdSupportedVersion:\n\texpected error: %v, but got no error", rt.expectedError)
-			} else if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
-				t.Errorf(
-					"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
-					rt.expectedVersion.String(),
-					actualVersion.String(),
-				)
-			}
-		}
+		})
 	}
 }
 
@@ -222,13 +228,15 @@ func TestGetKubeDNSVersion(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actualDNSVersion := GetDNSVersion(rt.dns)
-		if actualDNSVersion != rt.expected {
-			t.Errorf(
-				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actualDNSVersion,
-			)
-		}
+		t.Run(string(rt.dns), func(t *testing.T) {
+			actualDNSVersion := GetDNSVersion(rt.dns)
+			if actualDNSVersion != rt.expected {
+				t.Errorf(
+					"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					actualDNSVersion,
+				)
+			}
+		})
 	}
 }

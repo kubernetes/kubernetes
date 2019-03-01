@@ -18,9 +18,16 @@ function prepare-e2e() {
   echo "Local doesn't need special preparations for e2e tests" 1>&2
 }
 
+# Detect the IP for the master
+#
+# Vars set:
+#   KUBE_MASTER
+#   KUBE_MASTER_IP
+# Vars exported:
+#   KUBE_MASTER_URL
 function detect-master {
   KUBE_MASTER=localhost
   KUBE_MASTER_IP=127.0.0.1
-  KUBE_MASTER_URL="http://${KUBE_MASTER_IP}:8080"
+  export KUBE_MASTER_URL="http://${KUBE_MASTER_IP}:8080"
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }

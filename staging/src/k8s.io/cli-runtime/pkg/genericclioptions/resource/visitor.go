@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/text/encoding/unicode"
@@ -38,6 +39,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/kustomize"
+	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
 const (
@@ -139,6 +142,18 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	}
 	i.Object = obj
 	return nil
+}
+
+// ObjectName returns an approximate form of the resource's kind/name.
+func (i *Info) ObjectName() string {
+	if i.Mapping != nil {
+		return fmt.Sprintf("%s/%s", i.Mapping.Resource.Resource, i.Name)
+	}
+	gvk := i.Object.GetObjectKind().GroupVersionKind()
+	if len(gvk.Group) == 0 {
+		return fmt.Sprintf("%s/%s", strings.ToLower(gvk.Kind), i.Name)
+	}
+	return fmt.Sprintf("%s.%s/%s\n", strings.ToLower(gvk.Kind), gvk.Group, i.Name)
 }
 
 // String returns the general purpose string representation
@@ -504,6 +519,24 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
 	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
+	return v.StreamVisitor.Visit(fn)
+}
+
+// KustomizeVisitor is wrapper around a StreamVisitor, to handle Kustomization directories
+type KustomizeVisitor struct {
+	Path string
+	*StreamVisitor
+}
+
+// Visit in a KustomizeVisitor gets the output of Kustomize build and save it in the Streamvisitor
+func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
+	fSys := fs.MakeRealFS()
+	var out bytes.Buffer
+	err := kustomize.RunKustomizeBuild(&out, fSys, v.Path)
+	if err != nil {
+		return err
+	}
+	v.StreamVisitor.Reader = bytes.NewReader(out.Bytes())
 	return v.StreamVisitor.Visit(fn)
 }
 
