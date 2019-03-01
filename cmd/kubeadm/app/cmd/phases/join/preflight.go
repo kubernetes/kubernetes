@@ -73,6 +73,7 @@ func NewPreflightPhase() workflow.Phase {
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
 			options.TokenDiscoverySkipCAHash,
+			options.CertificateKey,
 		},
 	}
 }
