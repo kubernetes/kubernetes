@@ -21,6 +21,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -99,6 +100,9 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 	sysPath := "/sys/class/iscsi_host"
 	hostDirs, err := io.ReadDir(sysPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return portalHostMap, nil
+		}
 		return nil, err
 	}
 	for _, hostDir := range hostDirs {
