@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -346,6 +347,7 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 		},
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
+	klog.Errorf(">>>>> image being used: %v", deployment.Spec.Template.Spec.Containers[0].Image)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
 	By("Wait for the deployment to be ready")
 	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
