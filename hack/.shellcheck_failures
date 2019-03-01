@@ -109,10 +109,6 @@
 ./test/e2e_node/conformance/run_test.sh
 ./test/e2e_node/environment/setup_host.sh
 ./test/e2e_node/gubernator.sh
-./test/e2e_node/jenkins/conformance/conformance-jenkins.sh
-./test/e2e_node/jenkins/copy-e2e-image.sh
-./test/e2e_node/jenkins/e2e-node-jenkins.sh
-./test/e2e_node/jenkins/ubuntu-14.04-nvidia-install.sh
 ./test/images/image-util.sh
 ./test/images/pets/redis-installer/on-start.sh
 ./test/images/pets/zookeeper-installer/install.sh
