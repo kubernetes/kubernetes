@@ -40,7 +40,7 @@
 # Override this to use a different kubectl binary.
 kubectl=kubectl
 linux_deployment_timeout=60
-windows_deployment_timeout=120
+windows_deployment_timeout=180
 output_file=/tmp/k8s-smoke-test.out
 
 function check_windows_nodes_are_ready {
