@@ -151,7 +151,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
-	// Invalid VSAN storage capabilties parameters.
+	// Invalid VSAN storage capabilities parameters.
 	It("verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass", func() {
 		By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReserve: %s, stripeWidth: %s", ObjectSpaceReservationCapabilityVal, StripeWidthCapabilityVal))
 		scParameters["objectSpaceReserve"] = ObjectSpaceReservationCapabilityVal

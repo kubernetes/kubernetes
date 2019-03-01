@@ -127,7 +127,7 @@ func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, fol
 	return vmFolder.Reference(), nil
 }
 
-// CreateVolume creates a vsphere volume using given volume paramemters specified in VolumeOptions.
+// CreateVolume creates a vsphere volume using given volume parameters specified in VolumeOptions.
 // If volume is created successfully the canonical disk path is returned else error is returned.
 func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef types.ManagedObjectReference) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())

@@ -114,7 +114,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 
 	// Create a replication controller for a service
 	// that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image)
