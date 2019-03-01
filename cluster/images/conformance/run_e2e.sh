@@ -25,7 +25,7 @@ shutdown () {
 
     # Kind of a hack to wait for this pid to finish.
     # Since it's not a child of this shell we cannot use wait.
-    tail --pid ${E2E_SUITE_PID} -f /dev/null
+    tail --pid "${E2E_SUITE_PID}" -f /dev/null
     saveResults
 }
 
@@ -54,8 +54,8 @@ case ${E2E_PARALLEL} in
     [1-9]|[1-9][0-9]*) ginkgo_args+=("--nodes=${E2E_PARALLEL}") ;;
 esac
 
-echo "/usr/local/bin/ginkgo ${ginkgo_args[@]} /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider=\"${E2E_PROVIDER}\" --report-dir=\"${RESULTS_DIR}\" --kubeconfig=\"${KUBECONFIG}\""
-/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" | tee ${RESULTS_DIR}/e2e.log &
+echo "/usr/local/bin/ginkgo ${ginkgo_args[*]} /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider=\"${E2E_PROVIDER}\" --report-dir=\"${RESULTS_DIR}\" --kubeconfig=\"${KUBECONFIG}\""
+/usr/local/bin/ginkgo "${ginkgo_args[*]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" | tee "${RESULTS_DIR}/e2e.log" &
 # $! is the pid of tee, not ginkgo
-wait $(pgrep ginkgo)
+wait "$(pgrep ginkgo)"
 saveResults
