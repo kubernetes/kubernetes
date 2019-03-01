@@ -51,7 +51,7 @@ type describeClient struct {
 }
 
 func TestDescribePod(t *testing.T) {
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	gracePeriod := int64(1234)
 	condition1 := corev1.PodConditionType("condition1")
 	condition2 := corev1.PodConditionType("condition2")
@@ -937,7 +937,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 func TestPersistentVolumeDescriber(t *testing.T) {
 	block := corev1.PersistentVolumeBlock
 	file := corev1.PersistentVolumeFilesystem
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	testCases := []struct {
 		name               string
 		plugin             string
@@ -1305,7 +1305,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	file := corev1.PersistentVolumeFilesystem
 	goldClassName := "gold"
 	now := time.Now()
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
