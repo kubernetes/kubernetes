@@ -44,12 +44,6 @@ func getControlPlaneJoinPhaseFlags() []string {
 		options.CfgPath,
 		options.ControlPlane,
 		options.NodeName,
-		options.FileDiscovery,
-		options.TokenDiscovery,
-		options.TokenDiscoveryCAHash,
-		options.TokenDiscoverySkipCAHash,
-		options.TLSBootstrapToken,
-		options.TokenStr,
 	}
 }
 

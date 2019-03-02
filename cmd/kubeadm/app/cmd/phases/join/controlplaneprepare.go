@@ -41,11 +41,9 @@ func NewControlPlanePreparePhase() workflow.Phase {
 		Short: "Prepares the machine for serving a control plane.",
 		Phases: []workflow.Phase{
 			{
-				Name:  "all",
-				Short: "Prepares the machine for serving a control plane.",
-				InheritFlags: append(getControlPlanePreparePhaseFlags(),
-					options.CertificateKey,
-				),
+				Name:           "all",
+				Short:          "Prepares the machine for serving a control plane.",
+				InheritFlags:   getControlPlanePreparePhaseFlags("all"),
 				RunAllSiblings: true,
 			},
 			newControlPlanePrepareDownloadCertsSubphase(),
@@ -56,31 +54,39 @@ func NewControlPlanePreparePhase() workflow.Phase {
 	}
 }
 
-func getControlPlanePreparePhaseFlags() []string {
-	return []string{
+func getControlPlanePreparePhaseFlags(name string) []string {
+	flags := []string{
 		options.APIServerAdvertiseAddress,
 		options.APIServerBindPort,
 		options.CfgPath,
 		options.ControlPlane,
 		options.NodeName,
-		options.FileDiscovery,
-		options.TokenDiscovery,
-		options.TokenDiscoveryCAHash,
-		options.TokenDiscoverySkipCAHash,
-		options.TLSBootstrapToken,
-		options.TokenStr,
 	}
+	if name != "manifests" {
+		flags = append(flags,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+		)
+	}
+	if name == "all" || name == "download-certs" {
+		flags = append(flags,
+			options.CertificateKey,
+		)
+	}
+	return flags
 }
 
 func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "download-certs",
-		Short: fmt.Sprintf("Download certificates from %s", kubeadmconstants.KubeadmCertsSecret),
-		Long:  cmdutil.MacroCommandLongDescription,
-		Run:   runControlPlanePrepareDownloadCertsPhaseLocal,
-		InheritFlags: append(getControlPlanePreparePhaseFlags(),
-			options.CertificateKey,
-		),
+		Name:         "download-certs",
+		Short:        fmt.Sprintf("Download certificates from %s", kubeadmconstants.KubeadmCertsSecret),
+		Long:         cmdutil.MacroCommandLongDescription,
+		Run:          runControlPlanePrepareDownloadCertsPhaseLocal,
+		InheritFlags: getControlPlanePreparePhaseFlags("download-certs"),
 	}
 }
 
@@ -88,8 +94,8 @@ func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "certs",
 		Short:        "Generates the certificates for the new control plane components",
-		Run:          runControlPlanePrepareCertsPhaseLocal,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
+		Run:          runControlPlanePrepareCertsPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
+		InheritFlags: getControlPlanePreparePhaseFlags("certs"),
 	}
 }
 
@@ -97,8 +103,8 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "kubeconfig",
 		Short:        "Generates the kubeconfig for the new control plane components",
-		Run:          runControlPlanePrepareKubeconfigPhaseLocal,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
+		Run:          runControlPlanePrepareKubeconfigPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
+		InheritFlags: getControlPlanePreparePhaseFlags("kubeconfig"),
 	}
 }
 
@@ -106,8 +112,8 @@ func newControlPlanePrepareManifestsSubphases() workflow.Phase {
 	return workflow.Phase{
 		Name:         "manifests",
 		Short:        "Generates the manifests for the new control plane components",
-		Run:          runControlPlanePrepareManifestsSubphase,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each component
+		Run:          runControlPlanePrepareManifestsSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
+		InheritFlags: getControlPlanePreparePhaseFlags("manifests"),
 	}
 }
 
