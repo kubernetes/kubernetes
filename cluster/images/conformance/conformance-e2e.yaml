@@ -65,7 +65,7 @@ spec:
     - name: E2E_PROVIDER
       value: "local"
     - name: E2E_PARALLEL
-      value: "y"
+      value: "1"
     volumeMounts:
     - name: output-volume
       mountPath: /tmp/results
