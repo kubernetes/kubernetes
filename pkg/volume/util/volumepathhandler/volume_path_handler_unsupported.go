@@ -25,15 +25,15 @@ import (
 // AttachFileDevice takes a path to a regular file and makes it available as an
 // attached block device.
 func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
-	return "", fmt.Errorf("AttachFileDevice not supported for this build.")
+	return "", fmt.Errorf("AttachFileDevice not supported for this build")
 }
 
 // GetLoopDevice returns the full path to the loop device associated with the given path.
 func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
-	return "", fmt.Errorf("GetLoopDevice not supported for this build.")
+	return "", fmt.Errorf("GetLoopDevice not supported for this build")
 }
 
 // RemoveLoopDevice removes specified loopback device
 func (v VolumePathHandler) RemoveLoopDevice(device string) error {
-	return fmt.Errorf("RemoveLoopDevice not supported for this build.")
+	return fmt.Errorf("RemoveLoopDevice not supported for this build")
 }

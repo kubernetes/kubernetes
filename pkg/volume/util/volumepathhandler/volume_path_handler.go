@@ -29,8 +29,10 @@ import (
 )
 
 const (
-	losetupPath           = "losetup"
-	ErrDeviceNotFound     = "device not found"
+	losetupPath = "losetup"
+	// ErrDeviceNotFound is used to indicate "device not found" error
+	ErrDeviceNotFound = "device not found"
+	// ErrDeviceNotSupported is used to indicate "device not supported" error
 	ErrDeviceNotSupported = "device not supported"
 )
 
