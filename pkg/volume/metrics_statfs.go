@@ -55,7 +55,7 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
 func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.FsInfo(md.path)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}

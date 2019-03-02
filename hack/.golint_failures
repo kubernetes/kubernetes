@@ -354,7 +354,6 @@ pkg/volume/rbd
 pkg/volume/scaleio
 pkg/volume/storageos
 pkg/volume/testing
-pkg/volume/util/fs
 pkg/volume/util/recyclerclient
 pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
