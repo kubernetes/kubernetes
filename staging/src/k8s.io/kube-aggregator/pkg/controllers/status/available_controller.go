@@ -48,7 +48,7 @@ import (
 
 // ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
 // AvailableConditionController handles checking the availability of registered API services.
@@ -235,7 +235,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
-		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name)
+		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, apiService.Spec.Service.Port)
 		if err != nil {
 			return err
 		}

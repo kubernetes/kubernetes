@@ -129,6 +129,6 @@ type serviceResolver struct {
 	services v1.ServiceLister
 }
 
-func (r *serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveCluster(r.services, namespace, name)
+func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return proxy.ResolveCluster(r.services, namespace, name, port)
 }

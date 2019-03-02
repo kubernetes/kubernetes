@@ -63,7 +63,7 @@ func ValidateWebhookService(fldPath *field.Path, namespace, name string, path *s
 	}
 
 	if errs := validation.IsValidPortNum(int(port)); errs != nil {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), port, "port is not valid:"+strings.Join(errs, ",")))
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), port, "port is not valid: "+strings.Join(errs, ", ")))
 	}
 
 	if path == nil {

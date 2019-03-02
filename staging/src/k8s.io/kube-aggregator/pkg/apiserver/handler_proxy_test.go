@@ -84,7 +84,7 @@ type mockedRouter struct {
 	err             error
 }
 
-func (r *mockedRouter) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
 }
 
