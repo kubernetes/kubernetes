@@ -1471,6 +1471,22 @@ func TestCSIDriverValidation(t *testing.T) {
 				PodInfoOnMount: &notPodInfoOnMount,
 			},
 		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: nil,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: nil,
+			},
+		},
 	}
 
 	for _, csiDriver := range errorCases {

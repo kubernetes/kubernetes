@@ -43,4 +43,8 @@ func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
 		obj.Spec.AttachRequired = new(bool)
 		*(obj.Spec.AttachRequired) = true
 	}
+	if obj.Spec.PodInfoOnMount == nil {
+		obj.Spec.PodInfoOnMount = new(bool)
+		*(obj.Spec.PodInfoOnMount) = false
+	}
 }

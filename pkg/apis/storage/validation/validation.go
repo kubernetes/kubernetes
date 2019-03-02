@@ -324,7 +324,7 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.Error
 		allErrs = append(allErrs, field.Required(fldPath, nodeID))
 	}
 	if len(nodeID) > csiNodeIDMaxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("nodeID must be %d characters or less", csiNodeIDMaxLength)))
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
 	}
 	return allErrs
 }
@@ -387,6 +387,7 @@ func validateCSIDriverSpec(
 	spec *storage.CSIDriverSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
+	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
 	return allErrs
 }
 
@@ -394,6 +395,16 @@ func validateCSIDriverSpec(
 func validateAttachRequired(attachRequired *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if attachRequired == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validatePodInfoOnMount tests if podInfoOnMount is set for CSIDriver.
+func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if podInfoOnMount == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

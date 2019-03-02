@@ -42,6 +42,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.AttachRequired = new(bool)
 				*(obj.Spec.AttachRequired) = true
 			}
+			if obj.Spec.PodInfoOnMount == nil {
+				obj.Spec.PodInfoOnMount = new(bool)
+				*(obj.Spec.PodInfoOnMount) = false
+			}
 		},
 	}
 }
