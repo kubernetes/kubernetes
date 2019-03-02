@@ -819,9 +819,15 @@ function Configure-CniNetworking {
   Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
               "CNI config")
 
+  # We reserve .1 and .2 for gateways. Start the CIDR range from ".3" so that
+  # IPAM does not allocate those IPs to pods.
+  $cidr_range_start = `
+      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.3'
+
   # Explanation of the CNI config values:
   #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
   #   POD_CIDR: the pod CIDR assigned to this node.
+  #   CIDR_RANGE_START: start of the pod CIDR range.
   #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
   #     communicate with the rest of the cluster without NAT (i.e. the subnet
   #     that VM internal IPs are allocated from).
@@ -841,7 +847,8 @@ function Configure-CniNetworking {
   },
   "ipam":  {
     "type": "host-local",
-    "subnet": "POD_CIDR"
+    "subnet": "POD_CIDR",
+    "rangeStart": "CIDR_RANGE_START"
   },
   "dns":  {
     "Nameservers":  [
@@ -881,6 +888,7 @@ function Configure-CniNetworking {
     }
   ]
 }'.replace('POD_CIDR', ${env:POD_CIDR}).`
+  replace('CIDR_RANGE_START', ${cidr_range_start}).`
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
