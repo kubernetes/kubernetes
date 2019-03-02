@@ -354,7 +354,6 @@ pkg/volume/rbd
 pkg/volume/scaleio
 pkg/volume/storageos
 pkg/volume/testing
-pkg/volume/util/recyclerclient
 pkg/volume/vsphere_volume
 plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
