@@ -177,7 +177,10 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 		containerID := createResp.ID
 
 		if cleanupInfo != nil {
-			// save it for when the container starts or gets removed
+			// we don't perform the clean up just yet at that could destroy information
+			// needed for the container to start (e.g. Windows credentials stored in
+			// registry keys); instead, we'll clean up after the container successfully
+			// starts or gets removed
 			ds.containerCleanupInfos[containerID] = cleanupInfo
 		}
 		return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
