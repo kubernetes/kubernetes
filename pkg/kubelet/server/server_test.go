@@ -256,8 +256,12 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 	return map[string]volume.Volume{}, true
 }
 
-func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)     { return nil, nil }
-func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)  { return nil, nil }
+func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
+func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
+func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (_ *fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return nil, nil
+}
 func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)    { return nil, nil }
 func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
 func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
