@@ -150,24 +150,23 @@ func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedF
 }
 
 func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (sortedManagedFields []metav1.ManagedFieldsEntry, err error) {
-	operation := func(p, q metav1.ManagedFieldsEntry) bool {
-		return p.Operation < q.Operation
-	}
-	timestamp := func(p, q metav1.ManagedFieldsEntry) bool {
+	sort.Slice(encodedManagedFields, func(i, j int) bool {
+		p, q := encodedManagedFields[i], encodedManagedFields[j]
+
+		if p.Operation != q.Operation {
+			return p.Operation < q.Operation
+		}
+
 		if p.Time == nil || q.Time == nil {
 			return false
 		}
-		return q.Time.Before(p.Time)
-	}
-	manager := func(p, q metav1.ManagedFieldsEntry) bool {
+		if !p.Time.Equal(q.Time) {
+			return q.Time.Before(p.Time)
+		}
+
 		return p.Manager < q.Manager
-	}
+	})
 
-	sorter := &managedFieldsSorter{
-		less: []managedFieldsLessFunc{operation, timestamp, manager},
-	}
-
-	sorter.Sort(encodedManagedFields)
 	return encodedManagedFields, nil
 }
 
