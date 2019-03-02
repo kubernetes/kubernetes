@@ -121,6 +121,6 @@ func TestApiserverMetrics(t *testing.T) {
 	}
 	checkForExpectedMetrics(t, metrics, []string{
 		"apiserver_request_total",
-		"apiserver_request_latency_seconds",
+		"apiserver_request_duration_seconds",
 	})
 }

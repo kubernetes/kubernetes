@@ -70,7 +70,7 @@ var (
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "apiserver_request_latency_seconds",
+			Name: "apiserver_request_duration_seconds",
 			Help: "Response latency distribution in seconds for each verb, group, version, resource, subresource, scope and component.",
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
