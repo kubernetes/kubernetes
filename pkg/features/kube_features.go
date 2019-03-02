@@ -87,6 +87,8 @@ const (
 
 	// owner: @msau42
 	// alpha: v1.7
+	// beta: v1.10
+	// ga: v1.14
 	//
 	// A new volume type that supports local disks on a node.
 	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
@@ -428,7 +430,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TaintBasedEvictions:                         {Default: true, PreRelease: utilfeature.Beta},
 	RotateKubeletServerCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
-	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
+	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
 	HugePages:                                   {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
