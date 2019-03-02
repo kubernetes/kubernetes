@@ -275,6 +275,29 @@ func (_m *StatsProvider) ListPodStats() ([]v1alpha1.PodStats, error) {
 	return r0, r1
 }
 
+// ListPodStatsAndUpdateCPUNanoCoreUsage provides a mock function with given fields:
+func (_m *StatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]v1alpha1.PodStats, error) {
+	ret := _m.Called()
+
+	var r0 []v1alpha1.PodStats
+	if rf, ok := ret.Get(0).(func() []v1alpha1.PodStats); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]v1alpha1.PodStats)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListPodCPUAndMemoryStats provides a mock function with given fields:
 func (_m *StatsProvider) ListPodCPUAndMemoryStats() ([]v1alpha1.PodStats, error) {
 	ret := _m.Called()

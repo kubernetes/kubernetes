@@ -84,10 +84,16 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
 	}
-	podStats, err := sp.provider.ListPodStats()
+	var podStats []statsapi.PodStats
+	if updateStats {
+		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage()
+	} else {
+		podStats, err = sp.provider.ListPodStats()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
+
 	rlimit, err := sp.provider.RlimitStats()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
