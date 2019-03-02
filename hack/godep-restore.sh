@@ -23,6 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::log::status "Restoring kubernetes godeps"
 
+kube::util::godep_restored_prepare
+
 if kube::util::godep_restored 2>&1; then
     kube::log::status "Dependencies appear to be current - skipping download"
     exit 0

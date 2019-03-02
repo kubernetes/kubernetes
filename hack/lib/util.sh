@@ -347,13 +347,17 @@ kube::util::create-fake-git-tree() {
   popd >/dev/null || return 1
 }
 
+# Check requirements necessary to run godep_restored
+# We need a separate function for this because godep_restored() cannot report errors.
+kube::util::godep_restored_prepare() {
+  kube::util::require-jq
+}
+
 # Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
 # and are checked out to the referenced rev.
 kube::util::godep_restored() {
   local -r godeps_json=${1:-Godeps/Godeps.json}
   local -r gopath=${2:-${GOPATH%:*}}
-
-  kube::util::require-jq
 
   local root
   local old_rev=""
