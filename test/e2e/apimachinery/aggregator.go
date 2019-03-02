@@ -42,11 +42,16 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/utils/pointer"
 
 	. "github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
+
+const (
+	aggregatorServicePort = 7443
+)
 
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
@@ -266,7 +271,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
-					Port:       443,
+					Port:       aggregatorServicePort,
 					TargetPort: intstr.FromInt(443),
 				},
 			},
@@ -317,6 +322,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
+				Port:      pointer.Int32Ptr(aggregatorServicePort),
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",
