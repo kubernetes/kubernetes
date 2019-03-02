@@ -21,6 +21,7 @@ package nodeinfomanager // import "k8s.io/kubernetes/pkg/volume/csi/nodeinfomana
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"time"
 
@@ -60,8 +61,9 @@ var (
 // nodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINode objects.
 type nodeInfoManager struct {
-	nodeName   types.NodeName
-	volumeHost volume.VolumeHost
+	nodeName        types.NodeName
+	volumeHost      volume.VolumeHost
+	migratedPlugins map[string](func() bool)
 }
 
 // If no updates is needed, the function must return the same Node object as the input.
@@ -85,10 +87,12 @@ type Interface interface {
 // NewNodeInfoManager initializes nodeInfoManager
 func NewNodeInfoManager(
 	nodeName types.NodeName,
-	volumeHost volume.VolumeHost) Interface {
+	volumeHost volume.VolumeHost,
+	migratedPlugins map[string](func() bool)) Interface {
 	return &nodeInfoManager{
-		nodeName:   nodeName,
-		volumeHost: volumeHost,
+		nodeName:        nodeName,
+		volumeHost:      volumeHost,
+		migratedPlugins: migratedPlugins,
 	}
 }
 
@@ -418,7 +422,49 @@ func (nim *nodeInfoManager) CreateCSINode() (*storage.CSINode, error) {
 		},
 	}
 
+	setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
+
 	return csiKubeClient.StorageV1beta1().CSINodes().Create(nodeInfo)
+}
+
+const (
+	migratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+)
+
+func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storage.CSINode) (modified bool) {
+	if migratedPlugins == nil {
+		return false
+	}
+
+	nodeInfoAnnotations := nodeInfo.GetAnnotations()
+	if nodeInfoAnnotations == nil {
+		nodeInfoAnnotations = map[string]string{}
+	}
+
+	mpa := nodeInfoAnnotations[migratedPluginsAnnotationKey]
+	tok := strings.Split(mpa, ",")
+	oldAnnotationSet := sets.NewString(tok...)
+
+	newAnnotationSet := sets.NewString()
+	for pluginName, migratedFunc := range migratedPlugins {
+		if migratedFunc() {
+			newAnnotationSet.Insert(pluginName)
+		}
+	}
+
+	if oldAnnotationSet.Equal(newAnnotationSet) {
+		return false
+	}
+
+	nas := strings.Join(newAnnotationSet.List(), ",")
+	if len(nas) != 0 {
+		nodeInfoAnnotations[migratedPluginsAnnotationKey] = nas
+	} else {
+		delete(nodeInfoAnnotations, migratedPluginsAnnotationKey)
+	}
+
+	nodeInfo.Annotations = nodeInfoAnnotations
+	return true
 }
 
 func (nim *nodeInfoManager) installDriverToCSINode(
@@ -453,7 +499,9 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		}
 	}
 
-	if !specModified && !statusModified {
+	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
+
+	if !specModified && !statusModified && !annotationModified {
 		return nil
 	}
 
@@ -517,7 +565,10 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 			hasModified = true
 		}
 	}
-	if !hasModified {
+
+	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
+
+	if !hasModified && !annotationModified {
 		// No changes, don't update
 		return nil
 	}

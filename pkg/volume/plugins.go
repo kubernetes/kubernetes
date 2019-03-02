@@ -278,6 +278,13 @@ type BlockVolumePlugin interface {
 	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
 }
 
+// KubeletVolumeHost is a Kubelet specific interface that plugins can use to access the kubelet.
+type KubeletVolumeHost interface {
+	// SetKubeletError lets plugins set an error on the Kubelet runtime status
+	// that will cause the Kubelet to post NotReady status with the error message provided
+	SetKubeletError(err error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
