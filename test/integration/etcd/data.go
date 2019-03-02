@@ -491,7 +491,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 	// add csinodes if CSINodeInfo feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
-			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}`,
+			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
 			ExpectedEtcdPath: "/registry/csinodes/csini1",
 		}
 	}

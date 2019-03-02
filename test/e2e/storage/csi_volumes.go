@@ -55,11 +55,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		curDriver := initDriver()
 
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			// TODO(xyang): Disable the CSI tests until the sidecar container images
-			// are updated to support CSINodeInfo and CSIDriver Core APIs in the
-			// following PR:
-			// https://github.com/kubernetes/kubernetes/pull/73883
-			//testsuites.DefineTestSuite(curDriver, csiTestSuites)
+			testsuites.DefineTestSuite(curDriver, csiTestSuites)
 		})
 	}
 
