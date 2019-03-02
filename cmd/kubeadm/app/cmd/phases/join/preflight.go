@@ -54,7 +54,7 @@ var (
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:    "preflight",
+		Name:    "preflight [api-server-endpoint]",
 		Short:   "Run join pre-flight checks",
 		Long:    "Run pre-flight checks for kubeadm join.",
 		Example: preflightExample,

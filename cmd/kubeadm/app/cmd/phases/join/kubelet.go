@@ -56,7 +56,7 @@ var (
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "kubelet-start",
+		Name:  "kubelet-start [api-server-endpoint]",
 		Short: "Writes kubelet settings, certificates and (re)starts the kubelet",
 		Long:  "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
 		Run:   runKubeletStartJoinPhase,
@@ -102,7 +102,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
-	klog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
+	klog.V(1).Infoln("[kubelet-start] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
