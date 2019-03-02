@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1297,6 +1297,16 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 		}
 	}
+
+	// Drop the packets in INVALID state, which would potentially cause
+	// unexpected connection reset.
+	// https://github.com/kubernetes/kubernetes/issues/74839
+	writeLine(proxier.filterRules,
+		"-A", string(kubeForwardChain),
+		"-m", "conntrack",
+		"--ctstate", "INVALID",
+		"-j", "DROP",
+	)
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
