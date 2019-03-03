@@ -398,7 +398,7 @@ runTests() {
     for pkg in ${WHAT}
     do 
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
-      if [[ "$pkg" != "kubeadm" ]]; then 
+      if [[ "${pkg}" != "kubeadm" ]]; then 
         record_command run_${pkg}_tests
       fi
     done
