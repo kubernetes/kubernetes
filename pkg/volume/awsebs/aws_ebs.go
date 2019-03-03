@@ -317,8 +317,8 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 	return awsVolume.ResizeDisk(volumeID, oldSize, newSize)
 }
 
-func (plugin *awsElasticBlockStorePlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
+func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}

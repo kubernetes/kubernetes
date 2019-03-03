@@ -201,8 +201,8 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 	}
 }
 
-func (plugin *rbdPlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) (bool, error) {
-	_, err := volutil.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
+func (plugin *rbdPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := volutil.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}

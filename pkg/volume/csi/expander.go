@@ -21,21 +21,28 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
+
+var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
 
 func (c *csiPlugin) RequiresFSResize() bool {
 	// We could check plugin's node capability but we instead are going to rely on
 	// NodeExpand to do the right thing and return early if plugin does not have
 	// node expansion capability.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
+		klog.V(4).Infof("Resizing is not enabled for this CSI volume")
+		return false
+	}
 	return true
 }
 
-func (c *csiPlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) (bool, error) {
-	klog.V(4).Infof(log("Expander.NodeExpand(%s)", deviceMountPath))
-	pvSource, err := getCSISourceFromSpec(spec)
+func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	klog.V(4).Infof(log("Expander.NodeExpand(%s)", resizeOptions.DeviceMountPath))
+	pvSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
 		return false, err
 	}
@@ -50,7 +57,7 @@ func (c *csiPlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath st
 		return false, err
 	}
 
-	csiSource, err := getCSISourceFromSpec(spec)
+	csiSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
 		klog.Error(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
 		return false, err
@@ -62,5 +69,28 @@ func (c *csiPlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath st
 	if err != nil {
 		return false, fmt.Errorf("Expander.NodeExpand failed to check if node supports expansion : %v", err)
 	}
-	return false, nil
+
+	if !nodeExpandSet {
+		return false, fmt.Errorf("Expander.NodeExpand found CSI plugin %s to not support node expansion", c.GetPluginName())
+	}
+
+	// Check whether "STAGE_UNSTAGE_VOLUME" is set
+	stageUnstageSet, err := csiClient.NodeSupportsStageUnstage(ctx)
+	if err != nil {
+		return false, fmt.Errorf("Expander.NodeExpand failed to check if plugins supports stage_unstage %v", err)
+	}
+
+	// if plugin does not support STAGE_UNSTAGE but CSI volume path is staged
+	// it must mean this was placeholder staging performed by k8s and not CSI staging
+	// in which case we should return from here so as volume can be node published
+	// before we can resize
+	if !stageUnstageSet && resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
+		return false, nil
+	}
+
+	_, err = csiClient.NodeExpandVolume(ctx, csiSource.VolumeHandle, resizeOptions.DeviceMountPath, resizeOptions.NewSize)
+	if err != nil {
+		return false, fmt.Errorf("Expander.NodeExpand failed to expand the volume : %v", err)
+	}
+	return true, nil
 }

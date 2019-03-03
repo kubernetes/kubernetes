@@ -312,8 +312,8 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DataDiskURI, oldSize, newSize)
 }
 
-func (plugin *azureDataDiskPlugin) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
+func (plugin *azureDataDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}

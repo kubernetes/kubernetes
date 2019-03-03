@@ -537,7 +537,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NodeExpand(spec *Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) (bool, error) {
+func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
 	return true, nil
 }
 

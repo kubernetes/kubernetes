@@ -46,6 +46,9 @@ type ProbeEvent struct {
 	Op         ProbeOperation // The operation to the plugin
 }
 
+// CSIVolumePhaseType stores information about CSI volume path.
+type CSIVolumePhaseType string
+
 const (
 	// Common parameter which can be specified in StorageClass to specify the desired FSType
 	// Provisioners SHOULD implement support for this if they are block device based
@@ -55,6 +58,8 @@ const (
 
 	ProbeAddOrUpdate ProbeOperation = 1 << iota
 	ProbeRemove
+	CSIVolumeStaged    CSIVolumePhaseType = "staged"
+	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -83,6 +88,26 @@ type VolumeOptions struct {
 	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
+}
+
+// NodeResizeOptions contain options to be passed for node expansion.
+type NodeResizeOptions struct {
+	VolumeSpec *Spec
+
+	// DevicePath - location of actual device on the node. In case of CSI
+	// this just could be volumeID
+	DevicePath string
+
+	// DeviceMountPath location where device is mounted on the node. If volume type
+	// is attachable - this would be global mount path otherwise
+	// it would be location where volume was mounted for the pod
+	DeviceMountPath string
+
+	NewSize resource.Quantity
+	OldSize resource.Quantity
+
+	// CSIVolumePhase contains volume phase on the node
+	CSIVolumePhase CSIVolumePhaseType
 }
 
 type DynamicPluginProber interface {
@@ -232,8 +257,7 @@ type NodeExpandableVolumePlugin interface {
 	VolumePlugin
 	RequiresFSResize() bool
 	// NodeExpand expands volume on given deviceMountPath and returns true if resize is successful.
-	// devicePath can be set to empty string if unavailable.
-	NodeExpand(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) (bool, error)
+	NodeExpand(resizeOptions NodeResizeOptions) (bool, error)
 }
 
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of

@@ -38,9 +38,9 @@ func (e *expanderDefaults) ExpandVolumeDevice(spec *volume.Spec, newSize resourc
 
 // the defaults for NodeExpand return a generic resize indicator that will trigger the operation executor to go ahead with
 // generic filesystem resize
-func (e *expanderDefaults) NodeExpand(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) (bool, error) {
-	klog.Warning(logPrefix(e.plugin), "using default filesystem resize for volume ", spec.Name(), ", at ", devicePath)
-	_, err := util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), devicePath, deviceMountPath)
+func (e *expanderDefaults) NodeExpand(rsOpt volume.NodeResizeOptions) (bool, error) {
+	klog.Warning(logPrefix(e.plugin), "using default filesystem resize for volume ", rsOpt.VolumeSpec.Name(), ", at ", rsOpt.DevicePath)
+	_, err := util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), rsOpt.DevicePath, rsOpt.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}
