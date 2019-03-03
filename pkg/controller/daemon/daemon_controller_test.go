@@ -228,15 +228,18 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 type fakePodControl struct {
 	sync.Mutex
 	*controller.FakePodControl
-	podStore cache.Store
-	podIDMap map[string]*v1.Pod
+	podStore     cache.Store
+	podIDMap     map[string]*v1.Pod
+	expectations controller.ControllerExpectationsInterface
+	dsc          *daemonSetsController
 }
 
 func newFakePodControl() *fakePodControl {
 	podIDMap := make(map[string]*v1.Pod)
 	return &fakePodControl{
 		FakePodControl: &controller.FakePodControl{},
-		podIDMap:       podIDMap}
+		podIDMap:       podIDMap,
+	}
 }
 
 func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
@@ -264,6 +267,11 @@ func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod
+
+	ds := object.(*apps.DaemonSet)
+	dsKey, _ := controller.KeyFunc(ds)
+	f.expectations.CreationObserved(dsKey)
+
 	return nil
 }
 
@@ -289,6 +297,11 @@ func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template 
 
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod
+
+	ds := object.(*apps.DaemonSet)
+	dsKey, _ := controller.KeyFunc(ds)
+	f.expectations.CreationObserved(dsKey)
+
 	return nil
 }
 
@@ -304,6 +317,11 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 	}
 	f.podStore.Delete(pod)
 	delete(f.podIDMap, podID)
+
+	ds := object.(*apps.DaemonSet)
+	dsKey, _ := controller.KeyFunc(ds)
+	f.expectations.DeletionObserved(dsKey)
+
 	return nil
 }
 
@@ -344,14 +362,18 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	dsc.podControl = podControl
 	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
 
-	return &daemonSetsController{
+	newDsc := &daemonSetsController{
 		dsc,
 		informerFactory.Apps().V1().DaemonSets().Informer().GetStore(),
 		informerFactory.Apps().V1().ControllerRevisions().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		fakeRecorder,
-	}, podControl, clientset, nil
+	}
+
+	podControl.expectations = newDsc.expectations
+
+	return newDsc, podControl, clientset, nil
 }
 
 func resetCounters(manager *daemonSetsController) {
@@ -562,6 +584,34 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 				t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
 			}
 
+		}
+	}
+}
+
+func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
+	for _, f := range []bool{true, false} {
+		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		strategies := updateStrategies()
+		for _, strategy := range strategies {
+			ds := newDaemonSet("foo")
+			ds.Spec.UpdateStrategy = *strategy
+			manager, podControl, _, err := newTestController(ds)
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
+			podControl.FakePodControl.CreateLimit = 10
+			creationExpectations := 100
+			addNodes(manager.nodeStore, 0, 100, nil)
+			manager.dsStore.Add(ds)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
+			dsKey, err := controller.KeyFunc(ds)
+			if err != nil {
+				t.Fatalf("error get DaemonSets controller key: %v", err)
+			}
+
+			if !manager.expectations.SatisfiedExpectations(dsKey) {
+				t.Errorf("Unsatisfied pod creation expectatitons. Expected %d", creationExpectations)
+			}
 		}
 	}
 }
@@ -796,7 +846,8 @@ func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(
 // are sufficient resources.
 func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
-	for _, strategy := range updateStrategies() {
+
+	validate := func(strategy *apps.DaemonSetUpdateStrategy, expectedEvents int) {
 		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
@@ -813,7 +864,25 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 			Status: v1.PodStatus{Phase: v1.PodSucceeded},
 		})
 		manager.dsStore.Add(ds)
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 1)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, expectedEvents)
+	}
+
+	tests := []struct {
+		strategy       *apps.DaemonSetUpdateStrategy
+		expectedEvents int
+	}{
+		{
+			strategy:       newOnDeleteStrategy(),
+			expectedEvents: 1,
+		},
+		{
+			strategy:       newRollbackStrategy(),
+			expectedEvents: 2,
+		},
+	}
+
+	for _, t := range tests {
+		validate(t.strategy, t.expectedEvents)
 	}
 }
 
@@ -821,7 +890,7 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 
-	for _, strategy := range updateStrategies() {
+	validate := func(strategy *apps.DaemonSetUpdateStrategy, expectedEvents int) {
 		podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
@@ -837,7 +906,25 @@ func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 			Spec: podSpec,
 		})
 		manager.dsStore.Add(ds)
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 1)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, expectedEvents)
+	}
+
+	tests := []struct {
+		strategy       *apps.DaemonSetUpdateStrategy
+		expectedEvents int
+	}{
+		{
+			strategy:       newOnDeleteStrategy(),
+			expectedEvents: 1,
+		},
+		{
+			strategy:       newRollbackStrategy(),
+			expectedEvents: 2,
+		},
+	}
+
+	for _, t := range tests {
+		validate(t.strategy, t.expectedEvents)
 	}
 }
 
