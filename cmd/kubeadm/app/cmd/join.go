@@ -195,7 +195,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	}
 
 	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
-	addJoinOtherFlags(cmd.Flags(), &joinOptions.cfgPath, &joinOptions.ignorePreflightErrors, &joinOptions.controlPlane, &joinOptions.token, &joinOptions.certificateKey)
+	addJoinOtherFlags(cmd.Flags(), joinOptions)
 
 	joinRunner.AppendPhase(phases.NewPreflightPhase())
 	joinRunner.AppendPhase(phases.NewControlPlanePreparePhase())
@@ -257,32 +257,25 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 }
 
 // addJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func addJoinOtherFlags(
-	flagSet *flag.FlagSet,
-	cfgPath *string,
-	ignorePreflightErrors *[]string,
-	controlPlane *bool,
-	token *string,
-	certificateKey *string,
-) {
+func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 	flagSet.StringVar(
-		cfgPath, options.CfgPath, *cfgPath,
+		&joinOptions.cfgPath, options.CfgPath, joinOptions.cfgPath,
 		"Path to kubeadm config file.",
 	)
 	flagSet.StringSliceVar(
-		ignorePreflightErrors, options.IgnorePreflightErrors, *ignorePreflightErrors,
+		&joinOptions.ignorePreflightErrors, options.IgnorePreflightErrors, joinOptions.ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	flagSet.StringVar(
-		token, options.TokenStr, "",
+		&joinOptions.token, options.TokenStr, "",
 		"Use this token for both discovery-token and tls-bootstrap-token when those values are not provided.",
 	)
 	flagSet.BoolVar(
-		controlPlane, options.ControlPlane, *controlPlane,
+		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
 	)
 	flagSet.StringVar(
-		certificateKey, options.CertificateKey, "",
+		&joinOptions.certificateKey, options.CertificateKey, "",
 		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 }
