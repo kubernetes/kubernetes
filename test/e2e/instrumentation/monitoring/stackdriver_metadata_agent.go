@@ -136,7 +136,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 }
 
 func parseResource(resource interface{}) (*Resource, error) {
-	var labels = map[string]string{}
+	labels := map[string]string{}
 	resourceMap, ok := resource.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("Resource entry is of type %s, expected map[string]interface{}", reflect.TypeOf(resource))
