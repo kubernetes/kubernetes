@@ -41,12 +41,8 @@ import (
 
 var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 	f := framework.NewDefaultFramework("audit")
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
-	})
 
-	// TODO(@pbarker): Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
-	It("should dynamically audit API calls [DisabledForLargeClusters]", func() {
+	It("should dynamically audit API calls", func() {
 		namespace := f.Namespace.Name
 
 		By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
