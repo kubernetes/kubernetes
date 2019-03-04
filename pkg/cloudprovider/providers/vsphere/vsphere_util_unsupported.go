@@ -20,6 +20,6 @@ package vsphere
 
 import "fmt"
 
-func GetVMUUID() (string, error) {
+func getRawUUID() (string, error) {
 	return "", fmt.Errorf("Retrieving VM UUID on this build is not implemented.")
 }
