@@ -216,6 +216,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 		fakeClient,
 		nil,
 		"fakeNode",
+		nil,
 	)
 	plug.host = host
 
@@ -282,6 +283,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 		fakeClient,
 		nil,
 		"fakeNode",
+		nil,
 	)
 	plug.host = host
 
@@ -364,6 +366,7 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 		fakeClient,
 		nil,
 		"fakeNode",
+		nil,
 	)
 	plug.host = host
 

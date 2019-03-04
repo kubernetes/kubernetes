@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -48,11 +49,19 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	if client == nil {
 		client = fakeclient.NewSimpleClientset()
 	}
+
+	// Start informer for CSIDrivers.
+	factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverLister := csiDriverInformer.Lister()
+	go factory.Start(wait.NeverStop)
+
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		client,
 		nil,
 		"fakeNode",
+		csiDriverLister,
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -70,7 +79,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
 		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
 
