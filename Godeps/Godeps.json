@@ -1737,11 +1737,6 @@
 			"Rev": "eeefdecb41b842af6dc652aaea4026e8403e62df"
 		},
 		{
-			"ImportPath": "github.com/go-ini/ini",
-			"Comment": "v1.25.4",
-			"Rev": "300e940a926eb277d3901b20bdfcc54928ad3642"
-		},
-		{
 			"ImportPath": "github.com/go-openapi/analysis",
 			"Comment": "v0.17.2",
 			"Rev": "c701774f4e604d952e4e8c56dee260be696e33c3"
