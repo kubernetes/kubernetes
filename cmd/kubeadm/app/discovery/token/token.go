@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -71,7 +72,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 			return nil, err
 		}
 
-		fmt.Printf("[discovery] Created cluster-info discovery client, requesting info from %q\n", insecureBootstrapConfig.Clusters[clusterName].Server)
+		klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", insecureBootstrapConfig.Clusters[clusterName].Server)
 
 		// Make an initial insecure connection to get the cluster-info ConfigMap
 		var insecureClusterInfo *v1.ConfigMap
@@ -79,7 +80,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 			var err error
 			insecureClusterInfo, err = insecureClient.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if err != nil {
-				fmt.Printf("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
+				klog.V(1).Infof("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
 				return false, nil
 			}
 			return true, nil
@@ -106,7 +107,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 		// If no TLS root CA pinning was specified, we're done
 		if pubKeyPins.Empty() {
-			fmt.Printf("[discovery] Cluster info signature and contents are valid and no TLS pinning was specified, will use API Server %q\n", endpoint)
+			klog.V(1).Infof("[discovery] Cluster info signature and contents are valid and no TLS pinning was specified, will use API Server %q\n", endpoint)
 			return insecureConfig, nil
 		}
 
@@ -137,13 +138,13 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 			return nil, err
 		}
 
-		fmt.Printf("[discovery] Requesting info from %q again to validate TLS against the pinned public key\n", insecureBootstrapConfig.Clusters[clusterName].Server)
+		klog.V(1).Infof("[discovery] Requesting info from %q again to validate TLS against the pinned public key\n", insecureBootstrapConfig.Clusters[clusterName].Server)
 		var secureClusterInfo *v1.ConfigMap
 		wait.PollImmediateInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
 			var err error
 			secureClusterInfo, err = secureClient.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if err != nil {
-				fmt.Printf("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
+				klog.V(1).Infof("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
 				return false, nil
 			}
 			return true, nil
@@ -160,7 +161,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 			return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 		}
 
-		fmt.Printf("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q\n", endpoint)
+		klog.V(1).Infof("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q\n", endpoint)
 		return secureKubeconfig, nil
 	})
 	if err != nil {
@@ -196,13 +197,13 @@ func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Durati
 	go func() {
 		defer wg.Done()
 		wait.Until(func() {
-			fmt.Printf("[discovery] Trying to connect to API Server %q\n", apiEndpoint)
+			klog.V(1).Infof("[discovery] Trying to connect to API Server %q\n", apiEndpoint)
 			cfg, err := fetchKubeConfigFunc(apiEndpoint)
 			if err != nil {
-				fmt.Printf("[discovery] Failed to connect to API Server %q: %v\n", apiEndpoint, err)
+				klog.V(1).Infof("[discovery] Failed to connect to API Server %q: %v\n", apiEndpoint, err)
 				return
 			}
-			fmt.Printf("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
+			klog.V(1).Infof("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
 			once.Do(func() {
 				resultingKubeConfig = cfg
 				close(stopChan)
@@ -216,7 +217,7 @@ func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Durati
 			close(stopChan)
 		})
 		err := errors.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
-		fmt.Printf("[discovery] %v\n", err)
+		klog.V(1).Infof("[discovery] %v\n", err)
 		wg.Wait()
 		return nil, err
 	case <-stopChan:
