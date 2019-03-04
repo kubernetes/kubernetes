@@ -800,16 +800,24 @@ func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	responses := sets.NewString()
 	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 
-	for i := 0; i < 100; i++ {
-		url := fmt.Sprintf("http://%v", address)
+	requestCount := 100
+	errCount := 0
+	url := fmt.Sprintf("http://%v", address)
+	for i := 0; i < requestCount; i++ {
 		res, err := framework.SimpleGET(timeoutClient, url, "")
 		if err != nil {
+			errCount++
 			j.Logger.Errorf("Failed to GET %q. Got responses: %q: %v", url, res, err)
-			return responses, err
 		}
 		responses.Insert(res)
 	}
-	return responses, nil
+
+	// Tolerate 1 failure to reduce noise from transient network problem.
+	if errCount <= 1 {
+		return responses, nil
+	} else {
+		return responses, fmt.Errorf("Out of %v requests to %q, %v failed: %v", requestCount, url, errCount, err)
+	}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
