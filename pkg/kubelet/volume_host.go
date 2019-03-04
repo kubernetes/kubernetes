@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelister "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/features"
@@ -129,6 +130,10 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 
 func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
+}
+
+func (kvh *kubeletVolumeHost) GetCSIDriverLister() storagelister.CSIDriverLister {
+	return kvh.kubelet.csiDriverLister
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

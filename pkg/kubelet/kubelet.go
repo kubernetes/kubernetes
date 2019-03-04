@@ -43,9 +43,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
@@ -171,6 +173,9 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// Period for informers to resync
+	resyncPeriod = time.Minute
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -775,6 +780,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
+	// Initialize csiDriverLister before calling NewInitializedVolumePluginMgr
+	// because csiDriverLister is needed in csi_plugin.go
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		klet.informerFactory = informers.NewSharedInformerFactory(klet.kubeClient, resyncPeriod)
+		csiDriverInformer := klet.informerFactory.Storage().V1beta1().CSIDrivers()
+		klet.csiDriverLister = csiDriverInformer.Lister()
+	}
+
 	// NewInitializedVolumePluginMgr intializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
 	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
@@ -812,7 +825,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
 		experimentalCheckNodeCapabilitiesBeforeMount,
-		keepTerminatedPodVolumes)
+		keepTerminatedPodVolumes,
+		klet.informerFactory)
 
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
@@ -1216,6 +1230,10 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// This is for building the informer factory for CSIDriverLister
+	informerFactory informers.SharedInformerFactory
+	csiDriverLister storagelisters.CSIDriverLister
 }
 
 // setupDataDirs creates:
@@ -1408,6 +1426,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// start syncing lease
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
 			go kl.nodeLeaseController.Run(wait.NeverStop)
+		}
+
+		// start informer for CSIDriver
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+			go kl.informerFactory.Start(wait.NeverStop)
 		}
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)

@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
@@ -336,6 +337,11 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 }
 
 func (expc *expandController) GetSubpather() subpath.Interface {
+	// not needed for expand controller
+	return nil
+}
+
+func (expc *expandController) GetCSIDriverLister() storagelisters.CSIDriverLister {
 	// not needed for expand controller
 	return nil
 }

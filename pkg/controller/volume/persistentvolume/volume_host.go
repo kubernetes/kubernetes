@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -134,5 +135,10 @@ func (ctrl *PersistentVolumeController) GetEventRecorder() record.EventRecorder 
 
 func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
 	// No volume plugin needs Subpaths in PV controller.
+	return nil
+}
+
+func (ctrl *PersistentVolumeController) GetCSIDriverLister() storagelisters.CSIDriverLister {
+	// No volume plugin needs CSIDriver lister in PV controller.
 	return nil
 }

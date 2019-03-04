@@ -421,6 +421,9 @@ type VolumeHost interface {
 
 	// Returns an interface that should be used to execute subpath operations
 	GetSubpather() subpath.Interface
+
+	// Return a lister for CSIDriver
+	GetCSIDriverLister() storagelisters.CSIDriverLister
 }
 
 // VolumePluginMgr tracks registered plugins.

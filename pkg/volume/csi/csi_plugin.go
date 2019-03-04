@@ -37,10 +37,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	csiapiinformer "k8s.io/client-go/informers"
-	csiinformer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	csilister "k8s.io/client-go/listers/storage/v1beta1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -68,10 +65,8 @@ const (
 var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}
 
 type csiPlugin struct {
-	host              volume.VolumeHost
-	blockEnabled      bool
-	csiDriverLister   csilister.CSIDriverLister
-	csiDriverInformer csiinformer.CSIDriverInformer
+	host         volume.VolumeHost
+	blockEnabled bool
 }
 
 //TODO (vladimirvivien) add this type to storage api
@@ -211,18 +206,6 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiClient := host.GetKubeClient()
-		if csiClient == nil {
-			return errors.New("unable to get Kubernetes client")
-		}
-		// Start informer for CSIDrivers.
-		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-		p.csiDriverInformer = factory.Storage().V1beta1().CSIDrivers()
-		p.csiDriverLister = p.csiDriverInformer.Lister()
-		go factory.Start(wait.NeverStop)
-	}
 
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
@@ -763,10 +746,11 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return false, nil
 	}
-	if p.csiDriverLister == nil {
+	csiDriverLister := p.host.GetCSIDriverLister()
+	if csiDriverLister == nil {
 		return false, errors.New("CSIDriver lister does not exist")
 	}
-	csiDriver, err := p.csiDriverLister.Get(driver)
+	csiDriver, err := csiDriverLister.Get(driver)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist

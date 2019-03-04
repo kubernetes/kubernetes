@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	storage "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -281,6 +282,7 @@ var Factories = map[What]ItemFactory{
 	{"ServiceAccount"}:     &serviceAccountFactory{},
 	{"StatefulSet"}:        &statefulSetFactory{},
 	{"StorageClass"}:       &storageClassFactory{},
+	{"CSIDriver"}:          &csiDriverFactory{},
 }
 
 // PatchName makes the name of some item unique by appending the
@@ -546,6 +548,27 @@ func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 	client := f.ClientSet.StorageV1().StorageClasses()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create StorageClass")
+	}
+	return func() error {
+		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
+	}, nil
+}
+
+type csiDriverFactory struct{}
+
+func (f *csiDriverFactory) New() runtime.Object {
+	return &storagev1beta1.CSIDriver{}
+}
+
+func (*csiDriverFactory) Create(f *Framework, i interface{}) (func() error, error) {
+	item, ok := i.(*storagev1beta1.CSIDriver)
+	if !ok {
+		return nil, ItemNotSupported
+	}
+
+	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	if _, err := client.Create(item); err != nil {
+		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})

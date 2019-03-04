@@ -19,7 +19,6 @@ package csi
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -288,11 +287,13 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return nil, nil
 	}
-	if c.plugin.csiDriverLister == nil {
-		return nil, errors.New("CSIDriver lister does not exist")
+
+	csiDriverLister := c.plugin.host.GetCSIDriverLister()
+	if csiDriverLister == nil {
+		return nil, fmt.Errorf("CSIDriverLister not found")
 	}
 
-	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
+	csiDriver, err := csiDriverLister.Get(string(c.driverName))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
