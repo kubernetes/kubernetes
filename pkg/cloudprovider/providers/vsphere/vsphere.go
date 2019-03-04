@@ -534,7 +534,8 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 						vmMACAddr := strings.ToLower(i.HardwareAddr.String())
 						// Making sure that the MAC address is long enough
 						if len(vmMACAddr) < 17 {
-							return addrs, fmt.Errorf("MAC address %q is invalid", vmMACAddr)
+							glog.V(4).Infof("Skipping invalid MAC address: %q", vmMACAddr)
+							continue
 						}
 						if vmwareOUI[vmMACAddr[:8]] {
 							v1helper.AddToNodeAddresses(&addrs,
