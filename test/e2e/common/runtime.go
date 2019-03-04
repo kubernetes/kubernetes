@@ -359,6 +359,7 @@ while true; do sleep 1; done
 
 			It("should be able to pull image from docker hub [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
+				// TODO(claudiub): Switch to nanoserver image manifest list.
 				image := "e2eteam/busybox:1.29"
 				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
