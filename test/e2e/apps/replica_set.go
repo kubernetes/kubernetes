@@ -100,7 +100,16 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
+<<<<<<< HEAD
 	ginkgo.It("should surface a failure condition on a common issue like exceeded quota", func() {
+=======
+	/*
+		Release : v1.15
+		Testname: Replica Set, check for issues like exceeding allocated quota
+		Description: Attempt to create a ReplicaSet with pods exceeding the namespace quota. The creation MUST fail
+	*/
+	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
+>>>>>>> Promote exceeding quota e2e test for replicaSet to conformance - Version updated to v1.15
 		testReplicaSetConditionCheck(f)
 	})
 
