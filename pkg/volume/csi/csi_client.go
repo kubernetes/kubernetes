@@ -56,7 +56,7 @@ type csiClient interface {
 		fsType string,
 		mountOptions []string,
 	) error
-	NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (*resource.Quantity, error)
+	NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (resource.Quantity, error)
 	NodeUnpublishVolume(
 		ctx context.Context,
 		volID string,
@@ -307,14 +307,25 @@ func (c *csiDriverClient) NodePublishVolume(
 
 }
 
-func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (*resource.Quantity, error) {
+func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
 	if c.nodeV1ClientCreator == nil {
-		return nil, fmt.Errorf("version of CSI driver does not support volume expansion")
+		return newSize, fmt.Errorf("version of CSI driver does not support volume expansion")
+	}
+
+	if volumeID == "" {
+		return newSize, errors.New("missing volume id")
+	}
+	if volumePath == "" {
+		return newSize, errors.New("missing volume path")
+	}
+
+	if newSize.Value() < 0 {
+		return newSize, errors.New("size can not be less than 0")
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
 	if err != nil {
-		return nil, err
+		return newSize, err
 	}
 	defer closer.Close()
 
@@ -325,10 +336,10 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volume
 	}
 	resp, err := nodeClient.NodeExpandVolume(ctx, req)
 	if err != nil {
-		return nil, err
+		return newSize, err
 	}
 	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
-	return updatedQuantity, nil
+	return *updatedQuantity, nil
 }
 
 func (c *csiDriverClient) nodePublishVolumeV1(

@@ -54,7 +54,7 @@ spec:
 
 
         - name: mock
-          image: quay.io/k8scsi/mock-driver:v1.0.0-1
+          image: quay.io/k8scsi/mock-driver:v1.1.1
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock

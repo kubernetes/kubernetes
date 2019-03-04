@@ -640,6 +640,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions, volumePluginName)
 
 			if resizeError != nil {
+				klog.Errorf("MountVolume.resizeFileSystem failed with %v", resizeError)
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
 			}
 		}
@@ -669,9 +670,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 
+		// We need to call resizing here again in case resizing was not done during device mount. There could be
+		// two reasons of that:
+		//	- Volume does not support DeviceMounter interface.
+		//	- In case of CSI the volume does not have node stage_unstage capability.
 		if !resizeDone {
 			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions, volumePluginName)
 			if resizeError != nil {
+				klog.Errorf("MountVolume.resizeFileSystem failed with %v", resizeError)
 				return volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
 			}
 		}
@@ -746,6 +752,9 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOp
 			if resizeErr != nil {
 				return false, fmt.Errorf("MountVolume.resizeFileSystem failed : %v", resizeErr)
 			}
+			// Volume resizing is not done but it did not error out. This could happen if a CSI volume
+			// does not have node stage_unstage capability but was asked to resize the volume before
+			// node publish. In which case - we must retry resizing after node publish.
 			if !resizeDone {
 				return false, nil
 			}
@@ -1473,6 +1482,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 	fsResizeFunc := func() (error, error) {
 		var resizeDone bool
+		var simpleErr, detailedErr error
 		resizeOptions := volume.NodeResizeOptions{
 			VolumeSpec: volumeToMount.VolumeSpec,
 		}
@@ -1490,16 +1500,11 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 					return volumeToMount.GenerateError("VolumeFSResize.GetDeviceMountPath failed", err)
 				}
 				resizeOptions.DeviceMountPath = dmp
-				resizeDone, err = og.resizeFileSystem(volumeToMount, resizeOptions, volumePlugin.GetPluginName())
-				if err != nil {
-					return volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed", err)
+				resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions, volumePlugin.GetPluginName())
+				if simpleErr != nil || detailedErr != nil {
+					return simpleErr, detailedErr
 				}
 				if resizeDone {
-					markFSResizedErr := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.PodName, volumeToMount.VolumeName)
-					if markFSResizedErr != nil {
-						// On failure, return error. Caller will log and retry.
-						return volumeToMount.GenerateError("VolumeFSResize.MarkVolumeAsResized failed", markFSResizedErr)
-					}
 					return nil, nil
 				}
 			}
@@ -1515,16 +1520,11 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
-		resizeDone, err = og.resizeFileSystem(volumeToMount, resizeOptions, volumePlugin.GetPluginName())
-		if err != nil {
-			return volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed", err)
+		resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions, volumePlugin.GetPluginName())
+		if simpleErr != nil || detailedErr != nil {
+			return simpleErr, detailedErr
 		}
 		if resizeDone {
-			markFSResizedErr := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.PodName, volumeToMount.VolumeName)
-			if markFSResizedErr != nil {
-				// On failure, return error. Caller will log and retry.
-				return volumeToMount.GenerateError("VolumeFSResize.MarkVolumeAsResized failed", markFSResizedErr)
-			}
 			return nil, nil
 		}
 		// This is a placeholder error - we should NEVER reach here.
@@ -1543,6 +1543,28 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 		EventRecorderFunc: eventRecorderFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "volume_fs_resize"),
 	}, nil
+}
+
+func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	resizeOptions volume.NodeResizeOptions,
+	pluginName string) (bool, error, error) {
+	resizeDone, err := og.resizeFileSystem(volumeToMount, resizeOptions, pluginName)
+	if err != nil {
+		klog.Errorf("VolumeFSResize.resizeFileSystem failed : %v", err)
+		e1, e2 := volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed", err)
+		return false, e1, e2
+	}
+	if resizeDone {
+		markFSResizedErr := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.PodName, volumeToMount.VolumeName)
+		if markFSResizedErr != nil {
+			// On failure, return error. Caller will log and retry.
+			e1, e2 := volumeToMount.GenerateError("VolumeFSResize.MarkVolumeAsResized failed", markFSResizedErr)
+			return false, e1, e2
+		}
+		return true, nil, nil
+	}
+	return false, nil, nil
 }
 
 func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {

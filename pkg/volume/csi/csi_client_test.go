@@ -25,6 +25,7 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 )
 
@@ -37,6 +38,13 @@ func newFakeCsiDriverClient(t *testing.T, stagingCapable bool) *fakeCsiDriverCli
 	return &fakeCsiDriverClient{
 		t:          t,
 		nodeClient: fake.NewNodeClient(stagingCapable),
+	}
+}
+
+func newFakeCsiDriverClientWithExpansion(t *testing.T, stagingCapable bool, expansionSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithExpansion(stagingCapable, expansionSet),
 	}
 }
 
@@ -144,6 +152,28 @@ func (c *fakeCsiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stag
 	return err
 }
 
+func (c *fakeCsiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsNodeExpand...")
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
 	c.t.Log("calling fake.NodeGetCapabilities for NodeSupportsStageUnstage...")
 	req := &csipbv1.NodeGetCapabilitiesRequest{}
@@ -166,8 +196,27 @@ func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (boo
 	return stageUnstageSet, nil
 }
 
+func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
+	c.t.Log("calling fake.NodeExpandVolume")
+	req := &csipbv1.NodeExpandVolumeRequest{
+		VolumeId:      volumeid,
+		VolumePath:    volumePath,
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: newSize.Value()},
+	}
+	resp, err := c.nodeClient.NodeExpandVolume(ctx, req)
+	if err != nil {
+		return newSize, err
+	}
+	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
+	return *updatedQuantity, nil
+}
+
 func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
 	return newFakeCsiDriverClient(t, stageUnstageSet)
+}
+
+func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet bool) csiClient {
+	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
 }
 
 func checkErr(t *testing.T, expectedAnError bool, actualError error) {
@@ -410,6 +459,62 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		)
 		checkErr(t, tc.mustFail, err)
 
+		if !tc.mustFail {
+			fakeCloser.Check()
+		}
+	}
+}
+
+func TestNodeExpandVolume(t *testing.T) {
+	testCases := []struct {
+		name       string
+		volID      string
+		volumePath string
+		newSize    resource.Quantity
+		mustFail   bool
+		err        error
+	}{
+		{
+			name:       "with all correct values",
+			volID:      "vol-abcde",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("10Gi"),
+			mustFail:   false,
+		},
+		{
+			name:       "with missing volume-id",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("10Gi"),
+			mustFail:   true,
+		},
+		{
+			name:     "with missing volume path",
+			volID:    "vol-1234",
+			newSize:  resource.MustParse("10Gi"),
+			mustFail: true,
+		},
+		{
+			name:       "with invalid quantity",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    *resource.NewQuantity(-10, resource.DecimalSI),
+			mustFail:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test cases : %s", tc.name)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+				nodeClient.SetNextError(tc.err)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+		_, err := client.NodeExpandVolume(context.Background(), tc.volID, tc.volumePath, tc.newSize)
+		checkErr(t, tc.mustFail, err)
 		if !tc.mustFail {
 			fakeCloser.Check()
 		}
