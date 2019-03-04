@@ -21,16 +21,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
-
-	"net/url"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
@@ -43,8 +43,13 @@ const (
 	apiVersion = "v1"
 )
 
+func init() {
+	klog.InitFlags(nil)
+
+	cmdtesting.InitTestErrorHandler()
+}
+
 func TestTopNodeAllMetrics(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsAPIVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
@@ -100,7 +105,6 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
 	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
 
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsAPIVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
@@ -157,7 +161,6 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 }
 
 func TestTopNodeWithNameMetrics(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetrics := metrics.Items[0]
 	expectedNode := nodes.Items[0]
@@ -215,7 +218,6 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 }
 
 func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetrics := metricsv1alpha1api.NodeMetricsList{
 		ListMeta: metrics.ListMeta,
@@ -284,7 +286,6 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 }
 
 func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	expectedMetrics, nodes := testNodeV1beta1MetricsData()
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
@@ -345,7 +346,6 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 }
 
 func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1beta1MetricsData()
 	expectedMetrics := metrics.Items[0]
 	expectedNode := nodes.Items[0]
@@ -415,7 +415,6 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 }
 
 func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1beta1MetricsData()
 	expectedMetrics := &metricsv1beta1api.NodeMetricsList{
 		ListMeta: metrics.ListMeta,

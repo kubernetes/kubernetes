@@ -19,14 +19,14 @@ package testing
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -134,9 +134,9 @@ func GenResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 	return &http.Response{StatusCode: 200, Header: DefaultHeader(), Body: BytesBody(jsonBytes)}, nil
 }
 
-func InitTestErrorHandler(t *testing.T) {
+func InitTestErrorHandler() {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
-		t.Errorf("Error running command (exit code %d): %s", code, str)
+		panic(fmt.Errorf("Error running command (exit code %d): %s", code, str))
 	})
 }
 

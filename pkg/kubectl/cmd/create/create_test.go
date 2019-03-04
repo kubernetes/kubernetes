@@ -24,13 +24,18 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/klog"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-func TestExtraArgsFail(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
+func init() {
+	klog.InitFlags(nil)
 
+	cmdtesting.InitTestErrorHandler()
+}
+
+func TestExtraArgsFail(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
@@ -42,7 +47,6 @@ func TestExtraArgsFail(t *testing.T) {
 }
 
 func TestCreateObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "redis-master-controller"
 
@@ -78,7 +82,6 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestCreateMultipleObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -116,7 +119,6 @@ func TestCreateMultipleObject(t *testing.T) {
 }
 
 func TestCreateDirectory(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "name"
 

@@ -88,6 +88,10 @@ const (
 }`
 )
 
+func init() {
+	cmdtesting.InitTestErrorHandler()
+}
+
 func TestTopPod(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
@@ -142,7 +146,6 @@ func TestTopPod(t *testing.T) {
 			containers:   true,
 		},
 	}
-	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Logf("Running test case: %s", testCase.name)
@@ -284,7 +287,6 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			containers:   true,
 		},
 	}
-	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			metricsList := testV1beta1PodMetricsData()
@@ -493,7 +495,6 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			containers:   true,
 		},
 	}
-	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Logf("Running test case: %s", testCase.name)

@@ -46,6 +46,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/klog"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -67,6 +68,12 @@ var (
 	}
 	codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 )
+
+func init() {
+	klog.InitFlags(nil)
+
+	cmdtesting.InitTestErrorHandler()
+}
 
 func TestApplyExtraArgsFail(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
@@ -274,7 +281,6 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 }
 
 func TestRunApplyPrintsValidObjectList(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	configMapList := readConfigMapList(t, filenameCM)
 	pathCM := "/namespaces/test/configmaps"
 
@@ -469,7 +475,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 }
 
 func TestApplyObjectWithoutAnnotation(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -512,7 +517,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 }
 
 func TestApplyObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -560,7 +564,6 @@ func TestApplyObject(t *testing.T) {
 }
 
 func TestApplyObjectOutput(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -625,7 +628,6 @@ func TestApplyObjectOutput(t *testing.T) {
 }
 
 func TestApplyRetry(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -729,7 +731,6 @@ func TestApplyNonExistObject(t *testing.T) {
 }
 
 func TestApplyEmptyPatch(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, _ := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
@@ -888,7 +889,6 @@ func readDeploymentFromFile(t *testing.T, file string) []byte {
 }
 
 func TestApplyNULLPreservation(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	deploymentName := "nginx-deployment"
 	deploymentPath := "/namespaces/test/deployments/" + deploymentName
 
@@ -964,7 +964,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 // TestUnstructuredApply checks apply operations on an unstructured object
 func TestUnstructuredApply(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	name, curr := readAndAnnotateUnstructured(t, filenameWidgetClientside)
 	path := "/namespaces/test/widgets/" + name
 
@@ -1029,8 +1028,6 @@ func TestUnstructuredApply(t *testing.T) {
 
 // TestUnstructuredIdempotentApply checks repeated apply operation on an unstructured object
 func TestUnstructuredIdempotentApply(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-
 	serversideObject := readUnstructuredFromFile(t, filenameWidgetServerside)
 	serversideData, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: codec}, serversideObject)
 	if err != nil {
@@ -1090,7 +1087,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 }
 
 func TestRunApplySetLastApplied(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -1215,7 +1211,6 @@ func checkPatchString(t *testing.T, req *http.Request) {
 }
 
 func TestForceApply(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	scheme := runtime.NewScheme()
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC

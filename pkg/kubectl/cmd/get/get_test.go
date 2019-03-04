@@ -352,8 +352,6 @@ foo    0/0              0          <unknown>   <none>
 }
 
 func TestGetObjectIgnoreNotFound(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-
 	ns := &corev1.NamespaceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
@@ -733,8 +731,6 @@ serverunknown   Unhealthy             fizzbuzz error
 }
 
 func TestGetMixedGenericObjects(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-
 	// ensure that a runtime.Object without
 	// an ObjectMeta field is handled properly
 	structuredObj := &metav1.Status{

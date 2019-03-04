@@ -21,9 +21,8 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"time"
-
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,9 +40,11 @@ const (
 	metricsAPIVersion          = "v1alpha1"
 )
 
-func TestTopSubcommandsExist(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
+func init() {
+	cmdtesting.InitTestErrorHandler()
+}
 
+func TestTopSubcommandsExist(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 

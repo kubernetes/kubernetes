@@ -32,9 +32,16 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/klog"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
+
+func init() {
+	klog.InitFlags(nil)
+
+	cmdtesting.InitTestErrorHandler()
+}
 
 func fakecmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -46,7 +53,6 @@ func fakecmd() *cobra.Command {
 }
 
 func TestDeleteObjectByTuple(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -111,7 +117,6 @@ func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPro
 
 // Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
 func TestOrphanDependentsInDeleteObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -161,8 +166,6 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 }
 
 func TestDeleteNamedObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -214,7 +217,6 @@ func TestDeleteNamedObject(t *testing.T) {
 }
 
 func TestDeleteObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -249,7 +251,6 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestDeleteObjectGraceZero(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	pods, _, _ := cmdtesting.TestData()
 
 	count := 0
@@ -298,7 +299,6 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 }
 
 func TestDeleteObjectNotFound(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
@@ -335,7 +335,6 @@ func TestDeleteObjectNotFound(t *testing.T) {
 }
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
@@ -366,7 +365,6 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 }
 
 func TestDeleteAllNotFound(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, _ := cmdtesting.TestData()
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
@@ -415,7 +413,6 @@ func TestDeleteAllNotFound(t *testing.T) {
 }
 
 func TestDeleteAllIgnoreNotFound(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -457,7 +454,6 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 }
 
 func TestDeleteMultipleObject(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -494,7 +490,6 @@ func TestDeleteMultipleObject(t *testing.T) {
 }
 
 func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -542,7 +537,6 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 }
 
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, svc, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -581,7 +575,6 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 }
 
 func TestDeleteDirectory(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -615,7 +608,6 @@ func TestDeleteDirectory(t *testing.T) {
 }
 
 func TestDeleteMultipleSelector(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	pods, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -661,7 +653,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 }
 
 func TestResourceErrors(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
 	testCases := map[string]struct {
 		args  []string
 		errFn func(error) bool
