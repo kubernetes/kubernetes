@@ -6,6 +6,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "density.go",
+        "dns.go",
         "framework.go",
         "gmsa.go",
         "hybrid_network.go",
@@ -13,7 +14,6 @@ go_library(
         "networking.go",
         "service.go",
         "volumes.go",
-        "dns.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/windows",
     visibility = ["//visibility:public"],
