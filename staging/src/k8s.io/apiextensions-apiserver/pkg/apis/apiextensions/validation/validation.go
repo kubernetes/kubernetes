@@ -497,6 +497,10 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 			}
 		}
 
+		if schema.Nullable {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("openAPIV3Schema.nullable"), fmt.Sprintf(`nullable cannot be true at the root`)))
+		}
+
 		openAPIV3Schema := &specStandardValidatorV3{}
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema)...)
 	}
@@ -641,7 +645,7 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 	}
 
 	if schema.Type == "null" {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "type cannot be set to null"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "type cannot be set to null, use nullable as an alternative"))
 	}
 
 	if schema.Items != nil && len(schema.Items.JSONSchemas) != 0 {

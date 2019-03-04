@@ -23,6 +23,7 @@ type JSONSchemaProps struct {
 	Ref                  *string
 	Description          string
 	Type                 string
+	Nullable             bool
 	Format               string
 	Title                string
 	Default              *JSON
