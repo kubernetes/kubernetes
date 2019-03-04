@@ -120,9 +120,9 @@ func (m *multiClientInterface) GetForObject(groupKind schema.GroupKind, name str
 	}
 	if m.namespace == nil {
 		return client.RootScopedMetrics().GetForObject(groupKind, name, metricName, metricSelector)
-	} else {
-		return client.NamespacedMetrics(*m.namespace).GetForObject(groupKind, name, metricName, metricSelector)
 	}
+
+	return client.NamespacedMetrics(*m.namespace).GetForObject(groupKind, name, metricName, metricSelector)
 }
 
 func (m *multiClientInterface) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValueList, error) {
@@ -132,7 +132,7 @@ func (m *multiClientInterface) GetForObjects(groupKind schema.GroupKind, selecto
 	}
 	if m.namespace == nil {
 		return client.RootScopedMetrics().GetForObjects(groupKind, selector, metricName, metricSelector)
-	} else {
-		return client.NamespacedMetrics(*m.namespace).GetForObjects(groupKind, selector, metricName, metricSelector)
 	}
+
+	return client.NamespacedMetrics(*m.namespace).GetForObjects(groupKind, selector, metricName, metricSelector)
 }
