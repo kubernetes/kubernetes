@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -45,37 +45,37 @@ import (
 )
 
 var (
-	trEnabledFeature           = utilfeature.NewFeatureGate()
-	trDisabledFeature          = utilfeature.NewFeatureGate()
-	leaseEnabledFeature        = utilfeature.NewFeatureGate()
-	leaseDisabledFeature       = utilfeature.NewFeatureGate()
-	csiNodeInfoEnabledFeature  = utilfeature.NewFeatureGate()
-	csiNodeInfoDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature           = featuregate.NewFeatureGate()
+	trDisabledFeature          = featuregate.NewFeatureGate()
+	leaseEnabledFeature        = featuregate.NewFeatureGate()
+	leaseDisabledFeature       = featuregate.NewFeatureGate()
+	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
+	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := trEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
+	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
+	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := leaseEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
+	if err := leaseEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
+	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
+	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
+	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -367,7 +367,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		name       string
 		podsGetter corev1lister.PodLister
 		attributes admission.Attributes
-		features   utilfeature.FeatureGate
+		features   featuregate.FeatureGate
 		err        string
 	}{
 		// Mirror pods bound to us

@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/features"
@@ -81,7 +81,7 @@ func TestValidateNetworkPolicySCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldNetworkPolicyInfo.description, newNetworkPolicyInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
 					errs := ValidateConditionalNetworkPolicy(newNetworkPolicy, oldNetworkPolicy)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldNetworkPolicy, oldNetworkPolicyInfo.object()) {

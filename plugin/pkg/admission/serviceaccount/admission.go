@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -88,7 +89,7 @@ type serviceAccount struct {
 
 	generateName func(string) string
 
-	featureGate utilfeature.FeatureGate
+	featureGate featuregate.FeatureGate
 }
 
 var _ admission.MutationInterface = &serviceAccount{}

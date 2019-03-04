@@ -22,7 +22,7 @@ import (
 
 var (
 	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
-	// Only top-level commands/options setup and the k8s.io/apiserver/pkg/util/feature/testing package should make use of this.
+	// Only top-level commands/options setup and the k8s.io/component-base/featuregate/testing package should make use of this.
 	// Tests that need to modify feature gates for the duration of their test should use:
 	//   defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, <value>)()
 	DefaultMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
