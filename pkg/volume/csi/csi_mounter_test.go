@@ -33,7 +33,6 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
@@ -154,13 +153,6 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-				// Wait until the informer in CSI volume plugin has all CSIDrivers.
-				wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-					return plug.csiDriverInformer.Informer().HasSynced(), nil
-				})
-			}
 
 			registerFakePlugin(test.driver, "endpoint", []string{"1.0.0"}, t)
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
@@ -391,6 +383,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 		})
 	}
 }
+
 func TestMounterSetUpWithInline(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
@@ -527,6 +520,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		})
 	}
 }
+
 func TestMounterSetUpWithFSGroup(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
@@ -62,16 +63,20 @@ const (
 
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
-	rootDir    string
-	kubeClient clientset.Interface
-	pluginMgr  VolumePluginMgr
-	cloud      cloudprovider.Interface
-	mounter    mount.Interface
-	exec       mount.Exec
-	nodeLabels map[string]string
-	nodeName   string
-	subpather  subpath.Interface
+	rootDir         string
+	kubeClient      clientset.Interface
+	pluginMgr       VolumePluginMgr
+	cloud           cloudprovider.Interface
+	mounter         mount.Interface
+	exec            mount.Exec
+	nodeLabels      map[string]string
+	nodeName        string
+	subpather       subpath.Interface
+	csiDriverLister storagelisters.CSIDriverLister
 }
+
+var _ VolumeHost = &fakeVolumeHost{}
+var _ AttachDetachVolumeHost = &fakeVolumeHost{}
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
 	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
@@ -87,9 +92,12 @@ func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interf
 	return volHost
 }
 
-func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string) *fakeVolumeHost {
+func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
 	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
 	volHost.nodeName = nodeName
+	if driverLister != nil {
+		volHost.csiDriverLister = driverLister
+	}
 	return volHost
 }
 
@@ -1476,4 +1484,17 @@ func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.Persisten
 		}
 	}
 	return false
+}
+
+func (f *fakeVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
+	return f.csiDriverLister
+}
+
+func (f *fakeVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
+	// not needed for testing
+	return nil
+}
+
+func (f *fakeVolumeHost) IsAttachDetachController() bool {
+	return true
 }
