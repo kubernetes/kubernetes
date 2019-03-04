@@ -62,7 +62,7 @@ var (
 
 // NewCmdConfig returns cobra.Command for "kubeadm config" command
 func NewCmdConfig(out io.Writer) *cobra.Command {
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
+	var kubeConfigFile string
 
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -83,7 +83,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
-	kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 	cmd.AddCommand(NewCmdConfigPrint(out))
 	cmd.AddCommand(NewCmdConfigMigrate(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))

@@ -384,7 +384,7 @@ func TestGetPods(t *testing.T) {
 	assert.NoError(t, err)
 
 	if !verifyPods(expected, actual) {
-		t.Errorf("expected %q, got %q", expected, actual)
+		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
 

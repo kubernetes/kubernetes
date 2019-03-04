@@ -213,7 +213,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
 			},
 		},
-
+		{
+			// a role which provides just enough power read insensitive cluster information
+			ObjectMeta: metav1.ObjectMeta{Name: "system:public-info-viewer"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/healthz", "/version", "/version/",
+				).RuleOrDie(),
+			},
+		},
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
@@ -524,8 +532,9 @@ const systemNodeRoleName = "system:node"
 func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings := []rbacv1.ClusterRoleBinding{
 		rbacv1helpers.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
-		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
-		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:public-info-viewer").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
@@ -552,4 +561,17 @@ func ClusterRolesToAggregate() map[string]string {
 		"edit":  "system:aggregate-to-edit",
 		"view":  "system:aggregate-to-view",
 	}
+}
+
+// ClusterRoleBindingsToSplit returns a map of Names of source ClusterRoleBindings
+// to copy Subjects, Annotations, and Labels to destination ClusterRoleBinding templates.
+func ClusterRoleBindingsToSplit() map[string]rbacv1.ClusterRoleBinding {
+	bindingsToSplit := map[string]rbacv1.ClusterRoleBinding{}
+	for _, defaultClusterRoleBinding := range ClusterRoleBindings() {
+		switch defaultClusterRoleBinding.Name {
+		case "system:public-info-viewer":
+			bindingsToSplit["system:discovery"] = defaultClusterRoleBinding
+		}
+	}
+	return bindingsToSplit
 }

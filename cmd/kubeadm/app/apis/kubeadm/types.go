@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -34,11 +34,8 @@ type InitConfiguration struct {
 
 	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
 	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
-	// the `json:"-"` tag in the external variant of these API types. Here, in the internal version `json:",inline"` is used, which means
-	// that all of ClusterConfiguration's fields will appear as they would be InitConfiguration's fields. This is used in practice solely
-	// in kubeadm API roundtrip unit testing. Check out `cmd/kubeadm/app/util/config/*_test.go` for more information. Normally, the internal
-	// type is NEVER marshalled, but always converted to some external version first.
-	ClusterConfiguration `json:",inline"`
+	// the `json:"-"` tag in the external variant of these API types.
+	ClusterConfiguration `json:"-"`
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	BootstrapTokens []BootstrapToken

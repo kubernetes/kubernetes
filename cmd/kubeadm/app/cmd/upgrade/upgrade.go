@@ -59,7 +59,6 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("upgrade"),
 	}
 
-	flags.kubeConfigPath = cmdutil.FindExistingKubeConfig(flags.kubeConfigPath)
 	cmd.AddCommand(NewCmdApply(flags))
 	cmd.AddCommand(NewCmdPlan(flags))
 	cmd.AddCommand(NewCmdDiff(out))

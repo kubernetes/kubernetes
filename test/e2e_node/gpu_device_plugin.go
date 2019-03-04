@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			By("Restarting Kubelet and waiting for the current running pod to restart")
 			restartKubelet()
 
-			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
+			By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))

@@ -819,9 +819,15 @@ function Configure-CniNetworking {
   Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
               "CNI config")
 
+  # We reserve .1 and .2 for gateways. Start the CIDR range from ".3" so that
+  # IPAM does not allocate those IPs to pods.
+  $cidr_range_start = `
+      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.3'
+
   # Explanation of the CNI config values:
   #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
   #   POD_CIDR: the pod CIDR assigned to this node.
+  #   CIDR_RANGE_START: start of the pod CIDR range.
   #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
   #     communicate with the rest of the cluster without NAT (i.e. the subnet
   #     that VM internal IPs are allocated from).
@@ -841,7 +847,8 @@ function Configure-CniNetworking {
   },
   "ipam":  {
     "type": "host-local",
-    "subnet": "POD_CIDR"
+    "subnet": "POD_CIDR",
+    "rangeStart": "CIDR_RANGE_START"
   },
   "dns":  {
     "Nameservers":  [
@@ -881,6 +888,7 @@ function Configure-CniNetworking {
     }
   ]
 }'.replace('POD_CIDR', ${env:POD_CIDR}).`
+  replace('CIDR_RANGE_START', ${cidr_range_start}).`
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
@@ -914,14 +922,24 @@ function Configure-Kubelet {
 #   KUBERNETES_MASTER_NAME
 #   CLUSTER_IP_RANGE
 function Start-WorkerServices {
+  # Compute kubelet args
   $kubelet_args_str = ${kube_env}['KUBELET_ARGS']
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
-
-  $additional_arg_list = @(`
+  $default_kubelet_args = @(`
       "--pod-infra-container-image=${INFRA_CONTAINER}"
   )
-  $kubelet_args = ${kubelet_args} + ${additional_arg_list}
+  $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
+  Log-Output "Final kubelet_args: ${kubelet_args}"
+
+  # Compute kube-proxy args
+  $kubeproxy_args_str = ${kube_env}['KUBEPROXY_ARGS']
+  Try {
+    $kubeproxy_args = $kubeproxy_args_str.Split(" ")
+  } Catch {
+    $kubeproxy_args = ""
+  }
+  Log-Output "kubeproxy_args from metadata: ${kubeproxy_args}"
 
   # kubeproxy is started on Linux nodes using
   # kube-manifests/kubernetes/gci-trusty/kube-proxy.manifest, which is
@@ -934,12 +952,11 @@ function Start-WorkerServices {
   #   --ipvs-sync-period=1m --ipvs-min-sync-period=10s
   # And also with various volumeMounts and "securityContext: privileged: true".
   $apiserver_address = ${kube_env}['KUBERNETES_MASTER_NAME']
-  $kubeproxy_args = @(`
+  $default_kubeproxy_args = @(`
       "--v=4",
       "--master=https://${apiserver_address}",
       "--kubeconfig=${env:KUBEPROXY_KUBECONFIG}",
       "--proxy-mode=kernelspace",
-      "--hostname-override=$(hostname)",
       "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])",
 
       # Configure kube-proxy to run as a windows service.
@@ -960,6 +977,8 @@ function Start-WorkerServices {
       # of string delimiters.
       "--resource-container="
   )
+  $kubeproxy_args = ${default_kubeproxy_args} + ${kubeproxy_args}
+  Log-Output "Final kubeproxy_args: ${kubeproxy_args}"
 
   # TODO(pjh): kubelet is emitting these messages:
   # I1023 23:44:11.761915    2468 kubelet.go:274] Adding pod path:

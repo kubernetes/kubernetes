@@ -44,12 +44,6 @@ func getControlPlaneJoinPhaseFlags() []string {
 		options.CfgPath,
 		options.ControlPlane,
 		options.NodeName,
-		options.FileDiscovery,
-		options.TokenDiscovery,
-		options.TokenDiscoveryCAHash,
-		options.TokenDiscoverySkipCAHash,
-		options.TLSBootstrapToken,
-		options.TokenStr,
 	}
 }
 
@@ -68,7 +62,7 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			newEtcdLocalSubphase(),
-			newUploadConfigSubphase(),
+			newUpdateStatusSubphase(),
 			newMarkControlPlaneSubphase(),
 		},
 	}
@@ -77,17 +71,21 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 func newEtcdLocalSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "etcd",
-		Short:        "Generates the static Pod manifest file for a local etcd member",
+		Short:        "Add a new local etcd member",
 		Run:          runEtcdPhase,
 		InheritFlags: getControlPlaneJoinPhaseFlags(),
 	}
 }
 
-func newUploadConfigSubphase() workflow.Phase {
+func newUpdateStatusSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "upload-config",
-		Short:        "Upload the currently used configuration to the cluster",
-		Run:          runUploadConfigPhase,
+		Name: "update-status",
+		Short: fmt.Sprintf(
+			"Register the new control-plane node into the %s maintained in the %s ConfigMap",
+			kubeadmconstants.ClusterStatusConfigMapKey,
+			kubeadmconstants.KubeadmConfigConfigMap,
+		),
+		Run:          runUpdateStatusPhase,
 		InheritFlags: getControlPlaneJoinPhaseFlags(),
 	}
 }
@@ -111,9 +109,8 @@ func runEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	kubeConfigFile := data.KubeConfigPath()
-
-	client, err := data.ClientSetFromFile(kubeConfigFile)
+	// gets access to the cluster using the identity defined in admin.conf
+	client, err := data.ClientSet()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
@@ -143,7 +140,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	return nil
 }
 
-func runUploadConfigPhase(c workflow.RunData) error {
+func runUpdateStatusPhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
@@ -153,9 +150,8 @@ func runUploadConfigPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	kubeConfigFile := data.KubeConfigPath()
-
-	client, err := data.ClientSetFromFile(kubeConfigFile)
+	// gets access to the cluster using the identity defined in admin.conf
+	client, err := data.ClientSet()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
@@ -181,9 +177,8 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	kubeConfigFile := data.KubeConfigPath()
-
-	client, err := data.ClientSetFromFile(kubeConfigFile)
+	// gets access to the cluster using the identity defined in admin.conf
+	client, err := data.ClientSet()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}

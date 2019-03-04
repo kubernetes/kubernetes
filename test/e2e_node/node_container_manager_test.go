@@ -79,7 +79,7 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 		return fmt.Errorf("failed to parse output %v", err)
 	}
 
-	// Ensure that values are within a delta range to work arounding rounding errors.
+	// Ensure that values are within a delta range to work around rounding errors.
 	if (actual < (expectedValue - delta)) || (actual > (expectedValue + delta)) {
 		return fmt.Errorf("Expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
 	}

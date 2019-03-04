@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/component-base",
-	"GoVersion": "go1.11",
+	"GoVersion": "go1.12",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"./..."
