@@ -139,7 +139,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				return true, nil, err
 			}
 			// Only supports strategic merge patch and JSONPatch as coded.
-			switch action.GetPatchType() {
+			switch pt := action.GetPatchType(); pt {
 			case types.JSONPatchType:
 				patch, err := jsonpatch.DecodePatch(action.GetPatch())
 				if err != nil {
@@ -161,7 +161,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 					return true, nil, err
 				}
 			default:
-				return true, nil, fmt.Errorf("PatchType is not supported")
+				return true, nil, fmt.Errorf("PatchType is not supported: %v", pt)
 			}
 
 			if err = tracker.Update(gvr, obj, ns); err != nil {

@@ -185,7 +185,7 @@ func TestPatch(t *testing.T) {
 			object:     newUnstructured(testAPIVersion, testKind, testNamespace, testName),
 			patchType:  types.MergePatchType,
 			patchBytes: []byte(`{}`),
-			wantErrMsg: "PatchType is not supported",
+			wantErrMsg: "PatchType is not supported: application/merge-patch+json",
 		},
 		// TODO: Add tests for strategic merge using v1.Pod for example to ensure the test cases
 		// demonstrate expected use cases.
