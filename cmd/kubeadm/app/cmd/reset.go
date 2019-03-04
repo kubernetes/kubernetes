@@ -63,17 +63,16 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
-				client, err = getClientset(kubeConfigFile, false)
-				kubeadmutil.CheckErr(err)
+			var cfg *kubeadmapi.InitConfiguration
+			client, err = getClientset(kubeConfigFile, false)
+			if err == nil {
 				klog.V(1).Infof("[reset] loaded client set from kubeconfig file: %s", kubeConfigFile)
+				cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+				if err != nil {
+					klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+				}
 			} else {
 				klog.V(1).Infof("[reset] could not get client set from missing kubeconfig file: %s", kubeConfigFile)
-			}
-
-			cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
-			if err != nil {
-				klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 			}
 
 			if criSocketPath == "" {
