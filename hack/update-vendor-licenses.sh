@@ -21,9 +21,9 @@
 #
 #    --create-missing will write the files that only exist upstream, locally.
 #    This option is mostly used for testing as we cannot check-in any of the
-#    additionally created files into the godep auto-generated tree.
+#    additionally created files into the vendor auto-generated tree.
 #
-#    Run every time a license file is added/modified within /Godeps to
+#    Run every time a license file is added/modified within /vendor to
 #    update /Godeps/LICENSES
 
 set -o errexit
@@ -129,6 +129,8 @@ process_content () {
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+export GO111MODULE=on
+
 # Check bash version
 if ((${BASH_VERSINFO[0]}<4)); then
   echo
@@ -147,7 +149,7 @@ fi
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
-GODEPS_LICENSE_FILE="Godeps/LICENSES"
+VENDOR_LICENSE_FILE="Godeps/LICENSES"
 TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
@@ -163,8 +165,17 @@ echo "= LICENSE $(cat "${LICENSE_ROOT}/LICENSE" | md5sum | awk '{print $1}')"
 echo "================================================================================"
 ) > ${TMP_LICENSE_FILE}
 
-# Loop through every package in Godeps.json
-for PACKAGE in $(jq -r ".Deps[].ImportPath" < Godeps/Godeps.json | sort -f); do
+# Loop through every vendored package
+for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
+  if [[ -e "staging/src/${PACKAGE}" ]]; then
+    echo "$PACKAGE is a staging package, skipping" > /dev/stderr
+    continue
+  fi
+  if [[ ! -e "${DEPS_DIR}/${PACKAGE}" ]]; then
+    echo "$PACKAGE doesn't exist in vendor, skipping" > /dev/stderr
+    continue
+  fi
+
   process_content "${PACKAGE}" LICENSE
   process_content "${PACKAGE}" COPYRIGHT
   process_content "${PACKAGE}" COPYING
@@ -204,4 +215,4 @@ __EOF__
   echo
 done >> ${TMP_LICENSE_FILE}
 
-cat ${TMP_LICENSE_FILE} > ${GODEPS_LICENSE_FILE}
+cat ${TMP_LICENSE_FILE} > ${VENDOR_LICENSE_FILE}

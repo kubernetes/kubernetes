@@ -45,12 +45,13 @@ if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
 fi
 
 
-# Exclude godep checks in certain cases, if they're running in a separate job.
+# Exclude vendor checks in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
     "verify-godeps.sh"             # runs in separate godeps job
-    "verify-staging-godeps.sh"     # runs in separate godeps job
-    "verify-godep-licenses.sh"     # runs in separate godeps job
+    "verify-godeps-licenses.sh"    # runs in separate godeps job
+    "verify-vendor.sh"             # runs in separate godeps job
+    "verify-vendor-licenses.sh"    # runs in separate godeps job
     )
 fi
 
@@ -63,12 +64,12 @@ fi
 
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
-# `make` and `hack/godep-restore.sh` had already been run.
+# `make` had already been run.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-godep-licenses.sh"
+  "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-pkg-names.sh"

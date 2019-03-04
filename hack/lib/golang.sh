@@ -437,7 +437,7 @@ kube::golang::setup_env() {
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
-  # This seems to matter to some tools (godep, ginkgo...)
+  # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
 }
 
