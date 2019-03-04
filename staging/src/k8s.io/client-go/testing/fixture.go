@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -228,6 +229,12 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 		return nil, err
 	}
 
+	// If there are no items in the store we return list resourceVersion "1" as "0" and "" are reserved values.
+	err = meta.NewAccessor().SetResourceVersion(list, "1")
+	if err != nil {
+		return nil, err
+	}
+
 	if !meta.IsListType(list) {
 		return nil, fmt.Errorf("%q is not a list type", listGVK.Kind)
 	}
@@ -238,6 +245,37 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	objs, ok := t.objects[gvr]
 	if !ok {
 		return list, nil
+	}
+
+	// We need to return resourceVersion for the List
+	// It should be the highest resourceVersion in etcd for the resource
+	// but given we know about only few objects picking the highest RV
+	// in the store is enough.
+	maxRv := uint64(1)
+	for _, obj := range objs {
+		rv, err := meta.NewAccessor().ResourceVersion(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		if rv == "" {
+			// It's fine for unit tests
+			continue
+		}
+
+		// We are simulating the server so we are allowed to interpret RV
+		rvInt, err := strconv.ParseUint(rv, 10, 64)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse resourceVersion %q", rv))
+		}
+
+		if rvInt > maxRv {
+			maxRv = rvInt
+		}
+	}
+	err = meta.NewAccessor().SetResourceVersion(list, fmt.Sprintf("%d", maxRv))
+	if err != nil {
+		return nil, err
 	}
 
 	matchingObjs, err := filterByNamespaceAndName(objs, ns, "")
