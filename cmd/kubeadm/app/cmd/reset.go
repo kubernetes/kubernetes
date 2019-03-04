@@ -63,10 +63,12 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
 				client, err = getClientset(kubeConfigFile, false)
 				kubeadmutil.CheckErr(err)
+				klog.V(1).Infof("[reset] loaded client set from kubeconfig file: %s", kubeConfigFile)
+			} else {
+				klog.V(1).Infof("[reset] could not get client set from missing kubeconfig file: %s", kubeConfigFile)
 			}
 
 			cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
