@@ -137,6 +137,9 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 		},
 		HostConfig: &dockercontainer.HostConfig{
 			Binds: generateMountBindings(config.GetMounts()),
+			RestartPolicy: dockercontainer.RestartPolicy{
+				Name: "no",
+			},
 		},
 	}
 
