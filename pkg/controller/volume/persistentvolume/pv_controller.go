@@ -1355,7 +1355,7 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 	if ctrl.csiNameFromIntreeNameHook != nil {
 		return ctrl.csiNameFromIntreeNameHook(pluginName)
 	}
-	return csitranslation.GetCSINameFromIntreeName(pluginName)
+	return csitranslation.GetCSINameFromInTreeName(pluginName)
 }
 
 // provisionClaimOperation provisions a volume. This method is running in

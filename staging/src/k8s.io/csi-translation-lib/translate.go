@@ -76,18 +76,27 @@ func TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, erro
 }
 
 // IsMigratableByName tests whether there is Migration logic for the in-tree plugin
-// for the given `pluginName`
-func IsMigratableByName(pluginName string) bool {
+// whose name matches the given inTreePluginName
+func IsMigratableByName(inTreePluginName string) bool {
 	for _, curPlugin := range inTreePlugins {
-		if curPlugin.GetInTreePluginName() == pluginName {
+		if curPlugin.GetInTreePluginName() == inTreePluginName {
 			return true
 		}
 	}
 	return false
 }
 
-// GetCSINameFromIntreeName maps the name of a CSI driver to its in-tree version
-func GetCSINameFromIntreeName(pluginName string) (string, error) {
+// SupersedesInTreePlugin tests whether there exists an in-tree plugin with logic
+// to migrate to the CSI plugin with given name
+func SupersedesInTreePlugin(csiPluginName string) bool {
+	if _, ok := inTreePlugins[csiPluginName]; ok {
+		return true
+	}
+	return false
+}
+
+// GetCSINameFromInTreeName returns the name of a CSI driver that supersedes the in-tree plugin with the given name
+func GetCSINameFromInTreeName(pluginName string) (string, error) {
 	for csiDriverName, curPlugin := range inTreePlugins {
 		if curPlugin.GetInTreePluginName() == pluginName {
 			return csiDriverName, nil
@@ -96,7 +105,15 @@ func GetCSINameFromIntreeName(pluginName string) (string, error) {
 	return "", fmt.Errorf("Could not find CSI Driver name for plugin %v", pluginName)
 }
 
-// IsPVMigratable tests whether there is Migration logic for the given Persistent Volume
+// GetInTreeNameFromCSIName returns the name of the in-tree plugin superseded by a CSI driver with the given name
+func GetInTreeNameFromCSIName(pluginName string) (string, error) {
+	if plugin, ok := inTreePlugins[pluginName]; ok {
+		return plugin.GetInTreePluginName(), nil
+	}
+	return "", fmt.Errorf("Could not find In-Tree driver name for CSI plugin %v", pluginName)
+}
+
+// IsPVMigratable tests whether there is migration logic for the given Persistent Volume
 func IsPVMigratable(pv *v1.PersistentVolume) bool {
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.CanSupport(pv) {
