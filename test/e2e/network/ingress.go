@@ -219,7 +219,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				e2elog.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListTargetHTTPSProxies()) != 0 {
-				e2elog.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
+				e2elog.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPSProxies())
 			}
 			if len(gceController.ListSslCertificates()) != 0 {
 				e2elog.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
