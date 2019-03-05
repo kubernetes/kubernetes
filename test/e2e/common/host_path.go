@@ -68,7 +68,9 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source, true)
+		// we can't spawn privileged containers on Windows, nor do we need to.
+		privileged := !framework.NodeOSDistroIs("windows")
+		pod := testPodWithHostVol(volumePath, source, privileged)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--new_file_0644=%v", filePath),
@@ -97,7 +99,10 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source, true)
+
+		// we can't spawn privileged containers on Windows, nor do we need to.
+		privileged := !framework.NodeOSDistroIs("windows")
+		pod := testPodWithHostVol(volumePath, source, privileged)
 
 		// Write the file in the subPath from container 0
 		container := &pod.Spec.Containers[0]
