@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -179,7 +180,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+		existedClaim, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
@@ -192,8 +193,16 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		case err != nil:
 			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
+		case err == nil:
+			if !reflect.DeepEqual(existedClaim.Spec, claim.Spec) {
+				_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(&claim)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("Failed to update PVC %s: %s", claim.Name, err))
+					spc.recordClaimEvent("update", set, pod, &claim, err)
+				}
+			}
 		}
-		// TODO: Check resource requirements and accessmodes, update if necessary
+
 	}
 	return errorutils.NewAggregate(errs)
 }
