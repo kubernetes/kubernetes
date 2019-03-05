@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function kube::util::sourced_variable {
+  # Call this function to tell shellcheck that a variable is supposed to
+  # be used from other calling context. This helps quiet an "unused
+  # variable" warning from shellcheck and also document your code.
+  true
+}
+
 kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
@@ -39,7 +46,7 @@ kube::util::wait_for_url() {
   local times=${4:-30}
   local maxtime=${5:-1}
 
-  which curl >/dev/null || {
+  command -v curl >/dev/null || {
     kube::log::usage "curl must be installed"
     exit 1
   }
@@ -69,7 +76,7 @@ kube::util::trap_add() {
     local new_cmd
 
     # Grab the currently defined trap commands for this trap
-    existing_cmd=`trap -p "${trap_add_name}" |  awk -F"'" '{print $2}'`
+    existing_cmd=$(trap -p "${trap_add_name}" |  awk -F"'" '{print $2}')
 
     if [[ -z "${existing_cmd}" ]]; then
       new_cmd="${trap_add_cmd}"
@@ -77,7 +84,11 @@ kube::util::trap_add() {
       new_cmd="${trap_add_cmd};${existing_cmd}"
     fi
 
-    # Assign the test
+    # Assign the test. Disable the shellcheck warning telling that trap
+    # commands should be single quoted to avoid evaluating them at this
+    # point instead evaluating them at run time. The logic of adding new
+    # commands to a single trap requires them to be evaluated right away.
+    # shellcheck disable=SC2064
     trap "${new_cmd}" "${trap_add_name}"
   done
 }
@@ -173,8 +184,10 @@ kube::util::find-binary-for-platform() {
   # The bazel go rules place some binaries in subtrees like
   # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
   # the platform name is matched in the path.
-  locations+=($(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true) )
+  while IFS=$'\n' read -r location; do
+    locations+=("$location");
+  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
+    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
@@ -196,6 +209,10 @@ kube::util::gen-docs() {
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
   genfeddocs=$(kube::util::find-binary "genfeddocs")
+
+  # TODO: If ${genfeddocs} is not used from anywhere (it isn't used at
+  # least from k/k tree), remove it completely.
+  kube::util::sourced_variable "${genfeddocs}"
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
   "${gendocs}" "${dest}/docs/user-guide/kubectl/"
@@ -222,10 +239,10 @@ kube::util::gen-docs() {
   "${genyaml}" "${dest}/docs/yaml/kubectl/"
 
   # create the list of generated files
-  pushd "${dest}" > /dev/null
+  pushd "${dest}" > /dev/null || return 1
   touch docs/.generated_docs
   find . -type f | cut -sd / -f 2- | LC_ALL=C sort > docs/.generated_docs
-  popd > /dev/null
+  popd > /dev/null || return 1
 }
 
 # Removes previously generated docs-- we don't want to check them in. $KUBE_ROOT
@@ -233,7 +250,7 @@ kube::util::gen-docs() {
 kube::util::remove-gen-docs() {
   if [ -e "${KUBE_ROOT}/docs/.generated_docs" ]; then
     # remove all of the old docs; we don't want to check them in.
-    while read file; do
+    while read -r file; do
       rm "${KUBE_ROOT}/${file}" 2>/dev/null || true
     done <"${KUBE_ROOT}/docs/.generated_docs"
     # The docs/.generated_docs file lists itself, so we don't need to explicitly
@@ -249,18 +266,14 @@ kube::util::remove-gen-docs() {
 # * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
-  staging_apis=(
-  $(
-    cd "${KUBE_ROOT}/staging/src/k8s.io/api" &&
-    find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort
-  ))
-
   local group_version="$1"
 
-  if [[ " ${staging_apis[@]} " =~ " ${group_version/.*k8s.io/} " ]]; then
-    echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
-    return
-  fi
+  while IFS=$'\n' read -r api; do
+    if [[ "${api}" = "${group_version/.*k8s.io/}" ]]; then
+      echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+      return
+    fi
+  done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
@@ -322,7 +335,7 @@ kube::util::git_upstream_remote_name() {
 kube::util::create-fake-git-tree() {
   local -r target_dir=${1:-$(pwd)}
 
-  pushd "${target_dir}" >/dev/null
+  pushd "${target_dir}" >/dev/null || return 1
     git init >/dev/null
     git config --local user.email "nobody@k8s.io"
     git config --local user.name "$0"
@@ -331,7 +344,7 @@ kube::util::create-fake-git-tree() {
     if (( ${KUBE_VERBOSE:-5} >= 6 )); then
       kube::log::status "${target_dir} is now a git tree."
     fi
-  popd >/dev/null
+  popd >/dev/null || return 1
 }
 
 # Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
@@ -344,8 +357,8 @@ kube::util::godep_restored() {
 
   local root
   local old_rev=""
-  while read path rev; do
-    rev=$(echo "${rev}" | sed "s/['\"]//g") # remove quotes which are around revs sometimes
+  while read -r path rev; do
+    rev="${rev//[\'\"]}" # remove quotes which are around revs sometimes
 
     if [[ "${rev}" == "${old_rev}" ]] && [[ "${path}" == "${root}"* ]]; then
       # avoid checking the same git/hg root again
@@ -353,7 +366,7 @@ kube::util::godep_restored() {
     fi
 
     root="${path}"
-    while [ "${root}" != "." -a ! -d "${gopath}/src/${root}/.git" -a ! -d "${gopath}/src/${root}/.hg" ]; do
+    while [ "${root}" != "." ] && [ ! -d "${gopath}/src/${root}/.git" ] && [ ! -d "${gopath}/src/${root}/.hg" ]; do
       root=$(dirname "${root}")
     done
     if [ "${root}" == "." ]; then
@@ -387,7 +400,7 @@ kube::util::ensure_clean_working_dir() {
         exit 1
     fi | sed 's/^/  /'
     echo -e "\nCommit your changes in another terminal and then continue here by pressing enter."
-    read
+    read -r
   done 1>&2
 }
 
@@ -479,7 +492,8 @@ kube::util::has_changes() {
   local -r pattern=$2
   local -r not_pattern=${3:-totallyimpossiblepattern}
 
-  local base_ref=$(kube::util::base_ref "${git_branch}")
+  local base_ref
+  base_ref=$(kube::util::base_ref "${git_branch}")
   echo "Checking for '${pattern}' changes against '${base_ref}'"
 
   # notice this uses ... to find the first shared ancestor
@@ -499,11 +513,11 @@ kube::util::download_file() {
   local -r url=$1
   local -r destination_file=$2
 
-  rm  ${destination_file} 2&> /dev/null || true
+  rm "${destination_file}" 2&> /dev/null || true
 
   for i in $(seq 5)
   do
-    if ! curl -fsSL --retry 3 --keepalive-time 2 ${url} -o ${destination_file}; then
+    if ! curl -fsSL --retry 3 --keepalive-time 2 "${url}" -o "${destination_file}"; then
       echo "Downloading ${url} failed. $((5-i)) retries left."
       sleep 1
     else
@@ -518,8 +532,7 @@ kube::util::download_file() {
 # Sets:
 #  OPENSSL_BIN: The path to the openssl binary to use
 function kube::util::test_openssl_installed {
-    openssl version >& /dev/null
-    if [ "$?" != "0" ]; then
+    if ! openssl version >& /dev/null; then
       echo "Failed to run openssl. Please ensure openssl is installed"
       exit 1
     fi
@@ -602,7 +615,7 @@ function kube::util::write_client_kubeconfig {
     local api_port=$5
     local client_id=$6
     local token=${7:-}
-    cat <<EOF | ${sudo} tee "${dest_dir}"/${client_id}.kubeconfig > /dev/null
+    cat <<EOF | ${sudo} tee "${dest_dir}"/"${client_id}".kubeconfig > /dev/null
 apiVersion: v1
 kind: Config
 clusters:
@@ -635,7 +648,8 @@ EOF
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
-  DOCKER=(docker ${DOCKER_OPTS})
+  IFS=" " read -ra DOCKER <<< "${DOCKER_OPTS}"
+  DOCKER=(docker "${DOCKER[@]}")
   if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
     cat <<'EOF' >&2
 Can't connect to 'docker' daemon.  please fix and retry.
@@ -713,7 +727,7 @@ function kube::util::ensure-cfssl {
   fi
 
   mkdir -p "${cfssldir}"
-  pushd "${cfssldir}" > /dev/null
+  pushd "${cfssldir}" > /dev/null || return 1
 
     echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
     kernel=$(uname -s)
@@ -742,7 +756,7 @@ function kube::util::ensure-cfssl {
       echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
       exit 1
     fi
-  popd > /dev/null
+  popd > /dev/null || return 1
 }
 
 # kube::util::ensure_dockerized
@@ -766,12 +780,13 @@ function kube::util::ensure_dockerized {
 function kube::util::ensure-gnu-sed {
   if LANG=C sed --help 2>&1 | grep -q GNU; then
     SED="sed"
-  elif which gsed &>/dev/null; then
+  elif command -v gsed &>/dev/null; then
     SED="gsed"
   else
     kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
     return 1
   fi
+  kube::util::sourced_variable "${SED}"
 }
 
 # kube::util::check-file-in-alphabetical-order <file>
@@ -794,7 +809,7 @@ function kube::util::check-file-in-alphabetical-order {
 # kube::util::require-jq
 # Checks whether jq is installed.
 function kube::util::require-jq {
-  if ! which jq &>/dev/null; then
+  if ! command -v jq &>/dev/null; then
     echo "jq not found. Please install." 1>&2
     return 1
   fi
@@ -809,6 +824,14 @@ if [[ -z "${color_start-}" ]]; then
   declare -r color_blue="${color_start}1;34m"
   declare -r color_cyan="${color_start}1;36m"
   declare -r color_norm="${color_start}0m"
+
+  kube::util::sourced_variable "${color_start}"
+  kube::util::sourced_variable "${color_red}"
+  kube::util::sourced_variable "${color_yellow}"
+  kube::util::sourced_variable "${color_green}"
+  kube::util::sourced_variable "${color_blue}"
+  kube::util::sourced_variable "${color_cyan}"
+  kube::util::sourced_variable "${color_norm}"
 fi
 
 # ex: ts=2 sw=2 et filetype=sh
