@@ -40,10 +40,10 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/utils/integer"
 
 	"k8s.io/klog"
 )
@@ -483,18 +483,19 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	if job.Status.StartTime == nil {
 		now := metav1.Now()
 		job.Status.StartTime = &now
-		// enqueue a sync to check if job past ActiveDeadlineSeconds
-		if job.Spec.ActiveDeadlineSeconds != nil {
-			klog.V(4).Infof("Job %s have ActiveDeadlineSeconds will sync after %d seconds",
-				key, *job.Spec.ActiveDeadlineSeconds)
-			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
-		}
 
 		// enqueue a sync to check if job past ProgressDeadlineSeconds
 		if job.Spec.ProgressDeadlineSeconds != nil {
 			klog.V(4).Infof("Job %s have ProgressDeadlineSeconds will sync after %d seconds",
 				key, *job.Spec.ProgressDeadlineSeconds)
 			jm.queue.AddAfter(key, time.Duration(*job.Spec.ProgressDeadlineSeconds)*time.Second)
+		}
+
+		// enqueue a sync to check if job past ActiveDeadlineSeconds
+		if job.Spec.ActiveDeadlineSeconds != nil {
+			klog.V(4).Infof("Job %s have ActiveDeadlineSeconds will sync after %d seconds",
+				key, *job.Spec.ActiveDeadlineSeconds)
+			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
 		}
 	}
 
@@ -516,14 +517,14 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
-	} else if previousRetry == 0 && hasPendingPod(pods) && pastProgressDeadline(&job) {
-		jobFailed = true
-		failureReason = "ProgressDeadlineExceeded"
-		failureMessage = "Job has not started before ProgressDeadline"
-	} else if pastActiveDeadline(&job) {
+	} else if previousRetry == 0 && hasPendingPod(pods) && pastDeadline(&job, job.Spec.ProgressDeadlineSeconds) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
-		failureMessage = "Job was active longer than specified deadline"
+		failureMessage = "Job has not started before specified progress deadline"
+	} else if pastDeadline(&job, job.Spec.ActiveDeadlineSeconds) {
+		jobFailed = true
+		failureReason = "DeadlineExceeded"
+		failureMessage = "Job was active longer than specified active deadline"
 	}
 
 	if jobFailed {
@@ -671,27 +672,16 @@ func hasPendingPod(pods []*v1.Pod) bool {
 	return false
 }
 
-// pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
-func pastActiveDeadline(job *batch.Job) bool {
-	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
+// pastDeadline checks if job has ActiveDeadlineSeconds or ProgressDeadlineSeconds field set
+// and checks if it is exceeded.
+func pastDeadline(job *batch.Job, deadlineSeconds *int64) bool {
+	if deadlineSeconds == nil || job.Status.StartTime == nil {
 		return false
 	}
 	now := metav1.Now()
 	start := job.Status.StartTime.Time
 	duration := now.Time.Sub(start)
-	allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
-	return duration >= allowedDuration
-}
-
-// pastProgressDeadline checks if job has ProgressDeadlineSeconds field set and if it is exceeded.
-func pastProgressDeadline(job *batch.Job) bool {
-	if job.Spec.ProgressDeadlineSeconds == nil || job.Status.StartTime == nil {
-		return false
-	}
-	now := metav1.Now()
-	start := job.Status.StartTime.Time
-	duration := now.Time.Sub(start)
-	allowedDuration := time.Duration(*job.Spec.ProgressDeadlineSeconds) * time.Second
+	allowedDuration := time.Duration(*deadlineSeconds) * time.Second
 	return duration >= allowedDuration
 }
 

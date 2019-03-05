@@ -495,17 +495,17 @@ func TestSyncJobPastProgressDeadlineSeconds(t *testing.T) {
 		"past progressDeadlineSeconds with pending pod and completions greater than 1": {
 			1, 3, 10, 5, 8, 6,
 			1, 1, 1, 0,
-			true, 2, 0, 1, 2, "ProgressDeadlineExceeded",
+			true, 2, 0, 1, 2, "DeadlineExceeded",
 		},
 		"past progressDeadlineSeconds with pending pod and parallelism greater than 1": {
 			2, 3, 10, 5, 8, 6,
 			1, 1, 1, 0,
-			true, 2, 0, 1, 2, "ProgressDeadlineExceeded",
+			true, 2, 0, 1, 2, "DeadlineExceeded",
 		},
 		"past progressDeadlineSeconds with pending pod": {
 			1, 1, 10, 5, 8, 6,
 			1, 0, 0, 0,
-			true, 1, 0, 0, 1, "ProgressDeadlineExceeded",
+			true, 1, 0, 0, 1, "DeadlineExceeded",
 		},
 		"past progressDeadlineSeconds without pending pod": {
 			1, 1, 10, 5, 12, 6,

@@ -111,6 +111,8 @@ type JobSpec struct {
 
 	// Optional duration in seconds relative to the startTime that the job needs to become active,
 	// otherwise the system will try to terminate it; value must be positive integer
+	// Job is active means all pods of the job are in running state,
+	// or all pods were in running state but some are failing at the moment.
 	// +optional
 	ProgressDeadlineSeconds *int64
 
