@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/printers"
+	printerspkg "k8s.io/kubernetes/pkg/printers"
 )
 
 // UniversalDecoder call must specify parameter versions; otherwise it will decode to internal versions.
@@ -71,7 +72,7 @@ func TestMassageJSONPath(t *testing.T) {
 func TestNewColumnPrinterFromSpec(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []Column
+		expectedColumns []printerspkg.Column
 		expectErr       bool
 		name            string
 		noHeaders       bool
@@ -99,7 +100,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		{
 			spec: "NAME:metadata.name,API_VERSION:apiVersion",
 			name: "ok",
-			expectedColumns: []Column{
+			expectedColumns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -166,7 +167,7 @@ const exampleTemplateTwo = `NAME               		API_VERSION
 func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []Column
+		expectedColumns []printerspkg.Column
 		expectErr       bool
 		name            string
 	}{
@@ -193,7 +194,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateOne,
 			name: "ok",
-			expectedColumns: []Column{
+			expectedColumns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -207,7 +208,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateTwo,
 			name: "ok-2",
-			expectedColumns: []Column{
+			expectedColumns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -243,12 +244,12 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 
 func TestColumnPrint(t *testing.T) {
 	tests := []struct {
-		columns        []Column
+		columns        []printerspkg.Column
 		obj            runtime.Object
 		expectedOutput string
 	}{
 		{
-			columns: []Column{
+			columns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -260,7 +261,7 @@ foo
 `,
 		},
 		{
-			columns: []Column{
+			columns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -278,7 +279,7 @@ bar
 `,
 		},
 		{
-			columns: []Column{
+			columns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -294,7 +295,7 @@ foo    baz
 `,
 		},
 		{
-			columns: []Column{
+			columns: []printerspkg.Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -334,7 +335,7 @@ foo    baz           <none>
 
 // this mimics how resource/get.go calls the customcolumn printer
 func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
-	columns := []Column{
+	columns := []printerspkg.Column{
 		{
 			Header:    "NAME",
 			FieldSpec: "{.metadata.name}",

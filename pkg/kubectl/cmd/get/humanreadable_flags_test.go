@@ -44,6 +44,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 		// TODO(juanvallejo): test sorting once it's moved to the HumanReadablePrinter
 		sortBy       string
 		columnLabels []string
+		extraColumns []string
 
 		noHeaders     bool
 		withNamespace bool
@@ -108,6 +109,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 				ShowLabels:   &tc.showLabels,
 				SortBy:       &tc.sortBy,
 				ColumnLabels: &tc.columnLabels,
+				ExtraColumns: &tc.extraColumns,
 
 				NoHeaders:     tc.noHeaders,
 				WithNamespace: tc.withNamespace,
