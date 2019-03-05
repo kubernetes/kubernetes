@@ -35,10 +35,6 @@ type ManagedDiskController struct {
 	common *controllerCommon
 }
 
-func newManagedDiskController(common *controllerCommon) (*ManagedDiskController, error) {
-	return &ManagedDiskController{common: common}, nil
-}
-
 //CreateManagedDisk : create managed disk
 func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string,
 	sizeGB int, tags map[string]string) (string, error) {
