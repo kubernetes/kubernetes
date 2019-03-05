@@ -313,7 +313,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	It("should support configurable pod resolv.conf", func() {
+	/*
+		Release: v1.14
+		Testname: DNS, dnsConfig
+		Description: Create a Pod as DNS_Server to serve DNS resolution by dnsName and IP. Create another pod B, with dnsConfig pointing to DNS_Server pod and DNS options. Provided dnsConfig entries MUST match with Pod B's /etc/resolve.conf file.
+		Pod MUST be able to resolve dnsName to its IP.
+	*/
+	framework.ConformanceIt("should support configurable pod resolv.conf", func() {
 		By("Preparing a test DNS service with injected DNS names...")
 		testInjectedIP := "1.1.1.1"
 		testDNSNameShort := "notexistname"
