@@ -870,3 +870,628 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		}
 	}
 }
+
+func TestCSINodeValidation(t *testing.T) {
+	driverName := "driver-name"
+	driverName2 := "1io.kubernetes-storage-2-csi-driver3"
+	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
+	nodeID := "nodeA"
+	successCases := []storage.CSINode{
+		{
+			// driver name: dot only
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// driver name: dash only
+			ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io-kubernetes-storage-csi-driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// driver name: numbers
+			ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "1io-kubernetes-storage-2-csi-driver3",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// driver name: dot, dash
+			ObjectMeta: metav1.ObjectMeta{Name: "foo4"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage-csi-driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// driver name: dot, dash, and numbers
+			ObjectMeta: metav1.ObjectMeta{Name: "foo5"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         driverName2,
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Driver name length 1
+			ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "a",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// multiple drivers with different node IDs, topology keys
+			ObjectMeta: metav1.ObjectMeta{Name: "foo6"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1", "key2"},
+					},
+					{
+						Name:         "driverB",
+						NodeID:       "nodeA",
+						TopologyKeys: []string{"keyA", "keyB"},
+					},
+				},
+			},
+		},
+		{
+			// multiple drivers with same node IDs, topology keys
+			ObjectMeta: metav1.ObjectMeta{Name: "foo7"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+					{
+						Name:         "driver2",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+				},
+			},
+		},
+		{
+			// topology key names with -, _, and dot .
+			ObjectMeta: metav1.ObjectMeta{Name: "foo8"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"zone_1", "zone.2"},
+					},
+					{
+						Name:         "driver2",
+						NodeID:       "node1",
+						TopologyKeys: []string{"zone-3", "zone.4"},
+					},
+				},
+			},
+		},
+		{
+			// topology prefix with - and dot.
+			ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"company-com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// No topology keys
+			ObjectMeta: metav1.ObjectMeta{Name: "foo10"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:   driverName,
+						NodeID: nodeID,
+					},
+				},
+			},
+		},
+	}
+
+	for _, csiNode := range successCases {
+		if errs := ValidateCSINode(&csiNode); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []storage.CSINode{
+		{
+			// Empty driver name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Invalid start char in driver name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "_io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Invalid end char in driver name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo4"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver/",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Invalid separators in driver name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo5"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io/kubernetes/storage/csi~driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// driver name: underscore only
+			ObjectMeta: metav1.ObjectMeta{Name: "foo6"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io_kubernetes_storage_csi_driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Driver name length > 63
+			ObjectMeta: metav1.ObjectMeta{Name: "foo7"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         longName,
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// No driver name
+			ObjectMeta: metav1.ObjectMeta{Name: "foo8"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// Empty individual topology key
+			ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         driverName,
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", ""},
+					},
+				},
+			},
+		},
+		{
+			// duplicate drivers in driver specs
+			ObjectMeta: metav1.ObjectMeta{Name: "foo10"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1", "key2"},
+					},
+					{
+						Name:         "driver1",
+						NodeID:       "nodeX",
+						TopologyKeys: []string{"keyA", "keyB"},
+					},
+				},
+			},
+		},
+		{
+			// single driver with duplicate topology keys in driver specs
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1", "key1"},
+					},
+				},
+			},
+		},
+		{
+			// multiple drivers with one set of duplicate topology keys in driver specs
+			ObjectMeta: metav1.ObjectMeta{Name: "foo12"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+					{
+						Name:         "driver2",
+						NodeID:       "nodeX",
+						TopologyKeys: []string{"keyA", "keyA"},
+					},
+				},
+			},
+		},
+		{
+			// Empty NodeID
+			ObjectMeta: metav1.ObjectMeta{Name: "foo13"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         driverName,
+						NodeID:       "",
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// topology prefix should be lower case
+			ObjectMeta: metav1.ObjectMeta{Name: "foo14"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         driverName,
+						NodeID:       "node1",
+						TopologyKeys: []string{"Company.Com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, csiNode := range errorCases {
+		if errs := ValidateCSINode(&csiNode); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", csiNode)
+		}
+	}
+}
+
+func TestCSINodeUpdateValidation(t *testing.T) {
+	//driverName := "driver-name"
+	//driverName2 := "1io.kubernetes-storage-2-csi-driver3"
+	//longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
+	nodeID := "nodeA"
+
+	old := storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:         "io.kubernetes.storage.csi.driver-1",
+					NodeID:       nodeID,
+					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+				},
+				{
+					Name:         "io.kubernetes.storage.csi.driver-2",
+					NodeID:       nodeID,
+					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+				},
+			},
+		},
+	}
+
+	successCases := []storage.CSINode{
+		{
+			// no change
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// remove a driver
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// add a driver
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-3",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// remove a driver and add a driver
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.new-driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, csiNode := range successCases {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) != 0 {
+			t.Errorf("expected success: %+v", errs)
+		}
+	}
+
+	errorCases := []storage.CSINode{
+		{
+			// invalid change node id
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       "nodeB",
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+				},
+			},
+		},
+		{
+			// invalid change topology keys
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       "nodeB",
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, csiNode := range errorCases {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %+v", csiNode)
+		}
+	}
+}
+
+func TestCSIDriverValidation(t *testing.T) {
+	driverName := "test-driver"
+	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
+	invalidName := "-invalid-@#$%^&*()-"
+	attachRequired := true
+	attachNotRequired := false
+	podInfoOnMount := true
+	notPodInfoOnMount := false
+	successCases := []storage.CSIDriver{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// driver name: dot only
+			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi.driver"},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// driver name: dash only
+			ObjectMeta: metav1.ObjectMeta{Name: "io-kubernetes-storage-csi-driver"},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+			},
+		},
+		{
+			// driver name: numbers
+			ObjectMeta: metav1.ObjectMeta{Name: "1csi2driver3"},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// driver name: dot and dash
+			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi-driver"},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+			},
+		},
+	}
+
+	for _, csiDriver := range successCases {
+		if errs := ValidateCSIDriver(&csiDriver); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []storage.CSIDriver{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: invalidName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: longName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+			},
+		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: nil,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: nil,
+			},
+		},
+	}
+
+	for _, csiDriver := range errorCases {
+		if errs := ValidateCSIDriver(&csiDriver); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", csiDriver)
+		}
+	}
+}

@@ -38,7 +38,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
@@ -334,11 +333,6 @@ func (expc *expandController) GetNodeName() types.NodeName {
 
 func (expc *expandController) GetEventRecorder() record.EventRecorder {
 	return expc.recorder
-}
-
-func (expc *expandController) GetCSIClient() csiclientset.Interface {
-	// No volume plugin in expand controller needs csi.storage.k8s.io
-	return nil
 }
 
 func (expc *expandController) GetSubpather() subpath.Interface {

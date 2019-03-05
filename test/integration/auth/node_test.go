@@ -24,6 +24,7 @@ import (
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,8 +35,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
@@ -67,7 +65,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Enable NodeLease feature so that nodes can create leases
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
-	// Enable CSINodeInfo feature so that nodes can create CSINodeInfo objects.
+	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
 
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
@@ -95,7 +93,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Build client config and superuser clientset
 	clientConfig := server.ClientConfig
 	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
-	superuserCRDClient := crdClientsetForToken(tokenMaster, clientConfig)
 
 	// Wait for a healthy server
 	for {
@@ -157,13 +154,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	csiNodeInfoCRD, err := crdFromManifest("../../../staging/src/k8s.io/csi-api/pkg/crd/manifests/csinodeinfo.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	etcd.CreateTestCRDs(t, superuserCRDClient, false, csiNodeInfoCRD)
 
 	getSecret := func(client clientset.Interface) func() error {
 		return func() error {
@@ -412,84 +402,68 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
-	getNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
+	getNode1CSINode := func(client externalclientset.Interface) func() error {
 		return func() error {
-			_, err := client.CsiV1alpha1().CSINodeInfos().Get("node1", metav1.GetOptions{})
+			_, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
 			return err
 		}
 	}
-	createNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
+	createNode1CSINode := func(client externalclientset.Interface) func() error {
 		return func() error {
-			nodeInfo := &csiv1alpha1.CSINodeInfo{
+			nodeInfo := &storagev1beta1.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+				Spec: storagev1beta1.CSINodeSpec{
+					Drivers: []storagev1beta1.CSINodeDriver{
 						{
-							Name:         "com.example.csi/driver1",
+							Name:         "com.example.csi.driver1",
 							NodeID:       "com.example.csi/node1",
 							TopologyKeys: []string{"com.example.csi/zone"},
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
-						{
-							Name:                  "com.example.csi/driver1",
-							Available:             true,
-							VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
-						},
-					},
-				},
 			}
-			_, err := client.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
+			_, err := client.StorageV1beta1().CSINodes().Create(nodeInfo)
 			return err
 		}
 	}
-	updateNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
+	updateNode1CSINode := func(client externalclientset.Interface) func() error {
 		return func() error {
-			nodeInfo, err := client.CsiV1alpha1().CSINodeInfos().Get("node1", metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			nodeInfo.Spec.Drivers = []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo.Spec.Drivers = []storagev1beta1.CSINodeDriver{
 				{
-					Name:         "com.example.csi/driver1",
+					Name:         "com.example.csi.driver2",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
-			nodeInfo.Status.Drivers = []csiv1alpha1.CSIDriverInfoStatus{
-				{
-					Name:                  "com.example.csi/driver1",
-					Available:             true,
-					VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
-				},
-			}
-			_, err = client.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+			_, err = client.StorageV1beta1().CSINodes().Update(nodeInfo)
 			return err
 		}
 	}
-	patchNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
+	patchNode1CSINode := func(client externalclientset.Interface) func() error {
 		return func() error {
-			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage/driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
+			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
-			_, err := client.CsiV1alpha1().CSINodeInfos().Patch("node1", types.MergePatchType, bs)
+			_, err := client.StorageV1beta1().CSINodes().Patch("node1", types.MergePatchType, bs)
 			return err
 		}
 	}
-	deleteNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
+	deleteNode1CSINode := func(client externalclientset.Interface) func() error {
 		return func() error {
-			return client.CsiV1alpha1().CSINodeInfos().Delete("node1", &metav1.DeleteOptions{})
+			return client.StorageV1beta1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
 		}
 	}
 
 	nodeanonClient, _ := clientsetForToken(tokenNodeUnknown, clientConfig)
 	node1Client, node1ClientExternal := clientsetForToken(tokenNode1, clientConfig)
 	node2Client, node2ClientExternal := clientsetForToken(tokenNode2, clientConfig)
-	csiNode1Client := csiClientsetForToken(tokenNode1, clientConfig)
-	csiNode2Client := csiClientsetForToken(tokenNode2, clientConfig)
+	_, csiNode1Client := clientsetForToken(tokenNode1, clientConfig)
+	_, csiNode2Client := clientsetForToken(tokenNode2, clientConfig)
 
 	// all node requests from node1 and unknown node fail
 	expectForbidden(t, getSecret(nodeanonClient))
@@ -645,18 +619,18 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, patchNode1Lease(node2Client))
 	expectForbidden(t, deleteNode1Lease(node2Client))
 
-	// node1 allowed to operate on its own CSINodeInfo
-	expectAllowed(t, createNode1CSINodeInfo(csiNode1Client))
-	expectAllowed(t, getNode1CSINodeInfo(csiNode1Client))
-	expectAllowed(t, updateNode1CSINodeInfo(csiNode1Client))
-	expectAllowed(t, patchNode1CSINodeInfo(csiNode1Client))
-	expectAllowed(t, deleteNode1CSINodeInfo(csiNode1Client))
-	// node2 not allowed to operate on another node's CSINodeInfo
-	expectForbidden(t, createNode1CSINodeInfo(csiNode2Client))
-	expectForbidden(t, getNode1CSINodeInfo(csiNode2Client))
-	expectForbidden(t, updateNode1CSINodeInfo(csiNode2Client))
-	expectForbidden(t, patchNode1CSINodeInfo(csiNode2Client))
-	expectForbidden(t, deleteNode1CSINodeInfo(csiNode2Client))
+	// node1 allowed to operate on its own CSINode
+	expectAllowed(t, createNode1CSINode(csiNode1Client))
+	expectAllowed(t, getNode1CSINode(csiNode1Client))
+	expectAllowed(t, updateNode1CSINode(csiNode1Client))
+	expectAllowed(t, patchNode1CSINode(csiNode1Client))
+	expectAllowed(t, deleteNode1CSINode(csiNode1Client))
+	// node2 not allowed to operate on another node's CSINode
+	expectForbidden(t, createNode1CSINode(csiNode2Client))
+	expectForbidden(t, getNode1CSINode(csiNode2Client))
+	expectForbidden(t, updateNode1CSINode(csiNode2Client))
+	expectForbidden(t, patchNode1CSINode(csiNode2Client))
+	expectForbidden(t, deleteNode1CSINode(csiNode2Client))
 }
 
 // expect executes a function a set number of times until it either returns the

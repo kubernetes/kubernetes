@@ -50,7 +50,6 @@ var (
 		"nodeName",
 		"attachmentID",
 	}
-	currentPodInfoMountVersion = "v1"
 )
 
 type csiMountMgr struct {
@@ -247,8 +246,8 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		return nil, err
 	}
 
-	// if PodInfoOnMountVersion is not set or not v1 we do not set pod attributes
-	if csiDriver.Spec.PodInfoOnMountVersion == nil || *csiDriver.Spec.PodInfoOnMountVersion != currentPodInfoMountVersion {
+	// if PodInfoOnMount is not set or false we do not set pod attributes
+	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
 		klog.V(4).Infof(log("CSIDriver %q does not require pod information", c.driverName))
 		return nil, nil
 	}

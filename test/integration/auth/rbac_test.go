@@ -45,7 +45,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -84,13 +83,6 @@ func crdClientsetForToken(user string, config *restclient.Config) apiextensionsc
 	configCopy := *config
 	configCopy.BearerToken = user
 	return apiextensionsclient.NewForConfigOrDie(&configCopy)
-}
-
-func csiClientsetForToken(user string, config *restclient.Config) csiclientset.Interface {
-	configCopy := *config
-	configCopy.BearerToken = user
-	configCopy.ContentType = "application/json" // // csi client works with CRDs that support json only
-	return csiclientset.NewForConfigOrDie(&configCopy)
 }
 
 type testRESTOptionsGetter struct {

@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -85,7 +84,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			sc: make(map[string]*storage.StorageClass),
 			tp: tp,
 		}
-		csics := f.CSIClientSet
+		cs := f.ClientSet
 		var err error
 
 		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, tp.attachable, tp.podInfoVersion, tp.attachLimit)
@@ -102,10 +101,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		if tp.registerDriver {
-			err = waitForCSIDriver(csics, m.config.GetUniqueDriverName())
+			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
 			framework.ExpectNoError(err, "Failed to get CSIDriver : %v", err)
 			m.testCleanups = append(m.testCleanups, func() {
-				destroyCSIDriver(csics, m.config.GetUniqueDriverName())
+				destroyCSIDriver(cs, m.config.GetUniqueDriverName())
 			})
 		}
 	}
@@ -515,12 +514,12 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 	}
 }
 
-func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
+func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	timeout := 2 * time.Minute
 
 	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
-		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+		_, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
 			return err
 		}
@@ -528,13 +527,13 @@ func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
 	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
 }
 
-func destroyCSIDriver(csics csiclient.Interface, driverName string) {
-	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+func destroyCSIDriver(cs clientset.Interface, driverName string) {
+	driverGet, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 	if err == nil {
 		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
 		// framework.Logf("%s", framework.PrettyPrint(driverGet))
-		csics.CsiV1alpha1().CSIDrivers().Delete(driverName, nil)
+		cs.StorageV1beta1().CSIDrivers().Delete(driverName, nil)
 	}
 }
 
