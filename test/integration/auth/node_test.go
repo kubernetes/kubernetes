@@ -56,9 +56,6 @@ func TestNodeAuthorizer(t *testing.T) {
 		tokenNode2       = "node2-token"
 	)
 
-	// Enabled CSIPersistentVolume feature at startup so volumeattachments get watched
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
-
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
@@ -576,12 +573,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))
 
-	// Disabled CSIPersistentVolume feature
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, false)()
-	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
-	expectForbidden(t, getVolumeAttachment(node2ClientExternal))
 	// Enabled CSIPersistentVolume feature
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
 	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
 

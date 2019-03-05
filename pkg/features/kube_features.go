@@ -449,7 +449,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
-	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
+	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	CSIDriverRegistry:                           {Default: true, PreRelease: utilfeature.Beta},
 	CSINodeInfo:                                 {Default: true, PreRelease: utilfeature.Beta},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
@@ -474,7 +474,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA},
+	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
