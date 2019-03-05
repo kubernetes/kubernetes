@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -77,6 +78,8 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	for k := range pvcs {
 		pvc := pvcs[k]
+		pvc.Status.Phase = v1.ClaimBound
+		pvc.Spec.VolumeName = k
 		pvcIndexer.Add(&pvc)
 	}
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
@@ -125,6 +128,86 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	for i := range events {
 		if !strings.Contains(events[i], v1.EventTypeWarning) {
 			t.Errorf("Found unexpected non-warning event %s", events[i])
+		}
+	}
+}
+
+func TestStatefulPodControlCreatePodPvcDoNotUpdate(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	pvcs := getPersistentVolumeClaims(set, pod)
+	pvcName := fmt.Sprintf("%s-%s-%d", set.Spec.Template.Name, set.Name, 0)
+	pvc := pvcs[pvcName]
+	fakeClient := &fake.Clientset{}
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for k := range pvcs {
+		pvc = pvcs[k]
+		pvc.Status.Phase = v1.ClaimBound
+		pvc.Spec.VolumeName = k
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		return true, &pvc, nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	if err := control.CreateStatefulPod(set, pod); err != nil {
+		t.Error("Failed to produce error on PVC creation failure")
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 1 {
+		t.Errorf("PVC update failure: got %d events, but want 1", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeNormal) {
+			t.Errorf("Found unexpected non-warning event %s", events[i])
+		}
+	}
+}
+
+func TestStatefulPodControlCreatePodPvcUpdateSuccess(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	pvcs := getPersistentVolumeClaims(set, pod)
+	pvcName := fmt.Sprintf("%s-%s-%d", set.Spec.Template.Name, set.Name, 0)
+	pvc := pvcs[pvcName]
+	fakeClient := &fake.Clientset{}
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	storageClassName := "test"
+	for k := range pvcs {
+		pvc = pvcs[k]
+		pvc.Spec.StorageClassName = &storageClassName
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		return true, &pvc, nil
+	})
+	fakeClient.AddReactor("update", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		return true, update.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	if err := control.CreateStatefulPod(set, pod); err != nil {
+		t.Errorf("StatefulPodControl failed to create Pod error: %s", err)
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 2 {
+		t.Errorf("Expected 2 events for successful create found %d", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeNormal) {
+			t.Errorf("Found unexpected non-normal event %s", events[i])
 		}
 	}
 }
@@ -374,9 +457,9 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 		if !conflict {
 			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-		} else {
-			return true, update.GetObject(), nil
 		}
+		return true, update.GetObject(), nil
+
 	})
 	pod.Name = "goo-0"
 	if err := control.UpdateStatefulPod(set, pod); err != nil {
