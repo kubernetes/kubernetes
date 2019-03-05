@@ -96,3 +96,8 @@ func (t *osCinderCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 func (t *osCinderCSITranslator) GetInTreePluginName() string {
 	return CinderInTreePluginName
 }
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (t *osCinderCSITranslator) GetCSIPluginName() string {
+	return CinderDriverName
+}
