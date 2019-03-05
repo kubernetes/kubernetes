@@ -99,7 +99,7 @@ func TestParseConfig(t *testing.T) {
 		MaximumLoadBalancerRuleCount:      1,
 		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
 		PrimaryScaleSetName:               "primaryScaleSetName",
-		ResourceGroup:                     "resourceGroup",
+		ResourceGroup:                     "resourcegroup",
 		RouteTableName:                    "routeTableName",
 		SecurityGroupName:                 "securityGroupName",
 		SubnetName:                        "subnetName",

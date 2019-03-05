@@ -70,7 +70,7 @@ func (az *Cloud) getStandardMachineID(resourceGroup, machineName string) string 
 	return fmt.Sprintf(
 		machineIDTemplate,
 		az.SubscriptionID,
-		resourceGroup,
+		strings.ToLower(resourceGroup),
 		machineName)
 }
 
@@ -339,7 +339,14 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 			return "", err
 		}
 	}
-	return *machine.ID, nil
+
+	resourceID := *machine.ID
+	convertedResourceID, err := convertResourceGroupNameToLower(resourceID)
+	if err != nil {
+		klog.Errorf("convertResourceGroupNameToLower failed with error: %v", err)
+		return "", err
+	}
+	return convertedResourceID, nil
 }
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
