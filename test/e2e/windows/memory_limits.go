@@ -37,27 +37,27 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
 		framework.SkipUnlessNodeOSDistroIs("windows")
 	})
 
-	Context("Allocatable node memory", func() {
-		It("should be equal to a calculated allocatable memory value", func() {
+	ginkgo.Context("Allocatable node memory", func() {
+		ginkgo.It("should be equal to a calculated allocatable memory value", func() {
 			checkNodeAllocatableTest(f)
 		})
 	})
 
-	Context("attempt to deploy past allocatable memory limits", func() {
-		It("should fail deployments of pods once there isn't enough memory", func() {
+	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
+		ginkgo.It("should fail deployments of pods once there isn't enough memory", func() {
 			overrideAllocatableMemoryTest(f, 4)
 		})
 	})
@@ -93,10 +93,10 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
 	calculatedNodeAlloc.Sub(nodeMem.hardEviction)
 
-	By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
+	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
 
 	// sanity check against stated allocatable
-	Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(Equal(0))
+	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0))
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -110,7 +110,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 
 	memValue := totalAllocatable.Value()
 	memPerPod := memValue / int64(allocatablePods)
-	By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
+	ginkgo.By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
 
 	// these should all work
 	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
@@ -119,7 +119,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
 	f.PodClient().Create(failurePods[0])
 
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, e := range eventList.Items {
@@ -130,7 +130,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 			}
 		}
 		return false
-	}, 3*time.Minute, 10*time.Second).Should(Equal(true))
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
 }
 
 // newMemLimitTestPods creates a list of pods (specification) for test.
@@ -186,9 +186,9 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	Expect(nodeList.Size()).NotTo(Equal(0))
+	gomega.Expect(nodeList.Size()).NotTo(gomega.Equal(0))
 
-	By("Getting memory details from node status and kubelet config")
+	ginkgo.By("Getting memory details from node status and kubelet config")
 
 	status := nodeList.Items[0].Status
 
@@ -235,7 +235,7 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 	})
 	framework.ExpectNoError(err)
 
-	By("Summing allocatable memory across all agent nodes")
+	ginkgo.By("Summing allocatable memory across all agent nodes")
 
 	totalAllocatable := resource.NewQuantity(0, resource.BinarySI)
 
@@ -262,24 +262,24 @@ func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfigurati
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
 	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-	By("Opening proxy to cluster")
+	ginkgo.By("Opening proxy to cluster")
 	cmd := framework.KubectlCmd("proxy", "-p", "0")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-	Expect(err).NotTo(HaveOccurred(), "failed to start up proxy")
+	framework.ExpectNoError(err)
 	defer stdout.Close()
 	defer stderr.Close()
 	defer framework.TryKill(cmd)
 	buf := make([]byte, 128)
 	var n int
 	n, err = stdout.Read(buf)
-	Expect(err).NotTo(HaveOccurred(), "failed to read from kubectl proxy stdout")
+	framework.ExpectNoError(err)
 	output := string(buf[:n])
 	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 	match := proxyRegexp.FindStringSubmatch(output)
-	Expect(len(match)).To(Equal(2))
+	gomega.Expect(len(match)).To(gomega.Equal(2))
 	port, err := strconv.Atoi(match[1])
-	Expect(err).NotTo(HaveOccurred(), "failed to convert port into string")
-	By("http requesting node kubelet /configz")
+	framework.ExpectNoError(err)
+	ginkgo.By("http requesting node kubelet /configz")
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -290,7 +290,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	req.Header.Add("Accept", "application/json")
 
 	var resp *http.Response
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
@@ -302,7 +302,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 		}
 
 		return true
-	}, timeout, pollInterval).Should(Equal(true))
+	}, timeout, pollInterval).Should(gomega.Equal(true))
 	return resp
 }
 
