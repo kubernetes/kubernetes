@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
 	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/utils/image"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
@@ -57,6 +58,14 @@ func init() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	if framework.TestContext.ListImages {
+		for _, v := range image.GetImageConfigs() {
+			fmt.Println(v.GetE2EImage())
+		}
+		os.Exit(0)
+	}
+
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
 	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
@@ -73,6 +82,7 @@ func init() {
 		Asset:      generated.Asset,
 		AssetNames: generated.AssetNames,
 	})
+
 }
 
 func TestE2E(t *testing.T) {
