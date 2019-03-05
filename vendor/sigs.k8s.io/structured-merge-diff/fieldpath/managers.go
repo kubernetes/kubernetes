@@ -20,6 +20,7 @@ type APIVersion string
 type VersionedSet struct {
 	*Set
 	APIVersion APIVersion
+	Applied    bool
 }
 
 // ManagedFields is a map from manager to VersionedSet (what they own in
