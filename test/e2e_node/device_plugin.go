@@ -41,8 +41,7 @@ import (
 
 const (
 	// fake resource name
-	resourceName                 = "fake.com/resource"
-	resourceNameWithProbeSupport = "fake.com/resource2"
+	resourceName = "fake.com/resource"
 )
 
 // Serial because the test restarts Kubelet
