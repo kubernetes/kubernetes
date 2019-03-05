@@ -31,14 +31,7 @@ import (
 // (api format) to the format used by sigs.k8s.io/structured-merge-diff and back
 func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
-		`- apiVersion: v1beta1
-  fields:
-    i:5:
-      f:i: {}
-  manager: foo
-  operation: Update
-  time: "2011-12-13T14:15:16Z"
-- apiVersion: v1
+		`- apiVersion: v1
   fields:
     v:3:
       f:alsoPi: {}
@@ -49,6 +42,13 @@ func TestRoundTripManagedFields(t *testing.T) {
   manager: foo
   operation: Update
   time: "2001-02-03T04:05:06Z"
+- apiVersion: v1beta1
+  fields:
+    i:5:
+      f:i: {}
+  manager: foo
+  operation: Update
+  time: "2011-12-13T14:15:16Z"
 `,
 		`- apiVersion: v1
   fields:
@@ -240,7 +240,7 @@ func TestSortEncodedManagedFields(t *testing.T) {
 			},
 		},
 		{
-			name: "newest first",
+			name: "newest last",
 			managedFields: []metav1.ManagedFieldsEntry{
 				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
@@ -250,8 +250,8 @@ func TestSortEncodedManagedFields(t *testing.T) {
 			expected: []metav1.ManagedFieldsEntry{
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
 				{Manager: "b", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
-				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
 				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
+				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
 			},
 		},
 		{
@@ -259,14 +259,14 @@ func TestSortEncodedManagedFields(t *testing.T) {
 			managedFields: []metav1.ManagedFieldsEntry{
 				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
-				{Manager: "d", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
+				{Manager: "d", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 				{Manager: "b", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
 			},
 			expected: []metav1.ManagedFieldsEntry{
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
 				{Manager: "b", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
-				{Manager: "d", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
 				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
+				{Manager: "d", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 			},
 		},
 		{
@@ -282,10 +282,10 @@ func TestSortEncodedManagedFields(t *testing.T) {
 			expected: []metav1.ManagedFieldsEntry{
 				{Manager: "a", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
 				{Manager: "b", Operation: metav1.ManagedFieldsOperationApply, Time: nil},
+				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 				{Manager: "d", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
 				{Manager: "e", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
 				{Manager: "f", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2002-01-01T01:00:00Z")},
-				{Manager: "c", Operation: metav1.ManagedFieldsOperationUpdate, Time: parseTimeOrPanic("2001-01-01T01:00:00Z")},
 			},
 		},
 	}

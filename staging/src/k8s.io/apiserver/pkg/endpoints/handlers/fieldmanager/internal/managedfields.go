@@ -161,7 +161,7 @@ func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) 
 			return false
 		}
 		if !p.Time.Equal(q.Time) {
-			return q.Time.Before(p.Time)
+			return p.Time.Before(q.Time)
 		}
 
 		return p.Manager < q.Manager
