@@ -108,3 +108,8 @@ func (t *awsElasticBlockStoreCSITranslator) CanSupport(pv *v1.PersistentVolume) 
 func (t *awsElasticBlockStoreCSITranslator) GetInTreePluginName() string {
 	return AWSEBSInTreePluginName
 }
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (t *awsElasticBlockStoreCSITranslator) GetCSIPluginName() string {
+	return AWSEBSDriverName
+}

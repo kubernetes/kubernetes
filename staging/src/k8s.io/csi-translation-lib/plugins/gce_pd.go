@@ -155,6 +155,11 @@ func (g *gcePersistentDiskCSITranslator) GetInTreePluginName() string {
 	return GCEPDInTreePluginName
 }
 
+// GetCSIPluginName returns the name of the CSI plugin
+func (g *gcePersistentDiskCSITranslator) GetCSIPluginName() string {
+	return GCEPDDriverName
+}
+
 func pdNameFromVolumeID(id string) (string, error) {
 	splitID := strings.Split(id, "/")
 	if len(splitID) != volIDTotalElements {
