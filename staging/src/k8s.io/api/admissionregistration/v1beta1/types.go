@@ -248,6 +248,17 @@ type Webhook struct {
 	// Default to 30 seconds.
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If a persisted webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail
+	// and be subject to the failure policy.
+	// Default to `['v1beta1']`.
+	// +optional
+	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make

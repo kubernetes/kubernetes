@@ -239,6 +239,15 @@ type Webhook struct {
 	// The timeout value must be between 1 and 30 seconds.
 	// +optional
 	TimeoutSeconds *int32
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If the webhook configuration has already been persisted with a version apiserver
+	// does not understand, calls to the webhook will fail and be subject to the failure policy.
+	// +optional
+	AdmissionReviewVersions []string
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
