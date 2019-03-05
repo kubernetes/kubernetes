@@ -42,6 +42,15 @@ func TestSliceFromBytes(t *testing.T) {
 				testConfigMap.Map(),
 			},
 		})
+	testConfigMapList := factory.FromMap(
+		map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMapList",
+			"items": []interface{}{
+				testConfigMap.Map(),
+				testConfigMap.Map(),
+			},
+		})
 
 	tests := []struct {
 		name        string
@@ -149,6 +158,24 @@ items:
     name: winnie
 `),
 			expectedOut: []ifc.Kunstructured{testList},
+			expectedErr: false,
+		},
+		{
+			name: "ConfigMapList",
+			input: []byte(`
+apiVersion: v1
+kind: ConfigMapList
+items:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: winnie
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: winnie
+`),
+			expectedOut: []ifc.Kunstructured{testConfigMapList},
 			expectedErr: false,
 		},
 	}

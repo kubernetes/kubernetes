@@ -16,6 +16,11 @@ limitations under the License.
 
 package types
 
+import (
+	"strconv"
+	"strings"
+)
+
 // GenArgs contains both generator args and options
 type GenArgs struct {
 	args *GeneratorArgs
@@ -28,6 +33,18 @@ func NewGenArgs(args *GeneratorArgs, opts *GeneratorOptions) *GenArgs {
 		args: args,
 		opts: opts,
 	}
+}
+
+func (g *GenArgs) String() string {
+	if g == nil {
+		return "{nilGenArgs}"
+	}
+	return "{" +
+		strings.Join([]string{
+			"nsfx:" + strconv.FormatBool(g.NeedsHashSuffix()),
+			"beh:" + g.Behavior().String()},
+			",") +
+		"}"
 }
 
 // NeedHashSuffix returns true if the hash suffix is needed.
