@@ -75,9 +75,9 @@ func TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, erro
 	return nil, fmt.Errorf("could not find in-tree plugin translation logic for %s", copiedPV.Spec.CSI.Driver)
 }
 
-// IsMigratableByName tests whether there is Migration logic for the in-tree plugin
-// whose name matches the given inTreePluginName
-func IsMigratableByName(inTreePluginName string) bool {
+// IsMigratableIntreePluginByName tests whether there is migration logic for the in-tree plugin
+// whose name matches the given name
+func IsMigratableIntreePluginByName(inTreePluginName string) bool {
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.GetInTreePluginName() == inTreePluginName {
 			return true
@@ -86,16 +86,17 @@ func IsMigratableByName(inTreePluginName string) bool {
 	return false
 }
 
-// SupersedesInTreePlugin tests whether there exists an in-tree plugin with logic
-// to migrate to the CSI plugin with given name
-func SupersedesInTreePlugin(csiPluginName string) bool {
+// IsMigratedCSIDriverByName tests whether there exists an in-tree plugin with logic
+// to migrate to the CSI driver with given name
+func IsMigratedCSIDriverByName(csiPluginName string) bool {
 	if _, ok := inTreePlugins[csiPluginName]; ok {
 		return true
 	}
 	return false
 }
 
-// GetCSINameFromInTreeName returns the name of a CSI driver that supersedes the in-tree plugin with the given name
+// GetCSINameFromInTreeName returns the name of a CSI driver that supersedes the
+// in-tree plugin with the given name
 func GetCSINameFromInTreeName(pluginName string) (string, error) {
 	for csiDriverName, curPlugin := range inTreePlugins {
 		if curPlugin.GetInTreePluginName() == pluginName {
@@ -105,7 +106,8 @@ func GetCSINameFromInTreeName(pluginName string) (string, error) {
 	return "", fmt.Errorf("Could not find CSI Driver name for plugin %v", pluginName)
 }
 
-// GetInTreeNameFromCSIName returns the name of the in-tree plugin superseded by a CSI driver with the given name
+// GetInTreeNameFromCSIName returns the name of the in-tree plugin superseded by
+// a CSI driver with the given name
 func GetInTreeNameFromCSIName(pluginName string) (string, error) {
 	if plugin, ok := inTreePlugins[pluginName]; ok {
 		return plugin.GetInTreePluginName(), nil

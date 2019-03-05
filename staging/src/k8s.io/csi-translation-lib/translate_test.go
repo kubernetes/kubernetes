@@ -99,14 +99,14 @@ func TestPluginNameMappings(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error when mapping In-tree plugin name to CSI plugin name %s", err)
 		}
-		if !SupersedesInTreePlugin(csiPluginName) {
+		if !IsMigratedCSIDriverByName(csiPluginName) {
 			t.Errorf("%s expected to supersede an In-tree plugin", csiPluginName)
 		}
 		inTreePluginName, err := GetInTreeNameFromCSIName(csiPluginName)
 		if err != nil {
 			t.Errorf("Error when mapping CSI plugin name to In-tree plugin name %s", err)
 		}
-		if !IsMigratableByName(inTreePluginName) {
+		if !IsMigratableIntreePluginByName(inTreePluginName) {
 			t.Errorf("%s expected to be migratable to a CSI name", inTreePluginName)
 		}
 		if inTreePluginName != test.inTreePluginName || csiPluginName != test.csiPluginName {
