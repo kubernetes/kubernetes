@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -278,11 +279,30 @@ type BlockVolumePlugin interface {
 	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
 }
 
+// TODO(#14217)
+// As part of the Volume Host refactor we are starting to create Volume Hosts
+// for specific hosts. New methods for each specific host can be added here.
+// Currently consumers will do type assertions to get the specific type of Volume
+// Host; however, the end result should be that specific Volume Hosts are passed
+// to the specific functions they are needed in (instead of using a catch-all
+// VolumeHost interface)
+
 // KubeletVolumeHost is a Kubelet specific interface that plugins can use to access the kubelet.
 type KubeletVolumeHost interface {
 	// SetKubeletError lets plugins set an error on the Kubelet runtime status
 	// that will cause the Kubelet to post NotReady status with the error message provided
 	SetKubeletError(err error)
+}
+
+// AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
+// to access methods on the Attach Detach Controller.
+type AttachDetachVolumeHost interface {
+	// CSINodeLister returns the informer lister for the CSINode API Object
+	CSINodeLister() storagelisters.CSINodeLister
+
+	// CSINodeSynced returns a boolean representing whether the CSINode API Object
+	// informer has been synced
+	CSINodeSynced() bool
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.

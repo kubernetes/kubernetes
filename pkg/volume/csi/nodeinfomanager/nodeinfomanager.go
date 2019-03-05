@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,7 @@ type nodeUpdateFunc func(*v1.Node) (newNode *v1.Node, updated bool, err error)
 
 // Interface implements an interface for managing labels of a node
 type Interface interface {
-	CreateCSINode() (*storage.CSINode, error)
+	CreateCSINode() (*storagev1beta1.CSINode, error)
 
 	// Record in the cluster the given node information from the CSI driver with the given name.
 	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
@@ -388,7 +388,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	return nim.installDriverToCSINode(nodeInfo, driverName, driverNodeID, topology)
 }
 
-func (nim *nodeInfoManager) CreateCSINode() (*storage.CSINode, error) {
+func (nim *nodeInfoManager) CreateCSINode() (*storagev1beta1.CSINode, error) {
 
 	kubeClient := nim.volumeHost.GetKubeClient()
 	if kubeClient == nil {
@@ -405,7 +405,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storage.CSINode, error) {
 		return nil, err
 	}
 
-	nodeInfo := &storage.CSINode{
+	nodeInfo := &storagev1beta1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nim.nodeName),
 			OwnerReferences: []metav1.OwnerReference{
@@ -417,8 +417,8 @@ func (nim *nodeInfoManager) CreateCSINode() (*storage.CSINode, error) {
 				},
 			},
 		},
-		Spec: storage.CSINodeSpec{
-			Drivers: []storage.CSINodeDriver{},
+		Spec: storagev1beta1.CSINodeSpec{
+			Drivers: []storagev1beta1.CSINodeDriver{},
 		},
 	}
 
@@ -427,11 +427,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storage.CSINode, error) {
 	return csiKubeClient.StorageV1beta1().CSINodes().Create(nodeInfo)
 }
 
-const (
-	migratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
-)
-
-func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storage.CSINode) (modified bool) {
+func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storagev1beta1.CSINode) (modified bool) {
 	if migratedPlugins == nil {
 		return false
 	}
@@ -441,7 +437,7 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 		nodeInfoAnnotations = map[string]string{}
 	}
 
-	mpa := nodeInfoAnnotations[migratedPluginsAnnotationKey]
+	mpa := nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey]
 	tok := strings.Split(mpa, ",")
 	oldAnnotationSet := sets.NewString(tok...)
 
@@ -458,9 +454,9 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 
 	nas := strings.Join(newAnnotationSet.List(), ",")
 	if len(nas) != 0 {
-		nodeInfoAnnotations[migratedPluginsAnnotationKey] = nas
+		nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 	} else {
-		delete(nodeInfoAnnotations, migratedPluginsAnnotationKey)
+		delete(nodeInfoAnnotations, v1.MigratedPluginsAnnotationKey)
 	}
 
 	nodeInfo.Annotations = nodeInfoAnnotations
@@ -468,7 +464,7 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 }
 
 func (nim *nodeInfoManager) installDriverToCSINode(
-	nodeInfo *storage.CSINode,
+	nodeInfo *storagev1beta1.CSINode,
 	driverName string,
 	driverNodeID string,
 	topology map[string]string) error {
@@ -486,7 +482,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	specModified := true
 	statusModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
-	newDriverSpecs := []storage.CSINodeDriver{}
+	newDriverSpecs := []storagev1beta1.CSINodeDriver{}
 	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
 		if driverInfoSpec.Name == driverName {
 			if driverInfoSpec.NodeID == driverNodeID &&
@@ -506,7 +502,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	}
 
 	// Append new driver
-	driverSpec := storage.CSINodeDriver{
+	driverSpec := storagev1beta1.CSINodeDriver{
 		Name:         driverName,
 		NodeID:       driverNodeID,
 		TopologyKeys: topologyKeys.List(),

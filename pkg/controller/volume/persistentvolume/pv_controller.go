@@ -1376,7 +1376,8 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	var pluginName string
 	provisionerName := storageClass.Provisioner
 	if plugin != nil {
-		if plugin.IsMigratedToCSI() {
+		// TODO(dyzz) Just temporary to test without dynamic provisioning
+		if plugin.IsMigratedToCSI() && false {
 			// pluginName is not set here to align with existing behavior
 			// of not setting pluginName for external provisioners (including CSI)
 			// Set provisionerName to CSI plugin name for setClaimProvisioner
@@ -1401,7 +1402,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 	claim = newClaim
 
-	if plugin == nil || plugin.IsMigratedToCSI() {
+	if plugin == nil {
 		// findProvisionablePlugin returned no error nor plugin.
 		// This means that an unknown provisioner is requested. Report an event
 		// and wait for the external provisioner

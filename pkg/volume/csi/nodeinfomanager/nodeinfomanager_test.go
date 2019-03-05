@@ -580,7 +580,7 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			expectedNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
 				},
 			},
 			expectModified: true,
@@ -593,13 +593,13 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			existingNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
 				},
 			},
 			expectedNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
 				},
 			},
 			expectModified: false,
@@ -610,7 +610,7 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			existingNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
 				},
 			},
 			expectedNode: &storage.CSINode{
@@ -635,7 +635,7 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			expectedNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test", "other": "annotation"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
 				},
 			},
 			expectModified: true,
@@ -649,13 +649,13 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			existingNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{"other": "annotation", migratedPluginsAnnotationKey: "foo"},
+					Annotations: map[string]string{"other": "annotation", v1.MigratedPluginsAnnotationKey: "foo"},
 				},
 			},
 			expectedNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "test", "other": "annotation"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
 				},
 			},
 			expectModified: true,
@@ -675,7 +675,7 @@ func TestSetMigrationAnnotation(t *testing.T) {
 			expectedNode: &storage.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node1",
-					Annotations: map[string]string{migratedPluginsAnnotationKey: "foo,test", "other": "annotation"},
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "foo,test", "other": "annotation"},
 				},
 			},
 			expectModified: true,

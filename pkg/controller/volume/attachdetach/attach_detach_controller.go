@@ -31,10 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -101,6 +103,7 @@ func NewAttachDetachController(
 	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
+	csiNodeInformer storageinformers.CSINodeInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
@@ -122,18 +125,20 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		kubeClient:    kubeClient,
+		pvcLister:     pvcInformer.Lister(),
+		pvcsSynced:    pvcInformer.Informer().HasSynced,
+		pvLister:      pvInformer.Lister(),
+		pvsSynced:     pvInformer.Informer().HasSynced,
+		podLister:     podInformer.Lister(),
+		podsSynced:    podInformer.Informer().HasSynced,
+		podIndexer:    podInformer.Informer().GetIndexer(),
+		nodeLister:    nodeInformer.Lister(),
+		nodesSynced:   nodeInformer.Informer().HasSynced,
+		csiNodeLister: csiNodeInformer.Lister(),
+		csiNodeSynced: csiNodeInformer.Informer().HasSynced,
+		cloud:         cloud,
+		pvcQueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -256,6 +261,9 @@ type attachDetachController struct {
 
 	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
+
+	csiNodeLister storagelisters.CSINodeLister
+	csiNodeSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -641,6 +649,17 @@ func (adc *attachDetachController) processVolumesInUse(
 				attachedVolume.VolumeName, nodeName, mounted, err)
 		}
 	}
+}
+
+var _ volume.VolumeHost = &attachDetachController{}
+var _ volume.AttachDetachVolumeHost = &attachDetachController{}
+
+func (adc *attachDetachController) CSINodeLister() storagelisters.CSINodeLister {
+	return adc.csiNodeLister
+}
+
+func (adc *attachDetachController) CSINodeSynced() bool {
+	return adc.csiNodeSynced()
 }
 
 // VolumeHost implementation

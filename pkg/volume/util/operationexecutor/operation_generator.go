@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -84,6 +86,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
 		blkUtil:                          blkUtil,
 	}
+			// TODO(dyzz) look at default resync time
 }
 
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
@@ -303,8 +306,14 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	}
 
 	originalSpec := volumeToAttach.VolumeSpec
+	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+	if err != nil {
+		eventRecorderFunc(&err)
+		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.NodeUsingCSIPlugin failed", err)
+	}
+
 	// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 		// The volume represented by this spec is CSI and thus should be migrated
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 		if err != nil || attachableVolumePlugin == nil {
@@ -401,17 +410,22 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	if volumeToDetach.VolumeSpec != nil {
 		// Get attacher plugin
+		nu, err := nodeUsingCSIPlugin(og, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NodeUsingCSIPlugin failed", err)
+		}
+
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) {
+		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 
 			csiSpec, err := translateSpec(volumeToDetach.VolumeSpec)
 			if err != nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.TranslateSpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
 			}
 
 			volumeToDetach.VolumeSpec = csiSpec
@@ -1545,6 +1559,93 @@ func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 		}
 	}
 	return false
+}
+
+func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
+	var err error
+
+	migratable, err := og.volumePluginMgr.IsPluginMigratableBySpec(spec)
+	if err != nil {
+		return false, err
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) ||
+		!migratable {
+		return false, nil
+	}
+
+	if len(nodeName) == 0 {
+		return false, fmt.Errorf("nodeName is empty")
+	}
+
+	vpm := og.volumePluginMgr
+
+	kubeClient := vpm.Host.GetKubeClient()
+	if kubeClient == nil {
+		// TODO(dyzz) check this error case, what should we do in standalone kubelet mode?
+		return false, fmt.Errorf("failed to get kube client from volume host")
+	}
+
+	adcHost, ok := og.volumePluginMgr.Host.(volume.AttachDetachVolumeHost)
+	if !ok {
+		// This function is running not on the AttachDetachController
+		// We assume that Kubelet is servicing this function and therefore is
+		// trivially "using CSI Plugin"
+		return true, nil
+	}
+	var csiNode *storagev1beta1.CSINode
+	if adcHost.CSINodeSynced() {
+		csiNode, err = adcHost.CSINodeLister().Get(string(nodeName))
+		if err != nil {
+			return false, err
+		}
+	} else {
+		// Fallback to GET
+		klog.Warningf("CSINode informer not synced, falling back to GET directly from API Server")
+		csiNode, err = kubeClient.StorageV1beta1().CSINodes().Get(string(nodeName), metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+	}
+
+	ann := csiNode.GetAnnotations()
+	if ann == nil {
+		return false, nil
+	}
+
+	mpaSet := sets.NewString(strings.Split(ann[v1.MigratedPluginsAnnotationKey], ",")...)
+
+	pluginName, err := csilib.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
+	if err != nil {
+		return false, err
+	}
+
+	if len(pluginName) == 0 {
+		// Could not find a plugin name from translation directory
+		return false, nil
+	}
+
+	isMigratedOnNode := mpaSet.Has(pluginName)
+
+	if isMigratedOnNode {
+		installed := false
+		driverName, err := csilib.GetCSINameFromIntreeName(pluginName)
+		if err != nil {
+			return isMigratedOnNode, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				installed = true
+				break
+			}
+		}
+		if !installed {
+			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed.", pluginName, string(nodeName), driverName)
+		}
+	}
+
+	return isMigratedOnNode, nil
+
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
