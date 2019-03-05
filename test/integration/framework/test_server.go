@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 )
 
+// TestServerSetup holds configuration information for a kube-apiserver test server.
 type TestServerSetup struct {
 	ModifyServerRunOptions func(*options.ServerRunOptions)
 	ModifyServerConfig     func(*master.Config)

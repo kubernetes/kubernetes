@@ -17,6 +17,12 @@
   Top-level script that runs on Windows nodes to join them to the K8s cluster.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 $ErrorActionPreference = 'Stop'
 
 # Turn on tracing to debug
@@ -27,9 +33,10 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
 
-# Returns the GCE instance metadata value for $Key. If the key is not present
-# in the instance metadata returns $Default if set, otherwise returns $null.
-function Get-InstanceMetadataValue {
+# Returns the GCE instance metadata value for $Key where key is an "attribute"
+# of the instance. If the key is not present in the instance metadata returns
+# $Default if set, otherwise returns $null.
+function Get-InstanceMetadataAttribute {
   param (
     [parameter(Mandatory=$true)] [string]$Key,
     [parameter(Mandatory=$false)] [string]$Default
@@ -63,7 +70,7 @@ function FetchAndImport-ModuleFromMetadata {
     [parameter(Mandatory=$true)] [string]$Filename
   )
 
-  $module = Get-InstanceMetadataValue $MetadataKey
+  $module = Get-InstanceMetadataAttribute $MetadataKey
   if (Test-Path C:\$Filename) {
     if (-not $REDO_STEPS) {
       Log-Output "Skip: C:\$Filename already exists, not overwriting"
@@ -81,7 +88,7 @@ try {
   # Don't use FetchAndImport-ModuleFromMetadata for common.psm1 - the common
   # module includes variables and functions that any other function may depend
   # on.
-  $module = Get-InstanceMetadataValue 'common-psm1'
+  $module = Get-InstanceMetadataAttribute 'common-psm1'
   New-Item -ItemType file -Force C:\common.psm1 | Out-Null
   Set-Content C:\common.psm1 $module
   Import-Module -Force C:\common.psm1
@@ -90,6 +97,7 @@ try {
   # then put these calls into a loop over a list of XYZ-psm1 keys.
   FetchAndImport-ModuleFromMetadata 'k8s-node-setup-psm1' 'k8s-node-setup.psm1'
 
+  Dump-DebugInfoToConsole
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
   Disable-WindowsDefender

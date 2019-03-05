@@ -59,7 +59,13 @@ spec:
     imagePullPolicy: IfNotPresent
     env:
     - name: E2E_FOCUS
-      value: "Pods should be submitted and removed"
+      value: "\\[Conformance\\]"
+    - name: E2E_SKIP
+      value: ""
+    - name: E2E_PROVIDER
+      value: "local"
+    - name: E2E_PARALLEL
+      value: "1"
     volumeMounts:
     - name: output-volume
       mountPath: /tmp/results

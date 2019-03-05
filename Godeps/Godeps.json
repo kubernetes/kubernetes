@@ -4231,59 +4231,59 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen/args",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/aggregator",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators/rules",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/schemaconv",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/testing",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/validation",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/sets",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/repo-infra/kazel",

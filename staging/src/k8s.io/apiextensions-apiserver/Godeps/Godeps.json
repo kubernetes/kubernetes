@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/apiextensions-apiserver",
-	"GoVersion": "go1.11",
+	"GoVersion": "go1.12",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"./..."
@@ -572,17 +572,14 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Comment": "v0.9.2",
 			"Rev": "505eaef017263e299324067d40ca2c48f6a2cf50"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus/internal",
-			"Comment": "v0.9.2",
 			"Rev": "505eaef017263e299324067d40ca2c48f6a2cf50"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus/promhttp",
-			"Comment": "v0.9.2",
 			"Rev": "505eaef017263e299324067d40ca2c48f6a2cf50"
 		},
 		{
@@ -591,17 +588,14 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/expfmt",
-			"Comment": "v0.2.0",
 			"Rev": "cfeb6f9992ffa54aaa4f2170ade4067ee478b250"
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
-			"Comment": "v0.2.0",
 			"Rev": "cfeb6f9992ffa54aaa4f2170ade4067ee478b250"
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/model",
-			"Comment": "v0.2.0",
 			"Rev": "cfeb6f9992ffa54aaa4f2170ade4067ee478b250"
 		},
 		{
@@ -2266,27 +2260,27 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/schemaconv",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/pkg/api/apitesting/fuzzer",

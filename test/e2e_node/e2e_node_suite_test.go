@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
+	setExtraEnvs()
 	os.Exit(m.Run())
 }
 
@@ -146,6 +147,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
+		updateImageWhiteList()
 		err := PrePullAllImages()
 		Expect(err).ShouldNot(HaveOccurred())
 	}
@@ -244,6 +246,9 @@ func waitForNodeReady() {
 // TODO(random-liu): Using dynamic kubelet configuration feature to
 // update test context with node configuration.
 func updateTestContext() error {
+	setExtraEnvs()
+	updateImageWhiteList()
+
 	client, err := getAPIServerClient()
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %v", err)
@@ -261,7 +266,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get kubelet configuration: %v", err)
 	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config.
+	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 
@@ -318,4 +323,10 @@ func isNodeReady(node *v1.Node) bool {
 		}
 	}
 	return false
+}
+
+func setExtraEnvs() {
+	for name, value := range framework.TestContext.ExtraEnvs {
+		os.Setenv(name, value)
+	}
 }

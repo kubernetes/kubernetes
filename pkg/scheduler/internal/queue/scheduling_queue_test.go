@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -98,7 +99,7 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 func addOrUpdateUnschedulablePod(p *PriorityQueue, pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.unschedulableQ.addOrUpdate(newPodInfoNoTimestamp(pod))
+	p.unschedulableQ.addOrUpdate(p.newPodInfo(pod))
 }
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
@@ -973,8 +974,8 @@ func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
 		Message: "fake scheduling failure",
 	})
 
-	q.unschedulableQ.addOrUpdate(newPodInfoNoTimestamp(&highPod))
-	q.unschedulableQ.addOrUpdate(newPodInfoNoTimestamp(&midPod))
+	addOrUpdateUnschedulablePod(q, &highPod)
+	addOrUpdateUnschedulablePod(q, &midPod)
 	q.unschedulableQ.podInfoMap[util.GetPodFullName(&highPod)].timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
 	q.unschedulableQ.podInfoMap[util.GetPodFullName(&midPod)].timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
 
@@ -1010,13 +1011,14 @@ func TestPodTimestamp(t *testing.T) {
 		},
 	}
 
+	var timestamp = time.Now()
 	pInfo1 := &podInfo{
 		pod:       pod1,
-		timestamp: util.RealClock{}.Now(),
+		timestamp: timestamp,
 	}
 	pInfo2 := &podInfo{
 		pod:       pod2,
-		timestamp: util.RealClock{}.Now().Add(1 * time.Second),
+		timestamp: timestamp.Add(time.Second),
 	}
 
 	var queue *PriorityQueue
@@ -1061,8 +1063,14 @@ func TestPodTimestamp(t *testing.T) {
 			queue.MoveAllToActiveQueue()
 		}
 	}
+	backoffPod := func(pInfo *podInfo) operation {
+		return func() {
+			queue.backoffPod(pInfo.pod)
+		}
+	}
 	flushBackoffQ := func() operation {
 		return func() {
+			queue.clock.(*clock.FakeClock).Step(2 * time.Second)
 			queue.flushBackoffQCompleted()
 		}
 	}
@@ -1095,7 +1103,7 @@ func TestPodTimestamp(t *testing.T) {
 		{
 			name: "add one pod to BackoffQ and move it to activeQ",
 			operations: []operation{
-				addPodActiveQ(pInfo2), addPodBackoffQ(pInfo1), flushBackoffQ(), moveAllToActiveQ(),
+				addPodActiveQ(pInfo2), addPodBackoffQ(pInfo1), backoffPod(pInfo1), flushBackoffQ(), moveAllToActiveQ(),
 			},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
@@ -1103,7 +1111,7 @@ func TestPodTimestamp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue = NewPriorityQueue(nil)
+			queue = NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
 			var podInfoList []*podInfo
 
 			for _, op := range test.operations {

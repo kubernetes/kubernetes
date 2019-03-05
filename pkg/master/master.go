@@ -375,7 +375,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
+	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
@@ -388,8 +388,12 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "(Deprecated) The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
 }
 

@@ -97,7 +97,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
-			klog.V(1).Infof("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
+			klog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
 		}
 		return nil
 	}

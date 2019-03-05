@@ -18,6 +18,7 @@ package priorities
 
 import (
 	"context"
+	"runtime"
 	"sync"
 
 	"k8s.io/api/core/v1"
@@ -211,7 +212,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			}
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), runtime.NumCPU(), len(allNodeNames), processNode)
 	if pm.firstError != nil {
 		return nil, pm.firstError
 	}

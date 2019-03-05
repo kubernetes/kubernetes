@@ -45,6 +45,10 @@ ginkgo_args=(
     "--noColor=true"
 )
 
+if [[ -n ${E2E_DRYRUN:-} ]]; then
+    ginkgo_args+=("--dryRun=true")
+fi
+
 case ${E2E_PARALLEL} in
     'y'|'Y')           ginkgo_args+=("--nodes=25") ;;
     [1-9]|[1-9][0-9]*) ginkgo_args+=("--nodes=${E2E_PARALLEL}") ;;

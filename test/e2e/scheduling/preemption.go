@@ -385,6 +385,20 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 	priorityPairs := make([]priorityPair, 0)
 
 	AfterEach(func() {
+		// print out additional info if tests failed
+		if CurrentGinkgoTestDescription().Failed {
+			// list existing priorities
+			priorityList, err := cs.SchedulingV1().PriorityClasses().List(metav1.ListOptions{})
+			if err != nil {
+				framework.Logf("Unable to list priorities: %v", err)
+			} else {
+				framework.Logf("List existing priorities:")
+				for _, p := range priorityList.Items {
+					framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+				}
+			}
+		}
+
 		if node != nil {
 			nodeCopy := node.DeepCopy()
 			// force it to update
@@ -428,6 +442,10 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityVal := int32(i)
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
 			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
+			if err != nil {
+				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
+				framework.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
+			}
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 		}
 	})
@@ -557,7 +575,6 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			}
 		}
 	})
-
 })
 
 type pauseRSConfig struct {

@@ -54,6 +54,7 @@ type JSONSchemaProps struct {
 	Definitions          JSONSchemaDefinitions      `json:"definitions,omitempty" protobuf:"bytes,34,opt,name=definitions"`
 	ExternalDocs         *ExternalDocumentation     `json:"externalDocs,omitempty" protobuf:"bytes,35,opt,name=externalDocs"`
 	Example              *JSON                      `json:"example,omitempty" protobuf:"bytes,36,opt,name=example"`
+	Nullable             bool                       `json:"nullable,omitempty" protobuf:"bytes,37,opt,name=nullable"`
 }
 
 // JSON represents any valid JSON value.

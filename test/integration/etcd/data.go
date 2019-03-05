@@ -296,7 +296,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1alpha1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va1"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv1"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -304,6 +304,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1beta1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv2"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va2",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -311,7 +312,6 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va3",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
 		},
 		// --
 

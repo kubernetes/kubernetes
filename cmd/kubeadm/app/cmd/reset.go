@@ -63,15 +63,16 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
-				client, err = getClientset(kubeConfigFile, false)
-				kubeadmutil.CheckErr(err)
-			}
-
-			cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
-			if err != nil {
-				klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			var cfg *kubeadmapi.InitConfiguration
+			client, err = getClientset(kubeConfigFile, false)
+			if err == nil {
+				klog.V(1).Infof("[reset] loaded client set from kubeconfig file: %s", kubeConfigFile)
+				cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+				if err != nil {
+					klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+				}
+			} else {
+				klog.V(1).Infof("[reset] could not get client set from missing kubeconfig file: %s", kubeConfigFile)
 			}
 
 			if criSocketPath == "" {
@@ -142,7 +143,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 	// Only clear etcd data when using local etcd.
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 
-	klog.V(1).Infof("[reset] checking for etcd config")
+	klog.V(1).Infoln("[reset] checking for etcd config")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		dirsToClean = append(dirsToClean, etcdDataDir)
@@ -157,7 +158,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 	}
 
 	// Try to stop the kubelet service
-	klog.V(1).Infof("[reset] getting init system")
+	klog.V(1).Infoln("[reset] getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		klog.Warningln("[reset] the kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")

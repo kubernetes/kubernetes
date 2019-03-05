@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
@@ -208,6 +209,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go establishingController.Run(context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
 		return nil
+	})
+	// we don't want to report healthy until we can handle all CRDs that have already been registered.  Waiting for the informer
+	// to sync makes sure that the lister will be valid before we begin.  There may still be races for CRDs added after startup,
+	// but we won't go healthy until we can handle the ones already present.
+	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(context genericapiserver.PostStartHookContext) error {
+		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			return s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions().Informer().HasSynced(), nil
+		}, context.StopCh)
 	})
 
 	return s, nil

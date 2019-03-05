@@ -716,7 +716,7 @@ type PodStateVerification struct {
 
 	// Optional: only pods passing this function will pass the filter
 	// Verify a pod.
-	// As an optimization, in addition to specfying filter (boolean),
+	// As an optimization, in addition to specifying filter (boolean),
 	// this function allows specifying an error as well.
 	// The error indicates that the polling of the pod spectrum should stop.
 	Verify func(v1.Pod) (bool, error)
@@ -856,7 +856,7 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 	}
 }
 
-// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verifiy,
+// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verify,
 // so it may return very quickly if you have strict pod state requirements.
 //
 // For example, if you require at least 5 pods to be running before your test will pass,

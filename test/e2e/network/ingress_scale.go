@@ -44,7 +44,7 @@ var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
 
 			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, framework.TestContext.CloudConfig)
 			if err := scaleFramework.PrepareScaleTest(); err != nil {
-				framework.Failf("Unexpected error while preraring ingress scale test: %v", err)
+				framework.Failf("Unexpected error while preparing ingress scale test: %v", err)
 			}
 		})
 

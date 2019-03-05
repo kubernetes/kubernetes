@@ -39,6 +39,9 @@ var clientCertificateExpirationHistogram = prometheus.NewHistogram(
 		Help:      "Distribution of the remaining lifetime on the certificate used to authenticate a request.",
 		Buckets: []float64{
 			0,
+			(30 * time.Minute).Seconds(),
+			(1 * time.Hour).Seconds(),
+			(2 * time.Hour).Seconds(),
 			(6 * time.Hour).Seconds(),
 			(12 * time.Hour).Seconds(),
 			(24 * time.Hour).Seconds(),

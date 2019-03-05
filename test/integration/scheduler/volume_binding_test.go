@@ -922,7 +922,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	}
 }
 
-func initPVController(context *TestContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+func initPVController(context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
 	clientset := context.clientSet
 	// Informers factory for controllers, we disable resync period for testing.
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)

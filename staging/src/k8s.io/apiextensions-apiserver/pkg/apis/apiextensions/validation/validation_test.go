@@ -1225,6 +1225,68 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			statusEnabled: true,
 			wantError:     false,
 		},
+		{
+			name: "null type",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"null": {
+							Type: "null",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "nullable at the root",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "object",
+					Nullable: true,
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "nullable without type",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"nullable": {
+							Nullable: true,
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "nullable with types",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"object": {
+							Type:     "object",
+							Nullable: true,
+						},
+						"array": {
+							Type:     "array",
+							Nullable: true,
+						},
+						"number": {
+							Type:     "number",
+							Nullable: true,
+						},
+						"string": {
+							Type:     "string",
+							Nullable: true,
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

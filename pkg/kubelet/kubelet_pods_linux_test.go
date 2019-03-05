@@ -29,6 +29,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/mount"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 func TestMakeMounts(t *testing.T) {
@@ -241,13 +242,14 @@ func TestMakeMounts(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			fm := &mount.FakeMounter{}
+			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
 					HostNetwork: true,
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, fsp, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {

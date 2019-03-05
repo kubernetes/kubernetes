@@ -113,6 +113,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
@@ -255,6 +256,7 @@ type Dependencies struct {
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
 	Recorder                record.EventRecorder
+	Subpather               subpath.Interface
 	VolumePlugins           []volume.VolumePlugin
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
@@ -519,6 +521,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
 		cgroupRoot:                              kubeCfg.CgroupRoot,
 		mounter:                                 kubeDeps.Mounter,
+		subpather:                               kubeDeps.Subpather,
 		maxPods:                                 int(kubeCfg.MaxPods),
 		podsPerCore:                             int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:                         atomic.Value{},
@@ -775,10 +778,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder)
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		return nil, fmt.Errorf("mount propagation feature gate has been deprecated and will be removed in 1.14")
-	}
 
 	klet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
@@ -1098,6 +1097,9 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
+
+	// subpather to execute subpath actions
+	subpather subpath.Interface
 
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager

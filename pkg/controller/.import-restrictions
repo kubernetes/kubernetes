@@ -167,6 +167,7 @@
       "AllowedPrefixes": [
         "k8s.io/kubernetes/pkg/api/legacyscheme",
         "k8s.io/kubernetes/pkg/api/v1/endpoints",
+        "k8s.io/kubernetes/pkg/api/v1/node",
         "k8s.io/kubernetes/pkg/api/v1/pod",
         "k8s.io/kubernetes/pkg/apis/apps/v1",
         "k8s.io/kubernetes/pkg/apis/autoscaling",
@@ -241,6 +242,7 @@
         "k8s.io/kubernetes/pkg/volume/util",
         "k8s.io/kubernetes/pkg/volume/util/operationexecutor",
         "k8s.io/kubernetes/pkg/volume/util/recyclerclient",
+        "k8s.io/kubernetes/pkg/volume/util/subpath",
         "k8s.io/kubernetes/pkg/volume/util/types",
         "k8s.io/kubernetes/pkg/volume/util/volumepathhandler",
         "k8s.io/kubernetes/pkg/api/service",

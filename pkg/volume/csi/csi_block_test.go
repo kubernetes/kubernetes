@@ -233,7 +233,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}

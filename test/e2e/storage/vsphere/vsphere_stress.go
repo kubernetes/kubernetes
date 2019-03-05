@@ -34,7 +34,7 @@ import (
 	Induce stress to create volumes in parallel with multiple threads based on user configurable values for number of threads and iterations per thread.
 	The following actions will be performed as part of this test.
 
-	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capalibilies.)
+	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
 	2. READ VCP_STRESS_INSTANCES, VCP_STRESS_ITERATIONS, VSPHERE_SPBM_POLICY_NAME and VSPHERE_DATASTORE from System Environment.
 	3. Launch goroutine for volume lifecycle operations.
 	4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS

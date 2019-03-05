@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -52,7 +51,7 @@ import (
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
-	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
@@ -121,7 +120,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -148,7 +147,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -172,7 +171,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
