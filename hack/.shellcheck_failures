@@ -17,7 +17,6 @@
 ./cluster/gce/upgrade-aliases.sh
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
-./cluster/images/conformance/run_e2e.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
