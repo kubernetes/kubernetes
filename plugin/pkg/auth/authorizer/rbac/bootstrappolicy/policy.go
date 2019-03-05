@@ -292,7 +292,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
@@ -325,7 +325,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
