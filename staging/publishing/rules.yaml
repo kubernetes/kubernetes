@@ -238,6 +238,8 @@ rules:
         branch: release-1.14
       - repository: client-go
         branch: release-11.0
+      - repository: component-base
+        branch: release-1.14
 - destination: kube-aggregator
   branches:
   - source:
@@ -310,6 +312,8 @@ rules:
       - repository: client-go
         branch: release-11.0
       - repository: apiserver
+        branch: release-1.14
+      - repository: component-base
         branch: release-1.14
 - destination: sample-apiserver
   branches:
@@ -402,6 +406,8 @@ rules:
         branch: release-1.14
       - repository: code-generator
         branch: release-1.14
+      - repository: component-base
+        branch: release-1.14
     required-packages:
       - k8s.io/code-generator
   smoke-test: |
@@ -492,6 +498,8 @@ rules:
       - repository: client-go
         branch: release-11.0
       - repository: code-generator
+        branch: release-1.14
+      - repository: component-base
         branch: release-1.14
     required-packages:
       - k8s.io/code-generator
@@ -594,6 +602,8 @@ rules:
       - repository: apiserver
         branch: release-1.14
       - repository: code-generator
+        branch: release-1.14
+      - repository: component-base
         branch: release-1.14
     required-packages:
       - k8s.io/code-generator
@@ -827,6 +837,8 @@ rules:
         branch: release-1.14
       - repository: client-go
         branch: release-11.0
+      - repository: component-base
+        branch: release-1.14
 - destination: kube-proxy
   library: true
   branches:
@@ -862,6 +874,8 @@ rules:
     go: 1.12
     dependencies:
       - repository: apimachinery
+        branch: release-1.14
+      - repository: component-base
         branch: release-1.14
 - destination: kubelet
   library: true
@@ -907,6 +921,8 @@ rules:
         branch: release-1.14
       - repository: api
         branch: release-1.14
+      - repository: component-base
+        branch: release-1.14
 - destination: kube-scheduler
   library: true
   branches:
@@ -951,6 +967,8 @@ rules:
         branch: release-1.14
       - repository: apiserver
         branch: release-1.14
+      - repository: component-base
+        branch: release-1.14
 - destination: kube-controller-manager
   library: true
   branches:
@@ -994,6 +1012,8 @@ rules:
       - repository: apimachinery
         branch: release-1.14
       - repository: apiserver
+        branch: release-1.14
+      - repository: component-base
         branch: release-1.14
 - destination: cluster-bootstrap
   library: true
