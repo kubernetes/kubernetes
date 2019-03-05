@@ -32,20 +32,20 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("density-test-windows")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
 		framework.SkipUnlessNodeOSDistroIs("windows")
 	})
 
-	Context("create a batch of pods", func() {
+	ginkgo.Context("create a batch of pods", func() {
 		// TODO(coufon): the values are generous, set more precise limits with benchmark data
 		// and add more tests
 		dTests := []densityTest{
@@ -66,7 +66,7 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
-			It(desc, func() {
+			ginkgo.It(desc, func() {
 				itArg.createMethod = "batch"
 
 				runDensityBatchTest(f, itArg)
@@ -114,15 +114,15 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
-	By("Creating a batch of pods")
+	ginkgo.By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
 	createTimes := createBatchPodWithRateControl(f, pods, testArg.interval)
 
-	By("Waiting for all Pods to be observed by the watch...")
+	ginkgo.By("Waiting for all Pods to be observed by the watch...")
 
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		return len(watchTimes) == testArg.podsNr
-	}, 10*time.Minute, 10*time.Second).Should(BeTrue())
+	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
 		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
@@ -138,7 +138,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		Expect(ok).To(Equal(true))
+		gomega.Expect(ok).To(gomega.Equal(true))
 
 		e2eLags = append(e2eLags,
 			framework.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -182,7 +182,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	checkPodRunning := func(p *v1.Pod) {
 		mutex.Lock()
 		defer mutex.Unlock()
-		defer GinkgoRecover()
+		defer ginkgo.GinkgoRecover()
 
 		if p.Status.Phase == v1.PodRunning {
 			if _, found := watchTimes[p.Name]; !found {
@@ -208,12 +208,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				Expect(ok).To(Equal(true))
+				gomega.Expect(ok).To(gomega.Equal(true))
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				Expect(ok).To(Equal(true))
+				gomega.Expect(ok).To(gomega.Equal(true))
 				go checkPodRunning(p)
 			},
 		},
@@ -288,14 +288,14 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
+			gomega.Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
 		}(pod)
 	}
 	wg.Wait()
