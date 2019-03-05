@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import (
 )
 
 const (
-	defaultCmd          = "curl.exe -s -o 127.0.0.1"
 	defaultWindowsImage = "mcr.microsoft.com/windows/nanoserver:1809"
 )
 
@@ -50,7 +49,7 @@ var (
 					Name:            "ping-pod",
 					Image:           defaultWindowsImage,
 					Command:         []string{"cmd"},
-					Args:            []string{"-c", defaultCmd},
+					Args:            []string{"-c"},
 					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
 				},
 			},
@@ -82,28 +81,28 @@ var _ = SIGDescribe("Services", func() {
 		jig.SanityCheckService(service, v1.ServiceTypeNodePort)
 		nodePort := int(service.Spec.Ports[0].NodePort)
 
-		By("creating pod to be part of service " + serviceName)
+		By("creating Pod to be part of service " + serviceName)
 		jig.RunOrFail(ns, nil)
-		
-		// Create a testing pod so we can ping the nodeport from within the cluster
-		By(fmt.Sprintf("creating testing pod to curl http://%s:%d", nodeIP, nodePort))
+
+		// Create a testing Pod so we can ping the nodeport from within the cluster
+		By(fmt.Sprintf("creating testing Pod to curl http://%s:%d", nodeIP, nodePort))
 		windowsSelector := map[string]string{"beta.kubernetes.io/os": "windows"}
 		winPodSpec := defaultWindowsPod.DeepCopy()
 		winPodSpec.Spec.NodeSelector = windowsSelector
-		curl := fmt.Sprintf("curl.exe -s -o /dev/null -w \"%%{http_code}\" http://%s:%d", nodeIP, nodePort)
+		curl := fmt.Sprintf("curl.exe -s -o ./curl-output.txt -w \"%%{http_code}\" http://%s:%d", nodeIP, nodePort)
 		winPodSpec.Spec.Containers[0].Args = []string{"cmd", "/c", curl}
 		pod, err := cs.CoreV1().Pods(ns).Create(winPodSpec)
 		Expect(err).NotTo(HaveOccurred())
-		
-		By("waiting for pod to be running")
+
+		By("waiting for Pod to be running")
 		err = f.WaitForPodRunning(pod.Name)
 		Expect(err).NotTo(HaveOccurred(),
-			"Error waiting for pod %s to run", pod.Name)
-		
+			"Error waiting for Pod %s to run", pod.Name)
+
 		By("obtaining the logs of the command")
 		logs, err := framework.GetPodLogs(cs, ns, pod.Name, pod.Spec.Containers[0].Name)
 		Expect(err).NotTo(HaveOccurred(),
-			"Error getting logs from pod %s in namespace %s", pod.Name, ns)
+			"Error getting logs from Pod %s in namespace %s", pod.Name, ns)
 		if !strings.Contains(logs, "200") {
 			Fail("Error getting 200 from NodePort")
 		}
