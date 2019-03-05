@@ -19,6 +19,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -27,19 +28,27 @@ import (
 // GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
 // If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	metadata, err := az.metadata.GetMetadata()
+	if az.UseInstanceMetadata {
+		metadata, err := az.metadata.GetMetadata()
+		if err != nil {
+			return cloudprovider.Zone{}, err
+		}
+
+		if metadata.Compute == nil {
+			return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
+		}
+
+		return cloudprovider.Zone{
+			FailureDomain: metadata.Compute.FaultDomain,
+			Region:        az.Location,
+		}, nil
+	}
+	// if UseInstanceMetadata is false, get Zone name by calling ARM
+	hostname, err := os.Hostname()
 	if err != nil {
-		return cloudprovider.Zone{}, err
+		return cloudprovider.Zone{}, fmt.Errorf("failure getting hostname from kernel")
 	}
-
-	if metadata.Compute == nil {
-		return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
-	}
-
-	return cloudprovider.Zone{
-		FailureDomain: metadata.Compute.FaultDomain,
-		Region:        az.Location,
-	}, nil
+	return az.vmSet.GetZoneByNodeName(string(hostname))
 }
 
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
