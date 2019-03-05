@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
+var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
