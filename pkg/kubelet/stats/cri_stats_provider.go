@@ -45,6 +45,12 @@ var (
 	defaultCachePeriod = 10 * time.Minute
 )
 
+// cpuUsageRecord holds the cpu usage stats and the calculated usageNanoCores.
+type cpuUsageRecord struct {
+	stats          *runtimeapi.CpuUsage
+	usageNanoCores *uint64
+}
+
 // criStatsProvider implements the containerStatsProvider interface by getting
 // the container stats from CRI.
 type criStatsProvider struct {
@@ -63,8 +69,8 @@ type criStatsProvider struct {
 	logMetricsService LogMetricsService
 
 	// cpuUsageCache caches the cpu usage for containers.
-	cpuUsageCache map[string]*runtimeapi.CpuUsage
-	mutex         sync.Mutex
+	cpuUsageCache map[string]*cpuUsageRecord
+	mutex         sync.RWMutex
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -82,12 +88,32 @@ func newCRIStatsProvider(
 		runtimeService:    runtimeService,
 		imageService:      imageService,
 		logMetricsService: logMetricsService,
-		cpuUsageCache:     make(map[string]*runtimeapi.CpuUsage),
+		cpuUsageCache:     make(map[string]*cpuUsageRecord),
 	}
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.
 func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
+	// Don't update CPU nano core usage.
+	return p.listPodStats(false)
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
+// the containers and returns the stats for all the pod-managed containers.
+// This is a workaround because CRI runtimes do not supply nano core usages,
+// so this function calculate the difference between the current and the last
+// (cached) cpu stats to calculate this metrics. The implementation assumes a
+// single caller to periodically invoke this function to update the metrics. If
+// there exist multiple callers, the period used to compute the cpu usage may
+// vary and the usage could be incoherent (e.g., spiky). If no caller calls
+// this function, the cpu usage will stay nil. Right now, eviction manager is
+// the only caller, and it calls this function every 10s.
+func (p *criStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	// Update CPU nano core usage.
+	return p.listPodStats(true)
+}
+
+func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi.PodStats, error) {
 	// Gets node root filesystem information, which will be used to populate
 	// the available and capacity bytes/inodes in container stats.
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
@@ -157,7 +183,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		}
 
 		// Fill available stats for full set of required pod stats
-		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
+		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid(), updateCPUNanoCoreUsage)
 		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs)
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
@@ -435,6 +461,7 @@ func (p *criStatsProvider) makeContainerStats(
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
 	uid string,
+	updateCPUNanoCoreUsage bool,
 ) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
@@ -450,8 +477,12 @@ func (p *criStatsProvider) makeContainerStats(
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
 			result.CPU.UsageCoreNanoSeconds = &stats.Cpu.UsageCoreNanoSeconds.Value
 		}
-
-		usageNanoCores := p.getContainerUsageNanoCores(stats)
+		var usageNanoCores *uint64
+		if updateCPUNanoCoreUsage {
+			usageNanoCores = p.getAndUpdateContainerUsageNanoCores(stats)
+		} else {
+			usageNanoCores = p.getContainerUsageNanoCores(stats)
+		}
 		if usageNanoCores != nil {
 			result.CPU.UsageNanoCores = usageNanoCores
 		}
@@ -541,27 +572,63 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	return result
 }
 
-// getContainerUsageNanoCores gets usageNanoCores based on cached usageCoreNanoSeconds.
+// getContainerUsageNanoCores gets the cached usageNanoCores.
 func (p *criStatsProvider) getContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
-	if stats == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
+	if stats == nil || stats.Attributes == nil {
 		return nil
 	}
 
-	p.mutex.Lock()
-	defer func() {
-		// Update cache with new value.
-		p.cpuUsageCache[stats.Attributes.Id] = stats.Cpu
-		p.mutex.Unlock()
-	}()
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	cached, ok := p.cpuUsageCache[stats.Attributes.Id]
-	if !ok || cached.UsageCoreNanoSeconds == nil {
+	if !ok || cached.usageNanoCores == nil {
 		return nil
 	}
+	// return a copy of the usage
+	latestUsage := *cached.usageNanoCores
+	return &latestUsage
+}
 
-	nanoSeconds := stats.Cpu.Timestamp - cached.Timestamp
-	usageNanoCores := (stats.Cpu.UsageCoreNanoSeconds.Value - cached.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
-	return &usageNanoCores
+// getContainerUsageNanoCores computes usageNanoCores based on the given and
+// the cached usageCoreNanoSeconds, updates the cache with the computed
+// usageNanoCores, and returns the usageNanoCores.
+func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi.ContainerStats) *uint64 {
+	if stats == nil || stats.Attributes == nil || stats.Cpu == nil || stats.Cpu.UsageCoreNanoSeconds == nil {
+		return nil
+	}
+	id := stats.Attributes.Id
+	usage, err := func() (*uint64, error) {
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
+
+		cached, ok := p.cpuUsageCache[id]
+		if !ok || cached.stats.UsageCoreNanoSeconds == nil {
+			// Cannot compute the usage now, but update the cached stats anyway
+			p.cpuUsageCache[id] = &cpuUsageRecord{stats: stats.Cpu, usageNanoCores: nil}
+			return nil, nil
+		}
+
+		newStats := stats.Cpu
+		cachedStats := cached.stats
+		nanoSeconds := newStats.Timestamp - cachedStats.Timestamp
+		if nanoSeconds <= 0 {
+			return nil, fmt.Errorf("zero or negative interval (%v - %v)", newStats.Timestamp, cachedStats.Timestamp)
+		}
+		usageNanoCores := (newStats.UsageCoreNanoSeconds.Value - cachedStats.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
+
+		// Update cache with new value.
+		usageToUpdate := usageNanoCores
+		p.cpuUsageCache[id] = &cpuUsageRecord{stats: newStats, usageNanoCores: &usageToUpdate}
+
+		return &usageNanoCores, nil
+	}()
+
+	if err != nil {
+		// This should not happen. Log now to raise visiblity
+		klog.Errorf("failed updating cpu usage nano core: %v", err)
+	}
+	return usage
 }
 
 func (p *criStatsProvider) cleanupOutdatedCaches() {
@@ -573,7 +640,7 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 			delete(p.cpuUsageCache, k)
 		}
 
-		if time.Since(time.Unix(0, v.Timestamp)) > defaultCachePeriod {
+		if time.Since(time.Unix(0, v.stats.Timestamp)) > defaultCachePeriod {
 			delete(p.cpuUsageCache, k)
 		}
 	}

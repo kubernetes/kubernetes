@@ -692,17 +692,17 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 
 	tests := []struct {
 		desc          string
-		cpuUsageCache map[string]*runtimeapi.CpuUsage
+		cpuUsageCache map[string]*cpuUsageRecord
 		stats         *runtimeapi.ContainerStats
 		expected      *uint64
 	}{
 		{
 			desc:          "should return nil if stats is nil",
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			cpuUsageCache: map[string]*cpuUsageRecord{},
 		},
 		{
 			desc:          "should return nil if cpu stats is nil",
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			cpuUsageCache: map[string]*cpuUsageRecord{},
 			stats: &runtimeapi.ContainerStats{
 				Attributes: &runtimeapi.ContainerAttributes{
 					Id: "1",
@@ -712,7 +712,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc:          "should return nil if usageCoreNanoSeconds is nil",
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			cpuUsageCache: map[string]*cpuUsageRecord{},
 			stats: &runtimeapi.ContainerStats{
 				Attributes: &runtimeapi.ContainerAttributes{
 					Id: "1",
@@ -725,7 +725,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		},
 		{
 			desc:          "should return nil if cpu stats is not cached yet",
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{},
+			cpuUsageCache: map[string]*cpuUsageRecord{},
 			stats: &runtimeapi.ContainerStats{
 				Attributes: &runtimeapi.ContainerAttributes{
 					Id: "1",
@@ -751,11 +751,13 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 					},
 				},
 			},
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{
+			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					Timestamp: 0,
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
-						Value: 10000000000,
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 0,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 10000000000,
+						},
 					},
 				},
 			},
@@ -774,11 +776,13 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 					},
 				},
 			},
-			cpuUsageCache: map[string]*runtimeapi.CpuUsage{
+			cpuUsageCache: map[string]*cpuUsageRecord{
 				"1": {
-					Timestamp: 0,
-					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
-						Value: 10000000000,
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 0,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 10000000000,
+						},
 					},
 				},
 			},
@@ -788,7 +792,16 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
-		real := provider.getContainerUsageNanoCores(test.stats)
+		// Before the update, the cached value should be nil
+		cached := provider.getContainerUsageNanoCores(test.stats)
+		assert.Nil(t, cached)
+
+		// Update the cache and get the latest value.
+		real := provider.getAndUpdateContainerUsageNanoCores(test.stats)
 		assert.Equal(t, test.expected, real, test.desc)
+
+		// After the update, the cached value should be up-to-date
+		cached = provider.getContainerUsageNanoCores(test.stats)
+		assert.Equal(t, test.expected, cached, test.desc)
 	}
 }
