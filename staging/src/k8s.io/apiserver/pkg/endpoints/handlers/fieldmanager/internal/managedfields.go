@@ -146,6 +146,27 @@ func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedF
 		}
 		encodedManagedFields = append(encodedManagedFields, *v)
 	}
+	return sortEncodedManagedFields(encodedManagedFields)
+}
+
+func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (sortedManagedFields []metav1.ManagedFieldsEntry, err error) {
+	sort.Slice(encodedManagedFields, func(i, j int) bool {
+		p, q := encodedManagedFields[i], encodedManagedFields[j]
+
+		if p.Operation != q.Operation {
+			return p.Operation < q.Operation
+		}
+
+		if p.Time == nil || q.Time == nil {
+			return false
+		}
+		if !p.Time.Equal(q.Time) {
+			return p.Time.Before(q.Time)
+		}
+
+		return p.Manager < q.Manager
+	})
+
 	return encodedManagedFields, nil
 }
 
