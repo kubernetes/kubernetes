@@ -41,7 +41,6 @@
 ./hack/lib/protoc.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
-./hack/lib/util.sh
 ./hack/lib/version.sh
 ./hack/list-feature-tests.sh
 ./hack/local-up-cluster.sh

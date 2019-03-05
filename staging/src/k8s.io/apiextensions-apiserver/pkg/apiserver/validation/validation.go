@@ -70,6 +70,9 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	out.Description = in.Description
 	if in.Type != "" {
 		out.Type = spec.StringOrArray([]string{in.Type})
+		if in.Nullable {
+			out.Type = append(out.Type, "null")
+		}
 	}
 	out.Format = in.Format
 	out.Title = in.Title

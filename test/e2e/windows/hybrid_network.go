@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -42,27 +42,27 @@ var (
 var _ = SIGDescribe("Hybrid cluster network", func() {
 	f := framework.NewDefaultFramework("hybrid-network")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessNodeOSDistroIs("windows")
 	})
 
-	Context("for all supported CNIs", func() {
+	ginkgo.Context("for all supported CNIs", func() {
 
-		It("should have stable networking for Linux and Windows pods", func() {
-			By("creating linux and windows pods")
+		ginkgo.It("should have stable networking for Linux and Windows pods", func() {
+			ginkgo.By("creating linux and windows pods")
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 
-			By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
+			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
 			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
 
-			By("checking connectivity to www.google.com from Windows")
+			ginkgo.By("checking connectivity to www.google.com from Windows")
 			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"))
 
-			By("checking connectivity from Linux to Windows")
+			ginkgo.By("checking connectivity from Linux to Windows")
 			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80))
 
-			By("checking connectivity from Windows to Linux")
+			ginkgo.By("checking connectivity from Windows to Linux")
 			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
 
 		})
@@ -77,11 +77,11 @@ var (
 )
 
 func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
-	Consistently(func() error {
-		By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
+	gomega.Consistently(func() error {
+		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		_, _, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
 		return err
-	}, duration, pollInterval).ShouldNot(HaveOccurred())
+	}, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func linuxCheck(address string, port int) []string {
