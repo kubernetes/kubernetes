@@ -37,8 +37,12 @@ var _ = SIGDescribe("Job", func() {
 	completions := int32(4)
 	backoffLimit := int32(6) // default value
 
-	// Simplest case: all pods succeed promptly
-	It("should run a job to completion when tasks succeed", func() {
+	/*
+		Release : v1.15
+		Testname: Jobs, pod tasks successful execution
+		Description: Create a job. Execute all the tasks successfully. After pod execution, the Job MUST reach completion.
+	*/
+	framework.ConformanceIt("should run a job to completion when tasks succeed", func() {
 		By("Creating a job")
 		job := jobutil.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
