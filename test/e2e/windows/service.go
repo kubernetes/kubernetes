@@ -66,7 +66,7 @@ var _ = SIGDescribe("Services", func() {
 	BeforeEach(func() {
 		cs = f.ClientSet
 	})
-	//Note(immuzz -> Muzz Imam ) This test will run only for Windows Containers
+	//Only for Windows containers
 	It("should be able to create a functioning NodePort service for Windows", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
