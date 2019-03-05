@@ -88,7 +88,12 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	It("should exceed active deadline", func() {
+	/*
+		Release : v1.15
+		Testname: Jobs, activeDeadlineSeconds behaviour
+		Description: Create a job with a set activeDeadlineSeconds limit. Verify that the Job reaches activeDeadlineSeconds, all of its Pods are terminated and the Job status is set to type: Failed with reason: DeadlineExceeded.
+	*/
+	framework.ConformanceIt("should exceed active deadline", func() {
 		By("Creating a job")
 		var activeDeadlineSeconds int64 = 1
 		job := framework.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
