@@ -214,7 +214,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
+		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
 	// csiClient works with CRDs that support json only
@@ -252,7 +252,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration))
 
 		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
+			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
 		return nil, true, nil
@@ -408,7 +408,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ctx.InformersStarted,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
+		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)
 	}
 
 	// Start the garbage collector.
