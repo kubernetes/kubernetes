@@ -49,6 +49,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletfakes"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
@@ -71,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -318,6 +320,7 @@ func newTestKubeletWithImageList(
 		allPlugins = append(allPlugins, plug)
 	} else {
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	}
@@ -2173,6 +2176,32 @@ func TestSyncPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
+}
+
+func TestPluginHandlerRegistration(t *testing.T) {
+	// Setup
+	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	pluginWatcher := &kubeletfakes.FakePluginWatcher{}
+	kubelet := testKubelet.kubelet
+	kubelet.enablePluginsWatcher = true
+	kubelet.pluginWatcher = pluginWatcher
+
+	// Run
+	// kubelet.initializeRuntimeDependentModules() calls kubelet.registerCSIPluginHandler()
+	kubelet.initializeRuntimeDependentModules()
+
+	// Assert
+	addHandlerCallData := pluginWatcher.Invocations()["AddHandler"]
+	registeredPlugins := []string{}
+	for i := 0; i < len(addHandlerCallData); i++ {
+		// the first arguments to AddHandler is the plugin name
+		registeredPlugins = append(registeredPlugins, addHandlerCallData[i][0].(string))
+	}
+
+	require.Containsf(t, registeredPlugins, "CSIPlugin", "Expected the CSIPlugin to have been registered as a PluginHandler")
+	require.Containsf(t, registeredPlugins, "DevicePlugin", "Expected the Devicelugin to have been registered as a PluginHandler")
 }
 
 func waitForVolumeUnmount(

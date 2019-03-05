@@ -1202,7 +1202,7 @@ type Kubelet struct {
 	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
 	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
 	// directory returned by kubelet.getPluginsDir()
-	pluginWatcher *pluginwatcher.Watcher
+	pluginWatcher pluginWatcher
 
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
@@ -1212,6 +1212,13 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+}
+
+//go:generate counterfeiter . pluginWatcher
+type pluginWatcher interface {
+	AddHandler(pluginType string, handler pluginwatcher.PluginHandler)
+	Start() error
+	Stop() error
 }
 
 // setupDataDirs creates:
@@ -1362,7 +1369,11 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.containerLogManager.Start()
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler(pluginwatcherapi.CSIPlugin, pluginwatcher.PluginHandler(csi.PluginHandler))
+		if err := kl.registerCSIPluginHandler(); err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			klog.Fatalf("failed to register CSI Plugin Handler. err: %v", err)
+		}
+
 		// Adding Registration Callback function for Device Manager
 		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 		// Start the plugin watcher
@@ -1372,6 +1383,21 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 			klog.Fatalf("failed to start Plugin Watcher. err: %v", err)
 		}
 	}
+}
+
+func (kl *Kubelet) registerCSIPluginHandler() error {
+	volumePlugin, err := kl.volumePluginMgr.FindPluginByName(csi.CSIPluginName)
+	if err != nil {
+		return err
+	}
+
+	csiPluginHandler, err := csi.ToPluginHandler(volumePlugin)
+	if err != nil {
+		return err
+	}
+
+	kl.pluginWatcher.AddHandler(pluginwatcherapi.CSIPlugin, csiPluginHandler)
+	return nil
 }
 
 // Run starts the kubelet reacting to config updates
