@@ -523,14 +523,20 @@ func (r Request) finalURLTemplate() url.URL {
 
 	const CoreGroupPrefix = "api"
 	const NamedGroupPrefix = "apis"
+	const Version = "version"
 	isCoreGroup := segments[groupIndex] == CoreGroupPrefix
 	isNamedGroup := segments[groupIndex] == NamedGroupPrefix
+	isVersion := segments[groupIndex] == Version
 	if isCoreGroup {
 		// checking the case of core group with /api/v1/... format
 		index = groupIndex + 2
 	} else if isNamedGroup {
 		// checking the case of named group with /apis/apps/v1/... format
 		index = groupIndex + 3
+	} else if isVersion {
+		url.Path = "/version"
+		url.RawQuery = ""
+		return *url
 	} else {
 		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
 		// outlet here in case more API groups are added in future if ever possible:
