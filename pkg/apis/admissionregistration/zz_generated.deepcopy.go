@@ -267,6 +267,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.AdmissionReviewVersions != nil {
+		in, out := &in.AdmissionReviewVersions, &out.AdmissionReviewVersions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

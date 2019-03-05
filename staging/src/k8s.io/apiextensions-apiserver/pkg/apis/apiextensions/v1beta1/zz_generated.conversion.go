@@ -296,6 +296,7 @@ func Convert_apiextensions_CustomResourceColumnDefinition_To_v1beta1_CustomResou
 func autoConvert_v1beta1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in *CustomResourceConversion, out *apiextensions.CustomResourceConversion, s conversion.Scope) error {
 	out.Strategy = apiextensions.ConversionStrategyType(in.Strategy)
 	out.WebhookClientConfig = (*apiextensions.WebhookClientConfig)(unsafe.Pointer(in.WebhookClientConfig))
+	out.ConversionReviewVersions = *(*[]string)(unsafe.Pointer(&in.ConversionReviewVersions))
 	return nil
 }
 
@@ -307,6 +308,7 @@ func Convert_v1beta1_CustomResourceConversion_To_apiextensions_CustomResourceCon
 func autoConvert_apiextensions_CustomResourceConversion_To_v1beta1_CustomResourceConversion(in *apiextensions.CustomResourceConversion, out *CustomResourceConversion, s conversion.Scope) error {
 	out.Strategy = ConversionStrategyType(in.Strategy)
 	out.WebhookClientConfig = (*WebhookClientConfig)(unsafe.Pointer(in.WebhookClientConfig))
+	out.ConversionReviewVersions = *(*[]string)(unsafe.Pointer(&in.ConversionReviewVersions))
 	return nil
 }
 
