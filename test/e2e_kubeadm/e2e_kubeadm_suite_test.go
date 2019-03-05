@@ -44,5 +44,5 @@ func TestMain(m *testing.M) {
 func TestE2E(t *testing.T) {
 	reporters := []ginkgo.Reporter{}
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2EKubadm suite", reporters)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2EKubeadm suite", reporters)
 }
