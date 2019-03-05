@@ -66,6 +66,7 @@ func (t *dnsFederationsConfigMapTest) run() {
 		t.labels = []string{"abc", "ghi"}
 		valid1 := map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
+        health
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
@@ -74,12 +75,13 @@ func (t *dnsFederationsConfigMapTest) run() {
         federation %v {
            abc def.com
         }
-        proxy . /etc/resolv.conf
+        forward . /etc/resolv.conf
     }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
 		valid1m := map[string]string{t.labels[0]: "def.com"}
 
 		valid2 := map[string]string{
 			"Corefile": fmt.Sprintf(`:53 {
+        health
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
@@ -88,7 +90,7 @@ func (t *dnsFederationsConfigMapTest) run() {
         federation %v {
            ghi xyz.com
         }
-        proxy . /etc/resolv.conf
+        forward . /etc/resolv.conf
     }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
 		valid2m := map[string]string{t.labels[1]: "xyz.com"}
 
@@ -228,15 +230,16 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
+        health
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
         }
-        proxy . %v
+        forward . %v
     }
      acme.local:53 {
-       proxy . %v
+       forward . %v
     }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
 		}})
 
@@ -325,12 +328,13 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
+        health
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
         }
-        proxy . %v
+        forward . %v
     }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
@@ -434,12 +438,13 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
+        health
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
         }
-        proxy . %v
+        forward . %v
     }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
