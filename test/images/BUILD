@@ -31,6 +31,7 @@ filegroup(
         "//test/images/port-forward-tester:all-srcs",
         "//test/images/porter:all-srcs",
         "//test/images/resource-consumer:all-srcs",
+        "//test/images/resource-consumer-controller:all-srcs",
         "//test/images/sample-apiserver:all-srcs",
         "//test/images/sample-device-plugin:all-srcs",
         "//test/images/serve-hostname:all-srcs",
