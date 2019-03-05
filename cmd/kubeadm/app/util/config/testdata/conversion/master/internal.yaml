@@ -87,7 +87,7 @@ ComponentConfigs:
     ClusterDNS:
     - 10.96.0.10
     ClusterDomain: cluster.local
-    ConfigMapAndSecretChangeDetectionStrategy: Watch
+    ConfigMapAndSecretChangeDetectionStrategy: Cache
     ContainerLogMaxFiles: 5
     ContainerLogMaxSize: 10Mi
     ContentType: application/vnd.kubernetes.protobuf
