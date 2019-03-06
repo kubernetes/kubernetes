@@ -1356,7 +1356,6 @@ func (proxier *Proxier) syncProxyRules() {
 	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
 		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
 		metrics.NetworkProgrammingLatency.Observe(latency)
-		metrics.DeprecatedNetworkProgrammingLatency.Observe(latency)
 		klog.V(4).Infof("Network programming took %f seconds", latency)
 	}
 
