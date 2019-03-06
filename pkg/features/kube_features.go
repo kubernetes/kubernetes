@@ -414,6 +414,12 @@ const (
 	//
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA utilfeature.Feature = "WindowsGMSA"
+
+	// owner: @adisky
+	// alpha: v1.14
+	//
+	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
+	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
 )
 
 func init() {
@@ -470,6 +476,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: utilfeature.Beta},
+	CSIMigrationOpenStack:                       {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
