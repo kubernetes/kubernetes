@@ -190,6 +190,7 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
+pkg/kubelet/oom
 pkg/kubelet/pod
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption

@@ -27,6 +27,7 @@ type oomWatcherUnsupported struct{}
 
 var _ OOMWatcher = new(oomWatcherUnsupported)
 
+// NewOOMWatcher creates a fake one here
 func NewOOMWatcher(_ record.EventRecorder) OOMWatcher {
 	return &oomWatcherUnsupported{}
 }
