@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
@@ -30,21 +29,21 @@ import (
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
-var (
-	controlPlaneJoinExample = normalizer.Examples(`
-		# Joins a machine as a control plane instance
-		kubeadm join phase control-plane-join all
-		`)
-)
+var controlPlaneJoinExample = normalizer.Examples(`
+	# Joins a machine as a control plane instance
+	kubeadm join phase control-plane-join all
+`)
 
-func getControlPlaneJoinPhaseFlags() []string {
-	return []string{
-		options.APIServerAdvertiseAddress,
-		options.APIServerBindPort,
+func getControlPlaneJoinPhaseFlags(name string) []string {
+	flags := []string{
 		options.CfgPath,
 		options.ControlPlane,
 		options.NodeName,
 	}
+	if name != "mark-control-plane" {
+		flags = append(flags, options.APIServerAdvertiseAddress)
+	}
+	return flags
 }
 
 // NewControlPlaneJoinPhase creates a kubeadm workflow phase that implements joining a machine as a control plane instance
@@ -52,13 +51,12 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-join",
 		Short:   "Joins a machine as a control plane instance",
-		Long:    cmdutil.MacroCommandLongDescription,
 		Example: controlPlaneJoinExample,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
 				Short:          "Joins a machine as a control plane instance",
-				InheritFlags:   getControlPlaneJoinPhaseFlags(),
+				InheritFlags:   getControlPlaneJoinPhaseFlags("all"),
 				RunAllSiblings: true,
 			},
 			newEtcdLocalSubphase(),
@@ -73,7 +71,7 @@ func newEtcdLocalSubphase() workflow.Phase {
 		Name:         "etcd",
 		Short:        "Add a new local etcd member",
 		Run:          runEtcdPhase,
-		InheritFlags: getControlPlaneJoinPhaseFlags(),
+		InheritFlags: getControlPlaneJoinPhaseFlags("etcd"),
 	}
 }
 
@@ -86,7 +84,7 @@ func newUpdateStatusSubphase() workflow.Phase {
 			kubeadmconstants.KubeadmConfigConfigMap,
 		),
 		Run:          runUpdateStatusPhase,
-		InheritFlags: getControlPlaneJoinPhaseFlags(),
+		InheritFlags: getControlPlaneJoinPhaseFlags("update-status"),
 	}
 }
 
@@ -95,7 +93,7 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 		Name:         "mark-control-plane",
 		Short:        "Mark a node as a control-plane",
 		Run:          runMarkControlPlanePhase,
-		InheritFlags: getControlPlaneJoinPhaseFlags(),
+		InheritFlags: getControlPlaneJoinPhaseFlags("mark-control-plane"),
 	}
 }
 
