@@ -18,6 +18,7 @@ package node
 
 import (
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,13 +52,21 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 	})
 
 	It("should run without error", func() {
-		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := framework.NodeSSHHosts(f.ClientSet)
-		if err != nil {
-			framework.Failf("Error getting node hostnames: %v", err)
+		By("Getting all nodes and their SSH-able IP addresses")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		Expect(len(nodes.Items)).NotTo(BeZero())
+		hosts := []string{}
+		for _, node := range nodes.Items {
+			for _, addr := range node.Status.Addresses {
+				if addr.Type == v1.NodeExternalIP {
+					hosts = append(hosts, net.JoinHostPort(addr.Address, "22"))
+					break
+				}
+			}
 		}
-		Expect(len(hosts)).NotTo(BeZero())
+		Expect(len(hosts)).To(Equal(len(nodes.Items)))
 
+		isStandaloneMode := make(map[string]bool)
 		cpuUsageStats := make(map[string][]float64)
 		uptimeStats := make(map[string][]float64)
 		rssStats := make(map[string][]float64)
@@ -69,12 +78,16 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			rssStats[host] = []float64{}
 			workingSetStats[host] = []float64{}
 
+			cmd := "systemctl status node-problem-detector.service"
+			result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+			isStandaloneMode[host] = (err == nil && result.Code == 0)
+
 			By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
 			// Using brackets "[n]" is a trick to prevent grep command itself from
 			// showing up, because string text "[n]ode-problem-detector" does not
 			// match regular expression "[n]ode-problem-detector".
 			psCmd := "ps aux | grep [n]ode-problem-detector"
-			result, err := framework.SSH(psCmd, host, framework.TestContext.Provider)
+			result, err = framework.SSH(psCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			Expect(result.Code).To(BeZero())
 			Expect(result.Stdout).To(ContainSubstring("node-problem-detector"))
@@ -86,9 +99,11 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			Expect(result.Code).To(BeZero())
 			Expect(result.Stdout).NotTo(ContainSubstring("node-problem-detector.service: Failed"))
 
-			cpuUsage, uptime := getCpuStat(f, host)
-			cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
-			uptimeStats[host] = append(uptimeStats[host], uptime)
+			if isStandaloneMode[host] {
+				cpuUsage, uptime := getCpuStat(f, host)
+				cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
+				uptimeStats[host] = append(uptimeStats[host], uptime)
+			}
 
 			By(fmt.Sprintf("Inject log to trigger AUFSUmountHung on node %q", host))
 			log := "INFO: task umount.aufs:21568 blocked for more than 120 seconds."
@@ -99,8 +114,6 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		}
 
 		By("Check node-problem-detector can post conditions and events to API server")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(len(nodes.Items)).To(Equal(len(hosts)))
 		for _, node := range nodes.Items {
 			By(fmt.Sprintf("Check node-problem-detector posted KernelDeadlock condition on node %q", node.Name))
 			Eventually(func() error {
@@ -117,14 +130,21 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		By("Gather node-problem-detector cpu and memory stats")
 		numIterations := 60
 		for i := 1; i <= numIterations; i++ {
-			for _, host := range hosts {
-				rss, workingSet := getMemoryStat(f, host)
-				rssStats[host] = append(rssStats[host], rss)
-				workingSetStats[host] = append(workingSetStats[host], workingSet)
-				if i == numIterations {
-					cpuUsage, uptime := getCpuStat(f, host)
+			for j, host := range hosts {
+				if isStandaloneMode[host] {
+					rss, workingSet := getMemoryStat(f, host)
+					rssStats[host] = append(rssStats[host], rss)
+					workingSetStats[host] = append(workingSetStats[host], workingSet)
+					if i == numIterations {
+						cpuUsage, uptime := getCpuStat(f, host)
+						cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
+						uptimeStats[host] = append(uptimeStats[host], uptime)
+					}
+				} else {
+					cpuUsage, rss, workingSet := getNpdPodStat(f, nodes.Items[j].Name)
 					cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
-					uptimeStats[host] = append(uptimeStats[host], uptime)
+					rssStats[host] = append(rssStats[host], rss)
+					workingSetStats[host] = append(workingSetStats[host], workingSet)
 				}
 			}
 			time.Sleep(time.Second)
@@ -134,16 +154,24 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		rssStatsMsg := "RSS (MB):"
 		workingSetStatsMsg := "WorkingSet (MB):"
 		for i, host := range hosts {
-			cpuUsage := cpuUsageStats[host][1] - cpuUsageStats[host][0]
-			totaltime := uptimeStats[host][1] - uptimeStats[host][0]
-			cpuStatsMsg += fmt.Sprintf(" Node%d[%.3f];", i, cpuUsage/totaltime)
+			if isStandaloneMode[host] {
+				// When in standalone mode, NPD is running as systemd service. We
+				// calculate its cpu usage from cgroup cpuacct value differences.
+				cpuUsage := cpuUsageStats[host][1] - cpuUsageStats[host][0]
+				totaltime := uptimeStats[host][1] - uptimeStats[host][0]
+				cpuStatsMsg += fmt.Sprintf(" %s[%.3f];", nodes.Items[i].Name, cpuUsage/totaltime)
+			} else {
+				sort.Float64s(cpuUsageStats[host])
+				cpuStatsMsg += fmt.Sprintf(" %s[%.3f|%.3f|%.3f];", nodes.Items[i].Name,
+					cpuUsageStats[host][0], cpuUsageStats[host][len(cpuUsageStats[host])/2], cpuUsageStats[host][len(cpuUsageStats[host])-1])
+			}
 
 			sort.Float64s(rssStats[host])
-			rssStatsMsg += fmt.Sprintf(" Node%d[%.1f|%.1f|%.1f];", i,
+			rssStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes.Items[i].Name,
 				rssStats[host][0], rssStats[host][len(rssStats[host])/2], rssStats[host][len(rssStats[host])-1])
 
 			sort.Float64s(workingSetStats[host])
-			workingSetStatsMsg += fmt.Sprintf(" Node%d[%.1f|%.1f|%.1f];", i,
+			workingSetStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes.Items[i].Name,
 				workingSetStats[host][0], workingSetStats[host][len(workingSetStats[host])/2], workingSetStats[host][len(workingSetStats[host])-1])
 		}
 		framework.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
@@ -231,5 +259,24 @@ func getCpuStat(f *framework.Framework, host string) (usage, uptime float64) {
 
 	// Convert from nanoseconds to seconds
 	usage *= 1e-9
+	return
+}
+
+func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, workingSet float64) {
+	summary, err := framework.GetStatsSummary(f.ClientSet, nodeName)
+	framework.ExpectNoError(err)
+
+	hasNpdPod := false
+	for _, pod := range summary.Pods {
+		if !strings.HasPrefix(pod.PodRef.Name, "npd") {
+			continue
+		}
+		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
+		rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
+		workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+		hasNpdPod = true
+		break
+	}
+	Expect(hasNpdPod).To(BeTrue())
 	return
 }
