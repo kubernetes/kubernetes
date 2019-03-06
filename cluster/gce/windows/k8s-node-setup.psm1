@@ -777,6 +777,21 @@ function Configure-HostNetworkingService {
   Log-Output "Host network setup complete"
 }
 
+function Configure-GcePdTools {
+  if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
+    MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
+      -URLs "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
+  }
+  if (-not (Test-Path $PsHome\profile.ps1)) {
+    New-Item -path $PsHome\profile.ps1 -type file
+  }
+
+    Add-Content $PsHome\profile.ps1 `
+'$modulePath = "K8S_DIR\GetGcePdName.dll"
+Unblock-File $modulePath
+Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+}
+
 # Downloads the Windows CNI binaries and writes a CNI config file under
 # $env:CNI_CONFIG_DIR.
 #
