@@ -25,6 +25,9 @@ import (
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/kubernetes/pkg/kubectl/cmd/auth/reconciliation.RoleBinding
+// +k8s:deepcopy-gen:nonpointer-interfaces=true
 type RoleBindingAdapter struct {
 	RoleBinding *rbacv1.RoleBinding
 }
