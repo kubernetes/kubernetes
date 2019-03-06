@@ -35,6 +35,7 @@ import (
 	eventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
+	nodeinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/node/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
@@ -57,6 +58,7 @@ type Interface interface {
 	Events() eventsinternalversion.EventsInterface
 	Extensions() extensionsinternalversion.ExtensionsInterface
 	Networking() networkinginternalversion.NetworkingInterface
+	Node() nodeinternalversion.NodeInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
 	Scheduling() schedulinginternalversion.SchedulingInterface
@@ -81,6 +83,7 @@ type Clientset struct {
 	events                *eventsinternalversion.EventsClient
 	extensions            *extensionsinternalversion.ExtensionsClient
 	networking            *networkinginternalversion.NetworkingClient
+	node                  *nodeinternalversion.NodeClient
 	policy                *policyinternalversion.PolicyClient
 	rbac                  *rbacinternalversion.RbacClient
 	scheduling            *schedulinginternalversion.SchedulingClient
@@ -151,6 +154,11 @@ func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
 	return c.networking
+}
+
+// Node retrieves the NodeClient
+func (c *Clientset) Node() nodeinternalversion.NodeInterface {
+	return c.node
 }
 
 // Policy retrieves the PolicyClient
@@ -246,6 +254,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.node, err = nodeinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.policy, err = policyinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -291,6 +303,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.events = eventsinternalversion.NewForConfigOrDie(c)
 	cs.extensions = extensionsinternalversion.NewForConfigOrDie(c)
 	cs.networking = networkinginternalversion.NewForConfigOrDie(c)
+	cs.node = nodeinternalversion.NewForConfigOrDie(c)
 	cs.policy = policyinternalversion.NewForConfigOrDie(c)
 	cs.rbac = rbacinternalversion.NewForConfigOrDie(c)
 	cs.scheduling = schedulinginternalversion.NewForConfigOrDie(c)
@@ -317,6 +330,7 @@ func New(c rest.Interface) *Clientset {
 	cs.events = eventsinternalversion.New(c)
 	cs.extensions = extensionsinternalversion.New(c)
 	cs.networking = networkinginternalversion.New(c)
+	cs.node = nodeinternalversion.New(c)
 	cs.policy = policyinternalversion.New(c)
 	cs.rbac = rbacinternalversion.New(c)
 	cs.scheduling = schedulinginternalversion.New(c)

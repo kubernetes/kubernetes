@@ -6,6 +6,7 @@ go_library(
         "conversion.go",
         "doc.go",
         "register.go",
+        "zz_generated.conversion.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/node/v1alpha1",
     visibility = ["//visibility:public"],
