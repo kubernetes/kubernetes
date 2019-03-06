@@ -36,7 +36,7 @@ type ServiceReference struct {
 	Name string
 	// If specified, the port on the service that hosting the service.
 	// Default to 443 for backward compatibility.
-	// `Port` should be a valid port number (1-65535, inclusive).
+	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port int32
 }

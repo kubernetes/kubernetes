@@ -156,7 +156,7 @@ type ServiceReference struct {
 	Path *string
 
 	// If specified, the port on the service that hosting webhook.
-	// `Port` should be a valid port number (1-65535, inclusive).
+	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port int32
 }

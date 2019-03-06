@@ -165,7 +165,7 @@ type ServiceReference struct {
 
 	// If specified, the port on the service that hosting webhook.
 	// Default to 443 for backward compatibility.
-	// `Port` should be a valid port number (1-65535, inclusive).
+	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }
