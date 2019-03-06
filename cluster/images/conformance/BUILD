@@ -1,5 +1,6 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer")
-load("//build:platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
+load("@io_bazel_rules_docker//container:container.bzl", "container_layer")
+load("//build:platforms.bzl", "SERVER_PLATFORMS")
+load("//build:container.bzl", "multi_arch_container")
 
 container_layer(
     name = "cluster-srcs",
@@ -18,17 +19,18 @@ container_layer(
     ],
 )
 
-container_image(
-    name = "conformance-internal",
-    base = select(for_platforms(
-        for_server = "@debian-hyperkube-base-{ARCH}//image",
-        only_os = "linux",
-    )),
+multi_arch_container(
+    name = "conformance",
+    architectures = SERVER_PLATFORMS["linux"],
+    base = "@debian-hyperkube-base-{ARCH}//image",
     cmd = [
         "/bin/bash",
         "-c",
         "/run_e2e.sh",
     ],
+    # {ARCH} is replaced by the macro, but STABLE_DOCKER_TAG is replaced by the
+    # build stamping, so we need to escape it
+    docker_tags = ["k8s.gcr.io/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
     env = {
         "E2E_FOCUS": "\[Conformance\]",
         "E2E_SKIP": "",
@@ -45,23 +47,10 @@ container_image(
         ":bins",
     ],
     stamp = True,
-    workdir = "/usr/local/bin",
-)
-
-[container_bundle(
-    name = "conformance-%s" % arch,
-    images = {"k8s.gcr.io/conformance-%s:{STABLE_DOCKER_TAG}" % arch: "conformance-internal"},
     tags = ["manual"],
     visibility = ["//visibility:public"],
-) for arch in SERVER_PLATFORMS["linux"]]
-
-[alias(
-    name = "conformance%s" % suffix,
-    actual = select(for_platforms(for_server = "conformance-{ARCH}%s" % suffix)),
-) for suffix in [
-    "",
-    ".tar",
-]]
+    workdir = "/usr/local/bin",
+)
 
 filegroup(
     name = "package-srcs",

@@ -1,32 +1,20 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
-load("//build:platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
+load("//build:container.bzl", "multi_arch_container")
+load("//build:platforms.bzl", "SERVER_PLATFORMS")
 
-container_image(
-    name = "hyperkube-internal",
-    base = select(for_platforms(
-        for_server = "@debian-hyperkube-base-{ARCH}//image",
-        only_os = "linux",
-    )),
+multi_arch_container(
+    name = "hyperkube",
+    architectures = SERVER_PLATFORMS["linux"],
+    base = "@debian-hyperkube-base-{ARCH}//image",
+    # {ARCH} is replaced by the macro, but STABLE_DOCKER_TAG is replaced by the
+    # build stamping, so we need to escape it
+    docker_tags = ["k8s.gcr.io/hyperkube-{ARCH}:{{STABLE_DOCKER_TAG}}"],
     files = [
         "//cmd/hyperkube",
     ],
     stamp = True,
-)
-
-[container_bundle(
-    name = "hyperkube-%s" % arch,
-    images = {"k8s.gcr.io/hyperkube-%s:{STABLE_DOCKER_TAG}" % arch: "hyperkube-internal"},
     tags = ["manual"],
     visibility = ["//visibility:public"],
-) for arch in SERVER_PLATFORMS["linux"]]
-
-[alias(
-    name = "hyperkube%s" % suffix,
-    actual = select(for_platforms(for_server = "hyperkube-{ARCH}%s" % suffix)),
-) for suffix in [
-    "",
-    ".tar",
-]]
+)
 
 filegroup(
     name = "package-srcs",
