@@ -1793,11 +1793,18 @@ func TestCreateDisk(t *testing.T) {
 			}},
 		},
 	}
+
 	volume := &ec2.Volume{
 		AvailabilityZone: aws.String("us-east-1a"),
 		VolumeId:         aws.String("vol-volumeId0"),
+		State:            aws.String("available"),
 	}
 	awsServices.ec2.(*MockedFakeEC2).On("CreateVolume", request).Return(volume, nil)
+
+	describeVolumesRequest := &ec2.DescribeVolumesInput{
+		VolumeIds: []*string{aws.String("vol-volumeId0")},
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("DescribeVolumes", describeVolumesRequest).Return([]*ec2.Volume{volume}, nil)
 
 	volumeID, err := c.CreateDisk(volumeOptions)
 	assert.Nil(t, err, "Error creating disk: %v", err)
