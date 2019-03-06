@@ -17,6 +17,7 @@ limitations under the License.
 package dynamic
 
 import (
+	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -94,6 +95,9 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts meta
 			return nil, err
 		}
 		name = accessor.GetName()
+		if len(name) == 0 {
+			return nil, fmt.Errorf("name is required")
+		}
 	}
 
 	result := c.client.client.
@@ -122,6 +126,10 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts meta
 	if err != nil {
 		return nil, err
 	}
+	name := accessor.GetName()
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
@@ -129,7 +137,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts meta
 
 	result := c.client.client.
 		Put().
-		AbsPath(append(c.makeURLSegments(accessor.GetName()), subresources...)...).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do()
@@ -153,6 +161,10 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 	if err != nil {
 		return nil, err
 	}
+	name := accessor.GetName()
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
 
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
@@ -161,7 +173,7 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 
 	result := c.client.client.
 		Put().
-		AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).
+		AbsPath(append(c.makeURLSegments(name), "status")...).
 		Body(outBytes).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Do()
@@ -181,6 +193,9 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 }
 
 func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, subresources ...string) error {
+	if len(name) == 0 {
+		return fmt.Errorf("name is required")
+	}
 	if opts == nil {
 		opts = &metav1.DeleteOptions{}
 	}
@@ -216,6 +231,9 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 }
 
 func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
 	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -284,6 +302,9 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
 	result := c.client.client.
 		Patch(pt).
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
