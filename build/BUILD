@@ -2,7 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load(":code_generation_test.bzl", "code_generation_test_suite")
-load(":container.bzl", "multi_arch_container")
+load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
 load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
 
 code_generation_test_suite(
@@ -69,7 +69,12 @@ DOCKERIZED_BINARIES = {
         for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
         only_os = "linux",
     )),
-    docker_tags = ["k8s.gcr.io/%s:{{STABLE_DOCKER_TAG}}" % binary],
+    # Since the multi_arch_container macro replaces the {ARCH} format string,
+    # we need to escape the stamping vars.
+    # Also see comment above about why the push tags use ARCH while the
+    # non-push tags do not.
+    docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
@@ -79,6 +84,17 @@ DOCKERIZED_BINARIES = {
     tags = ["manual"],
     visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
+
+# Also roll up all images into a single bundle to push with one target.
+multi_arch_container_push(
+    name = "server-images",
+    architectures = SERVER_PLATFORMS["linux"],
+    docker_tags_images = {
+        "{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary: "%s-internal" % binary
+        for binary in DOCKERIZED_BINARIES.keys()
+    },
+    tags = ["manual"],
+)
 
 [genrule(
     name = binary + "_docker_tag",

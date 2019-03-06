@@ -28,9 +28,10 @@ multi_arch_container(
         "-c",
         "/run_e2e.sh",
     ],
-    # {ARCH} is replaced by the macro, but STABLE_DOCKER_TAG is replaced by the
-    # build stamping, so we need to escape it
-    docker_tags = ["k8s.gcr.io/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
+    # {ARCH} is replaced by the macro, but STABLE_ vars are replaced by the
+    # build stamping, so we need to escape them
+    docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
     env = {
         "E2E_FOCUS": "\[Conformance\]",
         "E2E_SKIP": "",
