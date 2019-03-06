@@ -32,6 +32,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
 	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
+	printerspkg "k8s.io/kubernetes/pkg/printers"
 )
 
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
@@ -73,7 +74,7 @@ func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHea
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
 	parts := strings.Split(spec, ",")
-	columns := make([]Column, len(parts))
+	columns := make([]printerspkg.Column, len(parts))
 	for ix := range parts {
 		colSpec := strings.SplitN(parts[ix], ":", 2)
 		if len(colSpec) != 2 {
@@ -83,7 +84,7 @@ func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHea
 		if err != nil {
 			return nil, err
 		}
-		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
+		columns[ix] = printerspkg.Column{Header: colSpec[0], FieldSpec: spec}
 	}
 	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: noHeaders}, nil
 }
@@ -119,13 +120,13 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runti
 		return nil, fmt.Errorf("number of headers (%d) and field specifications (%d) don't match", len(headers), len(specs))
 	}
 
-	columns := make([]Column, len(headers))
+	columns := make([]printerspkg.Column, len(headers))
 	for ix := range headers {
 		spec, err := RelaxedJSONPathExpression(specs[ix])
 		if err != nil {
 			return nil, err
 		}
-		columns[ix] = Column{
+		columns[ix] = printerspkg.Column{
 			Header:    headers[ix],
 			FieldSpec: spec,
 		}
@@ -133,19 +134,10 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runti
 	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: false}, nil
 }
 
-// Column represents a user specified column
-type Column struct {
-	// The header to print above the column, general style is ALL_CAPS
-	Header string
-	// The pointer to the field in the object to print in JSONPath form
-	// e.g. {.ObjectMeta.Name}, see pkg/util/jsonpath for more details.
-	FieldSpec string
-}
-
 // CustomColumnPrinter is a printer that knows how to print arbitrary columns
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
-	Columns   []Column
+	Columns   []printerspkg.Column
 	Decoder   runtime.Decoder
 	NoHeaders bool
 	// lastType records type of resource printed last so that we don't repeat

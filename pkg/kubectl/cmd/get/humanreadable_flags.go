@@ -17,6 +17,9 @@ limitations under the License.
 package get
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -33,6 +36,7 @@ type HumanPrintFlags struct {
 	ShowLabels   *bool
 	SortBy       *string
 	ColumnLabels *[]string
+	ExtraColumns *[]string
 
 	// get.go-specific values
 	NoHeaders bool
@@ -87,6 +91,23 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
+	spec := *f.ExtraColumns
+	extraColumns := make([]printers.Column, len(spec))
+	if *f.ExtraColumns != nil {
+		// Break up user specified extra-columns JSON paths into relaxed JSON expressions
+		for ix := range spec {
+			colSpec := strings.Split(spec[ix], ":")
+			if len(colSpec) != 2 {
+				return nil, fmt.Errorf("unexpected extra-columns spec: %s, expected <header>:<json-path-expr>", spec[ix])
+			}
+			spec, err := RelaxedJSONPathExpression(colSpec[1])
+			if err != nil {
+				return nil, err
+			}
+			extraColumns[ix] = printers.Column{Header: colSpec[0], FieldSpec: spec}
+		}
+	}
+
 	p := printers.NewHumanReadablePrinter(printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
@@ -94,6 +115,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		Wide:          outputFormat == "wide",
 		WithNamespace: f.WithNamespace,
 		ColumnLabels:  columnLabels,
+		ExtraColumns:  extraColumns,
 		ShowLabels:    showLabels,
 	})
 	printersinternal.AddHandlers(p)
@@ -118,6 +140,9 @@ func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 	if f.ShowKind != nil {
 		c.Flags().BoolVar(f.ShowKind, "show-kind", *f.ShowKind, "If present, list the resource type for the requested object(s).")
 	}
+	if f.ExtraColumns != nil {
+		c.Flags().StringSliceVarP(f.ExtraColumns, "extra-columns", "E", *f.ExtraColumns, "Accepts a comma separated list of extra columns expressed as a spec with a JSONPath expression in the same vein as -o=custom-columns=<spec> (e.g. 'NAME:.metadata.name'). These columns will be displayed in addition to the default columns.")
+	}
 }
 
 // NewHumanPrintFlags returns flags associated with
@@ -127,12 +152,14 @@ func NewHumanPrintFlags() *HumanPrintFlags {
 	sortBy := ""
 	showKind := false
 	columnLabels := []string{}
+	extraColumns := []string{}
 
 	return &HumanPrintFlags{
 		NoHeaders:          false,
 		WithNamespace:      false,
 		AbsoluteTimestamps: false,
 		ColumnLabels:       &columnLabels,
+		ExtraColumns:       &extraColumns,
 
 		Kind:       schema.GroupKind{},
 		ShowLabels: &showLabels,

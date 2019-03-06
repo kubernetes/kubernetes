@@ -37,6 +37,15 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
 }
 
+// Column represents a user specified column
+type Column struct {
+	// The header to print above the column, general style is ALL_CAPS
+	Header string
+	// The pointer to the field in the object to print in JSONPath form
+	// e.g. {.ObjectMeta.Name}, see pkg/util/jsonpath for more details.
+	FieldSpec string
+}
+
 type PrintOptions struct {
 	// supported Format types can be found in pkg/printers/printers.go
 	OutputFormatType     string
@@ -50,6 +59,7 @@ type PrintOptions struct {
 	AbsoluteTimestamps bool
 	Kind               schema.GroupKind
 	ColumnLabels       []string
+	ExtraColumns       []Column
 
 	SortBy string
 

@@ -79,6 +79,7 @@ type GetOptions struct {
 	Sort           bool
 	IgnoreNotFound bool
 	Export         bool
+	ExtraColumns   bool
 
 	genericclioptions.IOStreams
 }
@@ -206,6 +207,13 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	sortBy, err := cmd.Flags().GetString("sort-by")
+
+	extraCols, err := cmd.Flags().GetStringSlice("extra-columns")
+	if err != nil {
+		return err
+	}
+	o.ExtraColumns = len(extraCols) > 0
+
 	if err != nil {
 		return err
 	}
@@ -428,8 +436,8 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 	tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
 	req.SetHeader("Accept", tableParam)
 
-	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-	if o.Sort {
+	// if sorting or printing extra columns, ensure we receive the full object in order to introspect its fields via jsonpath
+	if o.Sort || o.ExtraColumns {
 		req.Param("includeObject", "Object")
 	}
 }

@@ -126,7 +126,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 	// Note that this requires empty fields to be considered later, when sorting.
 	var fieldFoundOnce bool
 	for _, obj := range objs {
-		values, err := findJSONPathResults(parser, obj)
+		values, err := jsonpath.FindJSONPathResults(parser, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -284,12 +284,12 @@ func (r *RuntimeSort) Less(i, j int) bool {
 		panic(err)
 	}
 
-	iValues, err = findJSONPathResults(parser, iObj)
+	iValues, err = jsonpath.FindJSONPathResults(parser, iObj)
 	if err != nil {
 		klog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
 	}
 
-	jValues, err = findJSONPathResults(parser, jObj)
+	jValues, err = jsonpath.FindJSONPathResults(parser, jObj)
 	if err != nil {
 		klog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
 	}
@@ -372,7 +372,7 @@ func NewTableSorter(table *metav1beta1.Table, field string) (*TableSorter, error
 
 	fieldFoundOnce := false
 	for i := range table.Rows {
-		parsedRow, err := findJSONPathResults(parser, table.Rows[i].Object.Object)
+		parsedRow, err := jsonpath.FindJSONPathResults(parser, table.Rows[i].Object.Object)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
 		}
@@ -391,10 +391,4 @@ func NewTableSorter(table *metav1beta1.Table, field string) (*TableSorter, error
 		field:      field,
 		parsedRows: parsedRows,
 	}, nil
-}
-func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
-	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
-		return parser.FindResults(unstructuredObj.Object)
-	}
-	return parser.FindResults(reflect.ValueOf(from).Elem().Interface())
 }
