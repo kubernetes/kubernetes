@@ -480,7 +480,6 @@ func (o *CopyOptions) untarAll(reader io.Reader, destFile, prefix string) error 
 			if err != nil {
 				return err
 			}
-			defer outFile.Close()
 			if _, err := io.Copy(outFile, tarReader); err != nil {
 				return err
 			}
