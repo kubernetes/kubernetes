@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -186,6 +186,12 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		sysadmin.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(sysadmin)
 	})
+
+	By("Running RunAsGroup and RunAsUser")
+	privileged := restrictedPod("RunAsGroup")
+	privileged.Spec.Containers[0].SecurityContext.RunAsGroup = 65529
+	privileged.Spec.Containers[0].SecurityContext.RunAsUser = 0
+	tester(privileged)
 }
 
 // createAndBindPSP creates a PSP in the policy API group.
@@ -272,7 +278,7 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 				Rule: policy.RunAsUserStrategyRunAsAny,
 			},
 			RunAsGroup: &policy.RunAsGroupStrategyOptions{
-				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 				Ranges: []policy.IDRange{
 					{Min: int64(999), Max: int64(999)}},
 			},
@@ -303,8 +309,9 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 			},
 		},
 		Spec: policy.PodSecurityPolicySpec{
-			Privileged:               false,
-			AllowPrivilegeEscalation: utilpointer.BoolPtr(false),
+			Privileged:                  false,
+			AllowPrivilegeEscalation:    utilpointer.BoolPtr(false),
+			RunAsGroupStrategyMustRunAs: utilpointer.Int64Ptr(65534),
 			RequiredDropCapabilities: []v1.Capability{
 				"AUDIT_WRITE",
 				"CHOWN",
