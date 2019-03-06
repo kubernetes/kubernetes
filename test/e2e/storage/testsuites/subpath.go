@@ -745,8 +745,6 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 			// 0 is the container that uses subpath
 			if status.Name == subpathContainerName {
 				switch {
-				case status.State.Running != nil:
-					return false, fmt.Errorf("subpath container unexpectedly became running")
 				case status.State.Terminated != nil:
 					if status.State.Terminated.ExitCode != 0 && allowContainerTerminationError {
 						return true, nil
