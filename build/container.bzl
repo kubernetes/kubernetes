@@ -17,9 +17,10 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 load("//build:platforms.bzl", "go_platform_constraint")
 
 # multi_arch_container produces a private internal container_image, multiple
-# arch-specific tagged container_bundles (named NAME-ARCH) and aliases
-# from NAME and NAME.tar to the appropriately NAME-ARCH container_bundle target
-# for the currently-configured architecture.
+# arch-specific tagged container_bundles (named NAME-ARCH), an alias
+# from NAME to the appropriately NAME-ARCH container_bundle target, and a
+# genrule for NAME.tar copying the appropriate NAME-ARCH container bundle
+# tarball output for the currently-configured architecture.
 # Additionally, if docker_push_tags is provided, uses multi_arch_container_push
 # to create container_bundles named push-NAME-ARCH with the provided push tags,
 # along with a push-NAME docker_push target.
@@ -70,14 +71,23 @@ def multi_arch_container(
             tags = tags,
             visibility = visibility,
         )
-    for suffix in ["", ".tar"]:
-        native.alias(
-            name = "%s%s" % (name, suffix),
-            actual = select({
-                go_platform_constraint(os = "linux", arch = arch): "%s-%s%s" % (name, arch, suffix)
-                for arch in architectures
-            }),
-        )
+    native.alias(
+        name = name,
+        actual = select({
+            go_platform_constraint(os = "linux", arch = arch): "%s-%s" % (name, arch)
+            for arch in architectures
+        }),
+    )
+    native.genrule(
+        name = "gen_%s.tar" % name,
+        outs = ["%s.tar" % name],
+        srcs = select({
+            go_platform_constraint(os = "linux", arch = arch): ["%s-%s.tar" % (name, arch)]
+            for arch in architectures
+        }),
+        cmd = "cp $< $@",
+        output_to_bindir = True,
+    )
 
     if docker_push_tags:
         multi_arch_container_push(
