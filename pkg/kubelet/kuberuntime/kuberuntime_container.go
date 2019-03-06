@@ -592,17 +592,58 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	return err
 }
 
+//returns true if the container is a sidecar
+func isSidecar(containers []v1.Container, name string) bool {
+	for _, container := range containers {
+		if container.Name == name && container.Sidecar {
+			return true
+		}
+	}
+	return false
+}
+
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 	wg := sync.WaitGroup{}
 
-	wg.Add(len(runningPod.Containers))
-	for _, container := range runningPod.Containers {
+	//split the running containers into sidecars and non sidecars
+	var containers []*kubecontainer.Container
+	var sidecars []*kubecontainer.Container
+
+	if pod != nil {
+		for _, container := range runningPod.Containers {
+			if isSidecar(pod.Spec.Containers, container.Name) {
+				sidecars = append(sidecars, container)
+			} else {
+				containers = append(containers, container)
+			}
+		}
+	} else {
+		containers = runningPod.Containers
+	}
+
+	//terminate containers first
+	wg.Add(len(containers))
+	for _, container := range containers {
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
+			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
+				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+			}
+			containerResults <- killContainerResult
+		}(container)
+	}
+	wg.Wait()
 
+	//wait until containers are terminated before terminating sidecars
+	wg.Add(len(sidecars))
+	for _, container := range sidecars {
+		go func(container *kubecontainer.Container) {
+			defer utilruntime.HandleCrash()
+			defer wg.Done()
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())

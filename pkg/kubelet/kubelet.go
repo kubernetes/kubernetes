@@ -2106,10 +2106,18 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
+		hasSidecars, sidecarsReady, containersNotRunning := status.SidecarsStatus(pod)
+
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		if status.NeedToReconcilePodReadiness(pod) {
 			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		} else if containersNotRunning {
+			// if containers aren't running and the sidecars are all ready trigger a sync so that the containers get started
+			if hasSidecars && sidecarsReady {
+				mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+				kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			}
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.

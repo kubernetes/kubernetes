@@ -301,6 +301,12 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for k := range podSpec.Containers {
+			podSpec.Containers[k].Sidecar = false
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {

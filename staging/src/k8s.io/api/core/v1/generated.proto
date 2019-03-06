@@ -751,6 +751,11 @@ message Container {
   // Default is false.
   // +optional
   optional bool tty = 18;
+
+  // Sidecar
+  // Default is false
+  // +optional
+  optional bool sidecar = 22;
 }
 
 // Describe a container image

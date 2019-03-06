@@ -2044,6 +2044,8 @@ type Container struct {
 	StdinOnce bool
 	// +optional
 	TTY bool
+	// +optional
+	Sidecar bool
 }
 
 // Handler defines a specific action that should be taken

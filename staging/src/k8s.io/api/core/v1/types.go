@@ -2233,6 +2233,10 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
+	//Sidecar
+	//Default is false
+	//+optional
+	Sidecar bool `json:"sidecar,omitempty" protobuf:"varint,22,opt,name=sidecar"`
 }
 
 // Handler defines a specific action that should be taken

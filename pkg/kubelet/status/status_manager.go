@@ -671,3 +671,32 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+//SidecarsStatus returns three bools, whether the pod has sidecars, whether the sidecars are ready and wheter the non-sidecar containers are in waiting state
+// this should probably return a struct instead, postional values aren't pretty
+func SidecarsStatus(pod *v1.Pod) (bool, bool, bool) {
+	sidecars := 0
+	var hasSidecars, sidecarsReady, containersNotRunning bool
+	sidecarsReady = true
+	for _, container := range pod.Spec.Containers {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == container.Name {
+				if container.Sidecar {
+					sidecars++
+					if !status.Ready {
+						sidecarsReady = false
+					}
+					//check if non-sidecars have started
+				} else if status.State.Waiting != nil {
+					containersNotRunning = true
+				}
+			}
+		}
+	}
+
+	if sidecars != 0 {
+		hasSidecars = true
+	}
+
+	return hasSidecars, sidecarsReady, containersNotRunning
+}
