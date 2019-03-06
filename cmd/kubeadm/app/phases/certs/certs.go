@@ -57,7 +57,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 		return errors.Wrap(err, "error creating PKI assets")
 	}
 
-	fmt.Printf("[certs] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
 	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)

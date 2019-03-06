@@ -39,7 +39,7 @@ const (
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	fmt.Printf("[upload-config] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	// Prepare the ClusterConfiguration for upload
 	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;
