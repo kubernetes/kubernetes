@@ -17,10 +17,12 @@ limitations under the License.
 package rules
 
 import (
+	"fmt"
 	"testing"
 
 	adreg "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 )
 
@@ -36,6 +38,30 @@ func a(group, version, resource, subresource, name string, operation admission.O
 		nil, nil,
 		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
 		"ns", name,
+		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
+		operation,
+		false,
+		nil,
+	)
+}
+
+func namespacedAttributes(group, version, resource, subresource, name string, operation admission.Operation) admission.Attributes {
+	return admission.NewAttributesRecord(
+		nil, nil,
+		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
+		"ns", name,
+		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
+		operation,
+		false,
+		nil,
+	)
+}
+
+func clusterScopedAttributes(group, version, resource, subresource, name string, operation admission.Operation) admission.Attributes {
+	return admission.NewAttributesRecord(
+		nil, nil,
+		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
+		"", name,
 		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
 		operation,
 		false,
@@ -296,6 +322,96 @@ func TestResource(t *testing.T) {
 			if r.resource() {
 				t.Errorf("%v: expected no match %#v", name, m)
 			}
+		}
+	}
+}
+
+func TestScope(t *testing.T) {
+	cluster := adreg.ClusterScope
+	namespace := adreg.NamespacedScope
+	allscopes := adreg.AllScopes
+	table := tests{
+		"cluster scope": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"*"},
+					Scope:     &cluster,
+				},
+			},
+			match: attrList(
+				clusterScopedAttributes("g", "v", "r", "", "name", admission.Create),
+				clusterScopedAttributes("g", "v", "r", "exec", "name", admission.Create),
+				clusterScopedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				clusterScopedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+			),
+			noMatch: attrList(
+				namespacedAttributes("g", "v", "r", "", "name", admission.Create),
+				namespacedAttributes("g", "v", "r", "exec", "name", admission.Create),
+			),
+		},
+		"namespace scope": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"*"},
+					Scope:     &namespace,
+				},
+			},
+			match: attrList(
+				namespacedAttributes("g", "v", "r", "", "name", admission.Create),
+				namespacedAttributes("g", "v", "r", "exec", "name", admission.Create),
+			),
+			noMatch: attrList(
+				clusterScopedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				clusterScopedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+				clusterScopedAttributes("g", "v", "r", "", "name", admission.Create),
+				clusterScopedAttributes("g", "v", "r", "exec", "name", admission.Create),
+			),
+		},
+		"all scopes": {
+			rule: adreg.RuleWithOperations{
+				Rule: adreg.Rule{
+					Resources: []string{"*"},
+					Scope:     &allscopes,
+				},
+			},
+			match: attrList(
+				namespacedAttributes("g", "v", "r", "", "name", admission.Create),
+				namespacedAttributes("g", "v", "r", "exec", "name", admission.Create),
+				clusterScopedAttributes("g", "v", "r", "", "name", admission.Create),
+				clusterScopedAttributes("g", "v", "r", "exec", "name", admission.Create),
+				clusterScopedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				clusterScopedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "", "ns", admission.Create),
+				namespacedAttributes("", "v1", "namespaces", "finalize", "ns", admission.Create),
+			),
+			noMatch: attrList(),
+		},
+	}
+	keys := sets.NewString()
+	for name := range table {
+		keys.Insert(name)
+	}
+	for _, name := range keys.List() {
+		tt := table[name]
+		for i, m := range tt.match {
+			t.Run(fmt.Sprintf("%s_match_%d", name, i), func(t *testing.T) {
+				r := Matcher{tt.rule, m}
+				if !r.scope() {
+					t.Errorf("%v: expected match %#v", name, m)
+				}
+			})
+		}
+		for i, m := range tt.noMatch {
+			t.Run(fmt.Sprintf("%s_nomatch_%d", name, i), func(t *testing.T) {
+				r := Matcher{tt.rule, m}
+				if r.scope() {
+					t.Errorf("%v: expected no match %#v", name, m)
+				}
+			})
 		}
 	}
 }
