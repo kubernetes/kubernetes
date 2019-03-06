@@ -17,6 +17,7 @@ limitations under the License.
 package transformers
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -75,7 +76,10 @@ func (pt *imageTransformer) findAndReplaceImage(obj map[string]interface{}) erro
 }
 
 func (pt *imageTransformer) updateContainers(obj map[string]interface{}, path string) error {
-	containers := obj[path].([]interface{})
+	containers, ok := obj[path].([]interface{})
+	if !ok {
+		return fmt.Errorf("containers path is not of type []interface{} but %T", obj[path])
+	}
 	for i := range containers {
 		container := containers[i].(map[string]interface{})
 		containerImage, found := container["image"]
@@ -85,20 +89,21 @@ func (pt *imageTransformer) updateContainers(obj map[string]interface{}, path st
 
 		imageName := containerImage.(string)
 		for _, img := range pt.images {
-			if isImageMatched(imageName, img.Name) {
-				name, tag := split(imageName)
-				if img.NewName != "" {
-					name = img.NewName
-				}
-				if img.NewTag != "" {
-					tag = ":" + img.NewTag
-				}
-				if img.Digest != "" {
-					tag = "@" + img.Digest
-				}
-				container["image"] = name + tag
-				break
+			if !isImageMatched(imageName, img.Name) {
+				continue
 			}
+			name, tag := split(imageName)
+			if img.NewName != "" {
+				name = img.NewName
+			}
+			if img.NewTag != "" {
+				tag = ":" + img.NewTag
+			}
+			if img.Digest != "" {
+				tag = "@" + img.Digest
+			}
+			container["image"] = name + tag
+			break
 		}
 	}
 	return nil
@@ -138,7 +143,18 @@ func isImageMatched(s, t string) bool {
 // from the image string using either colon `:` or at `@` separators.
 // Note that the returned tag keeps its separator.
 func split(imageName string) (name string, tag string) {
-	ic := strings.LastIndex(imageName, ":")
+	// check if image name contains a domain
+	// if domain is present, ignore domain and check for `:`
+	ic := -1
+	if slashIndex := strings.Index(imageName, "/"); slashIndex < 0 {
+		ic = strings.LastIndex(imageName, ":")
+	} else {
+		lastIc := strings.LastIndex(imageName[slashIndex:], ":")
+		// set ic only if `:` is present
+		if lastIc > 0 {
+			ic = slashIndex + lastIc
+		}
+	}
 	ia := strings.LastIndex(imageName, "@")
 	if ic < 0 && ia < 0 {
 		return imageName, ""
