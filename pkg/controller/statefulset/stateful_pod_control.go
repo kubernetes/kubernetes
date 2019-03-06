@@ -30,6 +30,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -179,7 +180,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+		currentClaim, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
@@ -189,11 +190,34 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
+
 		case err != nil:
 			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
+
+		default:
+			// Check resource requirements and accessmodes, update if necessary
+			claimNeedUpdated := false
+			if !volumeutil.AccessModesEqualSet(claim.Spec.AccessModes, currentClaim.Spec.AccessModes) {
+				currentClaim.Spec.AccessModes = claim.Spec.AccessModes
+				claimNeedUpdated = true
+			}
+
+			claimStorage, claimOk := claim.Spec.Resources.Requests[v1.ResourceStorage]
+			currentStorage, currentOk := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]
+			if claimOk && currentOk && claimStorage.Cmp(currentStorage) != 0 {
+				currentClaim.Spec.Resources.Requests[v1.ResourceStorage] = claimStorage
+				claimNeedUpdated = true
+			}
+
+			if claimNeedUpdated {
+				_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(currentClaim)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("Failed to update PVC %s: %s", claim.Name, err))
+					spc.recordClaimEvent("create", set, pod, &claim, err)
+				}
+			}
 		}
-		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
 	return errorutils.NewAggregate(errs)
 }

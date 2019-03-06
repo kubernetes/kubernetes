@@ -307,6 +307,30 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 	return true
 }
 
+// AccessModesEqualSet returns true when two array of modes exactly represent the same set of access modes
+func AccessModesEqualSet(modes []v1.PersistentVolumeAccessMode, otherModes []v1.PersistentVolumeAccessMode) bool {
+	var uniqModes []v1.PersistentVolumeAccessMode
+	var uniqOtherModes []v1.PersistentVolumeAccessMode
+
+	for _, mode := range modes {
+		if AccessModesContains(uniqModes, mode) {
+			continue
+		}
+		uniqModes = append(uniqModes, mode)
+	}
+
+	for _, mode := range otherModes {
+		if AccessModesContains(uniqOtherModes, mode) {
+			continue
+		}
+		uniqOtherModes = append(uniqOtherModes, mode)
+	}
+
+	return len(uniqModes) == len(uniqOtherModes) &&
+		AccessModesContainedInAll(uniqModes, uniqOtherModes) &&
+		AccessModesContainedInAll(uniqOtherModes, uniqModes)
+}
+
 // GetWindowsPath get a windows path
 func GetWindowsPath(path string) string {
 	windowsPath := strings.Replace(path, "/", "\\", -1)

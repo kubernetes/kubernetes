@@ -129,6 +129,42 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	}
 }
 
+func TestStatefulPodControlCreatePodUpdatePvc(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	fakeClient := &fake.Clientset{}
+	pvcs := getPersistentVolumeClaims(set, pod)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for k := range pvcs {
+		pvc := pvcs[k]
+		pvc.Spec.AccessModes = append(pvc.Spec.AccessModes, v1.ReadWriteMany)
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("update", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		return true, update.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	if err := control.CreateStatefulPod(set, pod); err != nil {
+		t.Errorf("StatefulPodControl failed to create Pod error: %s", err)
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 1 {
+		t.Errorf("Expected 1 events for successful create found %d", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeNormal) {
+			t.Errorf("Found unexpected non-normal event %s", events[i])
+		}
+	}
+}
+
 type fakeIndexer struct {
 	cache.Indexer
 	getError error
