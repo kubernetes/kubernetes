@@ -210,6 +210,10 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
+
+			if path != dir {
+				return filepath.SkipDir
+			}
 		case mode&os.ModeSocket != 0:
 			w.wg.Add(1)
 			go func() {
