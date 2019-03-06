@@ -2713,6 +2713,36 @@ func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddr
 	return
 }
 
+// GetHostAddress gets the node for a pod and returns the first
+// address. Returns an error if the node the pod is on doesn't have an
+// address.
+func GetHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	// Try externalAddress first
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+	// If no externalAddress found, try internalAddress
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+
+	// If not found, return error
+	return "", fmt.Errorf("No address for pod %v on node %v",
+		p.Name, p.Spec.NodeName)
+}
+
 type extractRT struct {
 	http.Header
 }

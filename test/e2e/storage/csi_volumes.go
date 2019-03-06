@@ -49,6 +49,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
+	testsuites.InitDisruptiveTestSuite,
 }
 
 // This executes testSuites for csi volumes.

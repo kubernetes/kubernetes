@@ -48,6 +48,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitDisruptiveTestSuite,
 }
 
 func init() {
