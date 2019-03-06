@@ -610,7 +610,8 @@ function build-linux-node-labels {
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
     # Add kube-proxy daemonset label to node to avoid situation during cluster
     # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+    # TODO(liggitt): drop beta.kubernetes.io/kube-proxy-ds-ready in 1.16
+    node_labels="node.kubernetes.io/kube-proxy-ds-ready=true,beta.kubernetes.io/kube-proxy-ds-ready=true"
   fi
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
