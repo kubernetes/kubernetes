@@ -114,6 +114,9 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet *fieldpath.VersionedSet, err error) {
 	versionedSet = &fieldpath.VersionedSet{}
 	versionedSet.APIVersion = fieldpath.APIVersion(encodedVersionedSet.APIVersion)
+	if encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply {
+		versionedSet.Applied = true
+	}
 
 	fields := metav1.Fields{}
 	if encodedVersionedSet.Fields != nil {
@@ -179,8 +182,11 @@ func encodeManagerVersionedSet(manager string, versionedSet *fieldpath.Versioned
 		return nil, fmt.Errorf("error unmarshalling manager identifier %v: %v", manager, err)
 	}
 
-	// Get the APIVersion and Fields from the VersionedSet
+	// Get the APIVersion, Operation, and Fields from the VersionedSet
 	encodedVersionedSet.APIVersion = string(versionedSet.APIVersion)
+	if versionedSet.Applied {
+		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
+	}
 	fields, err := SetToFields(*versionedSet.Set)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)
