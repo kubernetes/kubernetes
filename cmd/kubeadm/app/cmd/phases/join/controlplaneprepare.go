@@ -31,13 +31,20 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/pkg/util/normalizer"
 )
+
+var controlPlanePrepareExample = normalizer.Examples(`
+	# Prepares the machine for serving a control plane
+	kubeadm join phase control-plane-prepare all
+`)
 
 // NewControlPlanePreparePhase creates a kubeadm workflow phase that implements the preparation of the node to serve a control plane
 func NewControlPlanePreparePhase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "control-plane-prepare",
-		Short: "Prepares the machine for serving a control plane.",
+		Name:    "control-plane-prepare",
+		Short:   "Prepares the machine for serving a control plane.",
+		Example: controlPlanePrepareExample,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all [api-server-endpoint]",
@@ -48,33 +55,75 @@ func NewControlPlanePreparePhase() workflow.Phase {
 			newControlPlanePrepareDownloadCertsSubphase(),
 			newControlPlanePrepareCertsSubphase(),
 			newControlPlanePrepareKubeconfigSubphase(),
-			newControlPlanePrepareManifestsSubphases(),
+			newControlPlanePrepareControlPlaneSubphase(),
 		},
 	}
 }
 
 func getControlPlanePreparePhaseFlags(name string) []string {
-	flags := []string{
-		options.APIServerAdvertiseAddress,
-		options.APIServerBindPort,
-		options.CfgPath,
-		options.ControlPlane,
-		options.NodeName,
-	}
-	if name != "manifests" {
-		flags = append(flags,
+	var flags []string
+	switch name {
+	case "all":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.CfgPath,
+			options.ControlPlane,
+			options.NodeName,
 			options.FileDiscovery,
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
 			options.TokenDiscoverySkipCAHash,
 			options.TLSBootstrapToken,
 			options.TokenStr,
-		)
-	}
-	if name == "all" || name == "download-certs" {
-		flags = append(flags,
 			options.CertificateKey,
-		)
+		}
+	case "download-certs":
+		flags = []string{
+			options.CfgPath,
+			options.ControlPlane,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+			options.CertificateKey,
+		}
+	case "certs":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.CfgPath,
+			options.ControlPlane,
+			options.NodeName,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+		}
+	case "kubeconfig":
+		flags = []string{
+			options.CfgPath,
+			options.ControlPlane,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+			options.CertificateKey,
+		}
+	case "control-plane":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.CfgPath,
+			options.ControlPlane,
+		}
+	default:
+		flags = []string{}
 	}
 	return flags
 }
@@ -106,16 +155,16 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	}
 }
 
-func newControlPlanePrepareManifestsSubphases() workflow.Phase {
+func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "control-plane",
 		Short:        "Generates the manifests for the new control plane components",
-		Run:          runControlPlanePrepareManifestsSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
-		InheritFlags: getControlPlanePreparePhaseFlags("manifests"),
+		Run:          runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
+		InheritFlags: getControlPlanePreparePhaseFlags("control-plane"),
 	}
 }
 
-func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
+func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
