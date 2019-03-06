@@ -206,27 +206,37 @@ kube::golang::setup_platforms() {
     readonly KUBE_CLIENT_PLATFORMS
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
-    KUBE_SERVER_PLATFORMS=(linux/amd64)
-    readonly KUBE_SERVER_PLATFORMS
-    KUBE_NODE_PLATFORMS=(linux/amd64)
-    readonly KUBE_NODE_PLATFORMS
-    if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
+    if [[ "$(kube::util::host_arch)" = "arm64" ]]; then
+      KUBE_SERVER_PLATFORMS=(linux/arm64)
+      KUBE_NODE_PLATFORMS=(linux/arm64)
+      KUBE_TEST_PLATFORMS=(linux/arm64)
+      KUBE_CLIENT_PLATFORMS=(linux/arm64)
+    elif [[ "$(kube::util::host_arch)" = "ppc64le" ]]; then
+      KUBE_SERVER_PLATFORMS=(linux/ppc64le)
+      KUBE_NODE_PLATFORMS=(linux/ppc64le)
+      KUBE_TEST_PLATFORMS=(linux/ppc64le)
+      KUBE_CLIENT_PLATFORMS=(linux/ppc64le)
+    elif [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
+      KUBE_SERVER_PLATFORMS=(linux/amd64)
+      KUBE_NODE_PLATFORMS=(linux/amd64)
       KUBE_TEST_PLATFORMS=(
         darwin/amd64
         linux/amd64
       )
-      readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(
         darwin/amd64
         linux/amd64
       )
-      readonly KUBE_CLIENT_PLATFORMS
     else
+      KUBE_SERVER_PLATFORMS=(linux/amd64)
+      KUBE_NODE_PLATFORMS=(linux/amd64)
       KUBE_TEST_PLATFORMS=(linux/amd64)
-      readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(linux/amd64)
-      readonly KUBE_CLIENT_PLATFORMS
     fi
+    readonly KUBE_SERVER_PLATFORMS
+    readonly KUBE_NODE_PLATFORMS
+    readonly KUBE_TEST_PLATFORMS
+    readonly KUBE_CLIENT_PLATFORMS
   else
     KUBE_SERVER_PLATFORMS=("${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}")
     readonly KUBE_SERVER_PLATFORMS
