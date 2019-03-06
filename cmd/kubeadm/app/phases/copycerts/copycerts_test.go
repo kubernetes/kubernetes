@@ -25,19 +25,18 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
+	certutil "k8s.io/client-go/util/cert"
+	keyutil "k8s.io/client-go/util/keyutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
-func TestUploadCerts(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-
-}
-
-//teste cert name, teste cert can be decrypted
 func TestGetDataFromInitConfig(t *testing.T) {
 	certData := []byte("cert-data")
 	tmpdir := testutil.SetupTempDir(t)
@@ -154,5 +153,128 @@ func TestCertOrKeyNameToSecretName(t *testing.T) {
 		if secretName != tc.expectedSecretName {
 			t.Fatalf("secret name %s didn't match expected name %s", secretName, tc.expectedSecretName)
 		}
+	}
+}
+
+func TestUploadCerts(t *testing.T) {
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	secretKey, err := CreateCertificateKey()
+	if err != nil {
+		t.Fatalf("could not create certificate key: %v", err)
+	}
+
+	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
+
+	if err := certs.CreatePKIAssets(initConfiguration); err != nil {
+		t.Fatalf("error creating PKI assets: %v", err)
+	}
+
+	cs := fakeclient.NewSimpleClientset()
+	if err := UploadCerts(cs, initConfiguration, secretKey); err != nil {
+		t.Fatalf("error uploading certs: %v", err)
+	}
+	rawSecretKey, err := hex.DecodeString(secretKey)
+	if err != nil {
+		t.Fatalf("error decoding key: %v", err)
+	}
+	secretMap, err := cs.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("could not fetch secret: %v", err)
+	}
+	for certName, certPath := range certsToTransfer(initConfiguration) {
+		secretCertData, err := cryptoutil.DecryptBytes(secretMap.Data[certOrKeyNameToSecretName(certName)], rawSecretKey)
+		if err != nil {
+			t.Fatalf("error decrypting secret data: %v", err)
+		}
+		diskCertData, err := ioutil.ReadFile(certPath)
+		if err != nil {
+			t.Fatalf("error reading certificate from disk: %v", err)
+		}
+		// Check that the encrypted contents on the secret match the contents on disk, and that all
+		// the expected certificates are in the secret
+		if string(secretCertData) != string(diskCertData) {
+			t.Fatalf("cert %s does not have the expected contents. contents: %q; expected contents: %q", certName, string(secretCertData), string(diskCertData))
+		}
+	}
+}
+
+func TestDownloadCerts(t *testing.T) {
+	secretKey, err := CreateCertificateKey()
+	if err != nil {
+		t.Fatalf("could not create certificate key: %v", err)
+	}
+
+	// Temporary directory where certificates will be generated
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
+
+	// Temporary directory where certificates will be downloaded to
+	targetTmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(targetTmpdir)
+	initForDownloadConfiguration := testutil.GetDefaultInternalConfig(t)
+	initForDownloadConfiguration.ClusterConfiguration.CertificatesDir = targetTmpdir
+
+	if err := certs.CreatePKIAssets(initConfiguration); err != nil {
+		t.Fatalf("error creating PKI assets: %v", err)
+	}
+
+	kubeadmCertsSecret := createKubeadmCertsSecret(t, initConfiguration, secretKey)
+	cs := fakeclient.NewSimpleClientset(kubeadmCertsSecret)
+	if err := DownloadCerts(cs, initForDownloadConfiguration, secretKey); err != nil {
+		t.Fatalf("error downloading certs: %v", err)
+	}
+
+	const keyFileMode = 0600
+	const certFileMode = 0644
+
+	for certName, certPath := range certsToTransfer(initForDownloadConfiguration) {
+		diskCertData, err := ioutil.ReadFile(certPath)
+		if err != nil {
+			t.Errorf("error reading certificate from disk: %v", err)
+		}
+		// Check that the written files are either certificates or keys, and that they have
+		// the expected permissions
+		if _, err := keyutil.ParsePublicKeysPEM(diskCertData); err == nil {
+			if stat, err := os.Stat(certPath); err == nil {
+				if stat.Mode() != keyFileMode {
+					t.Errorf("key %q should have mode %#o, has %#o", certName, keyFileMode, stat.Mode())
+				}
+			} else {
+				t.Errorf("could not stat key %q: %v", certName, err)
+			}
+		} else if _, err := certutil.ParseCertsPEM(diskCertData); err == nil {
+			if stat, err := os.Stat(certPath); err == nil {
+				if stat.Mode() != certFileMode {
+					t.Errorf("cert %q should have mode %#o, has %#o", certName, certFileMode, stat.Mode())
+				}
+			} else {
+				t.Errorf("could not stat cert %q: %v", certName, err)
+			}
+		} else {
+			t.Errorf("secret %q was not identified as a cert or as a key", certName)
+		}
+	}
+}
+
+func createKubeadmCertsSecret(t *testing.T, cfg *kubeadmapi.InitConfiguration, secretKey string) *v1.Secret {
+	decodedKey, err := hex.DecodeString(secretKey)
+	if err != nil {
+		t.Fatalf("error decoding key: %v", err)
+	}
+	secretData, err := getDataFromDisk(cfg, decodedKey)
+	if err != nil {
+		t.Fatalf("error creating secret data: %v", err)
+	}
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeadmCertsSecret,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: secretData,
 	}
 }
