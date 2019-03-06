@@ -484,6 +484,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
+	WindowsGMSA:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

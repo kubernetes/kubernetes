@@ -33,15 +33,19 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 )
 
-type containerCreationCleanupInfo struct {
+type containerCleanupInfo struct {
 	gMSARegistryValueName string
 }
 
 // applyPlatformSpecificDockerConfig applies platform-specific configurations to a dockertypes.ContainerCreateConfig struct.
-// The containerCreationCleanupInfo struct it returns will be passed as is to performPlatformSpecificContainerCreationCleanup
-// after the container has been created.
-func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.CreateContainerRequest, createConfig *dockertypes.ContainerCreateConfig) (*containerCreationCleanupInfo, error) {
-	cleanupInfo := &containerCreationCleanupInfo{}
+// The containerCleanupInfo struct it returns will be passed as is to performPlatformSpecificContainerCleanup
+// after either:
+//   * the container creation has failed
+//   * the container has been successfully started
+//   * the container has been removed
+// whichever happens first.
+func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.CreateContainerRequest, createConfig *dockertypes.ContainerCreateConfig) (*containerCleanupInfo, error) {
+	cleanupInfo := &containerCleanupInfo{}
 
 	if err := applyGMSAConfig(request.GetConfig(), createConfig, cleanupInfo); err != nil {
 		return nil, err
@@ -58,7 +62,7 @@ func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.C
 // When docker supports passing a credential spec's contents directly, we should switch to using that
 // as it will avoid cluttering the registry - there is a moby PR out for this:
 // https://github.com/moby/moby/pull/38777
-func applyGMSAConfig(config *runtimeapi.ContainerConfig, createConfig *dockertypes.ContainerCreateConfig, cleanupInfo *containerCreationCleanupInfo) error {
+func applyGMSAConfig(config *runtimeapi.ContainerConfig, createConfig *dockertypes.ContainerCreateConfig, cleanupInfo *containerCleanupInfo) error {
 	credSpec := config.Annotations[kuberuntime.GMSASpecContainerAnnotationKey]
 	if credSpec == "" {
 		return nil
@@ -156,10 +160,15 @@ func randomString(length int) (string, error) {
 	return hex.EncodeToString(randBytes), nil
 }
 
-// performPlatformSpecificContainerCreationCleanup is responsible for doing any platform-specific cleanup
-// after a container creation. Any errors it returns are simply logged, but do not fail the container
-// creation.
-func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanupInfo *containerCreationCleanupInfo) (errors []error) {
+// performPlatformSpecificContainerCleanup is responsible for doing any platform-specific cleanup
+// after either:
+//   * the container creation has failed
+//   * the container has been successfully started
+//   * the container has been removed
+// whichever happens first.
+// Any errors it returns are simply logged, but do not prevent the container from being started or
+// removed.
+func (ds *dockerService) performPlatformSpecificContainerCleanup(cleanupInfo *containerCleanupInfo) (errors []error) {
 	if err := removeGMSARegistryValue(cleanupInfo); err != nil {
 		errors = append(errors, err)
 	}
@@ -167,7 +176,7 @@ func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanup
 	return
 }
 
-func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
+func removeGMSARegistryValue(cleanupInfo *containerCleanupInfo) error {
 	if cleanupInfo == nil || cleanupInfo.gMSARegistryValueName == "" {
 		return nil
 	}
@@ -184,11 +193,11 @@ func removeGMSARegistryValue(cleanupInfo *containerCreationCleanupInfo) error {
 	return nil
 }
 
-// platformSpecificContainerCreationInitCleanup is called when dockershim
+// platformSpecificContainerInitCleanup is called when dockershim
 // is starting, and is meant to clean up any cruft left by previous runs
 // creating containers.
 // Errors are simply logged, but don't prevent dockershim from starting.
-func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
+func (ds *dockerService) platformSpecificContainerInitCleanup() (errors []error) {
 	return removeAllGMSARegistryValues()
 }
 

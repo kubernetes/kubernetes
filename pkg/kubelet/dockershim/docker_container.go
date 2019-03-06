@@ -167,11 +167,6 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		for _, err := range ds.performPlatformSpecificContainerCreationCleanup(cleanupInfo) {
-			klog.Warningf("error when cleaning up after container %v's creation: %v", containerName, err)
-		}
-	}()
 
 	createResp, createErr := ds.client.CreateContainer(createConfig)
 	if createErr != nil {
@@ -179,8 +174,21 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	}
 
 	if createResp != nil {
-		return &runtimeapi.CreateContainerResponse{ContainerId: createResp.ID}, nil
+		containerID := createResp.ID
+
+		if cleanupInfo != nil {
+			// we don't perform the clean up just yet at that could destroy information
+			// needed for the container to start (e.g. Windows credentials stored in
+			// registry keys); instead, we'll clean up after the container successfully
+			// starts or gets removed
+			ds.containerCleanupInfos[containerID] = cleanupInfo
+		}
+		return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
 	}
+
+	// the creation failed, let's clean up right away
+	ds.performPlatformSpecificContainerCleanupAndLogErrors(containerName, cleanupInfo)
+
 	return nil, createErr
 }
 
@@ -267,6 +275,8 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
 	}
 
+	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
+
 	return &runtimeapi.StartContainerResponse{}, nil
 }
 
@@ -281,6 +291,8 @@ func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopCont
 
 // RemoveContainer removes the container.
 func (ds *dockerService) RemoveContainer(_ context.Context, r *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
+	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
+
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
 	// we can't prevent that now, so we also clean up the symlink here.
@@ -437,4 +449,21 @@ func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimea
 		return nil, fmt.Errorf("failed to update container %q: %v", r.ContainerId, err)
 	}
 	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
+}
+
+func (ds *dockerService) performPlatformSpecificContainerForContainer(containerID string) {
+	if cleanupInfo, present := ds.containerCleanupInfos[containerID]; present {
+		ds.performPlatformSpecificContainerCleanupAndLogErrors(containerID, cleanupInfo)
+		delete(ds.containerCleanupInfos, containerID)
+	}
+}
+
+func (ds *dockerService) performPlatformSpecificContainerCleanupAndLogErrors(containerNameOrID string, cleanupInfo *containerCleanupInfo) {
+	if cleanupInfo == nil {
+		return
+	}
+
+	for _, err := range ds.performPlatformSpecificContainerCleanup(cleanupInfo) {
+		klog.Warningf("error when cleaning up after container %q: %v", containerNameOrID, err)
+	}
 }

@@ -23,26 +23,35 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-type containerCreationCleanupInfo struct{}
+type containerCleanupInfo struct{}
 
 // applyPlatformSpecificDockerConfig applies platform-specific configurations to a dockertypes.ContainerCreateConfig struct.
-// The containerCreationCleanupInfo struct it returns will be passed as is to performPlatformSpecificContainerCreationCleanup
-// after the container has been created.
-func (ds *dockerService) applyPlatformSpecificDockerConfig(*runtimeapi.CreateContainerRequest, *dockertypes.ContainerCreateConfig) (*containerCreationCleanupInfo, error) {
+// The containerCleanupInfo struct it returns will be passed as is to performPlatformSpecificContainerCleanup
+// after either:
+//   * the container creation has failed
+//   * the container has been successfully started
+//   * the container has been removed
+// whichever happens first.
+func (ds *dockerService) applyPlatformSpecificDockerConfig(*runtimeapi.CreateContainerRequest, *dockertypes.ContainerCreateConfig) (*containerCleanupInfo, error) {
 	return nil, nil
 }
 
-// performPlatformSpecificContainerCreationCleanup is responsible for doing any platform-specific cleanup
-// after a container creation. Any errors it returns are simply logged, but do not fail the container
-// creation.
-func (ds *dockerService) performPlatformSpecificContainerCreationCleanup(cleanupInfo *containerCreationCleanupInfo) (errors []error) {
+// performPlatformSpecificContainerCleanup is responsible for doing any platform-specific cleanup
+// after either:
+//   * the container creation has failed
+//   * the container has been successfully started
+//   * the container has been removed
+// whichever happens first.
+// Any errors it returns are simply logged, but do not prevent the container from being started or
+// removed.
+func (ds *dockerService) performPlatformSpecificContainerCleanup(cleanupInfo *containerCleanupInfo) (errors []error) {
 	return
 }
 
-// platformSpecificContainerCreationInitCleanup is called when dockershim
+// platformSpecificContainerInitCleanup is called when dockershim
 // is starting, and is meant to clean up any cruft left by previous runs
 // creating containers.
 // Errors are simply logged, but don't prevent dockershim from starting.
-func (ds *dockerService) platformSpecificContainerCreationInitCleanup() (errors []error) {
+func (ds *dockerService) platformSpecificContainerInitCleanup() (errors []error) {
 	return
 }
