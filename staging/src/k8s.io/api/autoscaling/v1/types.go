@@ -22,6 +22,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// MetricSpecsAnnotation is the annotation which holds non-CPU-utilization HPA metric
+	// specs when converting the `Metrics` field from autoscaling/v2beta1 or autoscaling/v2beta2
+	MetricSpecsAnnotation = "autoscaling.alpha.kubernetes.io/metrics"
+
+	// MetricStatusesAnnotation is the annotation which holds non-CPU-utilization HPA metric
+	// statuses when converting the `CurrentMetrics` field from autoscaling/v2beta1 or autoscaling/v2beta2
+	MetricStatusesAnnotation = "autoscaling.alpha.kubernetes.io/current-metrics"
+
+	// HorizontalPodAutoscalerConditionsAnnotation is the annotation which holds the conditions
+	// of an HPA when converting the `Conditions` field from autoscaling/v2beta1 or autoscaling/v2beta2
+	HorizontalPodAutoscalerConditionsAnnotation = "autoscaling.alpha.kubernetes.io/conditions"
+
+	// DefaultCPUUtilization is the default value for CPU utilization, provided no other
+	// metrics are present.  This is used by v1 conversion from v2beta1 or v2beta2
+	DefaultCPUUtilization = 80
+)
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"

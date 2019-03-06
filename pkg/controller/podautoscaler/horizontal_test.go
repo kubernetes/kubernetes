@@ -39,7 +39,6 @@ import (
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
@@ -343,7 +342,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			}
 		}
 		var actualConditions []autoscalingv1.HorizontalPodAutoscalerCondition
-		if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
+		if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscalingv1.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
 			return true, nil, err
 		}
 		// TODO: it's ok not to sort these becaues statusOk

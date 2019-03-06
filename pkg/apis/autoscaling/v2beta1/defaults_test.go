@@ -25,7 +25,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -33,7 +32,7 @@ import (
 )
 
 func TestSetDefaultHPA(t *testing.T) {
-	utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
+	utilizationDefaultVal := int32(autoscalingv2beta1.DefaultCPUUtilization)
 	defaultReplicas := utilpointer.Int32Ptr(1)
 	defaultTemplate := []autoscalingv2beta1.MetricSpec{
 		{

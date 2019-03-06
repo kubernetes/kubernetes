@@ -20,7 +20,6 @@ import (
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -34,7 +33,7 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta1.HorizontalPodAu
 	}
 
 	if len(obj.Spec.Metrics) == 0 {
-		utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
+		utilizationDefaultVal := int32(autoscalingv2beta1.DefaultCPUUtilization)
 		obj.Spec.Metrics = []autoscalingv2beta1.MetricSpec{
 			{
 				Type: autoscalingv2beta1.ResourceMetricSourceType,

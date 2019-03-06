@@ -340,7 +340,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		if err != nil {
 			return err
 		}
-		out.Annotations[autoscaling.MetricSpecsAnnotation] = string(otherMetricsEnc)
+		out.Annotations[autoscalingv1.MetricSpecsAnnotation] = string(otherMetricsEnc)
 	}
 
 	if len(in.Status.CurrentMetrics) > 0 {
@@ -348,7 +348,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		if err != nil {
 			return err
 		}
-		out.Annotations[autoscaling.MetricStatusesAnnotation] = string(currentMetricsEnc)
+		out.Annotations[autoscalingv1.MetricStatusesAnnotation] = string(currentMetricsEnc)
 	}
 
 	if len(in.Status.Conditions) > 0 {
@@ -356,7 +356,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		if err != nil {
 			return err
 		}
-		out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation] = string(currentConditionsEnc)
+		out.Annotations[autoscalingv1.HorizontalPodAutoscalerConditionsAnnotation] = string(currentConditionsEnc)
 	}
 
 	return nil
@@ -367,7 +367,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		return err
 	}
 
-	if otherMetricsEnc, hasOtherMetrics := out.Annotations[autoscaling.MetricSpecsAnnotation]; hasOtherMetrics {
+	if otherMetricsEnc, hasOtherMetrics := out.Annotations[autoscalingv1.MetricSpecsAnnotation]; hasOtherMetrics {
 		var otherMetrics []autoscalingv1.MetricSpec
 		if err := json.Unmarshal([]byte(otherMetricsEnc), &otherMetrics); err != nil {
 			return err
@@ -384,10 +384,10 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 			outMetrics[len(otherMetrics)] = out.Spec.Metrics[0]
 		}
 		out.Spec.Metrics = outMetrics
-		delete(out.Annotations, autoscaling.MetricSpecsAnnotation)
+		delete(out.Annotations, autoscalingv1.MetricSpecsAnnotation)
 	}
 
-	if currentMetricsEnc, hasCurrentMetrics := out.Annotations[autoscaling.MetricStatusesAnnotation]; hasCurrentMetrics {
+	if currentMetricsEnc, hasCurrentMetrics := out.Annotations[autoscalingv1.MetricStatusesAnnotation]; hasCurrentMetrics {
 		// ignore any existing status values -- the ones here have more information
 		var currentMetrics []autoscalingv1.MetricStatus
 		if err := json.Unmarshal([]byte(currentMetricsEnc), &currentMetrics); err != nil {
@@ -400,7 +400,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 				return err
 			}
 		}
-		delete(out.Annotations, autoscaling.MetricStatusesAnnotation)
+		delete(out.Annotations, autoscalingv1.MetricStatusesAnnotation)
 	}
 
 	// autoscaling/v1 formerly had an implicit default applied in the controller.  In v2beta1, we apply it explicitly.
@@ -419,10 +419,10 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 			},
 		}
 		out.Spec.Metrics[0].Resource.Target.AverageUtilization = new(int32)
-		*out.Spec.Metrics[0].Resource.Target.AverageUtilization = autoscaling.DefaultCPUUtilization
+		*out.Spec.Metrics[0].Resource.Target.AverageUtilization = autoscalingv1.DefaultCPUUtilization
 	}
 
-	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
+	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscalingv1.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
 		var currentConditions []autoscalingv1.HorizontalPodAutoscalerCondition
 		if err := json.Unmarshal([]byte(currentConditionsEnc), &currentConditions); err != nil {
 			return err
@@ -434,7 +434,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 				return err
 			}
 		}
-		delete(out.Annotations, autoscaling.HorizontalPodAutoscalerConditionsAnnotation)
+		delete(out.Annotations, autoscalingv1.HorizontalPodAutoscalerConditionsAnnotation)
 	}
 
 	return nil

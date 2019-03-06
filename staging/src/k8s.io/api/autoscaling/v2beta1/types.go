@@ -22,6 +22,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// DefaultCPUUtilization is the default value for CPU utilization, provided no other
+	// metrics are present.  This is used by v2beta1 defaulting logic.
+	DefaultCPUUtilization = 80
+)
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
