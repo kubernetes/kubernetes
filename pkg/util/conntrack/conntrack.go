@@ -30,6 +30,7 @@ import (
 
 // NoConnectionToDelete is the error string returned by conntrack when no matching connections are found
 const NoConnectionToDelete = "0 flow entries have been deleted"
+const numRetries = 5
 
 func protoStr(proto v1.Protocol) string {
 	return strings.ToLower(string(proto))
@@ -62,11 +63,20 @@ func Exec(execer exec.Interface, parameters ...string) error {
 	if err != nil {
 		return fmt.Errorf("error looking for path of conntrack: %v", err)
 	}
-	output, err := execer.Command(conntrackPath, parameters...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
+
+	output := []byte("")
+	// Retry a few times because the conntrack command seems to fail at random.
+	for retry := 0; retry < numRetries; retry++ {
+		output, err = execer.Command(conntrackPath, parameters...).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		if strings.Contains(string(output), "0 flow entries") {
+			// Success, there were no flows.
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
 }
 
 // Exists returns true if conntrack binary is installed.
