@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/third_party/forked/golang/template"
 )
 
@@ -522,4 +524,12 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	fmt.Fprint(&buffer, iface)
 	return buffer.Bytes(), nil
+}
+
+// findJsonPath extracts a set of values from a runtime object using a parser
+func FindJSONPathResults(parser *JSONPath, from runtime.Object) ([][]reflect.Value, error) {
+	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
+		return parser.FindResults(unstructuredObj.Object)
+	}
+	return parser.FindResults(reflect.ValueOf(from).Elem().Interface())
 }
