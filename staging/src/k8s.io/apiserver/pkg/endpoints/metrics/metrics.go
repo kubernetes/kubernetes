@@ -330,7 +330,7 @@ func cleanVerb(verb string, request *http.Request) string {
 }
 
 func cleanDryRun(dryRun []string) string {
-	if err := validation.ValidateDryRun(nil, dryRun); err != nil {
+	if errs := validation.ValidateDryRun(nil, dryRun); len(errs) > 0 {
 		return "invalid"
 	}
 
