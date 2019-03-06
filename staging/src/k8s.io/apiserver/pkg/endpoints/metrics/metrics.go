@@ -21,11 +21,13 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/request"
 
@@ -48,7 +50,7 @@ var (
 			Name: "apiserver_request_count",
 			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"},
+		[]string{"verb", "dry_run", "resource", "subresource", "scope", "client", "contentType", "code"},
 	)
 	longRunningRequestGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -64,7 +66,7 @@ var (
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		[]string{"verb", "dry_run", "resource", "subresource", "scope"},
 	)
 	requestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -192,10 +194,11 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, fn f
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
+	dryRun := cleanDryRun(req.URL.Query()["dryRun"])
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
-	requestCounter.WithLabelValues(reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
+	requestCounter.WithLabelValues(reportedVerb, dryRun, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(reportedVerb, dryRun, resource, subresource, scope).Observe(elapsedMicroseconds)
 	requestLatenciesSummary.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
@@ -280,6 +283,26 @@ func cleanVerb(verb string, request *http.Request) string {
 		reportedVerb = "WATCH"
 	}
 	return reportedVerb
+}
+
+func cleanDryRun(dryRun []string) string {
+	if err := validation.ValidateDryRun(nil, dryRun); err != nil {
+		return "invalid"
+	}
+
+	// Since dryRun could be valid with any arbitrarily long length
+	// we have to dedup and sort the elements before joining them together
+	dryRunSet := map[string]bool{}
+	for _, element := range dryRun {
+		dryRunSet[element] = true
+	}
+	dryRunUnique := []string{}
+	for element := range dryRunSet {
+		dryRunUnique = append(dryRunUnique, element)
+	}
+	sort.Strings(dryRunUnique)
+
+	return strings.Join(dryRunUnique, ",")
 }
 
 func cleanUserAgent(ua string) string {
