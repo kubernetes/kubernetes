@@ -127,6 +127,8 @@ pkg/kubectl/apps
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apply
 pkg/kubectl/cmd/attach
+pkg/kubectl/cmd/auth/reconciliation
+pkg/kubectl/cmd/auth/validation
 pkg/kubectl/cmd/autoscale
 pkg/kubectl/cmd/certificates
 pkg/kubectl/cmd/clusterinfo
