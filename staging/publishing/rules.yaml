@@ -1085,6 +1085,8 @@ rules:
         branch: release-1.14
       - repository: apimachinery
         branch: release-1.14
+      - repository: apiserver
+        branch: release-1.14
       - repository: client-go
         branch: release-11.0
 - destination: node-api
