@@ -26,9 +26,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/jsonpath",
     importpath = "k8s.io/client-go/util/jsonpath",
     deps = [
-        "//staging/src/k8s.io/client-go/third_party/forked/golang/template:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/client-go/third_party/forked/golang/template:go_default_library",
     ],
 )
 
