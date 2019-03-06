@@ -16,13 +16,13 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_auth_CONSUMERS",
     ],
     deps = [
+        "//pkg/kubectl/cmd/auth/reconciliation:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/describe/versioned:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/printers:go_default_library",
         "//pkg/kubectl/util/rbac:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
-        "//pkg/registry/rbac/reconciliation:go_default_library",
         "//staging/src/k8s.io/api/authorization/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
@@ -50,7 +50,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/auth/reconciliation:all-srcs",
+        "//pkg/kubectl/cmd/auth/validation:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_auth_CONSUMERS",
