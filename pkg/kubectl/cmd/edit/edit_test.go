@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"

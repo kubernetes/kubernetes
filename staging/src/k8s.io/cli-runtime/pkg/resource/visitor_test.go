@@ -167,7 +167,7 @@ func TestVisitorHttpGet(t *testing.T) {
 
 func TestFlattenListVisitor(t *testing.T) {
 	b := newDefaultBuilder().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../artifacts/deeply-nested.yaml"}}).
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/deeply-nested.yaml"}}).
 		Flatten()
 
 	test := &testVisitor{}

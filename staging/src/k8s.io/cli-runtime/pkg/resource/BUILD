@@ -15,8 +15,8 @@ go_library(
         "selector.go",
         "visitor.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/genericclioptions/resource",
-    importpath = "k8s.io/cli-runtime/pkg/genericclioptions/resource",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/resource",
+    importpath = "k8s.io/cli-runtime/pkg/resource",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
