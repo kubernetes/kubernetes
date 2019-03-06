@@ -136,6 +136,7 @@ filegroup(
         "//pkg/controller/volume/events:all-srcs",
         "//pkg/controller/volume/expand:all-srcs",
         "//pkg/controller/volume/persistentvolume:all-srcs",
+        "//pkg/controller/volume/protectionutil:all-srcs",
         "//pkg/controller/volume/pvcprotection:all-srcs",
         "//pkg/controller/volume/pvprotection:all-srcs",
     ],
