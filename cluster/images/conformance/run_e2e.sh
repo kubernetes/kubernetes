@@ -25,7 +25,7 @@ shutdown () {
 
     # Kind of a hack to wait for this pid to finish.
     # Since it's not a child of this shell we cannot use wait.
-    tail --pid ${E2E_SUITE_PID} -f /dev/null
+    tail --pid "${E2E_SUITE_PID}" -f /dev/null
     saveResults
 }
 
@@ -39,23 +39,28 @@ saveResults() {
 # We get the TERM from kubernetes and handle it gracefully
 trap shutdown TERM
 
-ginkgo_args=(
-    "--focus=${E2E_FOCUS}"
-    "--skip=${E2E_SKIP}"
-    "--noColor=true"
-)
-
+ginkgo_args=()
 if [[ -n ${E2E_DRYRUN:-} ]]; then
     ginkgo_args+=("--dryRun=true")
 fi
 
 case ${E2E_PARALLEL} in
-    'y'|'Y')           ginkgo_args+=("--nodes=25") ;;
-    [1-9]|[1-9][0-9]*) ginkgo_args+=("--nodes=${E2E_PARALLEL}") ;;
+    'y'|'Y'|'true')
+        # The flag '--p' will automatically detect the optimal number of ginkgo nodes.
+        ginkgo_args+=("--p")
+        # Skip serial tests if parallel mode is enabled.
+        E2E_SKIP="\\[Serial\\]|${E2E_SKIP}" ;;
 esac
 
-echo "/usr/local/bin/ginkgo ${ginkgo_args[@]} /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider=\"${E2E_PROVIDER}\" --report-dir=\"${RESULTS_DIR}\" --kubeconfig=\"${KUBECONFIG}\""
-/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" | tee ${RESULTS_DIR}/e2e.log &
+ginkgo_args+=(
+    "--focus=${E2E_FOCUS}"
+    "--skip=${E2E_SKIP}"
+    "--noColor=true"
+)
+
+set -x
+/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" | tee "${RESULTS_DIR}"/e2e.log &
+set +x
 # $! is the pid of tee, not ginkgo
-wait $(pgrep ginkgo)
+wait "$(pgrep ginkgo)"
 saveResults

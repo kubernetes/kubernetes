@@ -17,7 +17,6 @@ limitations under the License.
 package file
 
 import (
-	"fmt"
 	"io/ioutil"
 
 	"github.com/pkg/errors"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -104,7 +104,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	fmt.Printf("[discovery] Created cluster-info discovery client, requesting info from %q\n", defaultCluster.Server)
+	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", defaultCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
 	wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
@@ -114,10 +114,10 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
 				// In that case, trust the cluster admin and do not refresh the cluster-info credentials
-				fmt.Printf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
+				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
 			}
-			fmt.Printf("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
+			klog.V(1).Infof("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
 			return false, nil
 		}
 		return true, nil
@@ -131,11 +131,11 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 	// We somehow got hold of the ConfigMap, try to read some data from it. If we can't, fallback on the user-provided file
 	refreshedBaseKubeConfig, err := tryParseClusterInfoFromConfigMap(clusterinfoCM)
 	if err != nil {
-		fmt.Printf("[discovery] The %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
+		klog.V(1).Infof("[discovery] The %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
 		return kubeconfig, nil
 	}
 
-	fmt.Println("[discovery] Synced cluster-info information from the API Server so we have got the latest information")
+	klog.V(1).Infoln("[discovery] Synced cluster-info information from the API Server so we have got the latest information")
 	// In an HA world in the future, this will make more sense, because now we've got new information, possibly about new API Servers to talk to
 	return refreshedBaseKubeConfig, nil
 }

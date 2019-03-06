@@ -230,13 +230,18 @@ while true; do sleep 1; done
 			// Images used for ConformanceContainer are not added into NodeImageWhiteList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image white list check.
-			imagePullTest := func(image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool) {
+			imagePullTest := func(image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
+				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
+				if windowsImage {
+					// -t: Ping the specified host until stopped.
+					command = []string{"ping", "-t", "localhost"}
+				}
 				container := ConformanceContainer{
 					PodClient: f.PodClient(),
 					Container: v1.Container{
 						Name:            "image-pull-test",
 						Image:           image,
-						Command:         []string{"/bin/sh", "-c", "while true; do sleep 1; done"},
+						Command:         command,
 						ImagePullPolicy: v1.PullAlways,
 					},
 					RestartPolicy: v1.RestartPolicyNever,
@@ -328,39 +333,51 @@ while true; do sleep 1; done
 
 			It("should not be able to pull image from invalid registry [NodeConformance]", func() {
 				image := "invalid.com/invalid/alpine:3.1"
-				imagePullTest(image, false, v1.PodPending, true)
+				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
 			It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
 				image := "k8s.gcr.io/invalid-image:invalid-tag"
-				imagePullTest(image, false, v1.PodPending, true)
+				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			// TODO(claudiub): Add a Windows equivalent test.
 			It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
 				image := "gcr.io/google-containers/debian-base:0.4.1"
-				imagePullTest(image, false, v1.PodRunning, false)
+				imagePullTest(image, false, v1.PodRunning, false, false)
+			})
+
+			It("should be able to pull image from gcr.io [NodeConformance]", func() {
+				framework.SkipUnlessNodeOSDistroIs("windows")
+				image := "gcr.io/kubernetes-e2e-test-images/windows-nanoserver:v1"
+				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
 
 			It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
 				image := "alpine:3.7"
-				imagePullTest(image, false, v1.PodRunning, false)
+				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
-			It("should be able to pull image from docker hub [WindowsOnly] [NodeConformance]", func() {
+			It("should be able to pull image from docker hub [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
+				// TODO(claudiub): Switch to nanoserver image manifest list.
 				image := "e2eteam/busybox:1.29"
-				imagePullTest(image, false, v1.PodRunning, false)
+				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
 
 			It("should not be able to pull from private registry without secret [NodeConformance]", func() {
 				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
-				imagePullTest(image, false, v1.PodPending, true)
+				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
 			It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
 				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
-				imagePullTest(image, true, v1.PodRunning, false)
+				imagePullTest(image, true, v1.PodRunning, false, false)
+			})
+
+			It("should be able to pull from private registry with secret [NodeConformance]", func() {
+				framework.SkipUnlessNodeOSDistroIs("windows")
+				image := "gcr.io/authenticated-image-pulling/windows-nanoserver:v1"
+				imagePullTest(image, true, v1.PodRunning, false, true)
 			})
 		})
 	})

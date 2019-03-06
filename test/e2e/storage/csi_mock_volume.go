@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -54,7 +53,7 @@ const (
 
 var _ = utils.SIGDescribe("CSI mock volume", func() {
 	type testParameters struct {
-		attachable      bool
+		disableAttach   bool
 		attachLimit     int
 		registerDriver  bool
 		podInfoVersion  *string
@@ -85,10 +84,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			sc: make(map[string]*storage.StorageClass),
 			tp: tp,
 		}
-		csics := f.CSIClientSet
+		cs := f.ClientSet
 		var err error
 
-		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, tp.attachable, tp.podInfoVersion, tp.attachLimit)
+		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, !tp.disableAttach, tp.podInfoVersion, tp.attachLimit)
 		config, testCleanup := m.driver.PrepareTest(f)
 		m.testCleanups = append(m.testCleanups, testCleanup)
 		m.config = config
@@ -102,10 +101,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		if tp.registerDriver {
-			err = waitForCSIDriver(csics, m.config.GetUniqueDriverName())
+			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
 			framework.ExpectNoError(err, "Failed to get CSIDriver : %v", err)
 			m.testCleanups = append(m.testCleanups, func() {
-				destroyCSIDriver(csics, m.config.GetUniqueDriverName())
+				destroyCSIDriver(cs, m.config.GetUniqueDriverName())
 			})
 		}
 	}
@@ -189,31 +188,29 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
 		tests := []struct {
-			name             string
-			driverAttachable bool
-			deployDriverCRD  bool
+			name            string
+			disableAttach   bool
+			deployDriverCRD bool
 		}{
 			{
-				name:             "should not require VolumeAttach for drivers without attachment",
-				driverAttachable: false,
-				deployDriverCRD:  true,
+				name:            "should not require VolumeAttach for drivers without attachment",
+				disableAttach:   true,
+				deployDriverCRD: true,
 			},
 			{
-				name:             "should require VolumeAttach for drivers with attachment",
-				driverAttachable: true,
-				deployDriverCRD:  true,
+				name:            "should require VolumeAttach for drivers with attachment",
+				deployDriverCRD: true,
 			},
 			{
-				name:             "should preserve attachment policy when no CSIDriver present",
-				driverAttachable: true,
-				deployDriverCRD:  false,
+				name:            "should preserve attachment policy when no CSIDriver present",
+				deployDriverCRD: false,
 			},
 		}
 		for _, t := range tests {
 			test := t
 			It(t.name, func() {
 				var err error
-				init(testParameters{registerDriver: test.deployDriverCRD, attachable: test.driverAttachable})
+				init(testParameters{registerDriver: test.deployDriverCRD, disableAttach: test.disableAttach})
 				defer cleanup()
 
 				_, claim, pod := createPod()
@@ -230,14 +227,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				_, err = m.cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
-						if test.driverAttachable {
+						if !test.disableAttach {
 							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 						}
 					} else {
 						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
 					}
 				}
-				if !test.driverAttachable {
+				if test.disableAttach {
 					Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
 				}
 			})
@@ -319,7 +316,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 
 			var err error
-			init(testParameters{attachable: true, nodeSelectorKey: "node-attach-limit-csi", attachLimit: 2})
+			init(testParameters{nodeSelectorKey: "node-attach-limit-csi", attachLimit: 2})
 			defer cleanup()
 			nodeName := m.config.ClientNodeName
 			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))
@@ -515,12 +512,12 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 	}
 }
 
-func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
+func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	timeout := 2 * time.Minute
 
 	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
-		_, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+		_, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
 			return err
 		}
@@ -528,13 +525,13 @@ func waitForCSIDriver(csics csiclient.Interface, driverName string) error {
 	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
 }
 
-func destroyCSIDriver(csics csiclient.Interface, driverName string) {
-	driverGet, err := csics.CsiV1alpha1().CSIDrivers().Get(driverName, metav1.GetOptions{})
+func destroyCSIDriver(cs clientset.Interface, driverName string) {
+	driverGet, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 	if err == nil {
 		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
 		// framework.Logf("%s", framework.PrettyPrint(driverGet))
-		csics.CsiV1alpha1().CSIDrivers().Delete(driverName, nil)
+		cs.StorageV1beta1().CSIDrivers().Delete(driverName, nil)
 	}
 }
 

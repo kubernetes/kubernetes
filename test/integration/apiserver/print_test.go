@@ -133,6 +133,8 @@ var missingHanlders = sets.NewString(
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
+	"CSINode",
+	"CSIDriver",
 )
 
 func TestServerSidePrint(t *testing.T) {

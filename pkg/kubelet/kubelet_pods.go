@@ -89,7 +89,19 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // GetActivePods returns non-terminal pods
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
-	allPods := kl.podManager.GetPods()
+	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
+	mirrorPodSet := make(map[string]*v1.Pod)
+	for _, p := range mirrorPods {
+		mirrorPodSet[kubecontainer.GetPodFullName(p)] = p
+	}
+	for i := range allPods {
+		podFullName := kubecontainer.GetPodFullName(allPods[i])
+		// replace static pod with mirror pod as some info (e.g. spec.Priority)
+		// is needed to make further decisions (e.g. eviction)
+		if mirrorPod, ok := mirrorPodSet[podFullName]; ok {
+			allPods[i] = mirrorPod
+		}
+	}
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
 }
@@ -546,11 +558,11 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 
 // Make the environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
-	var result []kubecontainer.EnvVar
-	enableServiceLinks := v1.DefaultEnableServiceLinks
-	if pod.Spec.EnableServiceLinks != nil {
-		enableServiceLinks = *pod.Spec.EnableServiceLinks
+	if pod.Spec.EnableServiceLinks == nil {
+		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
 	}
+
+	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
 	// v1.Container is already running by its hash. (We don't want to restart a container just
@@ -560,7 +572,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, enableServiceLinks)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
 	if err != nil {
 		return result, err
 	}

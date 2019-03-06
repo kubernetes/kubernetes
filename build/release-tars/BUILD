@@ -11,6 +11,7 @@ load(
 )
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
+load("//staging:repos_generated.bzl", "staging_repos")
 
 # Bazel doesn't make the output filename
 # (such as kubernetes-server-{OS}-{ARCH}.tar.gz) configurable, so we instead
@@ -55,38 +56,16 @@ filegroup(
     tags = ["automanaged"],
 )
 
-config_setting(
-    name = "package_src",
-    values = {
-        "define": "PACKAGE_SRC=true",
-    },
-    visibility = ["//visibility:private"],
-)
-
-genrule(
-    name = "kubernetes-src-readme",
-    outs = ["README-src.txt"],
-    cmd = """
-echo For build efficiency, the src was not included in this release.>$@
-echo The full source code can be viewed at >>$@
-echo -n https://github.com/kubernetes/kubernetes/tree/ >>$@
-grep ^STABLE_BUILD_GIT_COMMIT bazel-out/stable-status.txt | cut -d' ' -f2 >>$@
-""",
-    stamp = 1,
-)
-
 pkg_tar(
     name = "kubernetes-src",
-    srcs = select({
-        ":package_src": ["//:all-srcs"],
-        "//conditions:default": ["README-src.txt"],
-    }),
+    srcs = ["//:all-srcs"],
     extension = "tar.gz",
     package_dir = "kubernetes",
-    strip_prefix = select({
-        ":package_src": "//",
-        "//conditions:default": ".",
-    }),
+    strip_prefix = "//",
+    symlinks = {
+        "kubernetes/vendor/%s" % repo: "../../staging/src/%s" % repo
+        for repo in staging_repos
+    },
     tags = [
         "manual",
         "no-cache",

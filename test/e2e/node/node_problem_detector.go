@@ -70,11 +70,14 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			workingSetStats[host] = []float64{}
 
 			By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
-			psCmd := "ps aux | grep node-problem-detector"
+			// Using brackets "[n]" is a trick to prevent grep command itself from
+			// showing up, because string text "[n]ode-problem-detector" does not
+			// match regular expression "[n]ode-problem-detector".
+			psCmd := "ps aux | grep [n]ode-problem-detector"
 			result, err := framework.SSH(psCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			Expect(result.Code).To(BeZero())
-			Expect(result.Stdout).To(ContainSubstring("/home/kubernetes/bin/node-problem-detector"))
+			Expect(result.Stdout).To(ContainSubstring("node-problem-detector"))
 
 			By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 			journalctlCmd := "sudo journalctl -u node-problem-detector"

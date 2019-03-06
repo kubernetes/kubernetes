@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,9 +68,7 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
 			ginkgo.It(desc, func() {
 				itArg.createMethod = "batch"
-
 				runDensityBatchTest(f, itArg)
-
 			})
 		}
 	})
@@ -107,7 +105,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	)
 
 	// create test pod data structure
-	pods := newTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType)
+	pods := newDensityTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
@@ -221,64 +219,47 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	return controller
 }
 
-// newTestPods creates a list of pods (specification) for test.
-func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
+// newDensityTestPods creates a list of pods (specification) for test.
+func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
+
 	for i := 0; i < numPods; i++ {
+
 		podName := "test-" + string(uuid.NewUUID())
-		labels := map[string]string{
-			"type": podType,
-			"name": podName,
-		}
-		if volume {
-			pods = append(pods,
-				&v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   podName,
-						Labels: labels,
+		pod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+				Labels: map[string]string{
+					"type": podType,
+					"name": podName,
+				},
+			},
+			Spec: v1.PodSpec{
+				// Restart policy is always (default).
+				Containers: []v1.Container{
+					{
+						Image: imageName,
+						Name:  podName,
 					},
-					Spec: v1.PodSpec{
-						// Restart policy is always (default).
-						Containers: []v1.Container{
-							{
-								Image: imageName,
-								Name:  podName,
-								VolumeMounts: []v1.VolumeMount{
-									{MountPath: "/test-volume-mnt", Name: podName + "-volume"},
-								},
-							},
-						},
-						NodeSelector: map[string]string{
-							"beta.kubernetes.io/os": "windows",
-						},
-						Volumes: []v1.Volume{
-							{Name: podName + "-volume", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
-						},
-					},
-				})
-		} else {
-			pods = append(pods,
-				&v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   podName,
-						Labels: labels,
-					},
-					Spec: v1.PodSpec{
-						// Restart policy is always (default).
-						Containers: []v1.Container{
-							{
-								Image: imageName,
-								Name:  podName,
-							},
-						},
-						NodeSelector: map[string]string{
-							"beta.kubernetes.io/os": "windows",
-						},
-					},
-				})
+				},
+				NodeSelector: map[string]string{
+					"beta.kubernetes.io/os": "windows",
+				},
+			},
 		}
 
+		if volume {
+			pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{MountPath: "/test-volume-mnt", Name: podName + "-volume"},
+			}
+			pod.Spec.Volumes = []v1.Volume{
+				{Name: podName + "-volume", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+			}
+		}
+
+		pods = append(pods, &pod)
 	}
+
 	return pods
 }
 

@@ -231,7 +231,8 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 		key := ""
 		skipTokenPrint := false
 		uploadCerts := false
-		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), key, skipTokenPrint, uploadCerts)
+		skipCertificateKeyPrint := false
+		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), key, skipTokenPrint, uploadCerts, skipCertificateKeyPrint)
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}

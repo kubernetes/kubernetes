@@ -440,7 +440,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
 		// if it was PV it may have been migrated, but the same plugin with in-line may not have been.
 		// Suggestions welcome...
-		if csilib.IsMigratableByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if csilib.IsMigratableIntreePluginByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {

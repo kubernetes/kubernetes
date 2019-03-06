@@ -39,6 +39,7 @@ func NewUploadCertsPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.CfgPath,
 			options.UploadCerts,
+			options.CertificateKey,
 		},
 	}
 }

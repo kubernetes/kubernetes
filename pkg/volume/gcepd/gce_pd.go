@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -381,9 +382,12 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// in windows, we will use mklink to mount, will MkdirAll in Mount func
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			return err
+		}
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.

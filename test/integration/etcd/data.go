@@ -20,13 +20,15 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetEtcdStorageData returns etcd data for all persisted objects.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
 func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
-	return map[schema.GroupVersionResource]StorageData{
+	etcdStorageData := map[schema.GroupVersionResource]StorageData{
 		// k8s.io/kubernetes/pkg/api/v1
 		gvr("", "v1", "configmaps"): {
 			Stub:             `{"data": {"foo": "bar"}, "metadata": {"name": "cm1"}}`,
@@ -484,6 +486,26 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 	}
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	// add csinodes if CSINodeInfo feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
+			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+			ExpectedEtcdPath: "/registry/csinodes/csini1",
+		}
+	}
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	// add csidrivers if CSIDriverRegistry feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
+			Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
+			ExpectedEtcdPath: "/registry/csidrivers/csid1",
+		}
+	}
+
+	return etcdStorageData
 }
 
 // StorageData contains information required to create an object and verify its storage in etcd

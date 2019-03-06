@@ -113,6 +113,12 @@ func validateResourcesNoSubResources(resources []string, fldPath *field.Path) fi
 	return allErrors
 }
 
+var validScopes = sets.NewString(
+	string(admissionregistration.ClusterScope),
+	string(admissionregistration.NamespacedScope),
+	string(admissionregistration.AllScopes),
+)
+
 func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSubResource bool) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(rule.APIGroups) == 0 {
@@ -137,6 +143,9 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 		allErrors = append(allErrors, validateResources(rule.Resources, fldPath.Child("resources"))...)
 	} else {
 		allErrors = append(allErrors, validateResourcesNoSubResources(rule.Resources, fldPath.Child("resources"))...)
+	}
+	if rule.Scope != nil && !validScopes.Has(string(*rule.Scope)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scope"), *rule.Scope, validScopes.List()))
 	}
 	return allErrors
 }
