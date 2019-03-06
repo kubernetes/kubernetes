@@ -97,7 +97,6 @@ type kubeletVolumeHost struct {
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
 	kvh.kubelet.runtimeState.setStorageState(err)
-	return
 }
 
 func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {

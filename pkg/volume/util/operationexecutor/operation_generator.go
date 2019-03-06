@@ -17,13 +17,13 @@ limitations under the License.
 package operationexecutor
 
 import (
+	goerrors "errors"
 	"fmt"
 	"path"
 	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,7 +86,6 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
 		blkUtil:                          blkUtil,
 	}
-			// TODO(dyzz) look at default resync time
 }
 
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
@@ -875,7 +874,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		if deviceOpened {
 			return deviceToDetach.GenerateError(
 				"UnmountDevice failed",
-				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
+				goerrors.New("the device is in use when it was no longer expected to be in use"))
 		}
 
 		klog.Infof(deviceToDetach.GenerateMsg("UnmountDevice succeeded", ""))
@@ -982,7 +981,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			devicePath = pluginDevicePath
 		}
 		if len(devicePath) == 0 {
-			return volumeToMount.GenerateError("MapVolume failed", fmt.Errorf("Device path of the volume is empty"))
+			return volumeToMount.GenerateError("MapVolume failed", goerrors.New("Device path of the volume is empty"))
 		}
 
 		// When kubelet is containerized, devicePath may be a symlink at a place unavailable to
@@ -1547,8 +1546,11 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 	return deviceOpened, nil
 }
 
-// TODO(dyzz): need to also add logic to check CSINodeInfo for Kubelet migration status
 func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+	// TODO(#75146) Check whether the driver is installed as well so that
+	// we can throw a better error when the driver is not installed.
+	// The error should be of the approximate form:
+	// fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return false
 	}
@@ -1562,8 +1564,6 @@ func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 }
 
 func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
-	var err error
-
 	migratable, err := og.volumePluginMgr.IsPluginMigratableBySpec(spec)
 	if err != nil {
 		return false, err
@@ -1575,37 +1575,32 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 	}
 
 	if len(nodeName) == 0 {
-		return false, fmt.Errorf("nodeName is empty")
+		return false, goerrors.New("nodeName is empty")
 	}
 
-	vpm := og.volumePluginMgr
-
-	kubeClient := vpm.Host.GetKubeClient()
+	kubeClient := og.volumePluginMgr.Host.GetKubeClient()
 	if kubeClient == nil {
-		// TODO(dyzz) check this error case, what should we do in standalone kubelet mode?
-		return false, fmt.Errorf("failed to get kube client from volume host")
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// we are in a standalone (headless) Kubelet
+		return true, nil
 	}
 
 	adcHost, ok := og.volumePluginMgr.Host.(volume.AttachDetachVolumeHost)
 	if !ok {
-		// This function is running not on the AttachDetachController
-		// We assume that Kubelet is servicing this function and therefore is
-		// trivially "using CSI Plugin"
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// "enableControllerAttachDetach" is set to true on kubelet
 		return true, nil
 	}
-	var csiNode *storagev1beta1.CSINode
-	if adcHost.CSINodeSynced() {
-		csiNode, err = adcHost.CSINodeLister().Get(string(nodeName))
-		if err != nil {
-			return false, err
-		}
-	} else {
-		// Fallback to GET
-		klog.Warningf("CSINode informer not synced, falling back to GET directly from API Server")
-		csiNode, err = kubeClient.StorageV1beta1().CSINodes().Get(string(nodeName), metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
+
+	if adcHost.CSINodeLister() == nil {
+		return false, goerrors.New("could not find CSINodeLister in attachDetachController")
+	}
+
+	csiNode, err := adcHost.CSINodeLister().Get(string(nodeName))
+	if err != nil {
+		return false, err
 	}
 
 	ann := csiNode.GetAnnotations()
@@ -1613,7 +1608,14 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 		return false, nil
 	}
 
-	mpaSet := sets.NewString(strings.Split(ann[v1.MigratedPluginsAnnotationKey], ",")...)
+	var mpaSet sets.String
+	mpa := ann[v1.MigratedPluginsAnnotationKey]
+	tok := strings.Split(mpa, ",")
+	if len(mpa) == 0 {
+		mpaSet = sets.NewString()
+	} else {
+		mpaSet = sets.NewString(tok...)
+	}
 
 	pluginName, err := csilib.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
 	if err != nil {
@@ -1621,7 +1623,7 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 	}
 
 	if len(pluginName) == 0 {
-		// Could not find a plugin name from translation directory
+		// Could not find a plugin name from translation directory, assume not translated
 		return false, nil
 	}
 
@@ -1629,7 +1631,7 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 
 	if isMigratedOnNode {
 		installed := false
-		driverName, err := csilib.GetCSINameFromIntreeName(pluginName)
+		driverName, err := csilib.GetCSINameFromInTreeName(pluginName)
 		if err != nil {
 			return isMigratedOnNode, err
 		}
@@ -1640,7 +1642,7 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 			}
 		}
 		if !installed {
-			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed.", pluginName, string(nodeName), driverName)
+			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
 		}
 	}
 
@@ -1660,8 +1662,8 @@ func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
 			ReadOnly:         spec.ReadOnly,
 		}, nil
 	} else if spec.Volume != nil {
-		return &volume.Spec{}, fmt.Errorf("translation is not supported for in-line volumes yet")
+		return &volume.Spec{}, goerrors.New("translation is not supported for in-line volumes yet")
 	} else {
-		return &volume.Spec{}, fmt.Errorf("not a valid volume spec")
+		return &volume.Spec{}, goerrors.New("not a valid volume spec")
 	}
 }

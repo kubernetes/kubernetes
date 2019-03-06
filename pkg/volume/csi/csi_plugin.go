@@ -222,7 +222,12 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
-		// TODO(leakingtpan): Add AWS migration feature gates and place them here
+		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		},
+		csitranslationplugins.CinderInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+		},
 	}
 
 	// Initializing the label management channels
@@ -232,8 +237,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		// This function prevents Kubelet from posting Ready status until CSINodeInfo
 		// is both installed and initialized
-		err := initializeCSINodeInfo(host)
-		if err != nil {
+		if err := initializeCSINode(host); err != nil {
 			return fmt.Errorf("failed to initialize CSINodeInfo: %v", err)
 		}
 	}
@@ -241,20 +245,20 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func initializeCSINodeInfo(host volume.VolumeHost) error {
+func initializeCSINode(host volume.VolumeHost) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
-		klog.V(4).Infof("Skipping CSINodeInfo initialization, not running on Kubelet")
+		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINodeInfo initialization, not running on kubelet")
 		return nil
 	}
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		// Kubelet running in standalone mode. Skip CSINodeInfo initialization
-		klog.Warningf("Skipping CSINodeInfo initialization, Kubelet running in standalone mode")
+		klog.Warning("Skipping CSINodeInfo initialization, kubelet running in standalone mode")
 		return nil
 	}
 
-	kvh.SetKubeletError(fmt.Errorf("CSINodeInfo is not yet intialized"))
+	kvh.SetKubeletError(errors.New("CSINodeInfo is not yet initialized"))
 
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -269,8 +273,7 @@ func initializeCSINodeInfo(host volume.VolumeHost) error {
 		}
 		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
 			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
-			// TODO(dyzz): Just augment CreateCSINodeInfo to create the annotation on itself. Also update all updating functions to double check that the annotation is correct (yes)
-			_, err := nim.CreateCSINode()
+			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
 				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
@@ -282,6 +285,10 @@ func initializeCSINodeInfo(host volume.VolumeHost) error {
 			return true, nil
 		})
 		if err != nil {
+			// 2 releases after CSIMigration and all CSIMigrationX (where X is a volume plugin)
+			// are permanently enabled the apiserver/controllers can assume that the kubelet is
+			// using CSI for all Migrated volume plugins. Then all the CSINode initialization
+			// code can be dropped from Kubelet.
 			// Kill the Kubelet process and allow it to restart to retry initialization
 			klog.Fatalf("Failed to initialize CSINodeInfo after retrying")
 		}

@@ -300,9 +300,9 @@ type AttachDetachVolumeHost interface {
 	// CSINodeLister returns the informer lister for the CSINode API Object
 	CSINodeLister() storagelisters.CSINodeLister
 
-	// CSINodeSynced returns a boolean representing whether the CSINode API Object
-	// informer has been synced
-	CSINodeSynced() bool
+	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
+	// to the attachDetachController
+	IsAttachDetachController() bool
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
