@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -160,8 +161,12 @@ func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) 
 			return p.Operation < q.Operation
 		}
 
-		if p.Time == nil || q.Time == nil {
-			return false
+		ntime := &metav1.Time{Time: time.Time{}}
+		if p.Time == nil {
+			p.Time = ntime
+		}
+		if q.Time == nil {
+			q.Time = ntime
 		}
 		if !p.Time.Equal(q.Time) {
 			return p.Time.Before(q.Time)
