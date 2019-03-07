@@ -68,23 +68,7 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 				}
 
 				ginkgo.By("creating a pod with correct GMSA annotations")
-				f.PodClient().Create(pod)
-
-				ginkgo.By("waiting for the pod and its containers to be running")
-				gomega.Eventually(func() bool {
-					pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
-					if err != nil && pod.Status.Phase != corev1.PodRunning {
-						return false
-					}
-
-					for _, containerStatus := range pod.Status.ContainerStatuses {
-						if containerStatus.State.Running == nil {
-							return false
-						}
-					}
-
-					return true
-				}, 5*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+				f.PodClient().CreateSync(pod)
 
 				ginkgo.By("checking the domain reported by nltest in the containers")
 				namespaceOption := fmt.Sprintf("--namespace=%s", f.Namespace.Name)
