@@ -253,7 +253,7 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 		framework.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
 
-	snapshotter := config.GetUniqueDriverName()
+	snapshotter := d.DriverInfo.Name
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	suffix := snapshotter + "-vsc"
