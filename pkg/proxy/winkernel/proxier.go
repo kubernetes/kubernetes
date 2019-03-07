@@ -1001,6 +1001,7 @@ func (proxier *Proxier) syncProxyRules() {
 		var hnsEndpoints []endpointsInfo
 		klog.V(4).Infof("====Applying Policy for %s====", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
+		containsPublicIP := false
 
 		for _, ep := range proxier.endpointsMap[svcName] {
 			var newHnsEndpoint *endpointsInfo
@@ -1024,7 +1025,6 @@ func (proxier *Proxier) syncProxyRules() {
 				// A remote endpoint was already created and proxy was restarted
 				newHnsEndpoint, err = hns.getEndpointByIpAddress(ep.ip, hnsNetworkName)
 			}
-
 			if newHnsEndpoint == nil {
 				if ep.isLocal {
 					klog.Errorf("Local endpoint not found for %v: err: %v on network %s", ep.ip, err, hnsNetworkName)
@@ -1054,7 +1054,8 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					if len(providerAddress) == 0 {
 						klog.Errorf("Could not find provider address for %s", ep.ip)
-						continue
+						providerAddress = proxier.nodeIP.String()
+						containsPublicIP = true
 					}
 					hnsEndpoint := &endpointsInfo{
 						ip:              ep.ip,
@@ -1105,12 +1106,15 @@ func (proxier *Proxier) syncProxyRules() {
 
 		klog.V(4).Infof("Trying to Apply Policies for service %s", spew.Sdump(svcInfo))
 		var hnsLoadBalancer *loadBalancerInfo
-
+		var sourceVip = proxier.sourceVip
+		if containsPublicIP {
+			sourceVip = proxier.nodeIP.String()
+		}
 		hnsLoadBalancer, err := hns.getLoadBalancer(
 			hnsEndpoints,
 			false,
 			proxier.isDSR,
-			proxier.sourceVip,
+			sourceVip,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
 			uint16(svcInfo.targetPort),
@@ -1130,7 +1134,7 @@ func (proxier *Proxier) syncProxyRules() {
 				hnsEndpoints,
 				false,
 				false,
-				proxier.sourceVip,
+				sourceVip,
 				"",
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
@@ -1152,7 +1156,7 @@ func (proxier *Proxier) syncProxyRules() {
 				hnsEndpoints,
 				false,
 				false,
-				proxier.sourceVip,
+				sourceVip,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
@@ -1172,7 +1176,7 @@ func (proxier *Proxier) syncProxyRules() {
 				hnsEndpoints,
 				false,
 				false,
-				proxier.sourceVip,
+				sourceVip,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
