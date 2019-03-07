@@ -376,6 +376,8 @@ else
   ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
 fi
 
+ENABLE_APISERVER_DYNAMIC_AUDIT="${ENABLE_APISERVER_DYNAMIC_AUDIT:-false}"
+
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 

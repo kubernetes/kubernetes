@@ -1709,6 +1709,11 @@ function start-kube-apiserver {
     fi
   fi
 
+  if [[ "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}" == "true" ]]; then
+    params+=" --audit-dynamic-configuration"
+    RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
+  fi
+
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
