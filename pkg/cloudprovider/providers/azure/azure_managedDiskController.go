@@ -58,10 +58,6 @@ type ManagedDiskOptions struct {
 	StorageAccountType storage.SkuName
 }
 
-func newManagedDiskController(common *controllerCommon) (*ManagedDiskController, error) {
-	return &ManagedDiskController{common: common}, nil
-}
-
 //CreateManagedDisk : create managed disk
 func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (string, error) {
 	var err error
