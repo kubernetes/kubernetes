@@ -423,7 +423,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, externalcfg)
 			kubeadmutil.CheckErr(err)
-			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.GetCRISocket())
+			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
 			kubeadmutil.CheckErr(err)
 			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(&internalcfg.ClusterConfiguration))
 			kubeadmutil.CheckErr(imagesPull.PullAll())
