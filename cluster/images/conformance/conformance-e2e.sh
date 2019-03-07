@@ -25,6 +25,9 @@ while true; do
   if [[ "$STATUS" == "Succeeded" ]]; then
     echo "$timestamp Done."
     break
+  elif [[ "$STATUS" == "Failed" ]]; then
+    echo "$timestamp Failed."
+    break
   else
     sleep 5
   fi
