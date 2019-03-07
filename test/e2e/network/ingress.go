@@ -316,10 +316,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			executePresharedCertTest(f, jig, "")
 		})
 
-		It("should create ingress with backend HTTPS", func() {
-			executeBacksideBacksideHTTPSTest(f, jig, "")
-		})
-
 		It("should support multiple TLS certs", func() {
 			By("Creating an ingress with no certs.")
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
@@ -426,41 +422,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
-
-		// TODO: remove [Unreleased] tag to once the new GCE API GO client gets revendored in ingress-gce repo
-		It("should be able to switch between HTTPS and HTTP2 modes [Unreleased]", func() {
-			httpsScheme := "request_scheme=https"
-
-			By("Create a basic HTTP2 ingress")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http2"), ns, map[string]string{}, map[string]string{})
-			jig.WaitForIngress(true)
-
-			address, err := jig.WaitForIngressAddress(jig.Client, jig.Ingress.Namespace, jig.Ingress.Name, framework.LoadBalancerPollTimeout)
-
-			By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTP2", address))
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=2", httpsScheme)
-
-			By("Switch backend service to use HTTPS")
-			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.ServiceApplicationProtocolKey] = `{"http2":"HTTPS"}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
-				Expect(err).NotTo(HaveOccurred())
-			}
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=1.1", httpsScheme)
-
-			By("Switch backend service to use HTTP2")
-			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.ServiceApplicationProtocolKey] = `{"http2":"HTTP2"}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
-				Expect(err).NotTo(HaveOccurred())
-			}
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=2", httpsScheme)
-		})
-
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
 		// zone based on pod labels.
 	})
