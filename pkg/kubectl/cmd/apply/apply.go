@@ -56,7 +56,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
-type ApplyOptions struct {
+// Options defines flags and other configuration parameters for the `apply` command
+type Options struct {
 	RecordFlags *genericclioptions.RecordFlags
 	Recorder    genericclioptions.Recorder
 
@@ -132,8 +133,9 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
-func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
-	return &ApplyOptions{
+// NewApplyOptions creates new Options for the `apply` command
+func NewApplyOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -194,7 +196,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	return cmd
 }
 
-func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+// Complete verifies if Options are valid and without conflicts.
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
@@ -325,7 +328,8 @@ func isIncompatibleServerError(err error) bool {
 	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
-func (o *ApplyOptions) Run() error {
+// Run executes the `apply` command.
+func (o *Options) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
 		openapiSchema = o.OpenAPISchema
@@ -761,6 +765,7 @@ func (p *Patcher) delete(namespace, name string) error {
 	return runDelete(namespace, name, p.Mapping, p.DynamicClient, p.Cascade, p.GracePeriod, p.ServerDryRun)
 }
 
+// Patcher defines options to patch OpenAPI objects.
 type Patcher struct {
 	Mapping       *meta.RESTMapping
 	Helper        *resource.Helper
@@ -926,6 +931,8 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, patchedObj, err
 }
 
+// Patch tries to patch an OpenAPI resource. On success, returns the merge patch as well
+// the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
 	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)
