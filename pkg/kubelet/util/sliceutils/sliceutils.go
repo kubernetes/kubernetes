@@ -17,7 +17,6 @@ limitations under the License.
 package sliceutils
 
 import (
-	"k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -30,22 +29,6 @@ func StringInSlice(s string, list []string) bool {
 	}
 
 	return false
-}
-
-// PodsByCreationTime makes an array of pods sortable by their creation
-// timestamps in ascending order.
-type PodsByCreationTime []*v1.Pod
-
-func (s PodsByCreationTime) Len() int {
-	return len(s)
-}
-
-func (s PodsByCreationTime) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s PodsByCreationTime) Less(i, j int) bool {
-	return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
 }
 
 // ByImageSize makes an array of images sortable by their size in descending
