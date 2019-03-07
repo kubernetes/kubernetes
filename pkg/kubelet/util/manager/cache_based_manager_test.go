@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -453,10 +453,14 @@ func TestRegisterIdempotence(t *testing.T) {
 	assert.Equal(t, 1, refs("ns1", "s1"))
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
 	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
+	assert.Equal(t, 2, refs("ns1", "s1"))
 
 	manager.UnregisterPod(podWithSecrets("ns1", "name1", s1))
-	assert.Equal(t, 0, refs("ns1", "s1"))
+	assert.Equal(t, 1, refs("ns1", "s1"))
 	manager.UnregisterPod(podWithSecrets("ns1", "name1", s1))
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.UnregisterPod(podWithSecrets("ns1", "name2", s1))
 	assert.Equal(t, 0, refs("ns1", "s1"))
 }
 
