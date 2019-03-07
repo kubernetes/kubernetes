@@ -409,8 +409,10 @@ $(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversi
 OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
 OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
 OPENAPI_OUTPUT_PKG := pkg/generated/openapi
+CRD_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 REPORT_FILENAME := $(OUT_DIR)/violations.report
+IGNORED_REPORT_FILENAME := $(OUT_DIR)/ignored_violations.report
 KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
 # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
 # updated API violations to the known API violation exceptions list.
@@ -436,10 +438,11 @@ OPENAPI_DIRS := $(shell                                             \
 )
 
 OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
+CRD_OPENAPI_OUTFILE := $(CRD_OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 
 # This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
-gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
+gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN) $(CRD_OPENAPI_OUTFILE)
 
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -469,6 +472,17 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
 	diff $(REPORT_FILENAME) $(KNOWN_VIOLATION_FILENAME) ||                          \
 	(echo -e $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
 
+# TODO(roycaihw): move the automation to apiextensions-apiserver
+$(CRD_OPENAPI_OUTFILE): $(OPENAPI_GEN)
+	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+	    --v $(KUBE_VERBOSE)                                                         \
+	    --logtostderr                                                               \
+	    -i "k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/api/autoscaling/v1"         \
+	    -p $(PRJ_SRC_PATH)/$(CRD_OPENAPI_OUTPUT_PKG)                                \
+	    -O $(OPENAPI_BASENAME)                                                      \
+	    -h $(BOILERPLATE_FILENAME)                                                  \
+	    -r $(IGNORED_REPORT_FILENAME)                                               \
+	    "$$@"
 
 # How to build the generator tool.  The deps for this are defined in
 # the $(GO_PKGDEPS_FILE), above.
