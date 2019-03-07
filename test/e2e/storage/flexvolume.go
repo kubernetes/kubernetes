@@ -68,6 +68,26 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 	framework.VolumeTestCleanup(f, config)
 }
 
+// testFlexVolume tests that a client pod using a given flexvolume driver
+// successfully mounts it and runs
+func testUpdateFlexVolume(driver string, cs clientset.Interface, config framework.VolumeTestConfig, f *framework.Framework) {
+	tests := []framework.VolumeTest{
+		{
+			Volume: v1.VolumeSource{
+				FlexVolume: &v1.FlexVolumeSource{
+					Driver: "k8s/" + driver,
+				},
+			},
+			File: "index.html",
+			// Must match content of examples/volumes/flexvolume/dummy(-attachable) domount
+			ExpectedContent: "Update from flexvolume!",
+		},
+	}
+	framework.TestVolumeClient(cs, config, nil, tests)
+
+	framework.VolumeTestCleanup(f, config)
+}
+
 // installFlex installs the driver found at filePath on the node, and restarts
 // kubelet if 'restart' is true. If node is nil, installs on the master, and restarts
 // controller-manager if 'restart' is true.
@@ -210,8 +230,23 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
+		By(fmt.Sprintf("update flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, "dummy-update"))
+
+		config2 := framework.VolumeTestConfig{
+			Namespace:      ns.Name,
+			Prefix:         "flex2",
+			ClientNodeName: node.Name,
+		}
+		testUpdateFlexVolume(driverInstallAs, cs, config2, f)
+
 		By("waiting for flex client pod to terminate")
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+
+		By("waiting for flex2 client pod to terminate")
+		if err := f.WaitForPodTerminated(config2.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
 
