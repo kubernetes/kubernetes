@@ -253,12 +253,12 @@ func GetConfig(image int) Config {
 
 // GetE2EImage returns the fully qualified URI to an image (including version)
 func GetE2EImage(image int) string {
-	return fmt.Sprintf("%s/%s:%s", imageConfigs[image].registry, imageConfigs[image].name, imageConfigs[image].version)
+	return fmt.Sprintf("%s/%s-amd64:%s", imageConfigs[image].registry, imageConfigs[image].name, imageConfigs[image].version)
 }
 
 // GetE2EImage returns the fully qualified URI to an image (including version)
 func (i *Config) GetE2EImage() string {
-	return fmt.Sprintf("%s/%s:%s", i.registry, i.name, i.version)
+	return fmt.Sprintf("%s/%s-amd64:%s", i.registry, i.name, i.version)
 }
 
 // GetPauseImageName returns the pause image name with proper version
