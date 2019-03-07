@@ -33,20 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -697,62 +693,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			By("waiting for the PV to get deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, framework.PVDeletingTimeout)
 			framework.ExpectNoError(err)
-		})
-	})
-
-	Describe("DynamicProvisioner External", func() {
-		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
-			// external dynamic provisioner pods need additional permissions provided by the
-			// persistent-volume-provisioner clusterrole and a leader-locking role
-			serviceAccountName := "default"
-			subject := rbacv1beta1.Subject{
-				Kind:      rbacv1beta1.ServiceAccountKind,
-				Namespace: ns,
-				Name:      serviceAccountName,
-			}
-
-			err := auth.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns, subject)
-			framework.ExpectNoError(err)
-
-			roleName := "leader-locking-nfs-provisioner"
-			_, err = f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: roleName,
-				},
-				Rules: []rbacv1beta1.PolicyRule{{
-					APIGroups: []string{""},
-					Resources: []string{"endpoints"},
-					Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
-				}},
-			})
-			framework.ExpectNoError(err, "Failed to create leader-locking role")
-
-			err = auth.BindRoleInNamespace(c.RbacV1beta1(), roleName, ns, subject)
-			framework.ExpectNoError(err)
-
-			err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
-				serviceaccount.MakeUsername(ns, serviceAccountName),
-				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
-			framework.ExpectNoError(err, "Failed to update authorization")
-
-			By("creating an external dynamic provisioner pod")
-			pod := utils.StartExternalProvisioner(c, ns, externalPluginName)
-			defer framework.DeletePodOrFail(c, ns, pod.Name)
-
-			By("creating a StorageClass")
-			test := testsuites.StorageClassTest{
-				Client:       c,
-				Name:         "external provisioner test",
-				Provisioner:  externalPluginName,
-				ClaimSize:    "1500Mi",
-				ExpectedSize: "1500Mi",
-			}
-			test.Class = newStorageClass(test, ns, "external")
-			test.Claim = newClaim(test, ns, "external")
-			test.Claim.Spec.StorageClassName = &test.Class.Name
-
-			By("creating a claim with a external provisioning annotation")
-			test.TestDynamicProvisioning()
 		})
 	})
 

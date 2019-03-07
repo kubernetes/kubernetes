@@ -45,7 +45,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -65,16 +65,14 @@ import (
 
 // NFS
 type nfsDriver struct {
-	externalProvisionerPod *v1.Pod
-	externalPluginName     string
+	externalPluginName string
+	serverConfig       *volume.TestConfig
+	serverIP           string
 
 	driverInfo testsuites.DriverInfo
 }
 
 type nfsVolume struct {
-	serverIP  string
-	serverPod *v1.Pod
-	f         *framework.Framework
 }
 
 var _ testsuites.TestDriver = &nfsDriver{}
@@ -110,24 +108,20 @@ func (n *nfsDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (n *nfsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	nv, ok := volume.(*nfsVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to NFS test volume")
+func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, _ testsuites.TestVolume) *v1.VolumeSource {
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   n.serverIP,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
 	}
 }
 
-func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	nv, ok := volume.(*nfsVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to NFS test volume")
+func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, _ testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   n.serverIP,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -152,6 +146,12 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
 
+	// Create the server pod here instead of in CreateVolume because the dynamic provisioner needs it
+	c, serverPod, serverIP := volume.NewNFSServer(cs, ns.Name, []string{})
+	n.serverConfig = &c
+	n.serverIP = serverIP
+
+	// Create an nfs-client-provisioner pod to dynamically mkdir volumes in the server pod
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
 	err := auth.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
@@ -164,48 +164,28 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
 
 	By("creating an external dynamic provisioner pod")
-	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
+	externalProvisionerPod := utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName, serverIP)
 
 	return &testsuites.PerTestConfig{
 			Driver:    n,
 			Prefix:    "nfs",
 			Framework: f,
 		}, func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
+			// Must delete provisioner first as it has the server mounted
+			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, externalProvisionerPod))
+			volume.CleanUpVolumeServer(f, serverPod)
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
 			cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
 }
 
 func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := config.Framework
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	// NewNFSServer creates a pod for InlineVolume and PreprovisionedPV,
-	// and startExternalProvisioner creates a pods for DynamicPV.
-	// Therefore, we need a different PrepareTest logic for volType.
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := volume.NewNFSServer(cs, ns.Name, []string{})
-		config.ServerConfig = &c
-		return &nfsVolume{
-			serverIP:  serverIP,
-			serverPod: serverPod,
-			f:         f,
-		}
-	case testpatterns.DynamicPV:
-		// Do nothing
-	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
-	}
-	return nil
+	// Server was already created in PrepareTest as it was needed by dynamic provisioner
+	config.ServerConfig = n.serverConfig
+	return &nfsVolume{}
 }
 
 func (v *nfsVolume) DeleteVolume() {
-	volume.CleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Gluster

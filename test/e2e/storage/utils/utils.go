@@ -326,7 +326,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
-func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
+func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginName, serverIP string) *v1.Pod {
 	podClient := c.CoreV1().Pods(ns)
 
 	provisionerPod := &v1.Pod{
@@ -341,47 +341,39 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v2.2.0-k8s1.12",
-					SecurityContext: &v1.SecurityContext{
-						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
-						},
-					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
+					Name:            "nfs-client-provisioner",
+					Image:           "quay.io/external_storage/nfs-client-provisioner:v3.1.0-k8s1.11",
 					ImagePullPolicy: v1.PullIfNotPresent,
 					VolumeMounts: []v1.VolumeMount{
 						{
-							Name:      "export-volume",
-							MountPath: "/export",
+							Name:      "nfs-client-root",
+							MountPath: "/persistentvolumes",
+						},
+					},
+					Env: []v1.EnvVar{
+						{
+							Name:  "PROVISIONER_NAME",
+							Value: externalPluginName,
+						},
+						{
+							Name:  "NFS_SERVER",
+							Value: serverIP,
+						},
+						{
+							Name:  "NFS_PATH",
+							Value: "/",
 						},
 					},
 				},
 			},
 			Volumes: []v1.Volume{
 				{
-					Name: "export-volume",
+					Name: "nfs-client-root",
 					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
+						NFS: &v1.NFSVolumeSource{
+							Server: serverIP,
+							Path:   "/",
+						},
 					},
 				},
 			},
