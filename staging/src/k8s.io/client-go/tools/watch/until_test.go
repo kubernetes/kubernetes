@@ -25,9 +25,12 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
@@ -35,39 +38,92 @@ import (
 )
 
 type fakePod struct {
-	name string
+	Name string
 }
 
 func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj *fakePod) DeepCopyObject() runtime.Object   { panic("DeepCopyObject not supported by fakePod") }
 
 func TestUntil(t *testing.T) {
-	fw := watch.NewFake()
-	go func() {
-		var obj *fakePod
-		fw.Add(obj)
-		fw.Modify(obj)
-	}()
-	conditions := []ConditionFunc{
-		func(event watch.Event) (bool, error) { return event.Type == watch.Added, nil },
-		func(event watch.Event) (bool, error) { return event.Type == watch.Modified, nil },
+	tt := []struct {
+		name        string
+		events      []watch.Event
+		conditions  []ConditionFunc
+		lastEvent   *watch.Event
+		expectedErr error
+	}{
+		{
+			name: "add and modify conditions",
+			events: []watch.Event{
+				{
+					Type:   watch.Added,
+					Object: &fakePod{},
+				},
+				{
+					Type:   watch.Modified,
+					Object: &fakePod{},
+				},
+			},
+			conditions: []ConditionFunc{
+				func(event watch.Event) (bool, error) { return event.Type == watch.Added, nil },
+				func(event watch.Event) (bool, error) { return event.Type == watch.Modified, nil },
+			},
+			lastEvent: &watch.Event{
+				Type:   watch.Modified,
+				Object: &fakePod{},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "converts watch.Error into golang errors and return that error",
+			events: []watch.Event{
+				{
+					Type:   watch.Added,
+					Object: &fakePod{},
+				},
+				{
+					Type:   watch.Error,
+					Object: &apierrors.NewInternalError(errors.New("42")).ErrStatus,
+				},
+				{
+					Type:   watch.Modified,
+					Object: &fakePod{},
+				},
+			},
+			conditions: []ConditionFunc{
+				func(event watch.Event) (bool, error) { return false, nil },
+			},
+			lastEvent: &watch.Event{
+				Type:   watch.Error,
+				Object: &apierrors.NewInternalError(errors.New("42")).ErrStatus,
+			},
+			expectedErr: &WatcherError{
+				Object: &apierrors.NewInternalError(errors.New("42")).ErrStatus,
+			},
+		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
 
-	lastEvent, err := UntilWithoutRetry(ctx, fw, conditions...)
-	if err != nil {
-		t.Fatalf("expected nil error, got %#v", err)
-	}
-	if lastEvent == nil {
-		t.Fatal("expected an event")
-	}
-	if lastEvent.Type != watch.Modified {
-		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
-	}
-	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
-		t.Fatalf("expected a pod event, got %#v", got)
+			ch := make(chan watch.Event, len(tc.events))
+			for _, e := range tc.events {
+				ch <- e
+			}
+			w := watch.NewProxyWatcher(ch)
+
+			lastEvent, err := UntilWithoutRetry(ctx, w, tc.conditions...)
+			if !apiequality.Semantic.DeepEqual(tc.expectedErr, err) {
+				t.Fatalf("\nexpected %#v,\ngot      %#v", tc.expectedErr, err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(tc.lastEvent, lastEvent) {
+				t.Fatalf("\nexpected %#v,\ngot      %#v\ndiff: %s", tc.lastEvent, lastEvent, diff.ObjectReflectDiff(tc.lastEvent, lastEvent))
+			}
+
+		})
 	}
 }
 

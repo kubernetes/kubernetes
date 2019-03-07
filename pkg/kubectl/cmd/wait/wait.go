@@ -176,7 +176,9 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 
 func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
 	if strings.ToLower(condition) == "delete" {
-		return IsDeleted, nil
+		return Wait{
+			ErrOut: errOut,
+		}.IsDeleted, nil
 	}
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
@@ -252,8 +254,13 @@ func (o *WaitOptions) RunWait() error {
 	return err
 }
 
+// Wait has helper methods for handling watches, including error handling.
+type Wait struct {
+	ErrOut io.Writer
+}
+
 // IsDeleted is a condition func for waiting for something to be deleted
-func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+func (w Wait) IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
@@ -302,7 +309,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		}
 
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
+		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{ErrOut: o.ErrOut}.IsDeletedCond)
 		cancel()
 		switch {
 		case err == nil:
@@ -315,24 +322,25 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			}
 			return gottenObj, false, errWaitTimeoutWithName
 		default:
+			watchErr, ok := err.(*watchtools.WatcherError)
+			if ok {
+				fmt.Fprintf(w.ErrOut, "error: An error occurred while waiting for the condition to be satisfied: %v", watchErr)
+				continue
+			}
+
 			return gottenObj, false, err
 		}
 	}
 }
 
-// Wait has helper methods for handling watches, including error handling.
-type Wait struct {
-	errOut io.Writer
-}
-
 // IsDeleted returns true if the object is deleted. It prints any errors it encounters.
-func (w Wait) IsDeleted(event watch.Event) (bool, error) {
+func (w Wait) IsDeletedCond(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Error:
 		// keep waiting in the event we see an error - we expect the watch to be closed by
 		// the server if the error is unrecoverable.
 		err := apierrors.FromObject(event.Object)
-		fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the object to be deleted: %v", err)
+		fmt.Fprintf(w.ErrOut, "error: An error occurred while waiting for the object to be deleted: %v", err)
 		return false, nil
 	case watch.Deleted:
 		return true, nil
@@ -406,10 +414,15 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			continue
 		case err == wait.ErrWaitTimeout:
 			if watchEvent != nil {
-				return watchEvent.Object, false, errWaitTimeoutWithName
 			}
 			return gottenObj, false, errWaitTimeoutWithName
 		default:
+			watchErr, ok := err.(*watchtools.WatcherError)
+			if ok {
+				fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the condition to be satisfied: %v", watchErr)
+				continue
+			}
+
 			return gottenObj, false, err
 		}
 	}
@@ -440,13 +453,6 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 }
 
 func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
-	if event.Type == watch.Error {
-		// keep waiting in the event we see an error - we expect the watch to be closed by
-		// the server
-		err := apierrors.FromObject(event.Object)
-		fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the condition to be satisfied: %v", err)
-		return false, nil
-	}
 	if event.Type == watch.Deleted {
 		// this will chain back out, result in another get and an return false back up the chain
 		return false, nil

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,6 +44,16 @@ type ConditionFunc func(event watch.Event) (bool, error)
 
 // ErrWatchClosed is returned when the watch channel is closed before timeout in UntilWithoutRetry.
 var ErrWatchClosed = errors.New("watch closed before UntilWithoutRetry timeout")
+
+// WatcherError wraps the object returned in ERROR event
+type WatcherError struct {
+	Object runtime.Object
+}
+
+// Error implements interface
+func (e *WatcherError) Error() string {
+	return fmt.Sprintf("watch error: %v", apierrors.FromObject(e.Object))
+}
 
 // UntilWithoutRetry reads items from the watch until each provided condition succeeds, and then returns the last watch
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
@@ -78,6 +89,14 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 					return lastEvent, ErrWatchClosed
 				}
 				lastEvent = &event
+
+				// If the watcher return error event we will wrap it into a golang error and end the loop
+				// This will simplify the end user logic needed to correctly handle it and it is less bug prone.
+				if lastEvent.Type == watch.Error {
+					return lastEvent, &WatcherError{
+						Object: lastEvent.Object,
+					}
+				}
 
 				done, err := condition(event)
 				if err != nil {

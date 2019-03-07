@@ -18,6 +18,7 @@ package wait
 
 import (
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -425,9 +426,11 @@ func TestWaitForDeletion(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: IsDeleted,
-				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+				Printer: printers.NewDiscardingPrinter(),
+				ConditionFn: Wait{
+					ErrOut: os.Stdout,
+				}.IsDeleted,
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
