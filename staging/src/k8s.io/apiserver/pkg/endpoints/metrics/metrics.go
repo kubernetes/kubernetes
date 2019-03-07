@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 
 	"github.com/emicklei/go-restful"
@@ -290,20 +290,9 @@ func cleanDryRun(dryRun []string) string {
 	if errs := validation.ValidateDryRun(nil, dryRun); len(errs) > 0 {
 		return "invalid"
 	}
-
 	// Since dryRun could be valid with any arbitrarily long length
 	// we have to dedup and sort the elements before joining them together
-	dryRunSet := map[string]bool{}
-	for _, element := range dryRun {
-		dryRunSet[element] = true
-	}
-	dryRunUnique := []string{}
-	for element := range dryRunSet {
-		dryRunUnique = append(dryRunUnique, element)
-	}
-	sort.Strings(dryRunUnique)
-
-	return strings.Join(dryRunUnique, ",")
+	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
 }
 
 func cleanUserAgent(ua string) string {
