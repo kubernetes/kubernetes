@@ -69,6 +69,23 @@ func (f *HumanPrintFlags) AllowedFormats() []string {
 	return []string{"wide"}
 }
 
+func FieldSpecColumns(spec []string) ([]printers.Column, error) {
+	extraColumns := make([]printers.Column, len(spec))
+	// Break up user specified JSON paths into relaxed JSON expressions
+	for ix := range spec {
+		colSpec := strings.Split(spec[ix], ":")
+		if len(colSpec) != 2 {
+			return nil, fmt.Errorf("unexpected extra-columns spec: %s, expected <header>:<json-path-expr>", spec[ix])
+		}
+		fieldSpec, err := RelaxedJSONPathExpression(colSpec[1])
+		if err != nil {
+			return nil, err
+		}
+		extraColumns[ix] = printers.Column{Header: colSpec[0], FieldSpec: fieldSpec}
+	}
+	return extraColumns, nil
+}
+
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
@@ -91,20 +108,13 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
-	spec := *f.ExtraColumns
-	extraColumns := make([]printers.Column, len(spec))
+	extraColumns := []printers.Column{}
 	if *f.ExtraColumns != nil {
-		// Break up user specified extra-columns JSON paths into relaxed JSON expressions
-		for ix := range spec {
-			colSpec := strings.Split(spec[ix], ":")
-			if len(colSpec) != 2 {
-				return nil, fmt.Errorf("unexpected extra-columns spec: %s, expected <header>:<json-path-expr>", spec[ix])
-			}
-			spec, err := RelaxedJSONPathExpression(colSpec[1])
-			if err != nil {
-				return nil, err
-			}
-			extraColumns[ix] = printers.Column{Header: colSpec[0], FieldSpec: spec}
+		spec := *f.ExtraColumns
+		var err error
+		extraColumns, err = FieldSpecColumns(spec)
+		if err != nil {
+			return nil, err
 		}
 	}
 
