@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.11",
+	"GoVersion": "go1.12",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
@@ -3885,6 +3885,10 @@
 			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
 		},
 		{
+			"ImportPath": "gonum.org/v1/gonum/graph/internal/linear",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
 			"ImportPath": "gonum.org/v1/gonum/graph/internal/ordered",
 			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
 		},
@@ -3898,6 +3902,14 @@
 		},
 		{
 			"ImportPath": "gonum.org/v1/gonum/graph/simple",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/topo",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/traverse",
 			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
 		},
 		{
