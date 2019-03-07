@@ -104,7 +104,7 @@ function config-ip-firewall {
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 
-  # If METADATA_CONCEALMENT_NO_FIREWALL is set, don't create a firewall on this
+  # If METADATA_CONCEALMENT_NO_FIREWALL is setted, don't create a firewall on this
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
