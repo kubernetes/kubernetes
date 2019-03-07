@@ -4221,7 +4221,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		describeRequest.Filters = c.tagging.addFilters(filters)
 		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 		if err != nil {
-			return fmt.Errorf("Error querying security groups for ELB: %q", err)
+			return fmt.Errorf("error querying security groups for ELB: %q", err)
 		}
 
 		// Collect the security groups to delete
