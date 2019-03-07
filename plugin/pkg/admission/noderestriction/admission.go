@@ -309,6 +309,12 @@ func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) err
 		oldPVC.Status.Conditions = nil
 		newPVC.Status.Conditions = nil
 
+		// TODO(apelisse): We don't have a good mechanism to
+		// verify that only the things that should have changed
+		// have changed. Ignore it for now.
+		oldPVC.ObjectMeta.ManagedFields = nil
+		newPVC.ObjectMeta.ManagedFields = nil
+
 		// ensure no metadata changed. nodes should not be able to relabel, add finalizers/owners, etc
 		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.capacity and status.conditions: %v", nodeName, diff.ObjectReflectDiff(oldPVC, newPVC)))
