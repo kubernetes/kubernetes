@@ -48,16 +48,9 @@ var _ = SIGDescribe("DNS", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testUtilsPod := generateDNSUtilsPod()
 		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
-		testNdotsValue := "2"
 		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Nameservers: []string{testInjectedIP},
 			Searches:    []string{testSearchPath},
-			Options: []v1.PodDNSConfigOption{
-				{
-					Name:  "ndots",
-					Value: &testNdotsValue,
-				},
-			},
 		}
 		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
 		framework.ExpectNoError(err)
@@ -88,7 +81,7 @@ var _ = SIGDescribe("DNS", func() {
 		if dnsRegex.MatchString(stdout) {
 			match := dnsRegex.FindString(stdout)
 
-			if !strings.Contains(match, "ndots:2") {
+			if !strings.Contains(match, testInjectedIP) {
 				framework.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
 			}
 		} else {
