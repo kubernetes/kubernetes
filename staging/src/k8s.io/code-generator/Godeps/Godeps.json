@@ -196,7 +196,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/klog",
-			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+			"Rev": "8e90cee79f823779174776412c13478955131846"
 		}
 	]
 }
