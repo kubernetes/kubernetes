@@ -1775,24 +1775,30 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			csi:  &core.CSIPersistentVolumeSource{Driver: "io-kubernetes-storage-csi-flex", VolumeHandle: "test-123"},
 		},
 		{
-			name: "driver name: ok underscore only",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid underscore",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
-			name: "driver name: ok dot underscores",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid dot underscores",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
 			name: "driver name: ok beginnin with number",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage-csi.flex", VolumeHandle: "test-123"},
 		},
 		{
 			name: "driver name: ok ending with number",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex2", VolumeHandle: "test-123"},
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage-csi.flex2", VolumeHandle: "test-123"},
 		},
 		{
-			name: "driver name: ok dot dash underscores",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid dot dash underscores",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
 			name:     "driver name: invalid length 0",
@@ -1801,10 +1807,8 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			errfield: "driver",
 		},
 		{
-			name:     "driver name: invalid length 1",
-			csi:      &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "driver",
+			name: "driver name: ok length 1",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
 		},
 		{
 			name:     "driver name: invalid length > 63",

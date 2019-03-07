@@ -26,7 +26,7 @@ import (
 // that was confirmed to point to an existing directory.
 type ConfirmedDir string
 
-// Return a temporary dir, else error.
+// NewTmpConfirmedDir returns a temporary dir, else error.
 // The directory is cleaned, no symlinks, etc. so its
 // returned as a ConfirmedDir.
 func NewTmpConfirmedDir() (ConfirmedDir, error) {
@@ -34,7 +34,15 @@ func NewTmpConfirmedDir() (ConfirmedDir, error) {
 	if err != nil {
 		return "", err
 	}
-	return ConfirmedDir(n), nil
+
+	// In MacOs `ioutil.TempDir` creates a directory
+	// with root in the `/var` folder, which is in turn a symlinked path
+	// to `/private/var`.
+	// Function `filepath.EvalSymlinks`is used to
+	// resolve the real absolute path.
+	deLinked, err := filepath.EvalSymlinks(n)
+	return ConfirmedDir(deLinked), err
+
 }
 
 // HasPrefix returns true if the directory argument

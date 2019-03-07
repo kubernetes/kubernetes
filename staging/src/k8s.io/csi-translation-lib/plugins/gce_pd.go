@@ -87,13 +87,19 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 	}
 
 	gceSource := pv.Spec.PersistentVolumeSource.GCEPersistentDisk
+
+	partition := ""
+	if gceSource.Partition != 0 {
+		partition = strconv.Itoa(int(gceSource.Partition))
+	}
+
 	csiSource := &v1.CSIPersistentVolumeSource{
 		Driver:       GCEPDDriverName,
 		VolumeHandle: volID,
 		ReadOnly:     gceSource.ReadOnly,
 		FSType:       gceSource.FSType,
 		VolumeAttributes: map[string]string{
-			"partition": strconv.FormatInt(int64(gceSource.Partition), 10),
+			"partition": partition,
 		},
 	}
 
@@ -121,7 +127,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 		FSType:   csiSource.FSType,
 		ReadOnly: csiSource.ReadOnly,
 	}
-	if partition, ok := csiSource.VolumeAttributes["partition"]; ok {
+	if partition, ok := csiSource.VolumeAttributes["partition"]; ok && partition != "" {
 		partInt, err := strconv.Atoi(partition)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to convert partition %v to integer: %v", partition, err)
@@ -147,6 +153,11 @@ func (g *gcePersistentDiskCSITranslator) CanSupport(pv *v1.PersistentVolume) boo
 // GetInTreePluginName returns the name of the intree plugin driver
 func (g *gcePersistentDiskCSITranslator) GetInTreePluginName() string {
 	return GCEPDInTreePluginName
+}
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (g *gcePersistentDiskCSITranslator) GetCSIPluginName() string {
+	return GCEPDDriverName
 }
 
 func pdNameFromVolumeID(id string) (string, error) {

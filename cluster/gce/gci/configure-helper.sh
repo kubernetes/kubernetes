@@ -1709,6 +1709,11 @@ function start-kube-apiserver {
     fi
   fi
 
+  if [[ "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}" == "true" ]]; then
+    params+=" --audit-dynamic-configuration"
+    RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
+  fi
+
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
@@ -1931,6 +1936,35 @@ function setup-etcd-encryption {
   fi
 }
 
+# Updates node labels used by addons.
+function update-legacy-addon-node-labels() {
+  # need kube-apiserver to be ready
+  until kubectl get nodes; do
+    sleep 5
+  done
+  update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
+  update-node-label "beta.kubernetes.io/kube-proxy-ds-ready=true,node.kubernetes.io/kube-proxy-ds-ready!=true" "node.kubernetes.io/kube-proxy-ds-ready=true"
+  update-node-label "beta.kubernetes.io/masq-agent-ds-ready=true,node.kubernetes.io/masq-agent-ds-ready!=true" "node.kubernetes.io/masq-agent-ds-ready=true"
+}
+
+# A helper function for labeling all nodes matching a given selector.
+# Runs: kubectl label --overwrite nodes -l "${1}" "${2}"
+# Retries on failure
+#
+# $1: label selector of nodes
+# $2: label to apply
+function update-node-label() {
+  local selector="$1"
+  local label="$2"
+  local retries=5
+  until (( retries == 0 )); do
+    if kubectl label --overwrite nodes -l "${selector}" "${label}"; then
+      break
+    fi
+    (( retries-- ))
+    sleep 3
+  done
+}
 
 # Applies encryption provider config.
 # This function may be triggered in two scenarios:
@@ -2903,6 +2937,7 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    update-legacy-addon-node-labels &
     apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then

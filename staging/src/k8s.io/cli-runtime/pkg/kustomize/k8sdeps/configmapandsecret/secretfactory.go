@@ -80,8 +80,8 @@ func (f *SecretFactory) MakeSecret(args *types.SecretArgs, options *types.Genera
 	}
 	all = append(all, pairs...)
 
-	for _, kv := range all {
-		err = addKvToSecret(s, kv.Key, kv.Value)
+	for _, p := range all {
+		err = addKvToSecret(s, p.Key, p.Value)
 		if err != nil {
 			return nil, err
 		}

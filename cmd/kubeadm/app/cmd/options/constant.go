@@ -124,4 +124,7 @@ const (
 
 	// CertificateKey flag sets the key used to encrypt and decrypt certificate secrets
 	CertificateKey = "certificate-key"
+
+	// SkipCertificateKeyPrint flag instruct kubeadm to skip printing certificate key used to encrypt certs by 'kubeadm init'.
+	SkipCertificateKeyPrint = "skip-certificate-key-print"
 )

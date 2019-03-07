@@ -114,7 +114,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 	}, nil
 }
 
-// Name returns extenderURL to identifies the extender.
+// Name returns extenderURL to identify the extender.
 func (h *HTTPExtender) Name() string {
 	return h.extenderURL
 }
@@ -125,8 +125,8 @@ func (h *HTTPExtender) IsIgnorable() bool {
 	return h.ignorable
 }
 
-// SupportsPreemption returns if a extender support preemption.
-// A extender should have preempt verb defined and enabled its own node cache.
+// SupportsPreemption returns true if an extender supports preemption.
+// An extender should have preempt verb defined and enabled its own node cache.
 func (h *HTTPExtender) SupportsPreemption() bool {
 	return len(h.preemptVerb) > 0
 }

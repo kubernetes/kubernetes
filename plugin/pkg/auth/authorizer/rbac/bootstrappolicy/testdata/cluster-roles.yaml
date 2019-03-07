@@ -211,6 +211,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - create
@@ -326,6 +327,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - get
@@ -528,6 +530,14 @@ items:
     - ""
     resources:
     - nodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
     verbs:
     - get
     - list
@@ -985,6 +995,24 @@ items:
     - volumeattachments
     verbs:
     - get
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
   - apiGroups:
     - coordination.k8s.io
     resources:

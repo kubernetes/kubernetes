@@ -32,7 +32,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
@@ -140,10 +139,10 @@ type VolumePlugin interface {
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
 
 	// ConstructVolumeSpec constructs a volume spec based on the given volume name
-	// and mountPath. The spec may have incomplete information due to limited
+	// and volumePath. The spec may have incomplete information due to limited
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
-	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+	ConstructVolumeSpec(volumeName, volumePath string) (*Spec, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
 	// Specifying mount options in a volume plugin that doesn't support
@@ -276,7 +275,7 @@ type BlockVolumePlugin interface {
 	// The spec may have incomplete information due to limited information
 	// from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk.
-	ConstructBlockVolumeSpec(podUID types.UID, volumeName, mountPath string) (*Spec, error)
+	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -317,9 +316,6 @@ type VolumeHost interface {
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface
-
-	// GetCSIClient returns a client interface to csi.storage.k8s.io
-	GetCSIClient() csiclientset.Interface
 
 	// NewWrapperMounter finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which

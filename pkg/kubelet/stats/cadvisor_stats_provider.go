@@ -155,6 +155,14 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	return result, nil
 }
 
+// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
+// the containers and returns the stats for all the pod-managed containers.
+// For cadvisor, cpu nano core usages are pre-computed and cached, so this
+// function simply calls ListPodStats.
+func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return p.ListPodStats()
+}
+
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
 func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
 	infos, err := getCadvisorContainerInfo(p.cadvisor)

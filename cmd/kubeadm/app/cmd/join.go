@@ -282,7 +282,7 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 
 // newJoinOptions returns a struct ready for being used for creating cmd join flags.
 func newJoinOptions() *joinOptions {
-	// initialize the public kubeadm config API by appling defaults
+	// initialize the public kubeadm config API by applying defaults
 	externalcfg := &kubeadmapiv1beta1.JoinConfiguration{}
 
 	// Add optional config objects to host flags.
@@ -324,7 +324,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.File = nil
 	}
 
-	// if an APIServerEndpoint from which to retrive cluster information was not provided, unset the Discovery.BootstrapToken object
+	// if an APIServerEndpoint from which to retrieve cluster information was not provided, unset the Discovery.BootstrapToken object
 	if len(args) == 0 {
 		opt.externalcfg.Discovery.BootstrapToken = nil
 	} else {

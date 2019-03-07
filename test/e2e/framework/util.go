@@ -2371,6 +2371,11 @@ func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
+// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func RunKubectlInput(data string, args ...string) (string, error) {
+	return NewKubectlCommand(args...).WithStdinData(data).Exec()
+}
+
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
 func RunKubemciWithKubeconfig(args ...string) (string, error) {
 	if TestContext.KubeConfig != "" {

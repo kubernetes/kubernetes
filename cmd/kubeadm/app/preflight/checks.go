@@ -873,10 +873,14 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 }
 
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
-	// First, check if we're root separately from the other preflight checks and fail fast
-	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-		return err
+// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool) error {
+	if !isSecondaryControlPlane {
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
+			return err
+		}
 	}
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
@@ -895,13 +899,26 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
-	checks = addCommonChecks(execer, cfg, checks)
 
-	// Check ipvs required kernel module once we use ipvs kube-proxy mode
-	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks,
-			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-		)
+	if !isSecondaryControlPlane {
+		checks = addCommonChecks(execer, cfg, checks)
+
+		// Check IVPS required kernel module once we use IVPS kube-proxy mode
+		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+			checks = append(checks,
+				ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
+			)
+		}
+
+		// Check if Bridge-netfilter and IPv6 relevant flags are set
+		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
+			if ip.To4() == nil && ip.To16() != nil {
+				checks = append(checks,
+					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+				)
+			}
+		}
 	}
 
 	if cfg.Etcd.Local != nil {
@@ -927,14 +944,6 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
-	if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-		if ip.To4() == nil && ip.To16() != nil {
-			checks = append(checks,
-				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-				FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-			)
-		}
-	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 

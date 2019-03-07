@@ -1768,7 +1768,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/klog",
-			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+			"Rev": "8e90cee79f823779174776412c13478955131846"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
@@ -1808,23 +1808,23 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

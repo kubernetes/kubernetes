@@ -45,6 +45,7 @@ spec:
           - name: config
             mountPath: /etc/config
       nodeSelector:
+        # TODO(liggitt): switch to node.kubernetes.io/masq-agent-ds-ready in 1.16
         beta.kubernetes.io/masq-agent-ds-ready: "true"
       volumes:
         - name: config

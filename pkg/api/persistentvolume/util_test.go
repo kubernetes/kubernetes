@@ -28,12 +28,6 @@ import (
 )
 
 func TestDropDisabledFields(t *testing.T) {
-	specWithCSI := func() *api.PersistentVolumeSpec {
-		return &api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{CSI: &api.CSIPersistentVolumeSource{}}}
-	}
-	specWithoutCSI := func() *api.PersistentVolumeSpec {
-		return &api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{CSI: nil}}
-	}
 	specWithMode := func(mode *api.PersistentVolumeMode) *api.PersistentVolumeSpec {
 		return &api.PersistentVolumeSpec{VolumeMode: mode}
 	}
@@ -45,53 +39,8 @@ func TestDropDisabledFields(t *testing.T) {
 		newSpec       *api.PersistentVolumeSpec
 		expectOldSpec *api.PersistentVolumeSpec
 		expectNewSpec *api.PersistentVolumeSpec
-		csiEnabled    bool
 		blockEnabled  bool
 	}{
-		"disabled csi clears new": {
-			csiEnabled:    false,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithoutCSI(),
-			oldSpec:       nil,
-			expectOldSpec: nil,
-		},
-		"disabled csi clears update when old pv did not use csi": {
-			csiEnabled:    false,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithoutCSI(),
-			oldSpec:       specWithoutCSI(),
-			expectOldSpec: specWithoutCSI(),
-		},
-		"disabled csi preserves update when old pv did use csi": {
-			csiEnabled:    false,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithCSI(),
-			oldSpec:       specWithCSI(),
-			expectOldSpec: specWithCSI(),
-		},
-
-		"enabled csi preserves new": {
-			csiEnabled:    true,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithCSI(),
-			oldSpec:       nil,
-			expectOldSpec: nil,
-		},
-		"enabled csi preserves update when old pv did not use csi": {
-			csiEnabled:    true,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithCSI(),
-			oldSpec:       specWithoutCSI(),
-			expectOldSpec: specWithoutCSI(),
-		},
-		"enabled csi preserves update when old pv did use csi": {
-			csiEnabled:    true,
-			newSpec:       specWithCSI(),
-			expectNewSpec: specWithCSI(),
-			oldSpec:       specWithCSI(),
-			expectOldSpec: specWithCSI(),
-		},
-
 		"disabled block clears new": {
 			blockEnabled:  false,
 			newSpec:       specWithMode(&modeBlock),
@@ -139,7 +88,6 @@ func TestDropDisabledFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, tc.csiEnabled)()
 			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, tc.blockEnabled)()
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)

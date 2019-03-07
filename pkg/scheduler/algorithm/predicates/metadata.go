@@ -19,7 +19,6 @@ package predicates
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sync"
 
 	"k8s.io/klog"
@@ -416,7 +415,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), runtime.NumCPU(), len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
 	return topologyMaps, firstError
 }
 
@@ -504,7 +503,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), runtime.NumCPU(), len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
 	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, firstError
 }
 

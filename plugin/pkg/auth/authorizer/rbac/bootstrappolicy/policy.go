@@ -160,13 +160,13 @@ func NodeRules() []rbacv1.PolicyRule {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
+			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie()
+		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 	}
 
@@ -292,7 +292,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
@@ -325,7 +325,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
@@ -514,7 +514,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie())
+		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role for the csi external provisioner

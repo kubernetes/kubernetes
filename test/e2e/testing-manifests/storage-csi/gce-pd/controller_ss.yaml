@@ -16,7 +16,8 @@ spec:
       serviceAccountName: csi-controller-sa
       containers:
         - name: csi-provisioner
-          image: gcr.io/gke-release/csi-provisioner:v1.0.1-gke.0
+          # TODO: replace with official image
+          image: quay.io/k8scsi/csi-provisioner:tmp-test-1.14
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"

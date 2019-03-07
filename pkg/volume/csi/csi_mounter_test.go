@@ -29,14 +29,13 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	csiapi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
-	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -53,7 +52,7 @@ var (
 )
 
 func TestMounterGetPath(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	// TODO (vladimirvivien) specName with slashes will not work
@@ -142,17 +141,17 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 		},
 	}
 
-	emptyPodMountInfoVersion := ""
+	noPodMountInfo := false
+	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			klog.Infof("Starting test %s", test.name)
-			fakeClient := fakeclient.NewSimpleClientset()
-			fakeCSIClient := fakecsi.NewSimpleClientset(
-				getCSIDriver("no-info", &emptyPodMountInfoVersion, nil),
-				getCSIDriver("info", &currentPodInfoMountVersion, nil),
+			fakeClient := fakeclient.NewSimpleClientset(
+				getCSIDriver("no-info", &noPodMountInfo, nil),
+				getCSIDriver("info", &currentPodInfoMount, nil),
 				getCSIDriver("nil", nil, nil),
 			)
-			plug, tmpDir := newTestPlugin(t, fakeClient, fakeCSIClient)
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
@@ -269,7 +268,7 @@ func TestMounterSetUp(t *testing.T) {
 }
 func TestMounterSetUpWithFSGroup(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
-	plug, tmpDir := newTestPlugin(t, fakeClient, nil)
+	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -393,7 +392,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 }
 
 func TestUnmounterTeardown(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
@@ -443,7 +442,7 @@ func TestUnmounterTeardown(t *testing.T) {
 }
 
 func TestSaveVolumeData(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
 		name       string
@@ -490,14 +489,14 @@ func TestSaveVolumeData(t *testing.T) {
 	}
 }
 
-func getCSIDriver(name string, podInfoMountVersion *string, attachable *bool) *csiapi.CSIDriver {
-	return &csiapi.CSIDriver{
+func getCSIDriver(name string, podInfoMount *bool, attachable *bool) *storagev1beta1.CSIDriver {
+	return &storagev1beta1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
 		},
-		Spec: csiapi.CSIDriverSpec{
-			PodInfoOnMountVersion: podInfoMountVersion,
-			AttachRequired:        attachable,
+		Spec: storagev1beta1.CSIDriverSpec{
+			PodInfoOnMount: podInfoMount,
+			AttachRequired: attachable,
 		},
 	}
 }

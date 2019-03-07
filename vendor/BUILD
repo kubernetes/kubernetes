@@ -1,5 +1,3 @@
-# gazelle:importmap_prefix k8s.io/kubernetes/vendor
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),

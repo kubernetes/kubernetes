@@ -99,7 +99,7 @@ func TestParseConfig(t *testing.T) {
 		MaximumLoadBalancerRuleCount:      1,
 		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
 		PrimaryScaleSetName:               "primaryScaleSetName",
-		ResourceGroup:                     "resourceGroup",
+		ResourceGroup:                     "resourcegroup",
 		RouteTableName:                    "routeTableName",
 		SecurityGroupName:                 "securityGroupName",
 		SubnetName:                        "subnetName",
@@ -1676,7 +1676,8 @@ func validateEmptyConfig(t *testing.T, config string) {
 func TestGetZone(t *testing.T) {
 	cloud := &Cloud{
 		Config: Config{
-			Location: "eastus",
+			Location:            "eastus",
+			UseInstanceMetadata: true,
 		},
 	}
 	testcases := []struct {

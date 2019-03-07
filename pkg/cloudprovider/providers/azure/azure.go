@@ -423,6 +423,9 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 		return nil, err
 	}
 
+	// The resource group name may be in different cases from different Azure APIs, hence it is converted to lower here.
+	// See more context at https://github.com/kubernetes/kubernetes/issues/71994.
+	config.ResourceGroup = strings.ToLower(config.ResourceGroup)
 	return &config, nil
 }
 
@@ -578,7 +581,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 		// Add to nodeResourceGroups cache.
 		newRG, ok := newNode.ObjectMeta.Labels[externalResourceGroupLabel]
 		if ok && len(newRG) > 0 {
-			az.nodeResourceGroups[newNode.ObjectMeta.Name] = newRG
+			az.nodeResourceGroups[newNode.ObjectMeta.Name] = strings.ToLower(newRG)
 		}
 
 		// Add to unmanagedNodes cache.
@@ -677,7 +680,7 @@ func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
 // ShouldNodeExcludedFromLoadBalancer returns true if node is unmanaged or in external resource group.
 func (az *Cloud) ShouldNodeExcludedFromLoadBalancer(node *v1.Node) bool {
 	labels := node.ObjectMeta.Labels
-	if rg, ok := labels[externalResourceGroupLabel]; ok && rg != az.ResourceGroup {
+	if rg, ok := labels[externalResourceGroupLabel]; ok && !strings.EqualFold(rg, az.ResourceGroup) {
 		return true
 	}
 

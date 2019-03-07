@@ -108,7 +108,7 @@ func (o *Options) RunBuild(
 		return err
 	}
 	defer ldr.Cleanup()
-	kt, err := target.NewKustTarget(ldr, fSys, rf, ptf)
+	kt, err := target.NewKustTarget(ldr, rf, ptf)
 	if err != nil {
 		return err
 	}

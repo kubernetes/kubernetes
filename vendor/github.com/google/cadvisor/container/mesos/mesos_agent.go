@@ -113,8 +113,10 @@ func (s *state) fetchLabelsFromTask(exID string, labels map[string]string) error
 		}
 	}
 
-	for _, l := range t.Labels.Labels {
-		labels[l.Key] = *l.Value
+	if t.Labels != nil {
+		for _, l := range t.Labels.Labels {
+			labels[l.Key] = *l.Value
+		}
 	}
 
 	return nil

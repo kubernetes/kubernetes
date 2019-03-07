@@ -232,7 +232,7 @@ func TestRunInitNodeChecks(t *testing.T) {
 	}
 	for _, rt := range tests {
 		// TODO: Make RunInitNodeChecks accept a ClusterConfiguration object instead of InitConfiguration
-		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString())
+		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString(), false)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",

@@ -17,7 +17,6 @@
 ./cluster/gce/upgrade-aliases.sh
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
-./cluster/images/conformance/run_e2e.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
@@ -41,7 +40,6 @@
 ./hack/lib/protoc.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
-./hack/lib/util.sh
 ./hack/lib/version.sh
 ./hack/list-feature-tests.sh
 ./hack/local-up-cluster.sh

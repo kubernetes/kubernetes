@@ -32,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/openapi:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/crdserverscheme:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",

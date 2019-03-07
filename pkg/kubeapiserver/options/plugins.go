@@ -111,7 +111,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
 	nodetaint.Register(plugins)
-	label.Register(plugins) // DEPRECATED in favor of NewPersistentVolumeLabelController in CCM
+	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,9 +51,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.ServeHostname
+		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
-		TestReplicationControllerServeImageOrFail(f, "private", imageutils.GetE2EImage(privateimage))
+		TestReplicationControllerServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {

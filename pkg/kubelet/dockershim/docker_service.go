@@ -155,7 +155,7 @@ type dockerNetworkHost struct {
 	*portMappingGetter
 }
 
-var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
+var internalLabelKeys = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // ClientConfig is parameters used to initialize docker client
 type ClientConfig struct {
@@ -186,6 +186,7 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 	return nil
 }
 
+// NewDockerService creates a new `DockerService` struct.
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
 	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
@@ -211,6 +212,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		checkpointManager:         checkpointManager,
 		startLocalStreamingServer: startLocalStreamingServer,
 		networkReady:              make(map[string]bool),
+		containerCleanupInfos:     make(map[string]*containerCleanupInfo),
 	}
 
 	// check docker version compatibility.
@@ -305,6 +307,12 @@ type dockerService struct {
 	// startLocalStreamingServer indicates whether dockershim should start a
 	// streaming server on localhost.
 	startLocalStreamingServer bool
+
+	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
+	// needed to clean up after containers have been started or removed.
+	// (see `applyPlatformSpecificDockerConfig` and `performPlatformSpecificContainerCleanup`
+	// methods for more info).
+	containerCleanupInfos map[string]*containerCleanupInfo
 }
 
 // TODO: handle context.
@@ -411,7 +419,7 @@ func (ds *dockerService) Start() error {
 // initCleanup is responsible for cleaning up any crufts left by previous
 // runs. If there are any errros, it simply logs them.
 func (ds *dockerService) initCleanup() {
-	errors := ds.platformSpecificContainerCreationInitCleanup()
+	errors := ds.platformSpecificContainerInitCleanup()
 
 	for _, err := range errors {
 		klog.Warningf("initialization error: %v", err)

@@ -63,9 +63,9 @@ spec:
     - name: E2E_SKIP
       value: ""
     - name: E2E_PROVIDER
-      value: "local"
+      value: "skeleton"
     - name: E2E_PARALLEL
-      value: "1"
+      value: "false"
     volumeMounts:
     - name: output-volume
       mountPath: /tmp/results
