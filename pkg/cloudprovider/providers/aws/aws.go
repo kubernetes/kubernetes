@@ -4231,16 +4231,16 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			sgID := aws.StringValue(sg.GroupId)
 
 			if sgID == c.cfg.Global.ElbSecurityGroup {
-				//We don't want to delete a security group that was defined in the Cloud Configurationn.
+				//We don't want to delete a security group that was defined in the Cloud Configuration.
 				continue
 			}
 			if sgID == "" {
-				klog.Warning("Ignoring empty security group in ", service.Name)
+				klog.Warningf("Ignoring empty security group in %s", service.Name)
 				continue
 			}
 
 			if !c.tagging.hasClusterTag(sg.Tags) {
-				klog.Warning("Ignoring security group with no cluster tag in", service.Name)
+				klog.Warningf("Ignoring security group with no cluster tag in %s", service.Name)
 				continue
 			}
 
