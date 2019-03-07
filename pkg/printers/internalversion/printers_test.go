@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	genericprinters "k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -1094,12 +1095,13 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	verifyTable(t, table)
-	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+	if err := printers.PrintTable(table, parsers, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 		t.Fatal(err)
 	}
 	output := string(buff.Bytes())
@@ -1227,13 +1229,14 @@ func TestPrintHumanReadableService(t *testing.T) {
 
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
+			parsers := []*jsonpath.JSONPath{}
 			buff := bytes.NewBuffer([]byte{})
 			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.PrintOptions{Wide: wide})
 			if err != nil {
 				t.Fatal(err)
 			}
 			verifyTable(t, table)
-			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			if err := printers.PrintTable(table, parsers, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 				t.Fatal(err)
 			}
 			output := string(buff.Bytes())
@@ -2035,13 +2038,14 @@ func TestPrintDeployment(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -2051,7 +2055,7 @@ func TestPrintDeployment(t *testing.T) {
 		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{Wide: true})
 		verifyTable(t, table)
 		// print deployment with '-o wide' option
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
@@ -2090,13 +2094,14 @@ func TestPrintDaemonSet(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasPrefix(buf.String(), test.startsWith) {
@@ -2179,13 +2184,14 @@ func TestPrintJob(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -2786,13 +2792,14 @@ func TestPrintHPA(t *testing.T) {
 	}
 
 	buff := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buff.String() != test.expected {
@@ -3016,13 +3023,14 @@ func TestPrintService(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		// We ignore time
@@ -3074,13 +3082,14 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 		}}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3155,13 +3164,14 @@ func TestPrintControllerRevision(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3216,13 +3226,14 @@ func TestPrintReplicaSet(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3235,7 +3246,7 @@ func TestPrintReplicaSet(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
@@ -3328,13 +3339,14 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		},
 	}
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3401,13 +3413,14 @@ func TestPrintCronJob(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3445,13 +3458,14 @@ func TestPrintStorageClass(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3495,12 +3509,13 @@ func TestPrintLease(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3539,13 +3554,14 @@ func TestPrintPriorityClass(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	parsers := []*jsonpath.JSONPath{}
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
@@ -3582,6 +3598,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 		},
 	}
 
+	parsers := []*jsonpath.JSONPath{}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.PrintOptions{})
@@ -3589,7 +3606,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		if err := printers.PrintTable(table, parsers, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {

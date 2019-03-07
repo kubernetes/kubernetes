@@ -26,13 +26,14 @@ import (
 	"github.com/onsi/gomega"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -165,7 +166,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 func printTable(table *metav1beta1.Table) string {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
-	err := printers.PrintTable(table, tw, printers.PrintOptions{})
+	parsers := []*jsonpath.JSONPath{}
+	err := printers.PrintTable(table, parsers, tw, printers.PrintOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to print table: %+v", table)
 	tw.Flush()
 	return buf.String()

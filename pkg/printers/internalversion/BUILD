@@ -40,6 +40,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
+        "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
