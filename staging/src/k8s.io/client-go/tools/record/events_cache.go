@@ -103,11 +103,11 @@ type EventSourceObjectSpamFilter struct {
 }
 
 // NewEventSourceObjectSpamFilter allows burst events from a source about an object with the specified qps refill.
-func NewEventSourceObjectSpamFilter(lruCacheSize, burst int, qps float32, clock clock.Clock) *EventSourceObjectSpamFilter {
+func NewEventSourceObjectSpamFilter(clock clock.Clock) *EventSourceObjectSpamFilter {
 	return &EventSourceObjectSpamFilter{
-		cache: lru.New(lruCacheSize),
-		burst: burst,
-		qps:   qps,
+		cache: lru.New(maxLruCacheEntries),
+		burst: defaultSpamBurst,
+		qps:   defaultSpamQPS,
 		clock: clock,
 	}
 }
@@ -411,6 +411,10 @@ type EventCorrelateResult struct {
 	Skip bool
 }
 
+type EventSpamFilter interface {
+	Filter(event *v1.Event) bool
+}
+
 // NewEventCorrelator returns an EventCorrelator configured with default values.
 //
 // The EventCorrelator is responsible for event filtering, aggregating, and counting
@@ -426,21 +430,23 @@ type EventCorrelateResult struct {
 //     times.
 //   * A source may burst 25 events about an object, but has a refill rate budget
 //     per object of 1 event every 5 minutes to control long-tail of spam.
-func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
-	cacheSize := maxLruCacheEntries
-	spamFilter := NewEventSourceObjectSpamFilter(cacheSize, defaultSpamBurst, defaultSpamQPS, clock)
-	return &EventCorrelator{
+func NewEventCorrelator(clock clock.Clock, spamFilter EventSpamFilter) *EventCorrelator {
+	correlator := &EventCorrelator{
 		filterFunc: spamFilter.Filter,
 		aggregator: NewEventAggregator(
-			cacheSize,
+			maxLruCacheEntries,
 			EventAggregatorByReasonFunc,
 			EventAggregatorByReasonMessageFunc,
 			defaultAggregateMaxEvents,
 			defaultAggregateIntervalInSeconds,
 			clock),
 
-		logger: newEventLogger(cacheSize, clock),
+		logger: newEventLogger(maxLruCacheEntries, clock),
 	}
+	if spamFilter != nil {
+		correlator.filterFunc = spamFilter.Filter
+	}
+	return correlator
 }
 
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
@@ -450,7 +456,7 @@ func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateRes
 	}
 	aggregateEvent, ckey := c.aggregator.EventAggregate(newEvent)
 	observedEvent, patch, err := c.logger.eventObserve(aggregateEvent, ckey)
-	if c.filterFunc(observedEvent) {
+	if c.filterFunc != nil && c.filterFunc(observedEvent) {
 		return &EventCorrelateResult{Skip: true}, nil
 	}
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err

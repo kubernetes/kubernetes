@@ -234,7 +234,7 @@ func TestEventCorrelator(t *testing.T) {
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
 		clock := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelator(&clock)
+		correlator := NewEventCorrelator(&clock, NewEventSourceObjectSpamFilter(&clock))
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
 			now := metav1.NewTime(clock.Now())

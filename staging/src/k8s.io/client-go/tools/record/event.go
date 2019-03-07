@@ -97,16 +97,39 @@ type EventBroadcaster interface {
 
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration}
+	realClock := clock.RealClock{}
+	return &eventBroadcasterImpl{
+		Broadcaster:     watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		eventCorrelator: NewEventCorrelator(realClock, NewEventSourceObjectSpamFilter(realClock)),
+		sleepDuration:   defaultSleepDuration,
+	}
+}
+
+// NewBroadcasterWithNoSpamFilter creates new event broadcaster with no spam filter. This means that all events
+// are reported to API server without any rate-limiting.
+func NewBroadcasterWithNoSpamFilter() EventBroadcaster {
+	realClock := clock.RealClock{}
+	return &eventBroadcasterImpl{
+		Broadcaster:     watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		eventCorrelator: NewEventCorrelator(realClock, nil),
+		sleepDuration:   defaultSleepDuration,
+	}
 }
 
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), sleepDuration}
+	realClock := clock.RealClock{}
+	return &eventBroadcasterImpl{
+		Broadcaster:     watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		eventCorrelator: NewEventCorrelator(realClock, nil),
+		sleepDuration:   sleepDuration,
+	}
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	sleepDuration time.Duration
+
+	eventCorrelator *EventCorrelator
+	sleepDuration   time.Duration
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -116,10 +139,9 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelator(clock.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *v1.Event) {
-			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)
+			recordToSink(sink, event, eventBroadcaster.eventCorrelator, randGen, eventBroadcaster.sleepDuration)
 		})
 }
 
