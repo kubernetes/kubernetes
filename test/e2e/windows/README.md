@@ -4,7 +4,7 @@
 
 ```bash
 KUBECONFIG=path/to/kubeconfig
-curl https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/repo-list -o repo_list
+curl https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/images/image-repo-list -o repo_list
 export KUBE_TEST_REPO_LIST=$(pwd)/repo_list
 ```
 

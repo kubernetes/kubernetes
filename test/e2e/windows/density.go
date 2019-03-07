@@ -37,13 +37,7 @@ import (
 )
 
 var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
-
 	f := framework.NewDefaultFramework("density-test-windows")
-
-	ginkgo.BeforeEach(func() {
-		// NOTE(vyta): these tests are Windows specific
-		framework.SkipUnlessNodeOSDistroIs("windows")
-	})
 
 	ginkgo.Context("create a batch of pods", func() {
 		// TODO(coufon): the values are generous, set more precise limits with benchmark data
