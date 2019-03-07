@@ -718,10 +718,14 @@ func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	if _, err := os.Stat(pathname); os.IsNotExist(err) {
+	pathExists, pathErr := PathExists(pathname)
+	if !pathExists {
 		return []string{}, nil
-	} else if err != nil {
-		return nil, err
+	} else if IsCorruptedMnt(pathErr) {
+		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", pathname)
+		return []string{}, nil
+	} else if pathErr != nil {
+		return nil, fmt.Errorf("error checking path %s: %v", pathname, pathErr)
 	}
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
