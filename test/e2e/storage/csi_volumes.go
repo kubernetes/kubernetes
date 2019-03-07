@@ -59,7 +59,8 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		})
 	}
 
-	Context("CSI Topology test using GCE PD driver", func() {
+	// TODO: PD CSI driver needs to be serial because it uses a fixed name. Address as part of #71289
+	Context("CSI Topology test using GCE PD driver [Serial]", func() {
 		f := framework.NewDefaultFramework("csitopology")
 		driver := drivers.InitGcePDCSIDriver().(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
 		var (
