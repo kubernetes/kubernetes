@@ -7,6 +7,7 @@ test/e2e/apimachinery/garbage_collector.go: "should orphan RS created by deploym
 test/e2e/apimachinery/garbage_collector.go: "should keep the rc around until all its pods are deleted if the deleteOptions says so"
 test/e2e/apimachinery/garbage_collector.go: "should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted"
 test/e2e/apimachinery/garbage_collector.go: "should not be blocked by dependency circle"
+test/e2e/apimachinery/garbage_collector.go: "should delete jobs and pods created by cronjob"
 test/e2e/apimachinery/namespace.go: "should ensure that all pods are removed when a namespace is deleted"
 test/e2e/apimachinery/namespace.go: "should ensure that all services are removed when a namespace is deleted"
 test/e2e/apimachinery/watch.go: "should observe add, update, and delete watch notifications on configmaps"

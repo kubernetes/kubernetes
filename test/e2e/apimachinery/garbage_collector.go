@@ -1073,7 +1073,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 	})
 
-	It("should delete jobs and pods created by cronjob", func() {
+	/*
+		Release : v1.14
+		Testname: Garbage Collector, job and pod lifecycle management on cronjob deletion
+		Description: Create a Cronjob, wait for the Cronjob to create new jobs. Once the jobs are created, delete the CronJob. Verify that all the jobs and pods associated with the Cronjob is deleted and not left behind.
+	*/
+	framework.ConformanceIt("should delete jobs and pods created by cronjob", func() {
 		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 
 		By("Create the cronjob")
