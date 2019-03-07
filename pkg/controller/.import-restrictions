@@ -153,6 +153,7 @@
         "k8s.io/client-go/testing",
         "k8s.io/client-go/tools/cache",
         "k8s.io/client-go/tools/leaderelection/resourcelock",
+        "k8s.io/client-go/tools/pager",
         "k8s.io/client-go/tools/record",
         "k8s.io/client-go/tools/reference",
         "k8s.io/client-go/tools/watch",

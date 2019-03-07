@@ -24,6 +24,8 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -184,4 +186,15 @@ func (c *TestCrd) GetAPIVersions() []string {
 
 func (c *TestCrd) GetV1DynamicClient() dynamic.ResourceInterface {
 	return c.DynamicClients["v1"]
+}
+
+// PatchSchema takes validation schema in YAML and patches it to given CRD
+func (c *TestCrd) PatchSchema(schema []byte) error {
+	s, err := utilyaml.ToJSON(schema)
+	if err != nil {
+		return fmt.Errorf("failed to create json patch: %v", err)
+	}
+	patch := []byte(fmt.Sprintf(`{"spec":{"validation":{"openAPIV3Schema":%s}}}`, string(s)))
+	c.Crd, err = c.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(c.GetMetaName(), types.MergePatchType, patch)
+	return err
 }

@@ -139,10 +139,10 @@ type VolumePlugin interface {
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
 
 	// ConstructVolumeSpec constructs a volume spec based on the given volume name
-	// and mountPath. The spec may have incomplete information due to limited
+	// and volumePath. The spec may have incomplete information due to limited
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
-	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+	ConstructVolumeSpec(volumeName, volumePath string) (*Spec, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
 	// Specifying mount options in a volume plugin that doesn't support
@@ -275,7 +275,7 @@ type BlockVolumePlugin interface {
 	// The spec may have incomplete information due to limited information
 	// from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk.
-	ConstructBlockVolumeSpec(podUID types.UID, volumeName, mountPath string) (*Spec, error)
+	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.

@@ -281,6 +281,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should set different fsGroup for second pod if first pod is deleted", func() {
+					framework.Skipf("Disabled temporarily, reopen after #73168 is fixed")
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)

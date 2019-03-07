@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -56,7 +57,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		disableAttach   bool
 		attachLimit     int
 		registerDriver  bool
-		podInfoVersion  *string
+		podInfo         *bool
 		scName          string
 		nodeSelectorKey string
 	}
@@ -87,7 +88,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		cs := f.ClientSet
 		var err error
 
-		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, !tp.disableAttach, tp.podInfoVersion, tp.attachLimit)
+		m.driver = drivers.InitMockCSIDriver(tp.registerDriver, !tp.disableAttach, tp.podInfo, tp.attachLimit)
 		config, testCleanup := m.driver.PrepareTest(f)
 		m.testCleanups = append(m.testCleanups, testCleanup)
 		m.config = config
@@ -186,31 +187,31 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	}
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
-	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
+	Context("CSI attach test using mock driver", func() {
 		tests := []struct {
-			name            string
-			disableAttach   bool
-			deployDriverCRD bool
+			name                   string
+			disableAttach          bool
+			deployClusterRegistrar bool
 		}{
 			{
-				name:            "should not require VolumeAttach for drivers without attachment",
-				disableAttach:   true,
-				deployDriverCRD: true,
+				name:                   "should not require VolumeAttach for drivers without attachment",
+				disableAttach:          true,
+				deployClusterRegistrar: true,
 			},
 			{
-				name:            "should require VolumeAttach for drivers with attachment",
-				deployDriverCRD: true,
+				name:                   "should require VolumeAttach for drivers with attachment",
+				deployClusterRegistrar: true,
 			},
 			{
-				name:            "should preserve attachment policy when no CSIDriver present",
-				deployDriverCRD: false,
+				name:                   "should preserve attachment policy when no CSIDriver present",
+				deployClusterRegistrar: false,
 			},
 		}
 		for _, t := range tests {
 			test := t
 			It(t.name, func() {
 				var err error
-				init(testParameters{registerDriver: test.deployDriverCRD, disableAttach: test.disableAttach})
+				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				defer cleanup()
 
 				_, claim, pod := createPod()
@@ -242,56 +243,49 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	})
 
-	Context("CSI workload information using mock driver [Feature:CSIDriverRegistry]", func() {
+	Context("CSI workload information using mock driver", func() {
 		var (
-			err            error
-			podInfoV1      = "v1"
-			podInfoUnknown = "unknown"
-			podInfoEmpty   = ""
+			err          error
+			podInfoTrue  = true
+			podInfoFalse = false
 		)
 		tests := []struct {
-			name                  string
-			podInfoOnMountVersion *string
-			deployDriverCRD       bool
-			expectPodInfo         bool
+			name                   string
+			podInfoOnMount         *bool
+			deployClusterRegistrar bool
+			expectPodInfo          bool
 		}{
 			{
-				name:                  "should not be passed when podInfoOnMountVersion=nil",
-				podInfoOnMountVersion: nil,
-				deployDriverCRD:       true,
-				expectPodInfo:         false,
+				name:                   "should not be passed when podInfoOnMount=nil",
+				podInfoOnMount:         nil,
+				deployClusterRegistrar: true,
+				expectPodInfo:          false,
 			},
 			{
-				name:                  "should be passed when podInfoOnMountVersion=v1",
-				podInfoOnMountVersion: &podInfoV1,
-				deployDriverCRD:       true,
-				expectPodInfo:         true,
+				name:                   "should be passed when podInfoOnMount=true",
+				podInfoOnMount:         &podInfoTrue,
+				deployClusterRegistrar: true,
+				expectPodInfo:          true,
 			},
 			{
-				name:                  "should not be passed when podInfoOnMountVersion=<empty string>",
-				podInfoOnMountVersion: &podInfoEmpty,
-				deployDriverCRD:       true,
-				expectPodInfo:         false,
+				name:                   "should not be passed when podInfoOnMount=false",
+				podInfoOnMount:         &podInfoFalse,
+				deployClusterRegistrar: true,
+				expectPodInfo:          false,
 			},
 			{
-				name:                  "should not be passed when podInfoOnMountVersion=<unknown string>",
-				podInfoOnMountVersion: &podInfoUnknown,
-				deployDriverCRD:       true,
-				expectPodInfo:         false,
-			},
-			{
-				name:            "should not be passed when CSIDriver does not exist",
-				deployDriverCRD: false,
-				expectPodInfo:   false,
+				name:                   "should not be passed when CSIDriver does not exist",
+				deployClusterRegistrar: false,
+				expectPodInfo:          false,
 			},
 		}
 		for _, t := range tests {
 			test := t
 			It(t.name, func() {
 				init(testParameters{
-					registerDriver: test.deployDriverCRD,
+					registerDriver: test.deployClusterRegistrar,
 					scName:         "csi-mock-sc-" + f.UniqueName,
-					podInfoVersion: test.podInfoOnMountVersion})
+					podInfo:        test.podInfoOnMount})
 
 				defer cleanup()
 

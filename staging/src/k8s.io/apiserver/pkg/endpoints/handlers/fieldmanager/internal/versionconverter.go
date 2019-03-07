@@ -81,3 +81,8 @@ func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.AP
 	// Convert the object back to a smd typed value and return it.
 	return v.typeConverter.ObjectToTyped(convertedObject)
 }
+
+// IsMissingVersionError
+func (v *versionConverter) IsMissingVersionError(err error) bool {
+	return runtime.IsNotRegisteredError(err)
+}

@@ -1481,7 +1481,17 @@ func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v
 	namespace := f.Namespace.Name
 	configName := slowWebhookConfigName
 
-	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+	// Add a unique label to the namespace
+	ns, err := client.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting namespace %s", namespace)
+	if ns.Labels == nil {
+		ns.Labels = map[string]string{}
+	}
+	ns.Labels[slowWebhookConfigName] = namespace
+	_, err = client.CoreV1().Namespaces().Update(ns)
+	framework.ExpectNoError(err, "error labeling namespace %s", namespace)
+
+	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
@@ -1503,6 +1513,10 @@ func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v
 						Path:      strPtr("/always-allow-delay-5s"),
 					},
 					CABundle: context.signingCert,
+				},
+				// Scope the webhook to just this namespace
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: ns.Labels,
 				},
 				FailurePolicy:  policy,
 				TimeoutSeconds: timeout,

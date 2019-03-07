@@ -69,7 +69,7 @@ func TestUploadConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 				},
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: "v1.12.10",
+					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
 				},
 				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
 					{

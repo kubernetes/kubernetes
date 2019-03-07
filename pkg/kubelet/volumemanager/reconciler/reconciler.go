@@ -341,7 +341,7 @@ func (rc *reconciler) StatesHasBeenSynced() bool {
 type podVolume struct {
 	podName        volumetypes.UniquePodName
 	volumeSpecName string
-	mountPath      string
+	volumePath     string
 	pluginName     string
 	volumeMode     v1.PersistentVolumeMode
 }
@@ -477,7 +477,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		pod.UID,
 		volume.podName,
 		volume.volumeSpecName,
-		volume.mountPath,
+		volume.volumePath,
 		volume.pluginName)
 	if err != nil {
 		return nil, err
@@ -492,15 +492,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	} else {
 		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
 	}
-	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
-	if checkErr != nil {
-		return nil, checkErr
-	}
-	// If mount or symlink doesn't exist, volume reconstruction should be failed
-	if !isExist {
-		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
-	}
 
 	volumeMounter, newMounterErr := plugin.NewMounter(
 		volumeSpec,
@@ -514,6 +505,16 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 			volume.podName,
 			pod.UID,
 			newMounterErr)
+	}
+
+	// Check existence of mount point for filesystem volume or symbolic link for block volume
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volumeMounter.GetPath(), volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	if checkErr != nil {
+		return nil, checkErr
+	}
+	// If mount or symlink doesn't exist, volume reconstruction should be failed
+	if !isExist {
+		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
 	}
 
 	// TODO: remove feature gate check after no longer needed
@@ -680,12 +681,12 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 				}
 				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
-					mountPath := path.Join(volumePluginPath, volumeName)
-					klog.V(5).Infof("podName: %v, mount path from volume plugin directory: %v, ", podName, mountPath)
+					volumePath := path.Join(volumePluginPath, volumeName)
+					klog.V(5).Infof("podName: %v, volume path from volume plugin directory: %v, ", podName, volumePath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
 						volumeSpecName: volumeName,
-						mountPath:      mountPath,
+						volumePath:     volumePath,
 						pluginName:     unescapePluginName,
 						volumeMode:     volumeMode,
 					})

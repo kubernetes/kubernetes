@@ -88,6 +88,7 @@ const (
 	nginxDeployment1Filename = "nginx-deployment1.yaml.in"
 	nginxDeployment2Filename = "nginx-deployment2.yaml.in"
 	nginxDeployment3Filename = "nginx-deployment3.yaml.in"
+	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 var (
@@ -817,6 +818,69 @@ metadata:
 				}
 			}
 		})
+	})
+
+	framework.KubeDescribe("Kubectl client-side validation", func() {
+		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
+			ginkgo.By("create CRD with no validation schema")
+			crd, err := framework.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
+			if err := createApplyCustomResource(randomCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
+			ginkgo.By("prepare CRD with validation schema")
+			crd, err := framework.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+			if err := crd.PatchSchema(schemaFoo); err != nil {
+				framework.Failf("%v", err)
+			}
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
+			if err := createApplyCustomResource(validCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
+			ginkgo.By("prepare CRD with partially-specified validation schema")
+			crd, err := framework.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+			if err := crd.PatchSchema(schemaFoo); err != nil {
+				framework.Failf("%v", err)
+			}
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
+			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
 	})
 
 	framework.KubeDescribe("Kubectl cluster-info", func() {
@@ -2159,3 +2223,71 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 	p.Logger = log.New(logs, "", 0)
 	return httptest.NewServer(p), logs
 }
+
+// createApplyCustomResource asserts that given CustomResource be created and applied
+// without being rejected by client-side validation
+func createApplyCustomResource(resource, namespace, name string, crd *framework.TestCrd) error {
+	ns := fmt.Sprintf("--namespace=%v", namespace)
+	ginkgo.By("successfully create CR")
+	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {
+		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, ns, err)
+	}
+	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+	}
+	ginkgo.By("successfully apply CR")
+	if _, err := framework.RunKubectlInput(resource, ns, "apply", "-f", "-"); err != nil {
+		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, ns, err)
+	}
+	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+	}
+	return nil
+}
+
+var schemaFoo = []byte(`description: Foo CRD for Testing
+type: object
+properties:
+  spec:
+    type: object
+    description: Specification of Foo
+    properties:
+      bars:
+        description: List of Bars and their specs.
+        type: array
+        items:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            age:
+              description: Age of Bar.
+              type: string
+            bazs:
+              description: List of Bazs.
+              items:
+                type: string
+              type: array
+  status:
+    description: Status of Foo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            available:
+              description: Whether the Bar is installed.
+              type: boolean
+            quxType:
+              description: Indicates to external qux type.
+              pattern: in-tree|out-of-tree
+              type: string`)

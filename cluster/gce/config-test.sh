@@ -38,13 +38,7 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
-
-# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
-# To avoid situation during cluster upgrade when there are two instances
-# of fluentd running on a node, kubelet need to mark node on which
-# fluentd is not running as a manifest pod with appropriate label.
-# TODO(piosz): remove this in 1.8
-NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+NODE_LABELS="${KUBE_NODE_LABELS:-}"
 WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
 
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
@@ -257,6 +251,8 @@ ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-true}" # true, false
 METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # true, false
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
+  NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
+  # TODO(liggitt): remove this in v1.16
   NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
@@ -379,6 +375,8 @@ if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
 else
   ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
 fi
+
+ENABLE_APISERVER_DYNAMIC_AUDIT="${ENABLE_APISERVER_DYNAMIC_AUDIT:-false}"
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

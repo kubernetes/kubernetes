@@ -338,6 +338,7 @@ const (
 
 	// owner: @vladimirvivien
 	// alpha: v1.11
+	// beta: v1.14
 	//
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
@@ -414,6 +415,12 @@ const (
 	//
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA utilfeature.Feature = "WindowsGMSA"
+
+	// owner: @adisky
+	// alpha: v1.14
+	//
+	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
+	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
 )
 
 func init() {
@@ -470,13 +477,14 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: utilfeature.Beta},
+	CSIMigrationOpenStack:                       {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
-	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
+	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
@@ -484,6 +492,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
+	WindowsGMSA:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

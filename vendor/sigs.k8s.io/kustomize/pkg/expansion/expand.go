@@ -36,15 +36,17 @@ func syntaxWrap(input string) string {
 // implements the expansion semantics defined in the expansion spec; it
 // returns the input string wrapped in the expansion syntax if no mapping
 // for the input is found.
-func MappingFuncFor(context ...map[string]string) func(string) string {
+func MappingFuncFor(
+	counts map[string]int,
+	context ...map[string]string) func(string) string {
 	return func(input string) string {
 		for _, vars := range context {
 			val, ok := vars[input]
 			if ok {
+				counts[input]++
 				return val
 			}
 		}
-
 		return syntaxWrap(input)
 	}
 }

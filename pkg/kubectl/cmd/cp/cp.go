@@ -307,7 +307,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
-	return untarAll(reader, dest.File, prefix)
+	return o.untarAll(reader, dest.File, prefix)
 }
 
 // stripPathShortcuts removes any leading or trailing "../" from a given path
@@ -418,7 +418,7 @@ func clean(fileName string) string {
 	return path.Clean(string(os.PathSeparator) + fileName)
 }
 
-func untarAll(reader io.Reader, destFile, prefix string) error {
+func (o *CopyOptions) untarAll(reader io.Reader, destFile, prefix string) error {
 	entrySeq := -1
 
 	// TODO: use compression here?
@@ -433,6 +433,12 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 		}
 		entrySeq++
 		mode := header.FileInfo().Mode()
+		// all the files will start with the prefix, which is the directory where
+		// they were located on the pod, we need to strip down that prefix, but
+		// if the prefix is missing it means the tar was tempered with
+		if !strings.HasPrefix(header.Name, prefix) {
+			return fmt.Errorf("tar contents corrupted")
+		}
 		outFileName := path.Join(destFile, clean(header.Name[len(prefix):]))
 		baseName := path.Dir(outFileName)
 		if err := os.MkdirAll(baseName, 0755); err != nil {
@@ -457,8 +463,16 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 		}
 
 		if mode&os.ModeSymlink != 0 {
-			err := os.Symlink(header.Linkname, outFileName)
-			if err != nil {
+			linkname := header.Linkname
+			// error is returned if linkname can't be made relative to destFile,
+			// but relative can end up being ../dir that's why we also need to
+			// verify if relative path is the same after Clean-ing
+			relative, err := filepath.Rel(destFile, linkname)
+			if path.IsAbs(linkname) && (err != nil || relative != stripPathShortcuts(relative)) {
+				fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", outFileName, header.Linkname)
+				continue
+			}
+			if err := os.Symlink(linkname, outFileName); err != nil {
 				return err
 			}
 		} else {

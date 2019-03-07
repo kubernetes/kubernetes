@@ -666,7 +666,7 @@ func TestKustomizeDirectoryBuilder(t *testing.T) {
 		{
 			directory: "../../../artifacts/guestbook",
 			expectErr: true,
-			errMsg:    "No kustomization file found",
+			errMsg:    "unable to find one of 'kustomization.yaml', 'kustomization.yml' or 'Kustomization'",
 		},
 		{
 			directory:     dir,
