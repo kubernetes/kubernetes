@@ -61,6 +61,10 @@ func TestConvertToGVK(t *testing.T) {
 			},
 			gvk: examplev1.SchemeGroupVersion.WithKind("Pod"),
 			expectedObj: &examplev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "example.apiserver.k8s.io/v1",
+					Kind:       "Pod",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod1",
 					Labels: map[string]string{
@@ -86,6 +90,10 @@ func TestConvertToGVK(t *testing.T) {
 			},
 			gvk: example2v1.SchemeGroupVersion.WithKind("ReplicaSet"),
 			expectedObj: &example2v1.ReplicaSet{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "example2.apiserver.k8s.io/v1",
+					Kind:       "ReplicaSet",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "rs1",
 					Labels: map[string]string{
