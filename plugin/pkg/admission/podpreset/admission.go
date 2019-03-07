@@ -184,6 +184,12 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.Pod
 			errs = append(errs, err)
 		}
 	}
+	for _, iCtr := range pod.Spec.InitContainers {
+		if err := safeToApplyPodPresetsOnContainer(&iCtr, podPresets); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -380,6 +386,10 @@ func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.PodPreset
 	for i, ctr := range pod.Spec.Containers {
 		applyPodPresetsOnContainer(&ctr, podPresets)
 		pod.Spec.Containers[i] = ctr
+	}
+	for i, iCtr := range pod.Spec.InitContainers {
+		applyPodPresetsOnContainer(&iCtr, podPresets)
+		pod.Spec.InitContainers[i] = iCtr
 	}
 
 	// add annotation

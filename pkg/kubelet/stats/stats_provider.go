@@ -88,6 +88,7 @@ type StatsProvider struct {
 // containers managed by pods.
 type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
 	ImageFsDevice() (string, error)

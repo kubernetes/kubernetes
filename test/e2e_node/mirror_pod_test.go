@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("wait for the mirror pod to be updated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 
 			By("check the mirror pod container image is updated")
@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		/*
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("wait for the mirror pod to be recreated")
 			Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
+				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		AfterEach(func() {
@@ -191,7 +191,7 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	return nil
 }
 
-func checkMirrorPodRecreatedAndRunnig(cl clientset.Interface, name, namespace string, oUID types.UID) error {
+func checkMirrorPodRecreatedAndRunning(cl clientset.Interface, name, namespace string, oUID types.UID) error {
 	pod, err := cl.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)

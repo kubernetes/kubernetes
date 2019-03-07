@@ -31,11 +31,10 @@ type testJoinData struct{}
 // testJoinData must satisfy JoinData.
 var _ JoinData = &testJoinData{}
 
-func (j *testJoinData) CertificateKey() string                                      { return "" }
-func (j *testJoinData) Cfg() *kubeadmapi.JoinConfiguration                          { return nil }
-func (j *testJoinData) KubeConfigPath() string                                      { return "" }
-func (j *testJoinData) TLSBootstrapCfg() (*clientcmdapi.Config, error)              { return nil, nil }
-func (j *testJoinData) InitCfg() (*kubeadmapi.InitConfiguration, error)             { return nil, nil }
-func (j *testJoinData) ClientSetFromFile(path string) (*clientset.Clientset, error) { return nil, nil }
-func (j *testJoinData) IgnorePreflightErrors() sets.String                          { return nil }
-func (j *testJoinData) OutputWriter() io.Writer                                     { return nil }
+func (j *testJoinData) CertificateKey() string                          { return "" }
+func (j *testJoinData) Cfg() *kubeadmapi.JoinConfiguration              { return nil }
+func (j *testJoinData) TLSBootstrapCfg() (*clientcmdapi.Config, error)  { return nil, nil }
+func (j *testJoinData) InitCfg() (*kubeadmapi.InitConfiguration, error) { return nil, nil }
+func (j *testJoinData) ClientSet() (*clientset.Clientset, error)        { return nil, nil }
+func (j *testJoinData) IgnorePreflightErrors() sets.String              { return nil }
+func (j *testJoinData) OutputWriter() io.Writer                         { return nil }

@@ -178,7 +178,7 @@ func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 			return err
 		}
 		if err = volume.ValidateRecyclerPodTemplate(recyclerPod); err != nil {
-			return fmt.Errorf("Pod specification (%v): %v", path, err)
+			return fmt.Errorf("pod specification (%v): %v", path, err)
 		}
 		config.RecyclerPodTemplate = recyclerPod
 	}

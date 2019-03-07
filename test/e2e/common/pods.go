@@ -119,8 +119,8 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 			continue
 		}
 
-		if status.State.Waiting == nil && status.State.Running != nil && status.LastTerminationState.Terminated != nil && status.State.Running.StartedAt.Time.After(beginTime) {
-			startedAt := status.State.Running.StartedAt.Time
+		if status.State.Waiting == nil && status.State.Terminated != nil && status.LastTerminationState.Terminated != nil && status.State.Terminated.StartedAt.Time.After(beginTime) {
+			startedAt := status.State.Terminated.StartedAt.Time
 			finishedAt := status.LastTerminationState.Terminated.FinishedAt.Time
 			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, finishedAt, startedAt, startedAt.Sub(finishedAt))
 			return startedAt.Sub(finishedAt), nil

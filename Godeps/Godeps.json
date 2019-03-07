@@ -2002,188 +2002,188 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/accelerators",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/cache/memory",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client/v2",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/collector",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/common",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/containerd",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/crio",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/docker",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/libcontainer",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/mesos",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/raw",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/rkt",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container/systemd",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/devicemapper",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/events",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/fs",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v2",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/machine",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager/watcher",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager/watcher/raw",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager/watcher/rkt",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/metrics",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/storage",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/summary",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cloudinfo",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cpuload",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/cpuload/netlink",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/docker",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/oomparser",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/sysfs",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils/sysinfo",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/version",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/zfs",
-			"Comment": "v0.32.0",
-			"Rev": "8949c822ea91fa6b4996614a5ad6ade840be24ee"
+			"Comment": "v0.33.0",
+			"Rev": "511ec9ef821b334c3825cebb728208578c2300e8"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go",
@@ -4231,59 +4231,59 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen/args",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/aggregator",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators/rules",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/schemaconv",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/testing",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/validation",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/sets",
-			"Rev": "d7c86cdc46e3a4fcf892b32dd7bc3aa775e0870e"
+			"Rev": "b3a7cee44a305be0a69e1b9ac03018307287e1b0"
 		},
 		{
 			"ImportPath": "k8s.io/repo-infra/kazel",
@@ -4343,133 +4343,133 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/commands/build",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/constants",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/expansion",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/factory",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/fs",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/git",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/gvk",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc/transformer",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/image",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/internal/error",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/loader",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch/transformer",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/resid",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/resmap",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/resource",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/target",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/kustomize/pkg/types",
-			"Comment": "v2.0.1",
-			"Rev": "ce7e5ee2c30cc5856fea01fe423cf167f2a2d0c3"
+			"Comment": "v2.0.3",
+			"Rev": "a6f65144121d1955266b0cd836ce954c04122dc8"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "e5e029740eb81ee0217ecf9d950c25a0eeb9688a"
+			"Rev": "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

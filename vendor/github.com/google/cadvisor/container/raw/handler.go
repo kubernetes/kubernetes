@@ -39,8 +39,9 @@ type rawContainerHandler struct {
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
-	fsInfo         fs.FsInfo
-	externalMounts []common.Mount
+	fsInfo          fs.FsInfo
+	externalMounts  []common.Mount
+	includedMetrics container.MetricSet
 
 	libcontainerHandler *libcontainer.Handler
 }
@@ -86,6 +87,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		cgroupPaths:         cgroupPaths,
 		fsInfo:              fsInfo,
 		externalMounts:      externalMounts,
+		includedMetrics:     includedMetrics,
 		libcontainerHandler: handler,
 	}, nil
 }
@@ -185,36 +187,40 @@ func fsToFsStats(fs *fs.Fs) info.FsStats {
 }
 
 func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	var allFs []fs.Fs
-	// Get Filesystem information only for the root cgroup.
-	if isRootCgroup(self.name) {
-		filesystems, err := self.fsInfo.GetGlobalFsInfo()
-		if err != nil {
-			return err
+	var filesystems []fs.Fs
+
+	if self.includedMetrics.Has(container.DiskUsageMetrics) || self.includedMetrics.Has(container.DiskIOMetrics) {
+		var err error
+		// Get Filesystem information only for the root cgroup.
+		if isRootCgroup(self.name) {
+			filesystems, err = self.fsInfo.GetGlobalFsInfo()
+			if err != nil {
+				return err
+			}
+		} else if len(self.externalMounts) > 0 {
+			var mountSet map[string]struct{}
+			mountSet = make(map[string]struct{})
+			for _, mount := range self.externalMounts {
+				mountSet[mount.HostDir] = struct{}{}
+			}
+			filesystems, err = self.fsInfo.GetFsInfoForPath(mountSet)
+			if err != nil {
+				return err
+			}
 		}
-		for i := range filesystems {
-			fs := filesystems[i]
-			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
-		}
-		allFs = filesystems
-	} else if len(self.externalMounts) > 0 {
-		var mountSet map[string]struct{}
-		mountSet = make(map[string]struct{})
-		for _, mount := range self.externalMounts {
-			mountSet[mount.HostDir] = struct{}{}
-		}
-		filesystems, err := self.fsInfo.GetFsInfoForPath(mountSet)
-		if err != nil {
-			return err
-		}
-		for i := range filesystems {
-			fs := filesystems[i]
-			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
-		}
-		allFs = filesystems
 	}
 
-	common.AssignDeviceNamesToDiskStats(&fsNamer{fs: allFs, factory: self.machineInfoFactory}, &stats.DiskIo)
+	if self.includedMetrics.Has(container.DiskUsageMetrics) {
+		for i := range filesystems {
+			fs := filesystems[i]
+			stats.Filesystem = append(stats.Filesystem, fsToFsStats(&fs))
+		}
+	}
+
+	if self.includedMetrics.Has(container.DiskIOMetrics) {
+		common.AssignDeviceNamesToDiskStats(&fsNamer{fs: filesystems, factory: self.machineInfoFactory}, &stats.DiskIo)
+
+	}
 	return nil
 }
 

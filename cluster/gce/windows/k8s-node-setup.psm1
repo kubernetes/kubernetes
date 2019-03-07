@@ -134,6 +134,19 @@ function Add_GceMetadataServerRoute {
   }
 }
 
+# Writes debugging information, such as Windows version and patch info, to the
+# console.
+function Dump-DebugInfoToConsole {
+  Try {
+    $version = "$([System.Environment]::OSVersion.Version | Out-String)"
+    $hotfixes = "$(Get-Hotfix | Out-String)"
+    $image = "$(Get-InstanceMetadata 'image' | Out-String)"
+    Log-Output "Windows version:`n$version"
+    Log-Output "Installed hotfixes:`n$hotfixes"
+    Log-Output "GCE Windows image:`n$image"
+  } Catch { }
+}
+
 # Fetches the kube-env from the instance metadata.
 #
 # Returns: a PowerShell Hashtable object containing the key-value pairs from
@@ -141,7 +154,7 @@ function Add_GceMetadataServerRoute {
 function Fetch-KubeEnv {
   # Testing / debugging:
   # First:
-  #   ${kube_env} = Get-InstanceMetadataValue 'kube-env'
+  #   ${kube_env} = Get-InstanceMetadataAttribute 'kube-env'
   # or:
   #   ${kube_env} = [IO.File]::ReadAllText(".\kubeEnv.txt")
   # ${kube_env_table} = ConvertFrom-Yaml ${kube_env}
@@ -149,7 +162,7 @@ function Fetch-KubeEnv {
   # ${kube_env_table}.GetType()
 
   # The type of kube_env is a powershell String.
-  $kube_env = Get-InstanceMetadataValue 'kube-env'
+  $kube_env = Get-InstanceMetadataAttribute 'kube-env'
   $kube_env_table = ConvertFrom-Yaml ${kube_env}
   return ${kube_env_table}
 }
@@ -764,6 +777,21 @@ function Configure-HostNetworkingService {
   Log-Output "Host network setup complete"
 }
 
+function Configure-GcePdTools {
+  if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
+    MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
+      -URLs "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
+  }
+  if (-not (Test-Path $PsHome\profile.ps1)) {
+    New-Item -path $PsHome\profile.ps1 -type file
+  }
+
+    Add-Content $PsHome\profile.ps1 `
+'$modulePath = "K8S_DIR\GetGcePdName.dll"
+Unblock-File $modulePath
+Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+}
+
 # Downloads the Windows CNI binaries and writes a CNI config file under
 # $env:CNI_CONFIG_DIR.
 #
@@ -806,9 +834,15 @@ function Configure-CniNetworking {
   Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
               "CNI config")
 
+  # We reserve .1 and .2 for gateways. Start the CIDR range from ".3" so that
+  # IPAM does not allocate those IPs to pods.
+  $cidr_range_start = `
+      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.3'
+
   # Explanation of the CNI config values:
   #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
   #   POD_CIDR: the pod CIDR assigned to this node.
+  #   CIDR_RANGE_START: start of the pod CIDR range.
   #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
   #     communicate with the rest of the cluster without NAT (i.e. the subnet
   #     that VM internal IPs are allocated from).
@@ -828,7 +862,8 @@ function Configure-CniNetworking {
   },
   "ipam":  {
     "type": "host-local",
-    "subnet": "POD_CIDR"
+    "subnet": "POD_CIDR",
+    "rangeStart": "CIDR_RANGE_START"
   },
   "dns":  {
     "Nameservers":  [
@@ -868,6 +903,7 @@ function Configure-CniNetworking {
     }
   ]
 }'.replace('POD_CIDR', ${env:POD_CIDR}).`
+  replace('CIDR_RANGE_START', ${cidr_range_start}).`
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
@@ -888,7 +924,7 @@ function Configure-Kubelet {
   # The Kubelet config is built by build-kubelet-config() in
   # cluster/gce/util.sh, and stored in the metadata server under the
   # 'kubelet-config' key.
-  $kubelet_config = Get-InstanceMetadataValue 'kubelet-config'
+  $kubelet_config = Get-InstanceMetadataAttribute 'kubelet-config'
   Set-Content ${env:KUBELET_CONFIG} $kubelet_config
   Log-Output "Kubelet config:`n$(Get-Content -Raw ${env:KUBELET_CONFIG})"
 }
@@ -901,14 +937,24 @@ function Configure-Kubelet {
 #   KUBERNETES_MASTER_NAME
 #   CLUSTER_IP_RANGE
 function Start-WorkerServices {
+  # Compute kubelet args
   $kubelet_args_str = ${kube_env}['KUBELET_ARGS']
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
-
-  $additional_arg_list = @(`
+  $default_kubelet_args = @(`
       "--pod-infra-container-image=${INFRA_CONTAINER}"
   )
-  $kubelet_args = ${kubelet_args} + ${additional_arg_list}
+  $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
+  Log-Output "Final kubelet_args: ${kubelet_args}"
+
+  # Compute kube-proxy args
+  $kubeproxy_args_str = ${kube_env}['KUBEPROXY_ARGS']
+  Try {
+    $kubeproxy_args = $kubeproxy_args_str.Split(" ")
+  } Catch {
+    $kubeproxy_args = ""
+  }
+  Log-Output "kubeproxy_args from metadata: ${kubeproxy_args}"
 
   # kubeproxy is started on Linux nodes using
   # kube-manifests/kubernetes/gci-trusty/kube-proxy.manifest, which is
@@ -921,12 +967,11 @@ function Start-WorkerServices {
   #   --ipvs-sync-period=1m --ipvs-min-sync-period=10s
   # And also with various volumeMounts and "securityContext: privileged: true".
   $apiserver_address = ${kube_env}['KUBERNETES_MASTER_NAME']
-  $kubeproxy_args = @(`
+  $default_kubeproxy_args = @(`
       "--v=4",
       "--master=https://${apiserver_address}",
       "--kubeconfig=${env:KUBEPROXY_KUBECONFIG}",
       "--proxy-mode=kernelspace",
-      "--hostname-override=$(hostname)",
       "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])",
 
       # Configure kube-proxy to run as a windows service.
@@ -947,6 +992,8 @@ function Start-WorkerServices {
       # of string delimiters.
       "--resource-container="
   )
+  $kubeproxy_args = ${default_kubeproxy_args} + ${kubeproxy_args}
+  Log-Output "Final kubeproxy_args: ${kubeproxy_args}"
 
   # TODO(pjh): kubelet is emitting these messages:
   # I1023 23:44:11.761915    2468 kubelet.go:274] Adding pod path:
@@ -1032,6 +1079,155 @@ function Create-DockerRegistryKey {
   reg import ${tmp_dir}\${reg_file}
   Remove-Item -Force -Recurse ${tmp_dir}
 }
+
+# TODO(pjh): move the Stackdriver logging agent code below into a separate
+# module; it was put here temporarily to avoid disrupting the file layout in
+# the K8s release machinery.
+$STACKDRIVER_VERSION = 'v1-8'
+$STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
+
+# Install and start the Stackdriver logging agent according to
+# https://cloud.google.com/logging/docs/agent/installation.
+# TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
+# support kubernetes metadata properly. The current version does not recognizes
+# the local resource key "logging.googleapis.com/local_resource_id", and fails
+# to label namespace, pod and container names on the logs.
+function InstallAndStart-LoggingAgent {
+  # Remove the existing storage.json file if it exists. This is a workaround
+  # for the bug where the logging agent cannot start up if the file is
+  # corrupted.
+  Remove-Item `
+      -Force `
+      -ErrorAction Ignore `
+      ("$STACKDRIVER_ROOT\LoggingAgent\Main\pos\winevtlog.pos\worker0\" +
+       "storage.json")
+
+  if (Test-Path $STACKDRIVER_ROOT) {
+    # Note: we should reinstall the Stackdriver agent if $REDO_STEPS is true
+    # here, but we don't know how to run the installer without it prompting
+    # when Stackdriver is already installed. We dumped the strings in the
+    # installer binary and searched for flags to do this but found nothing. Oh
+    # well.
+    Log-Output ("Skip: $STACKDRIVER_ROOT is already present, assuming that " +
+                "Stackdriver logging agent is already installed")
+    # Restart-Service restarts a running service or starts a not-running
+    # service.
+    Restart-Service StackdriverLogging
+    return
+  }
+
+  $url = ("https://dl.google.com/cloudagents/windows/" +
+          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
+  $tmp_dir = 'C:\stackdriver_tmp'
+  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
+  $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
+  MustDownload-File -OutFile $installer_file -URLs $url
+
+  # Start the installer silently. This automatically starts the
+  # "StackdriverLogging" service.
+  Log-Output 'Invoking Stackdriver installer'
+  Start-Process $installer_file -ArgumentList "/S" -Wait
+
+  Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
+      -ArgumentList "install","fluent-plugin-record-reformer" `
+      -Wait
+
+  # Create a configuration file for kubernetes containers.
+  # The config.d directory should have already been created automatically, but
+  # try creating again just in case.
+  New-Item "$STACKDRIVER_ROOT\LoggingAgent\config.d" `
+      -ItemType 'directory' `
+      -Force | Out-Null
+  $FLUENTD_CONFIG | Out-File `
+      -FilePath "$STACKDRIVER_ROOT\LoggingAgent\config.d\k8s_containers.conf" `
+      -Encoding ASCII
+
+  # Restart the service to pick up the new configurations.
+  Restart-Service StackdriverLogging
+  Remove-Item -Force -Recurse $tmp_dir
+}
+
+# TODO(yujuhong):
+#   - Collect kubelet/kube-proxy logs.
+#   - Add tag for kubernetes node name.
+$FLUENTD_CONFIG = @'
+# This configuration file for Fluentd is used to watch changes to kubernetes
+# container logs in the directory /var/lib/docker/containers/ and submit the
+# log records to Google Cloud Logging using the cloud-logging plugin.
+#
+# Example
+# =======
+# A line in the Docker log file might look like this JSON:
+#
+# {"log":"2014/09/25 21:15:03 Got request with path wombat\\n",
+#  "stream":"stderr",
+#   "time":"2014-09-25T21:15:03.499185026Z"}
+#
+# The original tag is derived from the log file's location.
+# For example a Docker container's logs might be in the directory:
+#  /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b
+# and in the file:
+#  997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+# where 997599971ee6... is the Docker ID of the running container.
+# The Kubernetes kubelet makes a symbolic link to this file on the host
+# machine in the /var/log/containers directory which includes the pod name,
+# the namespace name and the Kubernetes container name:
+#    synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+#    ->
+#    /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+# The /var/log directory on the host is mapped to the /var/log directory in the container
+# running this instance of Fluentd and we end up collecting the file:
+#   /var/log/containers/synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+# This results in the tag:
+#  var.log.containers.synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+# where 'synthetic-logger-0.25lps-pod' is the pod name, 'default' is the
+# namespace name, 'synth-lgr' is the container name and '997599971ee6..' is
+# the container ID.
+# The record reformer is used to extract pod_name, namespace_name and
+# container_name from the tag and set them in a local_resource_id in the
+# format of:
+# 'k8s_container.<NAMESPACE_NAME>.<POD_NAME>.<CONTAINER_NAME>'.
+# The reformer also changes the tags to 'stderr' or 'stdout' based on the
+# value of 'stream'.
+# local_resource_id is later used by google_cloud plugin to determine the
+# monitored resource to ingest logs against.
+
+# Json Log Example:
+# {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+# TODO: Support CRI log format, which requires the multi_format plugin.
+<source>
+  @type tail
+  path /var/log/containers/*.log
+  pos_file /var/log/gcp-containers.log.pos
+  # Tags at this point are in the format of:
+  # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
+  tag reform.*
+  format json
+  time_key time
+  time_format %Y-%m-%dT%H:%M:%S.%NZ
+  read_from_head true
+</source>
+
+<match reform.**>
+  @type record_reformer
+  enable_ruby true
+  <record>
+    # Extract local_resource_id from tag for 'k8s_container' monitored
+    # resource. The format is:
+    # 'k8s_container.<namespace_name>.<pod_name>.<container_name>'.
+    "logging.googleapis.com/local_resource_id" ${"k8s_container.#{tag_suffix[4].rpartition('.')[0].split('_')[1]}.#{tag_suffix[4].rpartition('.')[0].split('_')[0]}.#{tag_suffix[4].rpartition('.')[0].split('_')[2].rpartition('-')[0]}"}
+    # Rename the field 'log' to a more generic field 'message'. This way the
+    # fluent-plugin-google-cloud knows to flatten the field as textPayload
+    # instead of jsonPayload after extracting 'time', 'severity' and
+    # 'stream' from the record.
+    message ${record['log']}
+    # If 'severity' is not set, assume stderr is ERROR and stdout is INFO.
+    severity ${record['severity'] || if record['stream'] == 'stderr' then 'ERROR' else 'INFO' end}
+  </record>
+  tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
+  remove_keys stream,log
+</match>
+'@
 
 # Export all public functions:
 Export-ModuleMember -Function *-*

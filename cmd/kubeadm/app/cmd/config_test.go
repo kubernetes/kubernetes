@@ -71,13 +71,13 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				":v1.12.1",
+				constants.CurrentKubernetesVersion.String(),
 			},
-			configContents: []byte(dedent.Dedent(`
+			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 				apiVersion: kubeadm.k8s.io/v1beta1
 				kind: ClusterConfiguration
-				kubernetesVersion: v1.12.1
-			`)),
+				kubernetesVersion: %s
+			`, constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",

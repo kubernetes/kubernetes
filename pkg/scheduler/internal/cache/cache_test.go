@@ -879,7 +879,7 @@ func TestForgetPod(t *testing.T) {
 }
 
 // getResourceRequest returns the resource request of all containers in Pods;
-// excuding initContainers.
+// excluding initContainers.
 func getResourceRequest(pod *v1.Pod) v1.ResourceList {
 	result := &schedulernodeinfo.Resource{}
 	for _, container := range pod.Spec.Containers {

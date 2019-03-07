@@ -25,93 +25,146 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/pkg/util/normalizer"
 )
+
+var controlPlanePrepareExample = normalizer.Examples(`
+	# Prepares the machine for serving a control plane
+	kubeadm join phase control-plane-prepare all
+`)
 
 // NewControlPlanePreparePhase creates a kubeadm workflow phase that implements the preparation of the node to serve a control plane
 func NewControlPlanePreparePhase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "control-plane-prepare",
-		Short: "Prepares the machine for serving a control plane.",
+		Name:    "control-plane-prepare",
+		Short:   "Prepares the machine for serving a control plane.",
+		Example: controlPlanePrepareExample,
 		Phases: []workflow.Phase{
 			{
-				Name:  "all",
-				Short: "Prepares the machine for serving a control plane.",
-				InheritFlags: append(getControlPlanePreparePhaseFlags(),
-					options.CertificateKey,
-				),
+				Name:           "all [api-server-endpoint]",
+				Short:          "Prepares the machine for serving a control plane.",
+				InheritFlags:   getControlPlanePreparePhaseFlags("all"),
 				RunAllSiblings: true,
 			},
 			newControlPlanePrepareDownloadCertsSubphase(),
 			newControlPlanePrepareCertsSubphase(),
 			newControlPlanePrepareKubeconfigSubphase(),
-			newControlPlanePrepareManifestsSubphases(),
+			newControlPlanePrepareControlPlaneSubphase(),
 		},
 	}
 }
 
-func getControlPlanePreparePhaseFlags() []string {
-	return []string{
-		options.APIServerAdvertiseAddress,
-		options.APIServerBindPort,
-		options.CfgPath,
-		options.ControlPlane,
-		options.NodeName,
-		options.FileDiscovery,
-		options.TokenDiscovery,
-		options.TokenDiscoveryCAHash,
-		options.TokenDiscoverySkipCAHash,
-		options.TLSBootstrapToken,
-		options.TokenStr,
+func getControlPlanePreparePhaseFlags(name string) []string {
+	var flags []string
+	switch name {
+	case "all":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.CfgPath,
+			options.ControlPlane,
+			options.NodeName,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+			options.CertificateKey,
+		}
+	case "download-certs":
+		flags = []string{
+			options.CfgPath,
+			options.ControlPlane,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+			options.CertificateKey,
+		}
+	case "certs":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.CfgPath,
+			options.ControlPlane,
+			options.NodeName,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+		}
+	case "kubeconfig":
+		flags = []string{
+			options.CfgPath,
+			options.ControlPlane,
+			options.FileDiscovery,
+			options.TokenDiscovery,
+			options.TokenDiscoveryCAHash,
+			options.TokenDiscoverySkipCAHash,
+			options.TLSBootstrapToken,
+			options.TokenStr,
+			options.CertificateKey,
+		}
+	case "control-plane":
+		flags = []string{
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.CfgPath,
+			options.ControlPlane,
+		}
+	default:
+		flags = []string{}
 	}
+	return flags
 }
 
 func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:  "download-certs",
-		Short: fmt.Sprintf("Download certificates from %s", kubeadmconstants.KubeadmCertsSecret),
-		Long:  cmdutil.MacroCommandLongDescription,
-		Run:   runControlPlanePrepareDownloadCertsPhaseLocal,
-		InheritFlags: append(getControlPlanePreparePhaseFlags(),
-			options.CertificateKey,
-		),
+		Name:         "download-certs [api-server-endpoint]",
+		Short:        fmt.Sprintf("[EXPERIMENTAL] Downloads certificates shared among control-plane nodes from the %s Secret", kubeadmconstants.KubeadmCertsSecret),
+		Run:          runControlPlanePrepareDownloadCertsPhaseLocal,
+		InheritFlags: getControlPlanePreparePhaseFlags("download-certs"),
 	}
 }
 
 func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "certs",
+		Name:         "certs [api-server-endpoint]",
 		Short:        "Generates the certificates for the new control plane components",
-		Run:          runControlPlanePrepareCertsPhaseLocal,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
+		Run:          runControlPlanePrepareCertsPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
+		InheritFlags: getControlPlanePreparePhaseFlags("certs"),
 	}
 }
 
 func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "kubeconfig",
+		Name:         "kubeconfig [api-server-endpoint]",
 		Short:        "Generates the kubeconfig for the new control plane components",
-		Run:          runControlPlanePrepareKubeconfigPhaseLocal,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
+		Run:          runControlPlanePrepareKubeconfigPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
+		InheritFlags: getControlPlanePreparePhaseFlags("kubeconfig"),
 	}
 }
 
-func newControlPlanePrepareManifestsSubphases() workflow.Phase {
+func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "manifests",
+		Name:         "control-plane",
 		Short:        "Generates the manifests for the new control plane components",
-		Run:          runControlPlanePrepareManifestsSubphase,
-		InheritFlags: getControlPlanePreparePhaseFlags(), //NB. eventually in future we would like to break down this in sub phases for each component
+		Run:          runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
+		InheritFlags: getControlPlanePreparePhaseFlags("control-plane"),
 	}
 }
 
-func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
+func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -127,8 +180,21 @@ func runControlPlanePrepareManifestsSubphase(c workflow.RunData) error {
 		return err
 	}
 
-	// Generate missing certificates (if any)
-	return controlplane.CreateInitStaticPodManifestFiles(kubeadmconstants.GetStaticPodDirectory(), cfg)
+	fmt.Printf("[control-plane] Using manifest folder %q\n", kubeadmconstants.GetStaticPodDirectory())
+
+	for _, component := range kubeadmconstants.ControlPlaneComponents {
+		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
+		err := controlplane.CreateStaticPodFiles(
+			kubeadmconstants.GetStaticPodDirectory(),
+			&cfg.ClusterConfiguration,
+			&cfg.LocalAPIEndpoint,
+			component,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
@@ -174,6 +240,8 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 		return err
 	}
 
+	fmt.Printf("[certs] Using certificateDir folder %q\n", cfg.CertificatesDir)
+
 	// Generate missing certificates (if any)
 	return certsphase.CreatePKIAssets(cfg)
 }
@@ -194,7 +262,8 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 		return err
 	}
 
-	fmt.Println("[control-plane-prepare] Generating kubeconfig files")
+	fmt.Println("[kubeconfig] Generating kubeconfig files")
+	fmt.Printf("[kubeconfig] Using kubeconfig folder %q\n", kubeadmconstants.KubernetesDir)
 
 	// Generate kubeconfig files for controller manager, scheduler and for the admin/kubeadm itself
 	// NB. The kubeconfig file for kubelet will be generated by the TLS bootstrap process in

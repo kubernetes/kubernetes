@@ -160,13 +160,13 @@ func NodeRules() []rbacv1.PolicyRule {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
+			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie()
+		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 	}
 
@@ -213,7 +213,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
 			},
 		},
-
+		{
+			// a role which provides just enough power read insensitive cluster information
+			ObjectMeta: metav1.ObjectMeta{Name: "system:public-info-viewer"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/healthz", "/version", "/version/",
+				).RuleOrDie(),
+			},
+		},
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
@@ -284,7 +292,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
@@ -317,7 +325,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 			},
 		},
 		{
@@ -506,7 +514,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie())
+		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role for the csi external provisioner
@@ -524,8 +532,9 @@ const systemNodeRoleName = "system:node"
 func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings := []rbacv1.ClusterRoleBinding{
 		rbacv1helpers.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
-		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
-		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:public-info-viewer").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
@@ -552,4 +561,17 @@ func ClusterRolesToAggregate() map[string]string {
 		"edit":  "system:aggregate-to-edit",
 		"view":  "system:aggregate-to-view",
 	}
+}
+
+// ClusterRoleBindingsToSplit returns a map of Names of source ClusterRoleBindings
+// to copy Subjects, Annotations, and Labels to destination ClusterRoleBinding templates.
+func ClusterRoleBindingsToSplit() map[string]rbacv1.ClusterRoleBinding {
+	bindingsToSplit := map[string]rbacv1.ClusterRoleBinding{}
+	for _, defaultClusterRoleBinding := range ClusterRoleBindings() {
+		switch defaultClusterRoleBinding.Name {
+		case "system:public-info-viewer":
+			bindingsToSplit["system:discovery"] = defaultClusterRoleBinding
+		}
+	}
+	return bindingsToSplit
 }

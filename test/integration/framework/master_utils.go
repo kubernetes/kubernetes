@@ -103,11 +103,13 @@ type MasterHolder struct {
 	M           *master.Master
 }
 
+// SetMaster assigns the current master.
 func (h *MasterHolder) SetMaster(m *master.Master) {
 	h.M = m
 	close(h.Initialized)
 }
 
+// DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
 func DefaultOpenAPIConfig() *openapicommon.Config {
 	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
 	openAPIConfig.Info = &spec.Info{
@@ -237,7 +239,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	return m, s, closeFn
 }
 
-// Returns the master config appropriate for most integration tests.
+// NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
@@ -249,7 +251,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	return masterConfig
 }
 
-// Returns a basic master config.
+// NewMasterConfig returns a basic master config.
 func NewMasterConfig() *master.Config {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
@@ -265,6 +267,8 @@ func NewMasterConfig() *master.Config {
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: batch.GroupName, Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	// we also need to set both for the storage group and for volumeattachments, separately
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csinodes"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csidrivers"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 
 	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
 	storageFactory.SetSerializer(
@@ -336,6 +340,7 @@ func NewMasterConfig() *master.Config {
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
+// RunAMaster starts a master with the provided config.
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
@@ -344,6 +349,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 	return startMasterOrDie(masterConfig, nil, nil)
 }
 
+// RunAMasterUsingServer starts up a master using the provided config on the specified server.
 func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
 }

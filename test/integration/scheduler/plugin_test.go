@@ -57,7 +57,7 @@ func (tp *TesterPlugin) Reserve(ps plugins.PluginSet, pod *v1.Pod, nodeName stri
 
 // Prebind is a test function that returns (true, nil) or errors for testing.
 func (tp *TesterPlugin) Prebind(ps plugins.PluginSet, pod *v1.Pod, nodeName string) (bool, error) {
-	var err error = nil
+	var err error
 	tp.numPrebindCalled++
 	if tp.failPrebind {
 		err = fmt.Errorf("injecting failure for pod %v", pod.Name)

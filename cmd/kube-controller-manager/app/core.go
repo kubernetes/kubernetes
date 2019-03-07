@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -214,16 +213,12 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
+		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
-	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
-	// csiClient works with CRDs that support json only
-	csiClientConfig.ContentType = "application/json"
 
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
-			csiclientset.NewForConfigOrDie(csiClientConfig),
 			ctx.InformerFactory.Core().V1().Pods(),
 			ctx.InformerFactory.Core().V1().Nodes(),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
@@ -252,7 +247,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration))
 
 		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
+			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
 		return nil, true, nil
@@ -408,7 +403,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ctx.InformersStarted,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
+		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)
 	}
 
 	// Start the garbage collector.

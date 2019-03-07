@@ -35,7 +35,12 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-const defaultHost = "http://127.0.0.1:8080"
+const (
+	defaultHost = "http://127.0.0.1:8080"
+
+	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
+	DefaultNumNodes = -1
+)
 
 // TestContextType contains test settings and global state. Due to
 // historic reasons, it is a mixture of items managed by the test
@@ -75,6 +80,8 @@ type TestContextType struct {
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string
+	// ListImages will list off all images that are used then quit
+	ListImages bool
 
 	// Provider identifies the infrastructure provider (gce, gke, aws)
 	Provider string
@@ -259,6 +266,8 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+
+	flag.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -294,7 +303,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
-	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
+	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flag.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flag.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flag.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")

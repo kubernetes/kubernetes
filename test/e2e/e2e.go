@@ -51,6 +51,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
 )
 
 var (
@@ -101,6 +102,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+
+	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
+	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
+		framework.TestContext.CloudConfig.NumNodes = len(framework.GetReadySchedulableNodesOrDie(c).Items)
+	}
 
 	// Ensure all pods are running and ready before starting tests (otherwise,
 	// cluster infrastructure pods that are being pulled or started can block

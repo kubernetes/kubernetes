@@ -211,6 +211,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - create
@@ -326,6 +327,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingresses
     - networkpolicies
     verbs:
     - get
@@ -528,6 +530,14 @@ items:
     - ""
     resources:
     - nodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
     verbs:
     - get
     - list
@@ -986,6 +996,24 @@ items:
     verbs:
     - get
   - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
     - coordination.k8s.io
     resources:
     - leases
@@ -1127,6 +1155,22 @@ items:
     - create
     - patch
     - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:public-info-viewer
+  rules:
+  - nonResourceURLs:
+    - /healthz
+    - /version
+    - /version/
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

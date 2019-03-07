@@ -397,7 +397,10 @@ runTests() {
    if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do 
-      record_command run_${pkg}_tests
+      # running of kubeadm is captured in hack/make-targets/test-cmd.sh
+      if [[ "${pkg}" != "kubeadm" ]]; then 
+        record_command run_${pkg}_tests
+      fi
     done
     cleanup_tests
     return

@@ -85,6 +85,8 @@ filegroup(
         "//pkg/registry/scheduling/rest:all-srcs",
         "//pkg/registry/settings/podpreset:all-srcs",
         "//pkg/registry/settings/rest:all-srcs",
+        "//pkg/registry/storage/csidriver:all-srcs",
+        "//pkg/registry/storage/csinode:all-srcs",
         "//pkg/registry/storage/rest:all-srcs",
         "//pkg/registry/storage/storageclass:all-srcs",
         "//pkg/registry/storage/volumeattachment:all-srcs",

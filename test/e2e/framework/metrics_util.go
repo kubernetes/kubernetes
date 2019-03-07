@@ -186,7 +186,7 @@ var InterestingControllerManagerMetrics = []string{
 var InterestingKubeletMetrics = []string{
 	"kubelet_container_manager_latency_microseconds",
 	"kubelet_docker_errors",
-	"kubelet_docker_operations_latency_seconds",
+	"kubelet_docker_operations_duration_seconds",
 	"kubelet_generate_pod_status_latency_microseconds",
 	"kubelet_pod_start_duration_seconds",
 	"kubelet_pod_worker_duration_seconds",

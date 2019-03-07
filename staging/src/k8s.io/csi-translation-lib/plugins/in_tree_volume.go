@@ -40,4 +40,7 @@ type InTreePlugin interface {
 
 	// GetInTreePluginName returns the in-tree plugin name this migrates
 	GetInTreePluginName() string
+
+	// GetCSIPluginName returns the name of the CSI plugin that supersedes the in-tree plugin
+	GetCSIPluginName() string
 }

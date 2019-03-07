@@ -113,7 +113,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test waits for the upgrade to complete, and then verifies
-// with a connectvity check to the loadbalancer ip.
+// with a connectivity check to the loadbalancer ip.
 func (t *IngressUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	switch upgrade {
 	case MasterUpgrade, ClusterUpgrade:

@@ -88,6 +88,7 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
+        # TODO(liggitt): switch to cloud.google.com/metadata-proxy-ready=true in v1.16
         beta.kubernetes.io/metadata-proxy-ready: "true"
         beta.kubernetes.io/os: linux
       terminationGracePeriodSeconds: 30

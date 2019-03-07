@@ -168,18 +168,18 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo     testsuites.DriverInfo
-	manifests      []string
-	podInfoVersion *string
-	attachable     bool
-	attachLimit    int
+	driverInfo  testsuites.DriverInfo
+	manifests   []string
+	podInfo     *bool
+	attachable  bool
+	attachLimit int
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
-func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfoVersion *string, attachLimit int) testsuites.TestDriver {
+func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfo *bool, attachLimit int) testsuites.TestDriver {
 	driverManifests := []string{
 		"test/e2e/testing-manifests/storage-csi/cluster-driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
@@ -212,10 +212,10 @@ func InitMockCSIDriver(registerDriver, driverAttachable bool, podInfoVersion *st
 				testsuites.CapExec:        false,
 			},
 		},
-		manifests:      driverManifests,
-		podInfoVersion: podInfoVersion,
-		attachable:     driverAttachable,
-		attachLimit:    attachLimit,
+		manifests:   driverManifests,
+		podInfo:     podInfo,
+		attachable:  driverAttachable,
+		attachLimit: attachLimit,
 	}
 }
 
@@ -273,7 +273,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		ProvisionerContainerName:      "csi-provisioner",
 		ClusterRegistrarContainerName: "csi-cluster-driver-registrar",
 		NodeName:                      config.ClientNodeName,
-		PodInfoVersion:                m.podInfoVersion,
+		PodInfo:                       m.podInfo,
 	}
 	cleanup, err := f.CreateFromManifests(func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)
@@ -306,17 +306,15 @@ func InitHostPathV0CSIDriver() testsuites.TestDriver {
 
 // gce-pd
 type gcePDCSIDriver struct {
-	topologyEnabled bool
-	driverInfo      testsuites.DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
-func InitGcePDCSIDriver(topologyEnabled bool) testsuites.TestDriver {
+func InitGcePDCSIDriver() testsuites.TestDriver {
 	return &gcePDCSIDriver{
-		topologyEnabled: topologyEnabled,
 		driverInfo: testsuites.DriverInfo{
 			Name:        GCEPDCSIProvisionerName,
 			FeatureTag:  "[Serial]",
@@ -367,13 +365,6 @@ func (g *gcePDCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	if !g.topologyEnabled {
-		// Topology is disabled in external-provisioner, so in a multizone cluster, a pod could be
-		// scheduled in a different zone from the provisioned volume, causing basic provisioning
-		// tests to fail.
-		framework.SkipIfMultizone(f.ClientSet)
-	}
-
 	By("deploying csi gce-pd driver")
 	cancelLogging := testsuites.StartPodLogs(f)
 	// It would be safer to rename the gcePD driver, but that
@@ -396,13 +387,9 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
+		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	if g.topologyEnabled {
-		manifests = append(manifests, "test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss_alpha.yaml")
-	} else {
-		manifests = append(manifests, "test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml")
-	}
 	cleanup, err := f.CreateFromManifests(nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)

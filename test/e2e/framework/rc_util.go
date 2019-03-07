@@ -45,7 +45,7 @@ func RcByNamePort(name string, replicas int32, image string, port int, protocol 
 	}, gracePeriod)
 }
 
-// RcByNameContainer returns a ReplicationControoler with specified name and container
+// RcByNameContainer returns a ReplicationController with specified name and container
 func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
 	gracePeriod *int64) *v1.ReplicationController {
 

@@ -140,7 +140,6 @@ go_library(
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",

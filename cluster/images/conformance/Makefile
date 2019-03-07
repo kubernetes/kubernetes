@@ -21,12 +21,13 @@ REGISTRY?=k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
 
-OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)
-BINARY_PATH=$(shell test -d $(OUTPUT_PATH)/local && echo $(OUTPUT_PATH)/local || echo $(OUTPUT_PATH)/dockerized)
+LOCAL_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/local/bin/linux/$(ARCH)
+DOCKERIZED_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)
 
-GINKGO_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/ginkgo
-KUBECTL_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/kubectl
-E2E_TEST_BIN?=$(BINARY_PATH)/bin/linux/$(ARCH)/e2e.test
+GINKGO_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/ginkgo && echo $(LOCAL_OUTPUT_PATH)/ginkgo || echo $(DOCKERIZED_OUTPUT_PATH)/ginkgo)
+KUBECTL_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/kubectl && echo $(LOCAL_OUTPUT_PATH)/kubectl || echo $(DOCKERIZED_OUTPUT_PATH)/kubectl)
+E2E_TEST_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/e2e.test && echo $(LOCAL_OUTPUT_PATH)/e2e.test || echo $(DOCKERIZED_OUTPUT_PATH)/e2e.test)
+
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1

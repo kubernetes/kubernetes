@@ -182,7 +182,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 	})
 }
 
-// WaitForJobComplete uses c to wait for compeletions to complete for the Job jobName in namespace ns.
+// WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
 func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})

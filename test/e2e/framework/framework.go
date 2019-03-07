@@ -46,7 +46,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	csi "k8s.io/csi-api/pkg/client/clientset/versioned"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -78,7 +77,6 @@ type Framework struct {
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 	APIExtensionsClientSet           apiextensionsclient.Interface
-	CSIClientSet                     csi.Interface
 	NodeAPIClientSet                 nodeapiclient.Interface
 
 	InternalClientset *internalclientset.Clientset
@@ -194,12 +192,9 @@ func (f *Framework) BeforeEach() {
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
 		ExpectNoError(err)
-		// csi.storage.k8s.io is based on CRD, which is served only as JSON
+		// node.k8s.io is based on CRD, which is served only as JSON
 		jsonConfig := config
 		jsonConfig.ContentType = "application/json"
-		f.CSIClientSet, err = csi.NewForConfig(jsonConfig)
-		ExpectNoError(err)
-		// node.k8s.io is also based on CRD
 		f.NodeAPIClientSet, err = nodeapiclient.NewForConfig(jsonConfig)
 		ExpectNoError(err)
 
@@ -716,7 +711,7 @@ type PodStateVerification struct {
 
 	// Optional: only pods passing this function will pass the filter
 	// Verify a pod.
-	// As an optimization, in addition to specfying filter (boolean),
+	// As an optimization, in addition to specifying filter (boolean),
 	// this function allows specifying an error as well.
 	// The error indicates that the polling of the pod spectrum should stop.
 	Verify func(v1.Pod) (bool, error)
@@ -856,7 +851,7 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 	}
 }
 
-// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verifiy,
+// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verify,
 // so it may return very quickly if you have strict pod state requirements.
 //
 // For example, if you require at least 5 pods to be running before your test will pass,

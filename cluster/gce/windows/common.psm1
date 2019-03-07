@@ -71,14 +71,13 @@ function ShouldWrite-File {
 
 # Returns the GCE instance metadata value for $Key. If the key is not present
 # in the instance metadata returns $Default if set, otherwise returns $null.
-function Get-InstanceMetadataValue {
+function Get-InstanceMetadata {
   param (
     [parameter(Mandatory=$true)] [string]$Key,
     [parameter(Mandatory=$false)] [string]$Default
   )
 
-  $url = ("http://metadata.google.internal/computeMetadata/v1/instance/" +
-          "attributes/$Key")
+  $url = "http://metadata.google.internal/computeMetadata/v1/instance/$Key"
   try {
     $client = New-Object Net.WebClient
     $client.Headers.Add('Metadata-Flavor', 'Google')
@@ -93,6 +92,18 @@ function Get-InstanceMetadataValue {
       return $null
     }
   }
+}
+
+# Returns the GCE instance metadata value for $Key where key is an "attribute"
+# of the instance. If the key is not present in the instance metadata returns
+# $Default if set, otherwise returns $null.
+function Get-InstanceMetadataAttribute {
+  param (
+    [parameter(Mandatory=$true)] [string]$Key,
+    [parameter(Mandatory=$false)] [string]$Default
+  )
+
+  return Get-InstanceMetadata "attributes/$Key" $Default
 }
 
 function Validate-SHA1 {

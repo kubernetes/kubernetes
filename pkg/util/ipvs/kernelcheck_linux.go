@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilsexec "k8s.io/utils/exec"
 
+	"github.com/lithammer/dedent"
 	"k8s.io/klog"
 )
 
@@ -80,10 +81,20 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []err
 			}
 		}
 		if len(builtInModules) != 0 {
-			warnings = append(warnings, fmt.Errorf(
-				"the IPVS proxier will not be used, because the following required kernel modules are not loaded: %v or no builtin kernel ipvs support: %v\n"+
-					"you can solve this problem with following methods:\n 1. Run 'modprobe -- ' to load missing kernel modules;\n"+
-					"2. Provide the missing builtin kernel ipvs support\n", modules, builtInModules))
+			warnings = append(warnings, fmt.Errorf(dedent.Dedent(`
+
+				The IPVS proxier may not be used because the following required kernel modules are not loaded: %v
+				or no builtin kernel IPVS support was found: %v.
+				However, these modules may be loaded automatically by kube-proxy if they are available on your system.
+				To verify IPVS support:
+
+				   Run "lsmod | grep 'ip_vs|nf_conntrack'" and verify each of the above modules are listed.
+
+				If they are not listed, you can use the following methods to load them:
+
+				1. For each missing module run 'modprobe $modulename' (e.g., 'modprobe ip_vs', 'modprobe ip_vs_rr', ...)
+				2. If 'modprobe $modulename' returns an error, you will need to install the missing module support for your kernel.
+				`), modules, builtInModules))
 		}
 	}
 

@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
-LABEL maintainer "Shyam JVS <shyamjvs@google.com>"
+FROM gcr.io/distroless/static:latest
 
 COPY etcd-version-monitor /etcd-version-monitor
 

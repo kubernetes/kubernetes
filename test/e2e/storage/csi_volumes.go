@@ -17,7 +17,7 @@ limitations under the License.
 package storage
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,7 +33,7 @@ import (
 // List of testDrivers to be executed in below loop
 var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
-	func() testsuites.TestDriver { return drivers.InitGcePDCSIDriver(false /* topology enabled */) },
+	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
 	drivers.InitHostPathV0CSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
@@ -59,9 +59,9 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		})
 	}
 
-	Context("CSI Topology test using GCE PD driver [Feature:CSINodeInfo]", func() {
+	Context("CSI Topology test using GCE PD driver", func() {
 		f := framework.NewDefaultFramework("csitopology")
-		driver := drivers.InitGcePDCSIDriver(true /* topology enabled */).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		driver := drivers.InitGcePDCSIDriver().(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
 		var (
 			config      *testsuites.PerTestConfig
 			testCleanup func()

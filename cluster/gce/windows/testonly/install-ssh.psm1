@@ -112,7 +112,7 @@ function Setup_WriteSshKeysScript {
 
   # Fetch helper module for manipulating Windows user profiles.
   if (ShouldWrite-File $USER_PROFILE_MODULE) {
-    $module = Get-InstanceMetadataValue 'user-profile-psm1'
+    $module = Get-InstanceMetadataAttribute 'user-profile-psm1'
     New-Item -ItemType file -Force $USER_PROFILE_MODULE | Out-Null
     Set-Content $USER_PROFILE_MODULE $module
   }

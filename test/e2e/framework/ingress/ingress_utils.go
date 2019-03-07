@@ -718,7 +718,7 @@ func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Du
 			framework.Logf(b)
 			return err
 		}
-		j.Logger.Infof("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)
 		time.Sleep(interval)
 	}
 	return nil
