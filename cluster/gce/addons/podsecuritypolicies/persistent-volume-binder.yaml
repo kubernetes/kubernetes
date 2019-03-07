@@ -14,7 +14,7 @@ spec:
   privileged: false
   volumes:
   - 'nfs'
-  - 'secret'   # Required for service account credentials.
+  - 'secret'   # Required for servicing account credentials.
   - 'projected'
   hostNetwork: false
   hostIPC: false
