@@ -31,6 +31,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
@@ -323,7 +325,7 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "WATCHLIST" {
 		reportedVerb = "WATCH"
 	}
-	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) {
+	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
 	return reportedVerb
