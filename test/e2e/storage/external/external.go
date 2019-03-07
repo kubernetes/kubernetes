@@ -192,6 +192,8 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 	supported := false
 	// TODO (?): add support for more volume types
 	switch pattern.VolType {
+	case "":
+		supported = true
 	case testpatterns.DynamicPV:
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" {
 			supported = true
