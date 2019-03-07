@@ -79,7 +79,6 @@ func dnsTests(isIPv6 bool) {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	}
 
-	// only IPv4 is conformance for now
 	if isIPv6 {
 		It("should provide DNS for the cluster", testDNSforCluster)
 	} else {
@@ -476,7 +475,7 @@ func dnsTests(isIPv6 bool) {
 			Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
 
 			By("Verifying customized DNS option is configured on pod...")
-			// TODO: Figure out a better way other than checking the actual resolv,conf file.
+			// TODO: Figure out a better way other than checking the actual resolv.conf file.
 			cmd := []string{"cat", "/etc/resolv.conf"}
 			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
 				Command:       cmd,
