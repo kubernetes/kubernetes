@@ -600,6 +600,7 @@ function write-linux-node-env {
 
 function write-windows-node-env {
   construct-windows-kubelet-flags
+  construct-windows-kubeproxy-flags
   build-windows-kube-env "${KUBE_TEMP}/windows-node-kube-env.yaml"
   build-kubelet-config false "windows" "${KUBE_TEMP}/windows-node-kubelet-config.yaml"
 }
@@ -869,6 +870,37 @@ function construct-windows-kubelet-flags {
   flags+=" --experimental-kernel-memcg-notification=false"
 
   KUBELET_ARGS="${flags}"
+}
+
+function construct-windows-kubeproxy-flags {
+  local flags=""
+
+  # Use the same log level as the Kubelet during tests.
+  flags+=" ${KUBELET_TEST_LOG_LEVEL:-"--v=2"}"
+
+  # Windows uses kernelspace proxymode
+  flags+=" --proxy-mode=kernelspace"
+
+  # Configure kube-proxy to run as a windows service.
+  flags+=" --windows-service=true"
+
+  # TODO(mtaufen): Configure logging for kube-proxy running as a service.
+  # I haven't been able to figure out how to direct stdout/stderr into log
+  # files when configuring it to run via sc.exe, so we just manually
+  # override logging config here.
+  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kube-proxy.log"
+
+  # klog sets this to true internally, so need to override to false
+  # so we actually log to the file
+  flags+=" --logtostderr=false"
+
+  # Configure flags with explicit empty string values. We can't escape
+  # double-quotes, because they still break sc.exe after expansion in the
+  # binPath parameter, and single-quotes get parsed as characters instead
+  # of string delimiters.
+  flags+=" --resource-container="
+
+  KUBEPROXY_ARGS="${flags}"
 }
 
 # $1: if 'true', we're rendering config for a master, else a node
@@ -1438,6 +1470,7 @@ CNI_CONFIG_DIR: $(yaml-quote ${WINDOWS_CNI_CONFIG_DIR})
 MANIFESTS_DIR: $(yaml-quote ${WINDOWS_MANIFESTS_DIR})
 PKI_DIR: $(yaml-quote ${WINDOWS_PKI_DIR})
 KUBELET_CONFIG_FILE: $(yaml-quote ${WINDOWS_KUBELET_CONFIG_FILE})
+KUBEPROXY_ARGS: $(yaml-quote ${KUBEPROXY_ARGS})
 KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBECONFIG_FILE})
 BOOTSTRAP_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE})
 KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBEPROXY_KUBECONFIG_FILE})
