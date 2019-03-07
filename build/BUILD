@@ -1,9 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load(":code_generation_test.bzl", "code_generation_test_suite")
-load(":platforms.bzl", "for_platforms")
+load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
+load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
 
 code_generation_test_suite(
     name = "code_generation_tests",
@@ -31,64 +31,70 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": select(for_platforms(
-            for_node = "@debian-iptables-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-iptables-{ARCH}//image",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
 
-[container_image(
-    name = binary + "-internal",
+# In the bash-based build (build/lib/release.sh), the images built for amd64 do not use
+# an arch in their name (but other arches do), and the GCE cluster scripts
+# (which sideload the images via tarfiles) expect there not to be an arch.
+# When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
+# manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
+# For now, we use the archless name for the image tars saved in the server tarball,
+# to satisfy GCE and other similar providers. (If one were to pull the images via the manifest
+# list, the arch wouldn't appear in the name either.)
+[multi_arch_container(
+    name = binary,
+    architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
     debs = select(for_platforms(
-        for_node = ["//build/debs:%s-{ARCH}.deb" % binary],
+        for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
         only_os = "linux",
     )),
+    # Since the multi_arch_container macro replaces the {ARCH} format string,
+    # we need to escape the stamping vars.
+    # Also see comment above about why the push tags use ARCH while the
+    # non-push tags do not.
+    docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
         # but the debs install the binaries into /usr/bin.
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
+    tags = ["manual"],
+    visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
-[container_bundle(
-    name = binary,
-    images = {
-        "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
+# Also roll up all images into a single bundle to push with one target.
+multi_arch_container_push(
+    name = "server-images",
+    architectures = SERVER_PLATFORMS["linux"],
+    docker_tags_images = {
+        "{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary: "%s-internal" % binary
+        for binary in DOCKERIZED_BINARIES.keys()
     },
-) for binary in DOCKERIZED_BINARIES.keys()]
+    tags = ["manual"],
+)
 
 [genrule(
     name = binary + "_docker_tag",
