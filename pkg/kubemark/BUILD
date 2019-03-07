@@ -33,6 +33,7 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/sysctl:go_default_library",
+        "//pkg/volume/csi:go_default_library",
         "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/projected:go_default_library",
         "//pkg/volume/secret:go_default_library",
