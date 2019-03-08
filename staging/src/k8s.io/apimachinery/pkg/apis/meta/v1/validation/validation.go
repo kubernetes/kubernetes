@@ -86,16 +86,16 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 		*options.PropagationPolicy != metav1.DeletePropagationOrphan {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("propagationPolicy"), options.PropagationPolicy, []string{string(metav1.DeletePropagationForeground), string(metav1.DeletePropagationBackground), string(metav1.DeletePropagationOrphan), "nil"}))
 	}
-	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
 	return allErrs
 }
 
 func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
-	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+	return ValidateDryRun(field.NewPath("dryRun"), options.DryRun)
 }
 
 func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
-	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+	return ValidateDryRun(field.NewPath("dryRun"), options.DryRun)
 }
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
@@ -103,13 +103,14 @@ func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchTyp
 	if patchType != types.ApplyPatchType && options.Force != nil {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
 	}
-	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
 	return allErrs
 }
 
 var allowedDryRunValues = sets.NewString(metav1.DryRunAll)
 
-func validateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
+// ValidateDryRun validates that a dryRun query param only contains allowed values.
+func ValidateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !allowedDryRunValues.HasAll(dryRun...) {
 		allErrs = append(allErrs, field.NotSupported(fldPath, dryRun, allowedDryRunValues.List()))

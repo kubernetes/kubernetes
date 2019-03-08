@@ -103,7 +103,7 @@ func TestValidDryRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
-			if errs := validateDryRun(field.NewPath("dryRun"), test); len(errs) != 0 {
+			if errs := ValidateDryRun(field.NewPath("dryRun"), test); len(errs) != 0 {
 				t.Errorf("%v should be a valid dry-run value: %v", test, errs)
 			}
 		})
@@ -118,7 +118,7 @@ func TestInvalidDryRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
-			if len(validateDryRun(field.NewPath("dryRun"), test)) == 0 {
+			if len(ValidateDryRun(field.NewPath("dryRun"), test)) == 0 {
 				t.Errorf("%v shouldn't be a valid dry-run value", test)
 			}
 		})
