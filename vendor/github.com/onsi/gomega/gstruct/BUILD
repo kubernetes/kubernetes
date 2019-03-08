@@ -6,6 +6,7 @@ go_library(
         "elements.go",
         "fields.go",
         "ignore.go",
+        "keys.go",
         "pointer.go",
         "types.go",
     ],
