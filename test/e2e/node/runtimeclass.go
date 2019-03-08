@@ -43,12 +43,6 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
 	})
 
-	It("should run a Pod requesting a RuntimeClass with an empty handler", func() {
-		rcName := createRuntimeClass(f, "empty-handler", "")
-		pod := createRuntimeClassPod(f, rcName)
-		expectPodSuccess(f, pod)
-	})
-
 	It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
@@ -57,7 +51,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	It("should reject a Pod requesting a deleted RuntimeClass", func() {
-		rcName := createRuntimeClass(f, "delete-me", "")
+		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 
 		By("Deleting RuntimeClass "+rcName, func() {
