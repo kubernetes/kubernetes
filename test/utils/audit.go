@@ -80,6 +80,11 @@ func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.Gro
 	}
 
 	var i int
+
+	defer func() {
+		missingReport.MissingEvents = findMissing(expectations)
+		missingReport.NumEventsChecked = i
+	}()
 	for i = 0; scanner.Scan(); i++ {
 		line := scanner.Text()
 
@@ -93,14 +98,15 @@ func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.Gro
 		}
 		missingReport.LastEventChecked = e
 
-		event, err := testEventFromInternal(e)
-		if err != nil {
-			return missingReport, err
-		}
+		event := testEventFromInternal(e)
 
 		// If the event was expected, mark it as found.
 		if _, found := expectations[event]; found {
-			expectations[event] = true
+			delete(expectations, event)
+			if len(expectations) == 0 {
+				// Found everything!
+				return
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -118,10 +124,7 @@ func CheckAuditList(el auditinternal.EventList, expected []AuditEvent) (missing 
 	expectations := buildEventExpectations(expected)
 
 	for _, e := range el.Items {
-		event, err := testEventFromInternal(&e)
-		if err != nil {
-			return expected, err
-		}
+		event := testEventFromInternal(&e)
 
 		// If the event was expected, mark it as found.
 		if _, found := expectations[event]; found {
@@ -140,10 +143,7 @@ func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, er
 	duplicates := auditinternal.EventList{}
 	var err error
 	for _, e := range el.Items {
-		event, err := testEventFromInternal(&e)
-		if err != nil {
-			return duplicates, err
-		}
+		event := testEventFromInternal(&e)
 		event.ID = e.AuditID
 		if _, ok := eventMap[event]; ok {
 			duplicates.Items = append(duplicates.Items, e)
@@ -165,7 +165,7 @@ func buildEventExpectations(expected []AuditEvent) map[AuditEvent]bool {
 }
 
 // testEventFromInternal takes an internal audit event and returns a test event
-func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
+func testEventFromInternal(e *auditinternal.Event) AuditEvent {
 	event := AuditEvent{
 		Level:      e.Level,
 		Stage:      e.Stage,
@@ -192,16 +192,14 @@ func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
 		event.ImpersonatedGroups = strings.Join(e.ImpersonatedUser.Groups, ",")
 	}
 	event.AuthorizeDecision = e.Annotations["authorization.k8s.io/decision"]
-	return event, nil
+	return event
 }
 
 // findMissing checks for false values in the expectations map and returns them as a list
 func findMissing(expectations map[AuditEvent]bool) []AuditEvent {
 	var missing []AuditEvent
-	for event, found := range expectations {
-		if !found {
-			missing = append(missing, event)
-		}
+	for event := range expectations {
+		missing = append(missing, event)
 	}
 	return missing
 }
