@@ -101,7 +101,7 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
+  if ! _out="$(diff -Naupr -x "BUILD" -x "zz_generated.openapi.go" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
     echo "Your vendored results are different:" >&2
     echo "${_out}" >&2
     echo "Godeps Verify failed." >&2
