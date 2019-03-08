@@ -140,7 +140,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
+	return node.ResourceLocation(ctx, r.connection, r.proxyTransport, id)
 }
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
