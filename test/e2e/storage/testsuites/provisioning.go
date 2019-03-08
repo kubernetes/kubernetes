@@ -35,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // StorageClassTest represents parameters to be used by provisioning tests.
@@ -70,6 +69,7 @@ func InitProvisioningTestSuite() TestSuite {
 			name: "provisioning",
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
+				testpatterns.NtfsDynamicPV,
 			},
 		},
 	}
@@ -120,7 +120,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		l.config, l.testCleanup = driver.PrepareTest(f)
 		l.cs = l.config.Framework.ClientSet
 		claimSize := dDriver.GetClaimSize()
-		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, "")
+		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
 		if l.sc == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
@@ -472,6 +472,9 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 
 	By(fmt.Sprintf("checking the created volume is readable and retains data on another node %+v", secondNode))
 	command = "grep 'hello world' /mnt/test/data"
+	if framework.NodeOSDistroIs("windows") {
+		command = "select-string 'hello world' /mnt/test/data"
+	}
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-reader-node2", command, secondNode)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
@@ -607,9 +610,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Image:   framework.GetTestImage(framework.BusyBoxImage),
+					Command: framework.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
