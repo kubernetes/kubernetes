@@ -80,6 +80,7 @@ func NewInitializedVolumePluginMgr(
 
 // Compile-time check to ensure kubeletVolumeHost implements the VolumeHost interface
 var _ volume.VolumeHost = &kubeletVolumeHost{}
+var _ volume.KubeletVolumeHost = &kubeletVolumeHost{}
 
 func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 	return kvh.kubelet.getPluginDir(pluginName)
@@ -92,6 +93,10 @@ type kubeletVolumeHost struct {
 	tokenManager     *token.Manager
 	configMapManager configmap.Manager
 	mountPodManager  mountpod.Manager
+}
+
+func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
+	kvh.kubelet.runtimeState.setStorageState(err)
 }
 
 func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {

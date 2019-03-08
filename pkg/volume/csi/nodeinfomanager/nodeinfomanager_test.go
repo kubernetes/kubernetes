@@ -19,6 +19,7 @@ package nodeinfomanager
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -545,6 +546,156 @@ func TestUninstallCSIDriverCSINodeInfoDisabled(t *testing.T) {
 	test(t, false /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
+func TestSetMigrationAnnotation(t *testing.T) {
+	testcases := []struct {
+		name            string
+		migratedPlugins map[string](func() bool)
+		existingNode    *storage.CSINode
+		expectedNode    *storage.CSINode
+		expectModified  bool
+	}{
+		{
+			name: "nil migrated plugins",
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+		},
+		{
+			name: "one modified plugin",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "existing plugin",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectModified: false,
+		},
+		{
+			name:            "remove plugin",
+			migratedPlugins: map[string](func() bool){},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "one modified plugin, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "multiple plugins modified, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+				"foo":  func() bool { return false },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation", v1.MigratedPluginsAnnotationKey: "foo"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+		{
+			name: "multiple plugins added, other annotations stable",
+			migratedPlugins: map[string](func() bool){
+				"test": func() bool { return true },
+				"foo":  func() bool { return true },
+			},
+			existingNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{"other": "annotation"},
+				},
+			},
+			expectedNode: &storage.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					Annotations: map[string]string{v1.MigratedPluginsAnnotationKey: "foo,test", "other": "annotation"},
+				},
+			},
+			expectModified: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Logf("test case: %s", tc.name)
+
+		modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
+		if modified != tc.expectModified {
+			t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
+		}
+
+		if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
+			t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
+		}
+	}
+}
+
 func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
 
@@ -591,7 +742,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 			nodeName,
 		)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
 		_, err = nim.CreateCSINode()
@@ -649,7 +800,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			nil,
 			nodeName,
 		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		//// Act
 		nim.CreateCSINode()

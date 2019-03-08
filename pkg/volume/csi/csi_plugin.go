@@ -33,6 +33,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -40,6 +41,7 @@ import (
 	csiinformer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	csilister "k8s.io/client-go/listers/storage/v1beta1"
+	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -216,12 +218,81 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		go factory.Start(wait.NeverStop)
 	}
 
+	var migratedPlugins = map[string](func() bool){
+		csitranslationplugins.GCEPDInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		},
+		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		},
+		csitranslationplugins.CinderInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+		},
+	}
+
 	// Initializing the label management channels
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
+	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
 
-	// TODO(#70514) Init CSINodeInfo object if the CRD exists and create Driver
-	// objects for migrated drivers.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		// This function prevents Kubelet from posting Ready status until CSINodeInfo
+		// is both installed and initialized
+		if err := initializeCSINode(host); err != nil {
+			return fmt.Errorf("failed to initialize CSINodeInfo: %v", err)
+		}
+	}
 
+	return nil
+}
+
+func initializeCSINode(host volume.VolumeHost) error {
+	kvh, ok := host.(volume.KubeletVolumeHost)
+	if !ok {
+		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINodeInfo initialization, not running on kubelet")
+		return nil
+	}
+	kubeClient := host.GetKubeClient()
+	if kubeClient == nil {
+		// Kubelet running in standalone mode. Skip CSINodeInfo initialization
+		klog.Warning("Skipping CSINodeInfo initialization, kubelet running in standalone mode")
+		return nil
+	}
+
+	kvh.SetKubeletError(errors.New("CSINodeInfo is not yet initialized"))
+
+	go func() {
+		defer utilruntime.HandleCrash()
+
+		// Backoff parameters tuned to retry over 140 seconds. Will fail and restart the Kubelet
+		// after max retry steps.
+		initBackoff := wait.Backoff{
+			Steps:    6,
+			Duration: 15 * time.Millisecond,
+			Factor:   6.0,
+			Jitter:   0.1,
+		}
+		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
+			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
+			err := nim.InitializeCSINodeWithAnnotation()
+			if err != nil {
+				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
+				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
+				return false, nil
+			}
+
+			// Successfully initialized drivers, allow Kubelet to post Ready
+			kvh.SetKubeletError(nil)
+			return true, nil
+		})
+		if err != nil {
+			// 2 releases after CSIMigration and all CSIMigrationX (where X is a volume plugin)
+			// are permanently enabled the apiserver/controllers can assume that the kubelet is
+			// using CSI for all Migrated volume plugins. Then all the CSINode initialization
+			// code can be dropped from Kubelet.
+			// Kill the Kubelet process and allow it to restart to retry initialization
+			klog.Fatalf("Failed to initialize CSINodeInfo after retrying")
+		}
+	}()
 	return nil
 }
 
