@@ -17,10 +17,15 @@ limitations under the License.
 package routes
 
 import (
+	"io"
 	"net/http"
 	"path"
+	"strings"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/emicklei/go-restful"
+	"github.com/hpcloud/tail"
 )
 
 // Logs adds handlers for the /logs path serving log files from /var/log.
@@ -39,13 +44,88 @@ func (l Logs) Install(c *restful.Container) {
 	c.Add(ws)
 }
 
+var logdir = "/var/log" // exposed for testing
+
 func logFileHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
 	actual := path.Join(logdir, req.PathParameter("logpath"))
-	http.ServeFile(resp.ResponseWriter, req.Request, actual)
+
+	if containsDotDot(actual) {
+		http.Error(resp.ResponseWriter, "invalid URL path", http.StatusBadRequest)
+		return
+	}
+
+	if req.QueryParameter("follow") != "true" {
+		http.ServeFile(resp.ResponseWriter, req.Request, actual)
+		return
+	}
+
+	// Follow the logfile.
+	file, err := tail.TailFile(actual, tail.Config{
+		Follow: true,
+		ReOpen: true,
+		// NOTE(tallclair): Tests revealed the inotify based watcher to be quite flaky. We may want to
+		// reevaluate this option in the future, but it should be thoroughly tested in multpile
+		// environments before reverting.
+		Poll:   true,
+		Logger: tail.DiscardingLogger,
+	})
+	if err != nil {
+		http.Error(resp.ResponseWriter, "Error reading file", http.StatusInternalServerError)
+		return
+	}
+
+	// Write headers
+	resp.AddHeader("Content-Type", "text/plain; charset=utf-8")
+	resp.AddHeader("X-Content-Type-Options", "nosniff")
+	resp.WriteHeader(http.StatusOK)
+
+	for {
+		// Drain the channel before flushing.
+	drain:
+		for {
+			select {
+			case line := <-file.Lines:
+				if _, err := io.WriteString(resp, line.Text+"\n"); err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
+			case <-resp.CloseNotify():
+				// Client connection closed.
+				return
+			default:
+				// Flush buffers & exit draining loop.
+				resp.Flush()
+				break drain
+			}
+		}
+
+		select {
+		case line := <-file.Lines:
+			if _, err := io.WriteString(resp, line.Text+"\n"); err != nil {
+				utilruntime.HandleError(err)
+				return
+			}
+		case <-resp.CloseNotify():
+			// Client connection closed.
+			return
+		}
+	}
 }
 
 func logFileListHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
 	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
+
+// copied from net/http/fs.go
+func containsDotDot(v string) bool {
+	if !strings.Contains(v, "..") {
+		return false
+	}
+	for _, ent := range strings.FieldsFunc(v, isSlashRune) {
+		if ent == ".." {
+			return true
+		}
+	}
+	return false
+}
+func isSlashRune(r rune) bool { return r == '/' || r == '\\' }

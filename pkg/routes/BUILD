@@ -1,9 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -12,7 +9,11 @@ go_library(
         "logs.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/routes",
-    deps = ["//vendor/github.com/emicklei/go-restful:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/github.com/hpcloud/tail:go_default_library",
+    ],
 )
 
 filegroup(
@@ -26,4 +27,15 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["logs_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+    ],
 )
