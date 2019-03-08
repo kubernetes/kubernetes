@@ -18,18 +18,26 @@ package statefulset
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/features"
+
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+)
+
+const (
+	AutoCleanupPersistentVolumeClaim = "storage.alpha.kubernetes.io/auto-clean-pvc"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -77,12 +85,36 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	_, err := spc.client.CoreV1().Pods(set.Namespace).Create(pod)
+	newPod, err := spc.client.CoreV1().Pods(set.Namespace).Create(pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err
 	}
 	spc.recordPodEvent("create", set, pod, err)
+
+	// update PVC's ownerReference
+	if utilfeature.DefaultFeatureGate.Enabled(features.AutoCleanupPersistentVolumeClaim) {
+		val, ok := set.Annotations[AutoCleanupPersistentVolumeClaim]
+		if ok && val == "" {
+			var controllerKind = v1.SchemeGroupVersion.WithKind("Pod")
+			ordinal := getOrdinal(pod)
+			templates := set.Spec.VolumeClaimTemplates
+			claimName := fmt.Sprintf("%s-%s-%d", templates[0].Name, set.Name, ordinal)
+			claim, _ := spc.pvcLister.PersistentVolumeClaims(set.Namespace).Get(claimName)
+
+			patch := fmt.Sprintf(
+				`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
+				controllerKind.GroupVersion().String(), controllerKind.Kind,
+				pod.GetName(), newPod.GetUID(), claim.GetUID())
+			_, err = spc.client.CoreV1().PersistentVolumeClaims(set.Namespace).Patch(
+				claimName,
+				types.MergePatchType,
+				[]byte(patch))
+			if err != nil {
+				spc.recordPodEvent("Update PVC", set, pod, err)
+			}
+		}
+	}
 	return err
 }
 
