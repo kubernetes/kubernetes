@@ -34,7 +34,6 @@
 ./hack/jenkins/test-dockerized.sh
 ./hack/jenkins/upload-to-gcs.sh
 ./hack/jenkins/verify-dockerized.sh
-./hack/lib/golang.sh
 ./hack/lib/init.sh
 ./hack/lib/logging.sh
 ./hack/lib/protoc.sh
