@@ -57,9 +57,12 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 }
 
 type CSIVolume struct {
-	VolumeContext map[string]string
-	Path          string
-	MountFlags    []string
+	VolumeHandle    string
+	VolumeContext   map[string]string
+	Path            string
+	DeviceMountPath string
+	FSType          string
+	MountFlags      []string
 }
 
 // NodeClient returns CSI node client
@@ -118,7 +121,6 @@ func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeCo
 
 // NodePublishVolume implements CSI NodePublishVolume
 func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodePublishVolumeResponse, error) {
-
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
@@ -135,9 +137,12 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 		return nil, errors.New("invalid fstype")
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
-		Path:          req.GetTargetPath(),
-		VolumeContext: req.GetVolumeContext(),
-		MountFlags:    req.GetVolumeCapability().GetMount().MountFlags,
+		VolumeHandle:    req.GetVolumeId(),
+		Path:            req.GetTargetPath(),
+		DeviceMountPath: req.GetStagingTargetPath(),
+		VolumeContext:   req.GetVolumeContext(),
+		FSType:          req.GetVolumeCapability().GetMount().GetFsType(),
+		MountFlags:      req.GetVolumeCapability().GetMount().MountFlags,
 	}
 	return &csipb.NodePublishVolumeResponse{}, nil
 }

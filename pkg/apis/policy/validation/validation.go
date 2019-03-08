@@ -121,6 +121,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPAllowedProcMountTypes(fldPath.Child("allowedProcMountTypes"), spec.AllowedProcMountTypes)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePSPAllowedCSIDrivers(fldPath.Child("allowedCSIDrivers"), spec.AllowedCSIDrivers)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
@@ -189,6 +190,17 @@ func validatePSPAllowedFlexVolumes(fldPath *field.Path, flexVolumes []policy.All
 				allErrs = append(allErrs, field.Required(fldPath.Child("allowedFlexVolumes").Index(idx).Child("driver"),
 					"must specify a driver"))
 			}
+		}
+	}
+	return allErrs
+}
+
+func validatePSPAllowedCSIDrivers(fldPath *field.Path, csiDrivers []policy.AllowedCSIDriver) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(csiDrivers) > 0 {
+		for idx, csiDriver := range csiDrivers {
+			fieldPath := fldPath.Child("allowedCSIDriver").Index(idx).Child("name")
+			allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(csiDriver.Name, fieldPath)...)
 		}
 	}
 	return allErrs

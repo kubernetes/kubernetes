@@ -213,6 +213,10 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
+	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+	// An empty value means no CSI drivers can run inline within a pod spec.
+	// +optional
+	AllowedCSIDrivers []AllowedCSIDriver
 	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
 	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
@@ -306,6 +310,12 @@ var (
 type AllowedFlexVolume struct {
 	// Driver is the name of the Flexvolume driver.
 	Driver string
+}
+
+// AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
+type AllowedCSIDriver struct {
+	// Name is the registered name of the CSI driver
+	Name string
 }
 
 // SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.

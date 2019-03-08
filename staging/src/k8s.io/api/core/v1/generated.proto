@@ -220,6 +220,37 @@ message CSIPersistentVolumeSource {
   optional SecretReference nodePublishSecretRef = 8;
 }
 
+// Represents a source location of a volume to mount, managed by an external CSI driver
+message CSIVolumeSource {
+  // Driver is the name of the CSI driver that handles this volume.
+  // Consult with your admin for the correct name as registered in the cluster.
+  optional string driver = 1;
+
+  // Specifies a read-only configuration for the volume.
+  // Defaults to false (read/write).
+  // +optional
+  optional bool readOnly = 2;
+
+  // Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+  // If not provided, the empty value is passed to the associated CSI driver
+  // which will determine the default filesystem to apply.
+  // +optional
+  optional string fsType = 3;
+
+  // VolumeAttributes stores driver-specific properties that are passed to the CSI
+  // driver. Consult your driver's documentation for supported values.
+  // +optional
+  map<string, string> volumeAttributes = 4;
+
+  // NodePublishSecretRef is a reference to the secret object containing
+  // sensitive information to pass to the CSI driver to complete the CSI
+  // NodePublishVolume and NodeUnpublishVolume calls.
+  // This field is optional, and  may be empty if no secret is required. If the
+  // secret object contains more than one secret, all secret references are passed.
+  // +optional
+  optional LocalObjectReference nodePublishSecretRef = 5;
+}
+
 // Adds and removes POSIX capabilities from running containers.
 message Capabilities {
   // Added capabilities
@@ -2492,7 +2523,7 @@ message PersistentVolumeSource {
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // CSI represents storage that handled by an external CSI driver (Beta feature).
+  // CSI represents storage that is handled by an external CSI driver (Beta feature).
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
@@ -4776,6 +4807,10 @@ message VolumeSource {
   // StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
   // +optional
   optional StorageOSVolumeSource storageos = 27;
+
+  // CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+  // +optional
+  optional CSIVolumeSource csi = 28;
 }
 
 // Represents a vSphere volume resource.
