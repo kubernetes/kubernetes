@@ -28,6 +28,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -55,6 +56,7 @@ type csiClient interface {
 		fsType string,
 		mountOptions []string,
 	) error
+	NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (resource.Quantity, error)
 	NodeUnpublishVolume(
 		ctx context.Context,
 		volID string,
@@ -71,6 +73,7 @@ type csiClient interface {
 	) error
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
+	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 }
 
 // Strongly typed address
@@ -302,6 +305,41 @@ func (c *csiDriverClient) NodePublishVolume(
 
 	return fmt.Errorf("failed to call NodePublishVolume. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
 
+}
+
+func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
+	if c.nodeV1ClientCreator == nil {
+		return newSize, fmt.Errorf("version of CSI driver does not support volume expansion")
+	}
+
+	if volumeID == "" {
+		return newSize, errors.New("missing volume id")
+	}
+	if volumePath == "" {
+		return newSize, errors.New("missing volume path")
+	}
+
+	if newSize.Value() < 0 {
+		return newSize, errors.New("size can not be less than 0")
+	}
+
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	if err != nil {
+		return newSize, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeExpandVolumeRequest{
+		VolumeId:      volumeID,
+		VolumePath:    volumePath,
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: newSize.Value()},
+	}
+	resp, err := nodeClient.NodeExpandVolume(ctx, req)
+	if err != nil {
+		return newSize, err
+	}
+	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
+	return *updatedQuantity, nil
 }
 
 func (c *csiDriverClient) nodePublishVolumeV1(
@@ -622,6 +660,41 @@ func (c *csiDriverClient) nodeUnstageVolumeV0(ctx context.Context, volID, stagin
 	}
 	_, err = nodeClient.NodeUnstageVolume(ctx, req)
 	return err
+}
+
+func (c *csiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, error) {
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if Node has EXPAND_VOLUME capability"))
+
+	if c.nodeV1ClientCreator != nil {
+		nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+		if err != nil {
+			return false, err
+		}
+		defer closer.Close()
+
+		req := &csipbv1.NodeGetCapabilitiesRequest{}
+		resp, err := nodeClient.NodeGetCapabilities(ctx, req)
+		if err != nil {
+			return false, err
+		}
+
+		capabilities := resp.GetCapabilities()
+
+		nodeExpandSet := false
+		if capabilities == nil {
+			return false, nil
+		}
+		for _, capability := range capabilities {
+			if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
+				nodeExpandSet = true
+			}
+		}
+		return nodeExpandSet, nil
+	} else if c.nodeV0ClientCreator != nil {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to call NodeSupportsNodeExpand. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+
 }
 
 func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {

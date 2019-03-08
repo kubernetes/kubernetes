@@ -975,8 +975,8 @@
 		},
 		{
 			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi",
-			"Comment": "v1.0.0",
-			"Rev": "ed0bb0e1557548aa028307f48728767cfe8f6345"
+			"Comment": "v1.1.0-rc1",
+			"Rev": "c751be1edc7952e7aac35720d5b34b669e48f113"
 		},
 		{
 			"ImportPath": "github.com/containerd/console",

@@ -67,6 +67,7 @@ type NodeClient struct {
 	nodePublishedVolumes map[string]CSIVolume
 	nodeStagedVolumes    map[string]CSIVolume
 	stageUnstageSet      bool
+	expansionSet         bool
 	nodeGetInfoResp      *csipb.NodeGetInfoResponse
 	nextErr              error
 }
@@ -77,6 +78,15 @@ func NewNodeClient(stageUnstageSet bool) *NodeClient {
 		nodePublishedVolumes: make(map[string]CSIVolume),
 		nodeStagedVolumes:    make(map[string]CSIVolume),
 		stageUnstageSet:      stageUnstageSet,
+	}
+}
+
+func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]CSIVolume),
+		nodeStagedVolumes:    make(map[string]CSIVolume),
+		stageUnstageSet:      stageUnstageSet,
+		expansionSet:         expansionSet,
 	}
 }
 
@@ -195,6 +205,29 @@ func (f *NodeClient) NodeUnstageVolume(ctx context.Context, req *csipb.NodeUnsta
 	return &csipb.NodeUnstageVolumeResponse{}, nil
 }
 
+// NodeExpandVolume implements csi method
+func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpandVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeExpandVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetVolumePath() == "" {
+		return nil, errors.New("missing volume path")
+	}
+
+	if req.GetCapacityRange().RequiredBytes <= 0 {
+		return nil, errors.New("required bytes should be greater than 0")
+	}
+
+	resp := &csipb.NodeExpandVolumeResponse{
+		CapacityBytes: req.GetCapacityRange().RequiredBytes,
+	}
+	return resp, nil
+}
+
 // NodeGetId implements csi method
 func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
 	if f.nextErr != nil {
@@ -206,20 +239,27 @@ func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoReque
 // NodeGetCapabilities implements csi method
 func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetCapabilitiesRequest, opts ...grpc.CallOption) (*csipb.NodeGetCapabilitiesResponse, error) {
 	resp := &csipb.NodeGetCapabilitiesResponse{
-		Capabilities: []*csipb.NodeServiceCapability{
-			{
-				Type: &csipb.NodeServiceCapability_Rpc{
-					Rpc: &csipb.NodeServiceCapability_RPC{
-						Type: csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-					},
-				},
-			},
-		},
+		Capabilities: []*csipb.NodeServiceCapability{},
 	}
 	if f.stageUnstageSet {
-		return resp, nil
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+				},
+			},
+		})
 	}
-	return nil, nil
+	if f.expansionSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_EXPAND_VOLUME,
+				},
+			},
+		})
+	}
+	return resp, nil
 }
 
 // NodeGetVolumeStats implements csi method

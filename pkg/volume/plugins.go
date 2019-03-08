@@ -46,6 +46,9 @@ type ProbeEvent struct {
 	Op         ProbeOperation // The operation to the plugin
 }
 
+// CSIVolumePhaseType stores information about CSI volume path.
+type CSIVolumePhaseType string
+
 const (
 	// Common parameter which can be specified in StorageClass to specify the desired FSType
 	// Provisioners SHOULD implement support for this if they are block device based
@@ -55,6 +58,8 @@ const (
 
 	ProbeAddOrUpdate ProbeOperation = 1 << iota
 	ProbeRemove
+	CSIVolumeStaged    CSIVolumePhaseType = "staged"
+	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -83,6 +88,26 @@ type VolumeOptions struct {
 	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
+}
+
+// NodeResizeOptions contain options to be passed for node expansion.
+type NodeResizeOptions struct {
+	VolumeSpec *Spec
+
+	// DevicePath - location of actual device on the node. In case of CSI
+	// this just could be volumeID
+	DevicePath string
+
+	// DeviceMountPath location where device is mounted on the node. If volume type
+	// is attachable - this would be global mount path otherwise
+	// it would be location where volume was mounted for the pod
+	DeviceMountPath string
+
+	NewSize resource.Quantity
+	OldSize resource.Quantity
+
+	// CSIVolumePhase contains volume phase on the node
+	CSIVolumePhase CSIVolumePhaseType
 }
 
 type DynamicPluginProber interface {
@@ -219,18 +244,20 @@ type DeviceMountableVolumePlugin interface {
 }
 
 // ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
-// expanded
+// expanded via control-plane ExpandVolumeDevice call.
 type ExpandableVolumePlugin interface {
 	VolumePlugin
 	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error)
 	RequiresFSResize() bool
 }
 
-// FSResizableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
-// that require extra steps on nodes for expansion to complete
-type FSResizableVolumePlugin interface {
-	ExpandableVolumePlugin
-	ExpandFS(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) error
+// NodeExpandableVolumePlugin is an expanded interface of VolumePlugin and is used for volumes that
+// require expansion on the node via NodeExpand call.
+type NodeExpandableVolumePlugin interface {
+	VolumePlugin
+	RequiresFSResize() bool
+	// NodeExpand expands volume on given deviceMountPath and returns true if resize is successful.
+	NodeExpand(resizeOptions NodeResizeOptions) (bool, error)
 }
 
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
@@ -951,26 +978,26 @@ func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugi
 	return nil, nil
 }
 
-// FindFSResizablePluginBySpec fetches a persistent volume plugin by spec
-func (pm *VolumePluginMgr) FindFSResizablePluginBySpec(spec *Spec) (FSResizableVolumePlugin, error) {
+// FindNodeExpandablePluginBySpec fetches a persistent volume plugin by spec
+func (pm *VolumePluginMgr) FindNodeExpandablePluginBySpec(spec *Spec) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 	return nil, nil
 }
 
-// FindFSResizablePluginByName fetches a persistent volume plugin by name
-func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (FSResizableVolumePlugin, error) {
+// FindNodeExpandablePluginByName fetches a persistent volume plugin by name
+func (pm *VolumePluginMgr) FindNodeExpandablePluginByName(name string) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
 	}
 
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 
