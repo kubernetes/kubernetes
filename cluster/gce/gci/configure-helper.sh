@@ -773,6 +773,7 @@ function create-master-audit-policy {
       - group: "extensions"
       - group: "metrics.k8s.io"
       - group: "networking.k8s.io"
+      - group: "node.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
       - group: "scheduling.k8s.io"
@@ -1747,6 +1748,9 @@ function start-kube-apiserver {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
+    params+=" --runtime-config=node.k8s.io/v1alpha1=true"
+  fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
@@ -2689,9 +2693,6 @@ EOF
     else
       setup-addon-manifests "addons" "istio/noauth"
     fi
-  fi
-  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
-    setup-addon-manifests "addons" "runtimeclass"
   fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons

@@ -51,6 +51,8 @@ import (
 	fakeextensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake"
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	fakenetworkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion/fake"
+	nodeinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/node/internalversion"
+	fakenodeinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/node/internalversion/fake"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	fakepolicyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -168,6 +170,11 @@ func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
 	return &fakenetworkinginternalversion.FakeNetworking{Fake: &c.Fake}
+}
+
+// Node retrieves the NodeClient
+func (c *Clientset) Node() nodeinternalversion.NodeInterface {
+	return &fakenodeinternalversion.FakeNode{Fake: &c.Fake}
 }
 
 // Policy retrieves the PolicyClient

@@ -20,31 +20,23 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
-	nodeapiinformer "k8s.io/node-api/pkg/client/informers/externalversions"
-	nodev1alpha1 "k8s.io/node-api/pkg/client/listers/node/v1alpha1"
-)
-
-var (
-	runtimeClassGVR = schema.GroupVersionResource{
-		Group:    "node.k8s.io",
-		Version:  "v1alpha1",
-		Resource: "runtimeclasses",
-	}
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	nodev1beta1 "k8s.io/client-go/listers/node/v1beta1"
 )
 
 // Manager caches RuntimeClass API objects, and provides accessors to the Kubelet.
 type Manager struct {
-	informerFactory nodeapiinformer.SharedInformerFactory
-	lister          nodev1alpha1.RuntimeClassLister
+	informerFactory informers.SharedInformerFactory
+	lister          nodev1beta1.RuntimeClassLister
 }
 
 // NewManager returns a new RuntimeClass Manager. Run must be called before the manager can be used.
-func NewManager(client nodeapiclient.Interface) *Manager {
+func NewManager(client clientset.Interface) *Manager {
 	const resyncPeriod = 0
-	factory := nodeapiinformer.NewSharedInformerFactory(client, resyncPeriod)
-	lister := factory.Node().V1alpha1().RuntimeClasses().Lister()
+
+	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
+	lister := factory.Node().V1beta1().RuntimeClasses().Lister()
 
 	return &Manager{
 		informerFactory: factory,
@@ -82,9 +74,5 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 		return "", fmt.Errorf("Failed to lookup RuntimeClass %s: %v", name, err)
 	}
 
-	handler := rc.Spec.RuntimeHandler
-	if handler == nil {
-		return "", nil
-	}
-	return *handler, nil
+	return rc.Handler, nil
 }

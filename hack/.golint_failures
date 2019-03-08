@@ -50,6 +50,7 @@ pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy
 pkg/apis/networking
 pkg/apis/networking/v1
+pkg/apis/node/v1alpha1
 pkg/apis/policy
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
@@ -279,6 +280,7 @@ pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
+pkg/registry/node/rest
 pkg/registry/policy/poddisruptionbudget/storage
 pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole
