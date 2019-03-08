@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -807,6 +808,33 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
+// trimURLPath trims a URL path.
+// For paths in the format of "/metrics/xxx", "metrics/xxx" is returned;
+// For all other paths, the first part of the path is returned.
+func trimURLPath(path string) string {
+	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 3)
+	if len(parts) == 0 {
+		return path
+	}
+
+	if parts[0] == "metrics" && len(parts) > 1 {
+		return fmt.Sprintf("%s/%s", parts[0], parts[1])
+
+	}
+	return parts[0]
+}
+
+// isLongRunningRequest determines whether the request is long-running or not.
+func isLongRunningRequest(path string) bool {
+	longRunningRequestPaths := []string{"exec", "attach", "portforward", "debug"}
+	for _, p := range longRunningRequestPaths {
+		if p == path {
+			return true
+		}
+	}
+	return false
+}
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer httplog.NewLogged(req, &w).StacktraceWhen(
@@ -820,6 +848,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusSwitchingProtocols,
 		),
 	).Log()
+
+	// monitor http requests
+	var serverType string
+	if s.auth == nil {
+		serverType = "readonly"
+	} else {
+		serverType = "readwrite"
+	}
+
+	method, path, host := req.Method, trimURLPath(req.URL.Path), req.URL.Host
+
+	longRunning := strconv.FormatBool(isLongRunningRequest(path))
+
+	servermetrics.HTTPRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
+
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Dec()
+
+	startTime := time.Now()
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, host, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+
 	s.restfulCont.ServeHTTP(w, req)
 }
 
