@@ -310,9 +310,9 @@ const (
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 
 	// owner @freehan
-	// beta: v1.11
+	// GA: v1.14
 	//
-	// Support Pod Ready++
+	// Allow user to specify additional conditions to be evaluated for Pod readiness.
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
 	// owner: @kevtaylor
@@ -480,7 +480,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
-	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
+	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
@@ -510,6 +510,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: utilfeature.Beta},
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: utilfeature.Beta},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: utilfeature.Alpha},
+	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: false, PreRelease: utilfeature.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

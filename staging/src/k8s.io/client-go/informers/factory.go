@@ -38,6 +38,7 @@ import (
 	extensions "k8s.io/client-go/informers/extensions"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	networking "k8s.io/client-go/informers/networking"
+	node "k8s.io/client-go/informers/node"
 	policy "k8s.io/client-go/informers/policy"
 	rbac "k8s.io/client-go/informers/rbac"
 	scheduling "k8s.io/client-go/informers/scheduling"
@@ -198,6 +199,7 @@ type SharedInformerFactory interface {
 	Events() events.Interface
 	Extensions() extensions.Interface
 	Networking() networking.Interface
+	Node() node.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
 	Scheduling() scheduling.Interface
@@ -247,6 +249,10 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 
 func (f *sharedInformerFactory) Networking() networking.Interface {
 	return networking.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Node() node.Interface {
+	return node.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {

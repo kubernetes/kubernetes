@@ -51,7 +51,11 @@ var _ = SIGDescribe("DNS", func() {
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
 			namesToResolve = append(namesToResolve, "google.com")
-			namesToResolve = append(namesToResolve, "metadata")
+			// Windows containers do not have a route to the GCE
+			// metadata server by default.
+			if !framework.NodeOSDistroIs("windows") {
+				namesToResolve = append(namesToResolve, "metadata")
+			}
 		}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -74,7 +78,11 @@ var _ = SIGDescribe("DNS", func() {
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
 			namesToResolve = append(namesToResolve, "google.com")
-			namesToResolve = append(namesToResolve, "metadata")
+			// Windows containers do not have a route to the GCE
+			// metadata server by default.
+			if !framework.NodeOSDistroIs("windows") {
+				namesToResolve = append(namesToResolve, "metadata")
+			}
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}

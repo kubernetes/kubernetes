@@ -95,7 +95,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	nodeapiclientset "k8s.io/node-api/pkg/client/clientset/versioned"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/nsenter"
 )
@@ -591,15 +590,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet heartbeat client: %v", err)
-		}
-
-		// CRDs are JSON only, and client renegotiation for streaming is not correct as per #67803
-		crdClientConfig := restclient.CopyConfig(clientConfig)
-		crdClientConfig.ContentType = "application/json"
-
-		kubeDeps.NodeAPIClient, err = nodeapiclientset.NewForConfig(crdClientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet node-api client: %v", err)
 		}
 	}
 

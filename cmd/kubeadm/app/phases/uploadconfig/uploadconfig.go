@@ -19,10 +19,12 @@ package uploadconfig
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -36,6 +38,69 @@ const (
 	// or during upgrade nodes
 	NodesKubeadmConfigClusterRoleName = "kubeadm:nodes-kubeadm-config"
 )
+
+// ResetClusterStatusForNode removes the APIEndpoint of a given control-plane node
+// from the ClusterStatus and updates the kubeadm ConfigMap
+func ResetClusterStatusForNode(nodeName string, client clientset.Interface) error {
+	fmt.Printf("[reset] Removing info for node %q from the ConfigMap %q in the %q Namespace\n",
+		nodeName, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+
+	// Get the kubeadm ConfigMap
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to get config map")
+	}
+
+	// Handle missing ClusterConfiguration in the ConfigMap. Should only happen if someone manually
+	// interacted with the ConfigMap.
+	clusterConfigurationYaml, ok := configMap.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
+	if !ok {
+		return errors.Errorf("cannot find key %q in ConfigMap %q in the %q Namespace",
+			kubeadmconstants.ClusterConfigurationConfigMapKey, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	}
+
+	// Obtain the existing ClusterStatus object
+	clusterStatus, err := configutil.UnmarshalClusterStatus(configMap.Data)
+	if err != nil {
+		return err
+	}
+
+	// Handle a nil APIEndpoints map. Should only happen if someone manually
+	// interacted with the ConfigMap.
+	if clusterStatus.APIEndpoints == nil {
+		return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
+			kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	}
+
+	// Check for existence of the nodeName key in the list of APIEndpoints.
+	// Return early if it's missing.
+	apiEndpoint, ok := clusterStatus.APIEndpoints[nodeName]
+	if !ok {
+		klog.Warningf("No APIEndpoint registered for node %q", nodeName)
+		return nil
+	}
+
+	klog.V(2).Infof("Removing APIEndpoint %#v for node %q", apiEndpoint, nodeName)
+	delete(clusterStatus.APIEndpoints, nodeName)
+
+	// Marshal the ClusterStatus back into YAML
+	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)
+	if err != nil {
+		return err
+	}
+
+	// Update the ClusterStatus in the ConfigMap
+	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			kubeadmconstants.ClusterConfigurationConfigMapKey: clusterConfigurationYaml,
+			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
+		},
+	})
+}
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {

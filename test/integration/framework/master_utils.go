@@ -33,6 +33,7 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbac "k8s.io/api/rbac/v1alpha1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -309,6 +310,10 @@ func NewMasterConfig() *master.Config {
 		ns)
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: auditreg.GroupName, Resource: serverstorage.AllResources},
+		"",
+		ns)
+	storageFactory.SetSerializer(
+		schema.GroupResource{Group: nodev1alpha1.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 

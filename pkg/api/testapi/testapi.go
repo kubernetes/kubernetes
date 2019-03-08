@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -70,6 +71,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
+	_ "k8s.io/kubernetes/pkg/apis/node/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -254,6 +256,12 @@ func init() {
 	if _, ok := Groups[networking.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(networking.GroupName)[0].Version}
 		Groups[networking.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
+	if _, ok := Groups[node.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: node.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(node.GroupName)[0].Version}
+		Groups[node.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}

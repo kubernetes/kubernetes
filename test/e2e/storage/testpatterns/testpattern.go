@@ -145,6 +145,30 @@ var (
 		FsType:  "xfs",
 	}
 
+	// Definitions for ntfs
+
+	// NtfsInlineVolume is TestPattern for "Inline-volume (ntfs)"
+	NtfsInlineVolume = TestPattern{
+		Name:       "Inline-volume (ntfs)",
+		VolType:    InlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "sig-windows",
+	}
+	// NtfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (ntfs)"
+	NtfsPreprovisionedPV = TestPattern{
+		Name:       "Pre-provisioned PV (ntfs)",
+		VolType:    PreprovisionedPV,
+		FsType:     "ntfs",
+		FeatureTag: "sig-windows",
+	}
+	// NtfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
+	NtfsDynamicPV = TestPattern{
+		Name:       "Dynamic PV (ntfs)",
+		VolType:    DynamicPV,
+		FsType:     "ntfs",
+		FeatureTag: "sig-windows",
+	}
+
 	// Definitions for Filesystem volume mode
 
 	// FsVolModePreprovisionedPV is TestPattern for "Pre-provisioned PV (filesystem)"

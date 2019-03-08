@@ -49,7 +49,7 @@ type cleanupFuncs func()
 
 const (
 	csiNodeLimitUpdateTimeout  = 5 * time.Minute
-	csiPodUnschedulableTimeout = 2 * time.Minute
+	csiPodUnschedulableTimeout = 5 * time.Minute
 )
 
 var _ = utils.SIGDescribe("CSI mock volume", func() {
@@ -310,7 +310,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 
 			var err error
-			init(testParameters{nodeSelectorKey: "node-attach-limit-csi", attachLimit: 2})
+			nodeSelectorKey := fmt.Sprintf("attach-limit-csi-%s", f.Namespace.Name)
+			init(testParameters{nodeSelectorKey: nodeSelectorKey, attachLimit: 2})
 			defer cleanup()
 			nodeName := m.config.ClientNodeName
 			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))

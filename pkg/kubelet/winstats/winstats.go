@@ -58,6 +58,7 @@ type nodeMetrics struct {
 	memoryPrivWorkingSetBytes uint64
 	memoryCommittedBytes      uint64
 	timeStamp                 time.Time
+	interfaceStats            []cadvisorapi.InterfaceStats
 }
 
 type nodeInfo struct {
@@ -109,12 +110,11 @@ func (c *StatsClient) WinVersionInfo() (*cadvisorapi.VersionInfo, error) {
 
 func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, error) {
 	nodeMetrics, err := c.client.getNodeMetrics()
-
 	if err != nil {
 		return nil, err
 	}
-	var stats []*cadvisorapiv2.ContainerStats
 
+	var stats []*cadvisorapiv2.ContainerStats
 	stats = append(stats, &cadvisorapiv2.ContainerStats{
 		Timestamp: nodeMetrics.timeStamp,
 		Cpu: &cadvisorapi.CpuStats{
@@ -126,6 +126,9 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 			WorkingSet: nodeMetrics.memoryPrivWorkingSetBytes,
 			Usage:      nodeMetrics.memoryCommittedBytes,
 		},
+		Network: &cadvisorapiv2.NetworkStats{
+			Interfaces: nodeMetrics.interfaceStats,
+		},
 	})
 
 	nodeInfo := c.client.getNodeInfo()
@@ -134,6 +137,7 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 			CreationTime: nodeInfo.startTime,
 			HasCpu:       true,
 			HasMemory:    true,
+			HasNetwork:   true,
 			Memory: cadvisorapiv2.MemorySpec{
 				Limit: nodeInfo.memoryPhysicalCapacityBytes,
 			},

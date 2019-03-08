@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	goerrors "errors"
 	"fmt"
 	"path"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -303,8 +305,14 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	}
 
 	originalSpec := volumeToAttach.VolumeSpec
+	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+	if err != nil {
+		eventRecorderFunc(&err)
+		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.NodeUsingCSIPlugin failed", err)
+	}
+
 	// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 		// The volume represented by this spec is CSI and thus should be migrated
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 		if err != nil || attachableVolumePlugin == nil {
@@ -401,17 +409,22 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	if volumeToDetach.VolumeSpec != nil {
 		// Get attacher plugin
+		nu, err := nodeUsingCSIPlugin(og, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NodeUsingCSIPlugin failed", err)
+		}
+
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) {
+		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 
 			csiSpec, err := translateSpec(volumeToDetach.VolumeSpec)
 			if err != nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.TranslateSpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
 			}
 
 			volumeToDetach.VolumeSpec = csiSpec
@@ -861,7 +874,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		if deviceOpened {
 			return deviceToDetach.GenerateError(
 				"UnmountDevice failed",
-				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
+				goerrors.New("the device is in use when it was no longer expected to be in use"))
 		}
 
 		klog.Infof(deviceToDetach.GenerateMsg("UnmountDevice succeeded", ""))
@@ -968,7 +981,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			devicePath = pluginDevicePath
 		}
 		if len(devicePath) == 0 {
-			return volumeToMount.GenerateError("MapVolume failed", fmt.Errorf("Device path of the volume is empty"))
+			return volumeToMount.GenerateError("MapVolume failed", goerrors.New("Device path of the volume is empty"))
 		}
 
 		// When kubelet is containerized, devicePath may be a symlink at a place unavailable to
@@ -1533,8 +1546,11 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 	return deviceOpened, nil
 }
 
-// TODO(dyzz): need to also add logic to check CSINodeInfo for Kubelet migration status
 func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+	// TODO(#75146) Check whether the driver is installed as well so that
+	// we can throw a better error when the driver is not installed.
+	// The error should be of the approximate form:
+	// fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return false
 	}
@@ -1545,6 +1561,93 @@ func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 		}
 	}
 	return false
+}
+
+func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
+	migratable, err := og.volumePluginMgr.IsPluginMigratableBySpec(spec)
+	if err != nil {
+		return false, err
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) ||
+		!migratable {
+		return false, nil
+	}
+
+	if len(nodeName) == 0 {
+		return false, goerrors.New("nodeName is empty")
+	}
+
+	kubeClient := og.volumePluginMgr.Host.GetKubeClient()
+	if kubeClient == nil {
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// we are in a standalone (headless) Kubelet
+		return true, nil
+	}
+
+	adcHost, ok := og.volumePluginMgr.Host.(volume.AttachDetachVolumeHost)
+	if !ok {
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// "enableControllerAttachDetach" is set to true on kubelet
+		return true, nil
+	}
+
+	if adcHost.CSINodeLister() == nil {
+		return false, goerrors.New("could not find CSINodeLister in attachDetachController")
+	}
+
+	csiNode, err := adcHost.CSINodeLister().Get(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+
+	ann := csiNode.GetAnnotations()
+	if ann == nil {
+		return false, nil
+	}
+
+	var mpaSet sets.String
+	mpa := ann[v1.MigratedPluginsAnnotationKey]
+	tok := strings.Split(mpa, ",")
+	if len(mpa) == 0 {
+		mpaSet = sets.NewString()
+	} else {
+		mpaSet = sets.NewString(tok...)
+	}
+
+	pluginName, err := csilib.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
+	if err != nil {
+		return false, err
+	}
+
+	if len(pluginName) == 0 {
+		// Could not find a plugin name from translation directory, assume not translated
+		return false, nil
+	}
+
+	isMigratedOnNode := mpaSet.Has(pluginName)
+
+	if isMigratedOnNode {
+		installed := false
+		driverName, err := csilib.GetCSINameFromInTreeName(pluginName)
+		if err != nil {
+			return isMigratedOnNode, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				installed = true
+				break
+			}
+		}
+		if !installed {
+			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
+		}
+	}
+
+	return isMigratedOnNode, nil
+
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
@@ -1559,8 +1662,8 @@ func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
 			ReadOnly:         spec.ReadOnly,
 		}, nil
 	} else if spec.Volume != nil {
-		return &volume.Spec{}, fmt.Errorf("translation is not supported for in-line volumes yet")
+		return &volume.Spec{}, goerrors.New("translation is not supported for in-line volumes yet")
 	} else {
-		return &volume.Spec{}, fmt.Errorf("not a valid volume spec")
+		return &volume.Spec{}, goerrors.New("not a valid volume spec")
 	}
 }

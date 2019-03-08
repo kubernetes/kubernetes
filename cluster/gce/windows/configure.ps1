@@ -100,6 +100,7 @@ try {
   Dump-DebugInfoToConsole
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
+  Disable-WindowsDefender
 
   if (Test-IsTestCluster $kube_env) {
     Log-Output 'Test cluster detected, installing OpenSSH.'
@@ -128,6 +129,9 @@ try {
   Log-Output 'Waiting 15 seconds for node to join cluster.'
   Start-Sleep 15
   Verify-WorkerServices
+
+  $config = New-FileRotationConfig
+  Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
 }
 catch {
   Write-Host 'Exception caught in script:'

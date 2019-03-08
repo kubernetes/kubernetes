@@ -5,6 +5,8 @@ go_library(
     srcs = [
         "cadvisor_stats_provider.go",
         "cri_stats_provider.go",
+        "cri_stats_provider_others.go",
+        "cri_stats_provider_windows.go",
         "helper.go",
         "log_metrics_provider.go",
         "stats_provider.go",
@@ -32,7 +34,13 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/github.com/Microsoft/hcsshim:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

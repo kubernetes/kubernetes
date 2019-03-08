@@ -23,7 +23,6 @@ package testsuites
 
 import (
 	"fmt"
-	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -63,6 +62,10 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.XfsInlineVolume,
 				testpatterns.XfsPreprovisionedPV,
 				testpatterns.XfsDynamicPV,
+				// ntfs
+				testpatterns.NtfsInlineVolume,
+				testpatterns.NtfsPreprovisionedPV,
+				testpatterns.NtfsDynamicPV,
 			},
 		},
 	}
@@ -105,7 +108,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volumeio")
+	f := framework.NewDefaultFramework("volume")
 
 	init := func() {
 		l = local{}
@@ -181,10 +184,9 @@ func testScriptInPod(
 		volName = "vol1"
 	)
 	suffix := generateSuffixForPodName(volumeType)
-	scriptName := fmt.Sprintf("test-%s.sh", suffix)
-	fullPath := filepath.Join(volPath, scriptName)
-	cmd := fmt.Sprintf("echo \"ls %s\" > %s; chmod u+x %s; %s", volPath, fullPath, fullPath, fullPath)
-
+	fileName := fmt.Sprintf("test-%s", suffix)
+	content := fmt.Sprintf("ls %s", volPath)
+	command := framework.GenerateWriteandExecuteScriptFileCmd(content, fileName, volPath)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("exec-volume-test-%s", suffix),
@@ -194,8 +196,8 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   imageutils.GetE2EImage(imageutils.Nginx),
-					Command: []string{"/bin/sh", "-ec", cmd},
+					Image:   framework.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
+					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volName,
@@ -215,7 +217,7 @@ func testScriptInPod(
 		},
 	}
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
-	f.TestContainerOutput("exec-volume-test", pod, 0, []string{scriptName})
+	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)

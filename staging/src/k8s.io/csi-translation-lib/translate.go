@@ -17,6 +17,7 @@ limitations under the License.
 package csitranslation
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func TranslateInTreeStorageClassParametersToCSI(inTreePluginName string, scParam
 // be modified
 func TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil {
-		return nil, fmt.Errorf("persistent volume was nil")
+		return nil, errors.New("persistent volume was nil")
 	}
 	copiedPV := pv.DeepCopy()
 	for _, curPlugin := range inTreePlugins {
@@ -64,7 +65,7 @@ func TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, erro
 // by the `Driver` field in the CSI Source. The input PV object will not be modified.
 func TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.CSI == nil {
-		return nil, fmt.Errorf("CSI persistent volume was nil")
+		return nil, errors.New("CSI persistent volume was nil")
 	}
 	copiedPV := pv.DeepCopy()
 	for driverName, curPlugin := range inTreePlugins {
@@ -95,6 +96,23 @@ func IsMigratedCSIDriverByName(csiPluginName string) bool {
 	return false
 }
 
+// GetInTreePluginNameFromSpec returns the plugin name
+func GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error) {
+	if pv != nil {
+		for _, curPlugin := range inTreePlugins {
+			if curPlugin.CanSupport(pv) {
+				return curPlugin.GetInTreePluginName(), nil
+			}
+		}
+		return "", fmt.Errorf("could not find in-tree plugin name from persistent volume %v", pv)
+	} else if vol != nil {
+		// TODO(dyzz): Implement inline volume migration support
+		return "", errors.New("inline volume migration not yet supported")
+	} else {
+		return "", errors.New("both persistent volume and volume are nil")
+	}
+}
+
 // GetCSINameFromInTreeName returns the name of a CSI driver that supersedes the
 // in-tree plugin with the given name
 func GetCSINameFromInTreeName(pluginName string) (string, error) {
@@ -103,7 +121,7 @@ func GetCSINameFromInTreeName(pluginName string) (string, error) {
 			return csiDriverName, nil
 		}
 	}
-	return "", fmt.Errorf("Could not find CSI Driver name for plugin %v", pluginName)
+	return "", fmt.Errorf("could not find CSI Driver name for plugin %v", pluginName)
 }
 
 // GetInTreeNameFromCSIName returns the name of the in-tree plugin superseded by

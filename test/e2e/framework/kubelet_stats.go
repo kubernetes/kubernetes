@@ -67,7 +67,7 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 // or else, the function will try to get kubelet metrics directly from the node.
 func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	if c == nil {
-		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
+		return metrics.GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
 	}
 	grabber, err := metrics.NewMetricsGrabber(c, nil, true, false, false, false, false)
 	if err != nil {

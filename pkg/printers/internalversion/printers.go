@@ -53,6 +53,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -446,6 +447,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(priorityClassColumnDefinitions, printPriorityClass)
 	h.TableHandler(priorityClassColumnDefinitions, printPriorityClassList)
+
+	runtimeClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Handler", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["handler"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClass)
+	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClassList)
 
 	AddDefaultHandlers(h)
 }
@@ -1963,6 +1972,30 @@ func printPriorityClassList(list *scheduling.PriorityClassList, options printers
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPriorityClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printRuntimeClass(obj *nodeapi.RuntimeClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	handler := obj.Handler
+	row.Cells = append(row.Cells, name, handler, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printRuntimeClassList(list *nodeapi.RuntimeClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printRuntimeClass(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

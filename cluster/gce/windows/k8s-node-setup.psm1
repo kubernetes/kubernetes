@@ -564,6 +564,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://APISERVER_ADDRESS
     certificate-authority-data: CA_CERT
 contexts:
 - context:
@@ -572,7 +573,8 @@ contexts:
   name: service-account-context
 current-context: service-account-context'.`
     replace('KUBEPROXY_TOKEN', ${kube_env}['KUBE_PROXY_TOKEN']).`
-    replace('CA_CERT', ${kube_env}['CA_CERT'])
+    replace('CA_CERT', ${kube_env}['CA_CERT']).`
+    replace('APISERVER_ADDRESS', ${kube_env}['KUBERNETES_MASTER_NAME'])
 
   Log-Output ("kubeproxy kubeconfig:`n" +
               "$(Get-Content -Raw ${env:KUBEPROXY_KUBECONFIG})")
@@ -934,7 +936,7 @@ function Configure-Kubelet {
 #
 # Required ${kube_env} keys:
 #   KUBELET_ARGS
-#   KUBERNETES_MASTER_NAME
+#   KUBEPROXY_ARGS
 #   CLUSTER_IP_RANGE
 function Start-WorkerServices {
   # Compute kubelet args
@@ -949,11 +951,7 @@ function Start-WorkerServices {
 
   # Compute kube-proxy args
   $kubeproxy_args_str = ${kube_env}['KUBEPROXY_ARGS']
-  Try {
-    $kubeproxy_args = $kubeproxy_args_str.Split(" ")
-  } Catch {
-    $kubeproxy_args = ""
-  }
+  $kubeproxy_args = $kubeproxy_args_str.Split(" ")
   Log-Output "kubeproxy_args from metadata: ${kubeproxy_args}"
 
   # kubeproxy is started on Linux nodes using
@@ -966,31 +964,9 @@ function Start-WorkerServices {
   #   --iptables-sync-period=1m --iptables-min-sync-period=10s
   #   --ipvs-sync-period=1m --ipvs-min-sync-period=10s
   # And also with various volumeMounts and "securityContext: privileged: true".
-  $apiserver_address = ${kube_env}['KUBERNETES_MASTER_NAME']
   $default_kubeproxy_args = @(`
-      "--v=4",
-      "--master=https://${apiserver_address}",
       "--kubeconfig=${env:KUBEPROXY_KUBECONFIG}",
-      "--proxy-mode=kernelspace",
-      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])",
-
-      # Configure kube-proxy to run as a windows service.
-      "--windows-service=true",
-
-      # TODO(mtaufen): Configure logging for kube-proxy running as a service.
-      # I haven't been able to figure out how to direct stdout/stderr into log
-      # files when configuring it to run via sc.exe, so we just manually
-      # override logging config here.
-      "--log-file=${env:LOGS_DIR}\kube-proxy.log",
-      # klog sets this to true intenrally, so need to override to false
-      # so we actually log to the file
-      "--logtostderr=false",
-
-      # Configure flags with explicit empty string values. We can't escape
-      # double-quotes, because they still break sc.exe after expansion in the
-      # binPath parameter, and single-quotes get parsed as characters instead
-      # of string delimiters.
-      "--resource-container="
+      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])"
   )
   $kubeproxy_args = ${default_kubeproxy_args} + ${kubeproxy_args}
   Log-Output "Final kubeproxy_args: ${kubeproxy_args}"

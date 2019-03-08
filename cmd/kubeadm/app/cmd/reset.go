@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	uploadconfig "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -140,10 +141,15 @@ func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, 
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.InitConfiguration) error {
 	var dirsToClean []string
-	// Only clear etcd data when using local etcd.
-	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 
+	// Reset the ClusterStatus for a given control-plane node.
+	if isControlPlane() && cfg != nil {
+		uploadconfig.ResetClusterStatusForNode(cfg.NodeRegistration.Name, client)
+	}
+
+	// Only clear etcd data when using local etcd.
 	klog.V(1).Infoln("[reset] Checking for etcd config")
+	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		dirsToClean = append(dirsToClean, etcdDataDir)
@@ -317,4 +323,14 @@ func resetDetectCRISocket(cfg *kubeadmapi.InitConfiguration) (string, error) {
 
 	// if this fails, try to detect it
 	return utilruntime.DetectCRISocket()
+}
+
+// isControlPlane checks if a node is a control-plane node by looking up
+// the kube-apiserver manifest file
+func isControlPlane() bool {
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, kubeadmconstants.GetStaticPodDirectory())
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

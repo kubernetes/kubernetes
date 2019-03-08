@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "fs_resource_analyzer.go",
         "handler.go",
+        "prometheus_resource_metrics.go",
         "resource_analyzer.go",
         "summary.go",
         "summary_sys_containers.go",
@@ -27,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -34,6 +36,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "prometheus_resource_metrics_test.go",
         "summary_test.go",
         "summary_windows_test.go",
         "volume_stat_calculator_test.go",
@@ -46,7 +49,10 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/cm:go_default_library",
