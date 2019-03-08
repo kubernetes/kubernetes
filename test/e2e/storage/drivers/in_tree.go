@@ -1106,21 +1106,18 @@ var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() testsuites.TestDriver {
-	var supportedTypes sets.String
-	var capFsGroup bool
-	if framework.NodeOSDistroIs("windows") {
-		supportedTypes = sets.NewString("ntfs")
-		capFsGroup = false
-	} else {
-		supportedTypes = sets.NewString(
-			"", // Default fsType
-			"ext2",
-			"ext3",
-			"ext4",
-			"xfs",
-		)
-		capFsGroup = true
-	}
+	// In current test structure, it first initialize the driver and then set up
+	// the new framework, so we cannot get the correct OS here. So here set to
+	// support all fs types including both linux and windows. We have code to check Node OS later
+	// during test.
+	supportedTypes := sets.NewString(
+		"", // Default fsType
+		"ext2",
+		"ext3",
+		"ext4",
+		"xfs",
+		"ntfs",
+	)
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:                 "gcepd",
@@ -1129,7 +1126,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
-				testsuites.CapFsGroup:     capFsGroup,
+				testsuites.CapFsGroup:     true,
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
@@ -1143,7 +1140,7 @@ func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FeatureTag == "sig-windows" {
+	if pattern.FeatureTag == "[sig-windows]" {
 		framework.SkipUnlessNodeOSDistroIs("windows")
 	}
 }

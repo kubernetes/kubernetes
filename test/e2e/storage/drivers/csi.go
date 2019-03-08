@@ -347,7 +347,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	if pattern.FsType == "xfs" {
 		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "sig-windows" {
+	if pattern.FeatureTag == "[sig-windows]" {
 		framework.Skipf("Skipping tests for windows since CSI does not support it yet")
 	}
 }
@@ -464,7 +464,7 @@ func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPa
 	if pattern.FsType == "xfs" {
 		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "sig-windows" {
+	if pattern.FeatureTag == "[sig-windows]" {
 		framework.Skipf("Skipping tests for windows since CSI does not support it yet")
 	}
 }
