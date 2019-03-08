@@ -2063,14 +2063,18 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		for nodeName, nodeIPs := range endpointNodeMap {
 			By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIPs[0]))
 			var body bytes.Buffer
-			var result bool
-			var err error
-			if pollErr := wait.PollImmediate(framework.Poll, framework.ServiceTestTimeout, func() (bool, error) {
-				result, err = framework.TestReachableHTTPWithContent(nodeIPs[0], healthCheckNodePort, "/healthz", "", &body)
-				return !result, nil
-			}); pollErr != nil {
-				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. Last err %v, last body %v",
-					nodeName, healthCheckNodePort, err, body.String())
+			pollfn := func() (bool, error) {
+				result := framework.PokeHTTP(nodeIPs[0], healthCheckNodePort, "/healthz", nil)
+				if result.Code == 0 {
+					return true, nil
+				}
+				body.Reset()
+				body.Write(result.Body)
+				return false, nil
+			}
+			if pollErr := wait.PollImmediate(framework.Poll, framework.ServiceTestTimeout, pollfn); pollErr != nil {
+				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
+					nodeName, healthCheckNodePort, body.String())
 			}
 		}
 
