@@ -379,6 +379,11 @@ func (d *initData) SetCertificateKey(key string) {
 	d.certificateKey = key
 }
 
+// SkipCertificateKeyPrint returns the skipCertificateKeyPrint flag.
+func (d *initData) SkipCertificateKeyPrint() bool {
+	return d.skipCertificateKeyPrint
+}
+
 // Cfg returns initConfiguration.
 func (d *initData) Cfg() *kubeadmapi.InitConfiguration {
 	return d.cfg
