@@ -24,12 +24,14 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
@@ -113,6 +115,10 @@ func ValidateCustomResourceDefinitionVersion(version *apiextensions.CustomResour
 
 // ValidateCustomResourceDefinitionSpec statically validates
 func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path) field.ErrorList {
+	return validateCustomResourceDefinitionSpec(spec, true, fldPath)
+}
+
+func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -205,7 +211,7 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceConversion(spec.Conversion, fldPath.Child("conversion"))...)
+	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, requireRecognizedVersion, fldPath.Child("conversion"))...)
 
 	return allErrs
 }
@@ -225,8 +231,66 @@ func validateEnumStrings(fldPath *field.Path, value string, accepted []string, r
 	return field.ErrorList{field.NotSupported(fldPath, value, accepted)}
 }
 
+var acceptedConversionReviewVersion = []string{v1beta1.SchemeGroupVersion.Version}
+
+func isAcceptedConversionReviewVersion(v string) bool {
+	for _, version := range acceptedConversionReviewVersion {
+		if v == version {
+			return true
+		}
+	}
+	return false
+}
+
+func validateConversionReviewVersions(versions []string, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(versions) < 1 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		seen := map[string]bool{}
+		hasAcceptedVersion := false
+		for i, v := range versions {
+			if seen[v] {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, "duplicate version"))
+				continue
+			}
+			seen[v] = true
+			for _, errString := range utilvalidation.IsDNS1035Label(v) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, errString))
+			}
+			if isAcceptedConversionReviewVersion(v) {
+				hasAcceptedVersion = true
+			}
+		}
+		if requireRecognizedVersion && !hasAcceptedVersion {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath, versions,
+				fmt.Sprintf("none of the versions accepted by this server. accepted version(s) are %v",
+					strings.Join(acceptedConversionReviewVersion, ", "))))
+		}
+	}
+	return allErrs
+}
+
+// hasValidConversionReviewVersion return true if there is a valid version or if the list is empty.
+func hasValidConversionReviewVersionOrEmpty(versions []string) bool {
+	if len(versions) < 1 {
+		return true
+	}
+	for _, v := range versions {
+		if isAcceptedConversionReviewVersion(v) {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateCustomResourceConversion statically validates
 func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, fldPath *field.Path) field.ErrorList {
+	return validateCustomResourceConversion(conversion, true, fldPath)
+}
+
+func validateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if conversion == nil {
 		return allErrs
@@ -250,15 +314,22 @@ func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 				allErrs = append(allErrs, webhook.ValidateWebhookService(fldPath.Child("webhookClientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path)...)
 			}
 		}
-	} else if conversion.WebhookClientConfig != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("webhookClientConfig"), "should not be set when strategy is not set to Webhook"))
+		allErrs = append(allErrs, validateConversionReviewVersions(conversion.ConversionReviewVersions, requireRecognizedVersion, fldPath.Child("conversionReviewVersions"))...)
+	} else {
+		if conversion.WebhookClientConfig != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("webhookClientConfig"), "should not be set when strategy is not set to Webhook"))
+		}
+		if len(conversion.ConversionReviewVersions) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("conversionReviewVersions"), "should not be set when strategy is not set to Webhook"))
+		}
 	}
 	return allErrs
 }
 
 // ValidateCustomResourceDefinitionSpecUpdate statically validates
 func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, established bool, fldPath *field.Path) field.ErrorList {
-	allErrs := ValidateCustomResourceDefinitionSpec(spec, fldPath)
+	requireRecognizedVersion := oldSpec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldSpec.Conversion.ConversionReviewVersions)
+	allErrs := validateCustomResourceDefinitionSpec(spec, requireRecognizedVersion, fldPath)
 
 	if established {
 		// these effect the storage and cannot be changed therefore

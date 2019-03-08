@@ -43,6 +43,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				i := int32(30)
 				obj.TimeoutSeconds = &i
 			}
+			obj.AdmissionReviewVersions = []string{"v1beta1"}
 		},
 	}
 }

@@ -60,6 +60,8 @@ type webhookConverter struct {
 	restClient    *rest.RESTClient
 	name          string
 	nopConverter  nopConverter
+
+	conversionReviewVersions []string
 }
 
 func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.ClientConfig {
@@ -96,6 +98,8 @@ func (f *webhookConverterFactory) NewWebhookConverter(validVersions map[schema.G
 		restClient:    restClient,
 		name:          crd.Name,
 		nopConverter:  nopConverter{validVersions: validVersions},
+
+		conversionReviewVersions: crd.Spec.Conversion.ConversionReviewVersions,
 	}, nil
 }
 
@@ -134,6 +138,16 @@ func (c *webhookConverter) Convert(in, out, context interface{}) error {
 	}
 	unstructOut.SetUnstructuredContent(unstructuredConverted.UnstructuredContent())
 	return nil
+}
+
+// hasConversionReviewVersion check whether a version is accepted by a given webhook.
+func (c *webhookConverter) hasConversionReviewVersion(v string) bool {
+	for _, b := range c.conversionReviewVersions {
+		if b == v {
+			return true
+		}
+	}
+	return false
 }
 
 func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.ConversionReview {
@@ -214,6 +228,12 @@ func (c *webhookConverter) ConvertToVersion(in runtime.Object, target runtime.Gr
 				return nil, fmt.Errorf("input list has invalid group/version `%v` at `%v` index", fromGV, i)
 			}
 		}
+	}
+
+	// Currently converter only supports `v1beta1` ConversionReview
+	// TODO: Make CRD webhooks caller capable of sending/receiving multiple ConversionReview versions
+	if !c.hasConversionReviewVersion(v1beta1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("webhook does not accept v1beta1 ConversionReview")
 	}
 
 	request := createConversionReview(in, toGV.String())
