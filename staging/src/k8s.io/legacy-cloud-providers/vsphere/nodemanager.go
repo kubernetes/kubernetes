@@ -39,6 +39,11 @@ type NodeInfo struct {
 	zone       *cloudprovider.Zone
 }
 
+func (n NodeInfo) String() string {
+	return fmt.Sprintf("{datacenter: %v, vm: %v, vcServer: %s, vmUUID: %s, zone: %v}",
+		*n.dataCenter, n.vm.Reference(), n.vcServer, n.vmUUID, *n.zone)
+}
+
 type NodeManager struct {
 	// TODO: replace map with concurrent map when k8s supports go v1.9
 

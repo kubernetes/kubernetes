@@ -187,6 +187,28 @@ func (dc *Datacenter) GetDatastoreByName(ctx context.Context, name string) (*Dat
 	return &datastore, nil
 }
 
+// GetDatastoreInfoByName gets the Datastore object for the given datastore name
+func (dc *Datacenter) GetDatastoreInfoByName(ctx context.Context, name string) (*DatastoreInfo, error) {
+	finder := getFinder(dc)
+	ds, err := finder.Datastore(ctx, name)
+	if err != nil {
+		klog.Errorf("Failed while searching for datastore: %s. err: %+v", name, err)
+		return nil, err
+	}
+	datastore := Datastore{ds, dc}
+	var dsMo mo.Datastore
+	pc := property.DefaultCollector(dc.Client())
+	properties := []string{DatastoreInfoProperty}
+	err = pc.RetrieveOne(ctx, ds.Reference(), properties, &dsMo)
+	if err != nil {
+		klog.Errorf("Failed to get Datastore managed objects from datastore reference."+
+			" dsRef: %+v, err: %+v", ds.Reference(), err)
+		return nil, err
+	}
+	klog.V(9).Infof("Result dsMo: %+v", dsMo)
+	return &DatastoreInfo{Datastore: &datastore, Info: dsMo.Info.GetDatastoreInfo()}, nil
+}
+
 // GetResourcePool gets the resource pool for the given path
 func (dc *Datacenter) GetResourcePool(ctx context.Context, resourcePoolPath string) (*object.ResourcePool, error) {
 	finder := getFinder(dc)
