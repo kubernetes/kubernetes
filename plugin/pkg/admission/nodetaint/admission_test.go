@@ -17,7 +17,9 @@ limitations under the License.
 package nodetaint
 
 import (
+	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,9 +30,21 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	TaintNodeAdditional = "node.kubernetes.io/additional"
+)
+
 var (
 	enableTaintNodesByCondition  = utilfeature.NewFeatureGate()
 	disableTaintNodesByCondition = utilfeature.NewFeatureGate()
+)
+
+var (
+	admissionConfig = `
+taints:
+- effect: NoSchedule
+  key: node.kubernetes.io/additional
+`
 )
 
 func init() {
@@ -47,6 +61,7 @@ func Test_nodeTaints(t *testing.T) {
 		mynode            = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		resource          = api.Resource("nodes").WithVersion("v1")
 		notReadyTaint     = api.Taint{Key: TaintNodeNotReady, Effect: api.TaintEffectNoSchedule}
+		additionalTaint   = api.Taint{Key: TaintNodeAdditional, Effect: api.TaintEffectNoSchedule}
 		notReadyCondition = api.NodeCondition{Type: api.NodeReady, Status: api.ConditionFalse}
 		myNodeObjMeta     = metav1.ObjectMeta{Name: "mynode"}
 		myNodeObj         = api.Node{ObjectMeta: myNodeObjMeta}
@@ -55,6 +70,7 @@ func Test_nodeTaints(t *testing.T) {
 		myUnreadyNodeObj = api.Node{ObjectMeta: myNodeObjMeta,
 			Status: api.NodeStatus{Conditions: []api.NodeCondition{notReadyCondition}}}
 		nodeKind = api.Kind("Node").WithVersion("v1")
+		config   = strings.NewReader(admissionConfig)
 	)
 	tests := []struct {
 		name           string
@@ -63,6 +79,7 @@ func Test_nodeTaints(t *testing.T) {
 		features       utilfeature.FeatureGate
 		operation      admission.Operation
 		expectedTaints []api.Taint
+		config         io.Reader
 	}{
 		{
 			name:           "notReady taint is added on creation",
@@ -70,6 +87,7 @@ func Test_nodeTaints(t *testing.T) {
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
 			expectedTaints: []api.Taint{notReadyTaint},
+			config:         nil,
 		},
 		{
 			name:           "NotReady taint is not added when TaintNodesByCondition is disabled",
@@ -77,6 +95,7 @@ func Test_nodeTaints(t *testing.T) {
 			features:       disableTaintNodesByCondition,
 			operation:      admission.Create,
 			expectedTaints: nil,
+			config:         nil,
 		},
 		{
 			name:           "already tainted node is not tainted again",
@@ -84,6 +103,7 @@ func Test_nodeTaints(t *testing.T) {
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
 			expectedTaints: []api.Taint{notReadyTaint},
+			config:         nil,
 		},
 		{
 			name:           "NotReady taint is added to an unready node as well",
@@ -91,16 +111,28 @@ func Test_nodeTaints(t *testing.T) {
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
 			expectedTaints: []api.Taint{notReadyTaint},
+			config:         nil,
+		},
+		{
+			name:           "additional taint is added on creation with config",
+			node:           myNodeObj,
+			features:       enableTaintNodesByCondition,
+			operation:      admission.Create,
+			expectedTaints: []api.Taint{notReadyTaint, additionalTaint},
+			config:         config,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			attributes := admission.NewAttributesRecord(&tt.node, &tt.oldNode, nodeKind, myNodeObj.Namespace, myNodeObj.Name, resource, "", tt.operation, false, mynode)
-			c := NewPlugin()
+			c, err := NewPlugin(tt.config)
+			if err != nil {
+				t.Errorf("nodePlugin.NewPlugin() error = %v", err)
+			}
 			if tt.features != nil {
 				c.features = tt.features
 			}
-			err := c.Admit(attributes, nil)
+			err = c.Admit(attributes, nil)
 			if err != nil {
 				t.Errorf("nodePlugin.Admit() error = %v", err)
 			}

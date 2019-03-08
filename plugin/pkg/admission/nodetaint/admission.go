@@ -19,6 +19,7 @@ package nodetaint
 import (
 	"fmt"
 	"io"
+
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -27,7 +28,7 @@ import (
 
 const (
 	// PluginName is the name of the plugin.
-	PluginName = "TaintNodesByCondition"
+	PluginName = "TaintNodesAtCreation"
 	// TaintNodeNotReady is the not-ready label as specified in the API.
 	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 )
@@ -35,22 +36,32 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewPlugin(), nil
+		return NewPlugin(config)
 	})
 }
 
 // NewPlugin creates a new NodeTaint admission plugin.
 // This plugin identifies requests from nodes
-func NewPlugin() *Plugin {
+func NewPlugin(config io.Reader) (*Plugin, error) {
+	admissionConfig, err := loadConfiguration(config)
+	if err != nil {
+		return nil, err
+	}
+	taints, err := initTaints(admissionConfig)
+	if err != nil {
+		return nil, err
+	}
 	return &Plugin{
 		Handler:  admission.NewHandler(admission.Create),
+		taints:   taints,
 		features: utilfeature.DefaultFeatureGate,
-	}
+	}, nil
 }
 
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
+	taints []api.Taint
 	// allows overriding for testing
 	features utilfeature.FeatureGate
 }
@@ -85,20 +96,37 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	// with the NotReady taint. Otherwise, a new node may receive the taint with
 	// some delay causing pods to be scheduled on a not-ready node.
 	// Node controller will remove the taint when the node becomes ready.
-	addNotReadyTaint(node)
+	// If admission config file is specified, the taints in config file will also be
+	// added to node at creation. The taints will be removed by third party components.
+
+	p.addTaint(node)
 	return nil
 }
 
-func addNotReadyTaint(node *api.Node) {
-	notReadyTaint := api.Taint{
-		Key:    TaintNodeNotReady,
-		Effect: api.TaintEffectNoSchedule,
-	}
-	for _, taint := range node.Spec.Taints {
-		if taint.MatchTaint(notReadyTaint) {
-			// the taint already exists.
-			return
+func (p *Plugin) addTaint(node *api.Node) {
+	for _, taint := range p.taints {
+		needTaint := true
+		for _, nodeTaint := range node.Spec.Taints {
+			if nodeTaint.MatchTaint(taint) {
+				needTaint = false
+				break
+			}
+		}
+		if needTaint {
+			node.Spec.Taints = append(node.Spec.Taints, taint)
 		}
 	}
-	node.Spec.Taints = append(node.Spec.Taints, notReadyTaint)
+}
+
+func initTaints(admissionConfig *AdmissionConfig) ([]api.Taint, error) {
+	nodeTaints := []api.Taint{{
+		Key:    TaintNodeNotReady,
+		Effect: api.TaintEffectNoSchedule,
+	}}
+
+	if len(admissionConfig.Taints) > 0 {
+		nodeTaints = append(nodeTaints, admissionConfig.Taints...)
+	}
+
+	return nodeTaints, nil
 }

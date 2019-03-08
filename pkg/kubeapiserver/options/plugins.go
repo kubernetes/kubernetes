@@ -70,7 +70,7 @@ var AllOrderedPlugins = []string{
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
 	noderestriction.PluginName,              // NodeRestriction
-	nodetaint.PluginName,                    // TaintNodesByCondition
+	nodetaint.PluginName,                    // TaintNodesAtCreation
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
 	podsecuritypolicy.PluginName,            // PodSecurityPolicy
@@ -144,7 +144,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition
+		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesAtCreation
 	}
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
