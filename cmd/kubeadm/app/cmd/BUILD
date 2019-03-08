@@ -22,7 +22,6 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/alpha:go_default_library",

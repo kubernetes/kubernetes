@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	nodeV1alpha3YAML   = "testdata/conversion/node/v1alpha3.yaml"
 	nodeV1beta1YAML    = "testdata/conversion/node/v1beta1.yaml"
 	nodeInternalYAML   = "testdata/conversion/node/internal.yaml"
 	nodeIncompleteYAML = "testdata/defaulting/node/incomplete.yaml"
@@ -45,11 +44,6 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using LoadJoinConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha3 -> internal
-			name:        "v1alpha3IsDeprecated",
-			in:          nodeV1alpha3YAML,
-			expectedErr: true,
-		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
 			in:           nodeV1beta1YAML,
