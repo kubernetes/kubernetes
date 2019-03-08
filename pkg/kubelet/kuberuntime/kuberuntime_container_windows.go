@@ -20,6 +20,7 @@ package kuberuntime
 
 import (
 	"fmt"
+
 	"github.com/docker/docker/pkg/sysinfo"
 
 	"k8s.io/api/core/v1"
@@ -27,7 +28,6 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -91,16 +91,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.MemoryLimitInBytes = memoryLimit
 	}
 
-	// setup security context
-	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
-	if effectiveSc.RunAsUser != nil {
-		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
+	if container.SecurityContext != nil {
+		return nil, fmt.Errorf("PodSecurityContext is not supported on Windows")
 	}
+
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-
 	return wc, nil
 }
 
