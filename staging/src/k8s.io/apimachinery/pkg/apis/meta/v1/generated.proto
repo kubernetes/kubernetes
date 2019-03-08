@@ -143,6 +143,13 @@ message CreateOptions {
   // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
+
+  // fieldManager is a name associated with the actor or entity
+  // that is making these changes. The value must be less than or
+  // 128 characters long, and only contain printable characters,
+  // as defined by https://golang.org/pkg/unicode/#IsPrint.
+  // +optional
+  optional string fieldManager = 3;
 }
 
 // DeleteOptions may be provided when deleting an API object.
@@ -730,6 +737,16 @@ message PatchOptions {
   // flag must be unset for non-apply patch requests.
   // +optional
   optional bool force = 2;
+
+  // fieldManager is a name associated with the actor or entity
+  // that is making these changes. The value must be less than or
+  // 128 characters long, and only contain printable characters,
+  // as defined by https://golang.org/pkg/unicode/#IsPrint. This
+  // field is required for apply requests
+  // (application/apply-patch) but optional for non-apply patch
+  // types (JsonPatch, MergePatch, StrategicMergePatch).
+  // +optional
+  optional string fieldManager = 3;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -926,6 +943,13 @@ message UpdateOptions {
   // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
+
+  // fieldManager is a name associated with the actor or entity
+  // that is making these changes. The value must be less than or
+  // 128 characters long, and only contain printable characters,
+  // as defined by https://golang.org/pkg/unicode/#IsPrint.
+  // +optional
+  optional string fieldManager = 2;
 }
 
 // Verbs masks the value so protobuf can generate
