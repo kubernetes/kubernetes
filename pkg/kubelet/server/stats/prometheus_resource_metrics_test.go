@@ -295,7 +295,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			provider := &mockSummaryProvider{}
 			provider.On("GetCPUAndMemoryStats").Return(tc.summary, tc.summaryErr)
-			collector := NewPrometheusResourceMetricCollector(provider, tc.config)
+			collector := NewPrometheusCoreCollector(provider, tc.config)
 			metrics := collectMetrics(t, collector, len(tc.expectedMetrics))
 			for i := range metrics {
 				assertEqual(t, metrics[i], tc.expectedMetrics[i])

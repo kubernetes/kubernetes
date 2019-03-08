@@ -84,6 +84,7 @@ go_library(
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
+        "//pkg/kubelet/server/stats/resourcemetrics:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/stats:go_default_library",
         "//pkg/kubelet/status:go_default_library",

@@ -291,7 +291,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
+	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, s.resourceAnalyzer))
 	s.restfulCont.Handle(metricsPath, prometheus.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -313,7 +313,7 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 
 	v1alpha1ResourceRegistry := prometheus.NewRegistry()
-	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusCoreCollector(s.resourceAnalyzer, v1alpha1.Config()))
 	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
 		promhttp.HandlerFor(v1alpha1ResourceRegistry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)

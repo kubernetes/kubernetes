@@ -17,9 +17,12 @@ limitations under the License.
 package cm
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
@@ -76,6 +79,10 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 			resource.BinarySI),
 	}
 	return c
+}
+
+func (cm *containerManagerStub) GetResourceMetrics(cgroupName CgroupName) (*libcontainercgroups.Stats, time.Time, error) {
+	return nil, time.Now(), nil
 }
 
 func (cm *containerManagerStub) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {

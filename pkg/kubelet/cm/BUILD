@@ -41,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -84,7 +85,6 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/github.com/docker/go-units:go_default_library",
-            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",

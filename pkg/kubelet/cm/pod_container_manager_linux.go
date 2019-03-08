@@ -280,6 +280,52 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	return foundPods, nil
 }
 
+func (m *podContainerManagerImpl) GetAllPodsContainersFromCgroups() ([]CgroupName, error) {
+	foundContainers := []CgroupName{}
+	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
+	//	mountPoints := []string{m.subsystems.MountPoints["cpu"], m.subsystems.MountPoints["memory"]}
+	mountPoints := []string{m.subsystems.MountPoints["cpu"]}
+
+	for _, val := range mountPoints {
+		for _, qosContainerName := range qosContainersList {
+			qcConversion := m.cgroupManager.Name(qosContainerName)
+			qosContainerPath := path.Join(val, qcConversion)
+			podContainers, err := convert(qosContainerPath)
+			if err != nil {
+				return nil, err
+			}
+			for _, podContainerName := range podContainers {
+				podContainerCgroupPath := path.Join(qosContainerPath, podContainerName)
+				containers, err := convert(podContainerCgroupPath)
+				if err != nil {
+					return nil, err
+				}
+				for _, containerName := range containers {
+					cg := m.cgroupManager.CgroupName(path.Join(qcConversion, podContainerName, containerName))
+					foundContainers = append(foundContainers, cg)
+				}
+			}
+		}
+	}
+	return foundContainers, nil
+}
+
+func convert(p string) ([]string, error) {
+	ret := []string{}
+	dirInfo, err := ioutil.ReadDir(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", p, err)
+	}
+	for i := range dirInfo {
+		// its not a directory, so continue on...
+		if !dirInfo[i].IsDir() {
+			continue
+		}
+		ret = append(ret, dirInfo[i].Name())
+	}
+	return ret, nil
+}
+
 // podContainerManagerNoop implements podContainerManager interface.
 // It is a no-op implementation and basically does nothing
 // podContainerManagerNoop is used in case the QoS cgroup Hierarchy is not
@@ -323,4 +369,8 @@ func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 
 func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
+}
+
+func (m *podContainerManagerNoop) GetAllPodsContainersFromCgroups() ([]CgroupName, error) {
+	return nil, nil
 }

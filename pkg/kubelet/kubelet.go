@@ -89,6 +89,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats/resourcemetrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -607,8 +608,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		MTU:                int(crOptions.NetworkPluginMTU),
 	}
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
-
 	// if left at nil, that means it is unneeded
 	var legacyLogProvider kuberuntime.LegacyLogProvider
 
@@ -659,6 +658,18 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
+
+	var rmp resourcemetrics.ResourceMetricsProvider
+	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
+		klog.Info("we are using legacy provider")
+		rmp = resourcemetrics.NewCoreMetrics(kubeDeps.ContainerManager, klet.runtimeService)
+	} else {
+		klog.Info("we are using cri provider")
+		rmp = resourcemetrics.NewCRIMetricsProvider(kubeDeps.ContainerManager, klet.runtimeService)
+	}
+
+	//mp := serverstats.NewCoreMetrics(kubeDeps.ContainerManager, kubeDeps.ContainerManager.NewPodContainerManager(), klet.runtimeService)
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, rmp, kubeCfg.VolumeStatsAggPeriod.Duration)
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),

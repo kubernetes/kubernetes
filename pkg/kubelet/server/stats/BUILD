@@ -19,6 +19,7 @@ go_library(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/server/stats/resourcemetrics:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/volume:go_default_library",
@@ -113,6 +114,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubelet/server/stats/resourcemetrics:all-srcs",
         "//pkg/kubelet/server/stats/testing:all-srcs",
     ],
     tags = ["automanaged"],

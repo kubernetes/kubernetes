@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats/resourcemetrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -53,8 +54,7 @@ type ResourceMetricsConfig struct {
 	ContainerMetrics []ContainerResourceMetric
 }
 
-// NewPrometheusResourceMetricCollector returns a prometheus.Collector which exports resource metrics
-func NewPrometheusResourceMetricCollector(provider SummaryProvider, config ResourceMetricsConfig) prometheus.Collector {
+func NewPrometheusCoreCollector(provider resourcemetrics.ResourceMetricsProvider, config ResourceMetricsConfig) *resourceMetricCollector {
 	return &resourceMetricCollector{
 		provider: provider,
 		config:   config,
@@ -66,7 +66,7 @@ func NewPrometheusResourceMetricCollector(provider SummaryProvider, config Resou
 }
 
 type resourceMetricCollector struct {
-	provider SummaryProvider
+	provider resourcemetrics.ResourceMetricsProvider
 	config   ResourceMetricsConfig
 	errors   prometheus.Gauge
 }
@@ -90,8 +90,7 @@ func (rc *resourceMetricCollector) Describe(ch chan<- *prometheus.Desc) {
 // prometheus.Collector in a way that only collects metrics for active containers.
 func (rc *resourceMetricCollector) Collect(ch chan<- prometheus.Metric) {
 	rc.errors.Set(0)
-	defer rc.errors.Collect(ch)
-	summary, err := rc.provider.GetCPUAndMemoryStats()
+	summary, err := rc.provider.GetMetrics()
 	if err != nil {
 		rc.errors.Set(1)
 		klog.Warningf("Error getting summary for resourceMetric prometheus endpoint: %v", err)

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
@@ -104,6 +105,8 @@ type ContainerManager interface {
 
 	// GetDevices returns information about the devices assigned to pods and containers
 	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+
+	GetResourceMetrics(cgroupName CgroupName) (*libcontainercgroups.Stats, time.Time, error)
 }
 
 type NodeConfig struct {

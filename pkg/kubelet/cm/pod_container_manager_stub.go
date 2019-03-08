@@ -53,3 +53,7 @@ func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 func (m *podContainerManagerStub) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
 }
+
+func (m *podContainerManagerStub) GetAllPodsContainersFromCgroups() ([]CgroupName, error) {
+	return nil, nil
+}

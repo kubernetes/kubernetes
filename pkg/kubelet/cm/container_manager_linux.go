@@ -897,3 +897,7 @@ func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceLi
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
 	return cm.deviceManager.GetDevices(podUID, containerName)
 }
+
+func (cm *containerManagerImpl) GetResourceMetrics(cgroupName CgroupName) (*cgroups.Stats, time.Time, error) {
+	return cm.cgroupManager.GetResourceMetrics(cgroupName)
+}

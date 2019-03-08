@@ -18,6 +18,8 @@ package stats
 
 import (
 	"time"
+
+	"k8s.io/kubernetes/pkg/kubelet/server/stats/resourcemetrics"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
@@ -26,21 +28,23 @@ type ResourceAnalyzer interface {
 
 	fsResourceAnalyzerInterface
 	SummaryProvider
+	resourcemetrics.ResourceMetricsProvider
 }
 
 // resourceAnalyzer implements ResourceAnalyzer
 type resourceAnalyzer struct {
 	*fsResourceAnalyzer
 	SummaryProvider
+	resourcemetrics.ResourceMetricsProvider
 }
 
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
-func NewResourceAnalyzer(statsProvider Provider, calVolumeFrequency time.Duration) ResourceAnalyzer {
+func NewResourceAnalyzer(statsProvider Provider, mp resourcemetrics.ResourceMetricsProvider, calVolumeFrequency time.Duration) ResourceAnalyzer {
 	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency)
 	summaryProvider := NewSummaryProvider(statsProvider)
-	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
+	return &resourceAnalyzer{fsAnalyzer, summaryProvider, mp}
 }
 
 // Start starts background functions necessary for the ResourceAnalyzer to function

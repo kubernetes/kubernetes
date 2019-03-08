@@ -17,6 +17,9 @@ limitations under the License.
 package cm
 
 import (
+	"time"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -92,6 +95,7 @@ type CgroupManager interface {
 	ReduceCPULimits(cgroupName CgroupName) error
 	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
 	GetResourceStats(name CgroupName) (*ResourceStats, error)
+	GetResourceMetrics(cgroupName CgroupName) (*libcontainercgroups.Stats, time.Time, error)
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -124,6 +128,8 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+
+	GetAllPodsContainersFromCgroups() ([]CgroupName, error)
 
 	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
 	IsPodCgroup(cgroupfs string) (bool, types.UID)

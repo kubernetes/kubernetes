@@ -591,3 +591,13 @@ func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, e
 	}
 	return toResourceStats(stats), nil
 }
+
+func (m *cgroupManagerImpl) GetResourceMetrics(cgroupName CgroupName) (*libcontainercgroups.Stats, time.Time, error) {
+	stats := libcontainercgroups.NewStats()
+	memMountPoint := path.Join(m.subsystems.MountPoints["memory"], m.Name(cgroupName))
+	cpuMountPoint := path.Join(m.subsystems.MountPoints["cpu"], m.Name(cgroupName))
+	startTime := time.Now()
+	(&cgroupfs.MemoryGroup{}).GetStats(memMountPoint, stats)
+	(&cgroupfs.CpuacctGroup{}).GetStats(cpuMountPoint, stats)
+	return stats, startTime, nil
+}

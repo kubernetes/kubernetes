@@ -34,6 +34,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats/resourcemetrics"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -103,13 +104,13 @@ type Provider interface {
 }
 
 type handler struct {
-	provider        Provider
-	summaryProvider SummaryProvider
+	provider                Provider
+	summaryProvider         SummaryProvider
+	resourceMetricsProvider resourcemetrics.ResourceMetricsProvider
 }
 
-// CreateHandlers creates the REST handlers for the stats.
-func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider) *restful.WebService {
-	h := &handler{provider, summaryProvider}
+func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, rp resourcemetrics.ResourceMetricsProvider) *restful.WebService {
+	h := &handler{provider, summaryProvider, rp}
 
 	ws := &restful.WebService{}
 	ws.Path(rootPath).
@@ -124,6 +125,7 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 		{"/container", h.handleSystemContainer},
 		{"/{podName}/{containerName}", h.handlePodContainer},
 		{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
+		{"/metrics/resource/v1alpha1", h.handleResourceMetrics},
 	}
 
 	for _, e := range endpoints {
@@ -297,6 +299,15 @@ func (h *handler) handlePodContainer(request *restful.Request, response *restful
 	writeResponse(response, stats)
 }
 
+func (h *handler) handleResourceMetrics(request *restful.Request, response *restful.Response) {
+	resources, err := h.resourceMetricsProvider.GetMetrics()
+	if err != nil {
+		var str string
+		str = fmt.Sprintf("%#v\n", err)
+		response.Write([]byte(str))
+	}
+	writeResponse(response, resources)
+}
 func writeResponse(response *restful.Response, stats interface{}) {
 	if err := response.WriteAsJson(stats); err != nil {
 		klog.Errorf("Error writing response: %v", err)
