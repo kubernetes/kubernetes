@@ -41,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"

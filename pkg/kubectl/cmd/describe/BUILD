@@ -16,7 +16,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
@@ -35,7 +35,7 @@ go_test(
         "//pkg/kubectl/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
     ],
 )
