@@ -52,6 +52,7 @@ const (
 	DatacenterType             = "Datacenter"
 	ClusterComputeResourceType = "ClusterComputeResource"
 	HostSystemType             = "HostSystem"
+	NameProperty               = "name"
 )
 
 // Test Constants
