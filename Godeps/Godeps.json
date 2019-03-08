@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.12",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
@@ -2470,13 +2470,37 @@
 			"Rev": "558b29266ce0a873991ecfb3edc41a668a998514"
 		},
 		{
+			"ImportPath": "github.com/hpcloud/tail",
+			"Comment": "v1.0.0-24-g022b1e144f2b7a",
+			"Rev": "022b1e144f2b7a190403ea202e8b773b67b06652"
+		},
+		{
+			"ImportPath": "github.com/hpcloud/tail/ratelimiter",
+			"Comment": "v1.0.0-24-g022b1e144f2b7a",
+			"Rev": "022b1e144f2b7a190403ea202e8b773b67b06652"
+		},
+		{
+			"ImportPath": "github.com/hpcloud/tail/util",
+			"Comment": "v1.0.0-24-g022b1e144f2b7a",
+			"Rev": "022b1e144f2b7a190403ea202e8b773b67b06652"
+		},
+		{
+			"ImportPath": "github.com/hpcloud/tail/watch",
+			"Comment": "v1.0.0-24-g022b1e144f2b7a",
+			"Rev": "022b1e144f2b7a190403ea202e8b773b67b06652"
+		},
+		{
+			"ImportPath": "github.com/hpcloud/tail/winfile",
+			"Comment": "v1.0.0-24-g022b1e144f2b7a",
+			"Rev": "022b1e144f2b7a190403ea202e8b773b67b06652"
+		},
+		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Comment": "v0.3.5",
 			"Rev": "9316a62528ac99aaecb4e47eadd6dc8aa6533d58"
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2558,10 +2582,12 @@
 		},
 		{
 			"ImportPath": "github.com/lib/pq",
+			"Comment": "go1.0-cutoff-203-g88edab0803230a",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
 		{
 			"ImportPath": "github.com/lib/pq/oid",
+			"Comment": "go1.0-cutoff-203-g88edab0803230a",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
 		{
@@ -2635,7 +2661,7 @@
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
-			"Comment": "v1.0.1",
+			"Comment": "v1.0.0-2-gc12348ce28de40",
 			"Rev": "c12348ce28de40eed0136aa2b644d0ee0650e56c"
 		},
 		{
@@ -2741,7 +2767,7 @@
 		},
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
-			"Comment": "v1.0.1",
+			"Comment": "1.0.1-2-g94122c33edd361",
 			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
 		},
 		{
@@ -4161,6 +4187,11 @@
 			"Rev": "168a6198bcb0ef175f7dacec0b8691fc141dc9b8"
 		},
 		{
+			"ImportPath": "gopkg.in/fsnotify/fsnotify.v1",
+			"Comment": "v1.2.1",
+			"Rev": "7be54206639f256967dd82fa767397ba5f8f48f5"
+		},
+		{
 			"ImportPath": "gopkg.in/gcfg.v1",
 			"Comment": "v1.2.0",
 			"Rev": "27e4946190b4a327b539185f2b5b1f7c84730728"
@@ -4182,7 +4213,6 @@
 		},
 		{
 			"ImportPath": "gopkg.in/inf.v0",
-			"Comment": "v0.9.0",
 			"Rev": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
 		},
 		{
@@ -4209,6 +4239,10 @@
 			"ImportPath": "gopkg.in/square/go-jose.v2/jwt",
 			"Comment": "v2.1.6-4-g89060dee6a84df",
 			"Rev": "89060dee6a84df9a4dae49f676f0c755037834f1"
+		},
+		{
+			"ImportPath": "gopkg.in/tomb.v1",
+			"Rev": "c131134a1947e9afd9cecfe11f4c6dff0732ae58"
 		},
 		{
 			"ImportPath": "gopkg.in/warnings.v0",

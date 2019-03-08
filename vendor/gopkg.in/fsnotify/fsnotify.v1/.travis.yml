@@ -1,0 +1,20 @@
+sudo: false
+language: go
+
+go:
+  - 1.5.1
+
+before_script:
+  - go get -u github.com/golang/lint/golint
+
+after_script:
+  - test -z "$(gofmt -s -l -w . | tee /dev/stderr)"
+  - test -z "$(golint ./...     | tee /dev/stderr)"
+  - go vet ./...
+
+os:
+  - linux
+  - osx
+
+notifications:
+  email: false
