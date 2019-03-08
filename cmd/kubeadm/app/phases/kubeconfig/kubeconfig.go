@@ -233,7 +233,10 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	// The kubeconfig already exists, let's check if it has got the same CA and server URL
 	currentConfig, err := clientcmd.LoadFromFile(kubeConfigFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to load kubeconfig file %s that already exists on disk", kubeConfigFilePath)
+		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
+		if err != nil {
+			return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
+		}
 	}
 
 	expectedCtx := config.CurrentContext
@@ -245,6 +248,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	if !bytes.Equal(currentConfig.Clusters[currentCluster].CertificateAuthorityData, config.Clusters[expectedCluster].CertificateAuthorityData) {
 		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
 	}
+
 	// If the current API Server location on disk doesn't match the expected API server, error out because we have a file, but it's stale
 	if currentConfig.Clusters[currentCluster].Server != config.Clusters[expectedCluster].Server {
 		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong API Server URL", kubeConfigFilePath)
