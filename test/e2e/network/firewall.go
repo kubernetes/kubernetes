@@ -18,6 +18,7 @@ package network
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -182,3 +183,15 @@ var _ = SIGDescribe("Firewall rule", func() {
 		Expect(flag).To(BeTrue())
 	})
 })
+
+
+func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
+	result := framework.PokeHTTP(ip, port, "/", &framework.HTTPPokeParams{Timeout: timeout})
+	if result.Status == framework.HTTPError {
+		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
+	}
+	if result.Code != 0 {
+		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
+	}
+}
+>>>>>>> Retool HTTP and UDP e2e utils
