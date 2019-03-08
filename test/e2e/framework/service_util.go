@@ -623,6 +623,7 @@ func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout 
 // name as the jig and runs the "netexec" container.
 func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationController {
 	var replicas int32 = 1
+	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -654,7 +655,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: new(int64),
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
