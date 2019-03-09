@@ -614,7 +614,8 @@ func TestPluginNewMounter(t *testing.T) {
 			if string(csiMounter.podUID) != string(test.podUID) {
 				t.Error("mounter podUID not set")
 			}
-			if csiMounter.csiClient == nil {
+			csiClient, err := csiMounter.csiClientGetter.Get()
+			if csiClient == nil {
 				t.Error("mounter csiClient is nil")
 			}
 			if csiMounter.driverMode != test.driverMode {
@@ -732,7 +733,8 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 			if string(csiMounter.podUID) != string(test.podUID) {
 				t.Error("mounter podUID not set")
 			}
-			if csiMounter.csiClient == nil {
+			csiClient, err := csiMounter.csiClientGetter.Get()
+			if csiClient == nil {
 				t.Error("mounter csiClient is nil")
 			}
 			if csiMounter.driverMode != test.driverMode {
@@ -815,8 +817,9 @@ func TestPluginNewUnmounter(t *testing.T) {
 		t.Error("podUID not set")
 	}
 
-	if csiUnmounter.csiClient == nil {
-		t.Error("unmounter csiClient is nil")
+	csiClient, err := csiUnmounter.csiClientGetter.Get()
+	if csiClient == nil {
+		t.Error("mounter csiClient is nil")
 	}
 }
 
@@ -932,7 +935,8 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	if csiMapper.podUID == types.UID("") {
 		t.Error("CSI block mapper missing pod.UID")
 	}
-	if csiMapper.csiClient == nil {
+	csiClient, err := csiMapper.csiClientGetter.Get()
+	if csiClient == nil {
 		t.Error("mapper csiClient is nil")
 	}
 
@@ -994,7 +998,8 @@ func TestPluginNewUnmapper(t *testing.T) {
 		t.Error("specName not set")
 	}
 
-	if csiUnmapper.csiClient == nil {
+	csiClient, err := csiUnmapper.csiClientGetter.Get()
+	if csiClient == nil {
 		t.Error("unmapper csiClient is nil")
 	}
 
