@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
@@ -242,7 +242,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 }
 
 // GetWatcherHandler returns the plugin handler
-func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
+func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	if f, err := os.Create(m.socketdir + "DEPRECATION"); err != nil {
 		klog.Errorf("Failed to create deprecation file at %s", m.socketdir)
 	} else {
@@ -250,7 +250,7 @@ func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
 		klog.V(4).Infof("created deprecation file %s", f.Name())
 	}
 
-	return watcher.PluginHandler(m)
+	return cache.PluginHandler(m)
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
