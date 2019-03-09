@@ -36,7 +36,7 @@ import (
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
 // the nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector", func() {
+var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 	const (
 		pollInterval = 1 * time.Second
 		pollTimeout  = 1 * time.Minute
