@@ -302,11 +302,6 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	csi, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
-	if err != nil {
-		return nil, err
-	}
-
 	mounter := &csiMountMgr{
 		plugin:       p,
 		k8s:          k8s,
@@ -316,9 +311,9 @@ func (p *csiPlugin) NewMounter(
 		driverName:   csiDriverName(pvSource.Driver),
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
-		csiClient:    csi,
 		readOnly:     readOnly,
 	}
+	mounter.csiClientGetter.driverName = csiDriverName(pvSource.Driver)
 
 	// Save volume info in pod dir
 	dir := mounter.GetPath()
@@ -374,10 +369,7 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	}
 	unmounter.driverName = csiDriverName(data[volDataKey.driverName])
 	unmounter.volumeID = data[volDataKey.volHandle]
-	unmounter.csiClient, err = newCsiDriverClient(unmounter.driverName)
-	if err != nil {
-		return nil, err
-	}
+	unmounter.csiClientGetter.driverName = unmounter.driverName
 
 	return unmounter, nil
 }
@@ -489,10 +481,6 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 
 	klog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
-	if err != nil {
-		return nil, err
-	}
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -501,7 +489,6 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 
 	mapper := &csiBlockMapper{
-		csiClient:  client,
 		k8s:        k8s,
 		plugin:     p,
 		volumeID:   pvSource.VolumeHandle,
@@ -511,6 +498,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		specName:   spec.Name(),
 		podUID:     podRef.UID,
 	}
+	mapper.csiClientGetter.driverName = csiDriverName(pvSource.Driver)
 
 	// Save volume info in pod dir
 	dataDir := getVolumeDeviceDataDir(spec.Name(), p.host)
@@ -565,7 +553,7 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 	}
 	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
-	unmapper.csiClient, err = newCsiDriverClient(unmapper.driverName)
+	unmapper.csiClientGetter.driverName = unmapper.driverName
 	if err != nil {
 		return nil, err
 	}
