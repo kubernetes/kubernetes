@@ -135,7 +135,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			copy(ephemeralStats, vstats.EphemeralVolumes)
 			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
 		}
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, nil, false)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
@@ -223,53 +223,6 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats,
 	}
 
 	return result, nil
-}
-
-func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
-	result := &statsapi.FsStats{
-		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: &rootFsInfo.Available,
-		CapacityBytes:  &rootFsInfo.Capacity,
-		InodesFree:     rootFsInfo.InodesFree,
-		Inodes:         rootFsInfo.Inodes,
-	}
-	for _, container := range containers {
-		addContainerUsage(result, &container)
-	}
-	for _, volume := range volumes {
-		result.UsedBytes = addUsage(result.UsedBytes, volume.FsStats.UsedBytes)
-		result.InodesUsed = addUsage(result.InodesUsed, volume.InodesUsed)
-		result.Time = maxUpdateTime(&result.Time, &volume.FsStats.Time)
-	}
-	return result
-}
-
-func addContainerUsage(stat *statsapi.FsStats, container *statsapi.ContainerStats) {
-	if rootFs := container.Rootfs; rootFs != nil {
-		stat.Time = maxUpdateTime(&stat.Time, &rootFs.Time)
-		stat.InodesUsed = addUsage(stat.InodesUsed, rootFs.InodesUsed)
-		stat.UsedBytes = addUsage(stat.UsedBytes, rootFs.UsedBytes)
-		if logs := container.Logs; logs != nil {
-			stat.UsedBytes = addUsage(stat.UsedBytes, logs.UsedBytes)
-			stat.Time = maxUpdateTime(&stat.Time, &logs.Time)
-		}
-	}
-}
-
-func maxUpdateTime(first, second *metav1.Time) metav1.Time {
-	if first.Before(second) {
-		return *second
-	}
-	return *first
-}
-func addUsage(first, second *uint64) *uint64 {
-	if first == nil {
-		return second
-	} else if second == nil {
-		return first
-	}
-	total := *first + *second
-	return &total
 }
 
 // ImageFsStats returns the stats of the filesystem for storing images.

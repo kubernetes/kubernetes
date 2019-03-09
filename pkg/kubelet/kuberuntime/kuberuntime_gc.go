@@ -339,7 +339,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 		}
 		for _, dir := range dirs {
 			name := dir.Name()
-			podUID := types.UID(name)
+			podUID := parsePodUIDFromLogsDirectory(name)
 			if !cgc.podStateProvider.IsPodDeleted(podUID) {
 				continue
 			}
