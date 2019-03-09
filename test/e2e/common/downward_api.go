@@ -78,7 +78,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
-			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
+			"POD_IP=(?:\\d+\\.\\d+\\.\\d+\\.\\d+|[a-fA-F0-9:]+)",
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
@@ -105,7 +105,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 		}
 
 		expectations := []string{
-			"HOST_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
+			"HOST_IP=(?:\\d+\\.\\d+\\.\\d+\\.\\d+|[a-fA-F0-9:]+)",
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
