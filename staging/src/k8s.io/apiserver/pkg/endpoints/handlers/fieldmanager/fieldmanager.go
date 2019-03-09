@@ -72,7 +72,7 @@ func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
+			Converter: internal.NewCRDVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
 		},
 	}
 }
