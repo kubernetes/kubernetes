@@ -356,6 +356,7 @@ const (
 
 	// owner: @tallclair
 	// alpha: v1.12
+	// beta:  v1.14
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass utilfeature.Feature = "RuntimeClass"
@@ -498,7 +499,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},
 	CSIInlineVolume:                             {Default: false, PreRelease: utilfeature.Alpha},
-	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
+	RuntimeClass:                                {Default: true, PreRelease: utilfeature.Beta},
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
