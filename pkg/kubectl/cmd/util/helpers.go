@@ -406,8 +406,9 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
-	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().String("experimental-field-manager", "kubectl", "Name of the manager used to track field ownership. This is an alpha feature and flag.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -484,11 +485,15 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 }
 
 func GetServerSideApplyFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "server-side")
+	return GetFlagBool(cmd, "experimental-server-side")
 }
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "force-conflicts")
+	return GetFlagBool(cmd, "experimental-force-conflicts")
+}
+
+func GetFieldManagerFlag(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "experimental-field-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
