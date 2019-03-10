@@ -192,6 +192,8 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 	supported := false
 	// TODO (?): add support for more volume types
 	switch pattern.VolType {
+	case "":
+		supported = true
 	case testpatterns.DynamicPV:
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" {
 			supported = true
@@ -253,7 +255,7 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 		framework.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
 
-	snapshotter := config.GetUniqueDriverName()
+	snapshotter := d.DriverInfo.Name
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	suffix := snapshotter + "-vsc"
