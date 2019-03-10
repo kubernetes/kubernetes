@@ -210,7 +210,7 @@ func main() {
 	http.HandleFunc("/write", state.serveWrite)
 	http.HandleFunc("/status", state.serveStatus)
 
-	go log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *port), nil))
+	go log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 
 	select {}
 }
