@@ -294,6 +294,7 @@ __kubectl_convert_bash_to_zsh() {
 	-e "s/${LWORD}compopt${RWORD}/__kubectl_compopt/g" \
 	-e "s/${LWORD}declare${RWORD}/builtin declare/g" \
 	-e "s/\\\$(type${RWORD}/\$(__kubectl_type/g" \
+	-e "s/FUNCNAME/funcstack/" \
 	<<'BASH_COMPLETION_EOF'
 `
 	out.Write([]byte(zshInitialization))
