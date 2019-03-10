@@ -28,7 +28,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
@@ -37,40 +37,59 @@ import (
 	"k8s.io/klog"
 )
 
-// main demonstrates a leader elected process that will step down if interrupted.
+func buildConfig(kubeconfig string) (*rest.Config, error) {
+	if kubeconfig != "" {
+		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+		return cfg, nil
+	}
+
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func main() {
 	klog.InitFlags(nil)
+
+	var kubeconfig string
+	var leaseLockName string
+	var leaseLockNamespace string
+	var id string
+
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
+	flag.StringVar(&id, "id", "", "the holder identity name")
+	flag.StringVar(&leaseLockName, "lease-lock-name", "example", "the lease lock resource name")
+	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
 	flag.Parse()
-	args := flag.Args()
-	if len(args) != 3 {
-		log.Fatalf("requires three arguments: ID NAMESPACE CONFIG_MAP_NAME (%d)", len(args))
+
+	if id == "" {
+		klog.Fatal("unable to get id (missing id flag).")
 	}
 
-	// leader election uses the Kubernetes API by writing to a ConfigMap or Endpoints
-	// object. Conflicting writes are detected and each client handles those actions
+	// leader election uses the Kubernetes API by writing to a
+	// lock object, which can be a LeaseLock object (preferred),
+	// a ConfigMap, or an Endpoints (deprecated) object.
+	// Conflicting writes are detected and each client handles those actions
 	// independently.
-	var config *rest.Config
-	var err error
-	if kubeconfig := os.Getenv("KUBECONFIG"); len(kubeconfig) > 0 {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
-	}
+	config, err := buildConfig(kubeconfig)
 	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
+		klog.Fatal(err)
 	}
+	client := clientset.NewForConfigOrDie(config)
 
-	// we use the ConfigMap lock type since edits to ConfigMaps are less common
-	// and fewer objects in the cluster watch "all ConfigMaps" (unlike the older
-	// Endpoints lock type, where quite a few system agents like the kube-proxy
-	// and ingress controllers must watch endpoints).
-	id := args[0]
-	lock := &resourcelock.ConfigMapLock{
-		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: args[1],
-			Name:      args[2],
+	// we use the Lease lock type since edits to Leases are less common
+	// and fewer objects in the cluster watch "all Leases".
+	lock := &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name:      leaseLockName,
+			Namespace: leaseLockNamespace,
 		},
-		Client: kubernetes.NewForConfigOrDie(config).CoreV1(),
+		Client: client.CoordinationV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity: id,
 		},
@@ -83,7 +102,6 @@ func main() {
 
 	// use a client that will stop allowing new requests once the context ends
 	config.Wrap(transport.ContextCanceller(ctx, fmt.Errorf("the leader is shutting down")))
-	exampleClient := kubernetes.NewForConfigOrDie(config).CoreV1()
 
 	// listen for interrupts or the Linux SIGTERM signal and cancel
 	// our context, which the leader election code will observe and
@@ -113,18 +131,26 @@ func main() {
 			OnStartedLeading: func(ctx context.Context) {
 				// we're notified when we start - this is where you would
 				// usually put your code
-				log.Printf("%s: leading", id)
+				klog.Infof("%s: leading", id)
 			},
 			OnStoppedLeading: func() {
 				// we can do cleanup here, or after the RunOrDie method
 				// returns
-				log.Printf("%s: lost", id)
+				klog.Infof("%s: lost", id)
+			},
+			OnNewLeader: func(identity string) {
+				// we're notified when new leader elected
+				if identity == id {
+					// I just got the lock
+					return
+				}
+				klog.Infof("new leader elected: %v", identity)
 			},
 		},
 	})
 
 	// because the context is closed, the client should report errors
-	_, err = exampleClient.ConfigMaps(args[1]).Get(args[2], metav1.GetOptions{})
+	_, err = client.CoordinationV1().Leases(leaseLockNamespace).Get(leaseLockName, metav1.GetOptions{})
 	if err == nil || !strings.Contains(err.Error(), "the leader is shutting down") {
 		log.Fatalf("%s: expected to get an error when trying to make a client call: %v", id, err)
 	}
