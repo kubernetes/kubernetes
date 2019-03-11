@@ -31,7 +31,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzInitConfiguration,
 		fuzzClusterConfiguration,
 		fuzzComponentConfigs,
-		fuzzNodeRegistration,
 		fuzzDNS,
 		fuzzLocalEtcd,
 		fuzzNetworking,
@@ -82,13 +81,6 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Usages: []string{"foo"},
 		},
 	}
-}
-
-func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
-
-	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
-	obj.CRISocket = "foo"
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
