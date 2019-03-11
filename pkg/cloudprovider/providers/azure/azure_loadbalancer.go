@@ -169,27 +169,47 @@ func (az *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, ser
 func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
-	klog.V(5).Infof("delete(%s): START clusterName=%q", serviceName, clusterName)
+	klog.V(5).Infof("Delete service (%s): START clusterName=%q", serviceName, clusterName)
+
+	ignoreErrors := func(err error) error {
+		if ignoreStatusNotFoundFromError(err) == nil {
+			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusNotFound error because the resource doesn't exist (%v)", err)
+			return nil
+		}
+
+		if ignoreStatusForbiddenFromError(err) == nil {
+			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusForbidden error (%v). This may be caused by wrong configuration via service annotations", err)
+			return nil
+		}
+
+		return err
+	}
 
 	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
-	if err != nil {
+	if ignoreErrors(err) != nil {
 		return err
 	}
 
 	klog.V(2).Infof("EnsureLoadBalancerDeleted: reconciling security group for service %q with IP %q, wantLb = false", serviceName, serviceIPToCleanup)
 	if _, err := az.reconcileSecurityGroup(clusterName, service, &serviceIPToCleanup, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
 	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
 	if _, err := az.reconcilePublicIP(clusterName, service, nil, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
-	klog.V(2).Infof("delete(%s): FINISH", serviceName)
+	klog.V(2).Infof("Delete service (%s): FINISH", serviceName)
 	return nil
 }
 
