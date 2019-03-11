@@ -26,8 +26,13 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
@@ -50,9 +55,13 @@ var (
 	requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "apiserver_request_total",
-			Help: "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
+			Help: "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
+		// The label_name contentType doesn't follow the label_name convention defined here:
+		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/instrumentation.md
+		// But changing it would break backwards compatibility. Future label_names
+		// should be all lowercase and separated by underscores.
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
 	deprecatedRequestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -71,14 +80,14 @@ var (
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "apiserver_request_duration_seconds",
-			Help: "Response latency distribution in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
 			Buckets: []float64{0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 				1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60},
 		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	deprecatedRequestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -225,12 +234,13 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
+	dryRun := cleanDryRun(req.URL.Query()["dryRun"])
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	elapsedSeconds := elapsed.Seconds()
-	requestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
+	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	deprecatedRequestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
@@ -315,7 +325,19 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "WATCHLIST" {
 		reportedVerb = "WATCH"
 	}
+	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		reportedVerb = "APPLY"
+	}
 	return reportedVerb
+}
+
+func cleanDryRun(dryRun []string) string {
+	if errs := validation.ValidateDryRun(nil, dryRun); len(errs) > 0 {
+		return "invalid"
+	}
+	// Since dryRun could be valid with any arbitrarily long length
+	// we have to dedup and sort the elements before joining them together
+	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
 }
 
 func cleanUserAgent(ua string) string {

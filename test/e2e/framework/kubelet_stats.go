@@ -281,8 +281,8 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	return badMetrics, nil
 }
 
-// getStatsSummary contacts kubelet for the container information.
-func getStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
+// GetStatsSummary contacts kubelet for the container information.
+func GetStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 	defer cancel()
 
@@ -348,7 +348,7 @@ func getOneTimeResourceUsageOnNode(
 		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
 	}
 	// Get information of all containers on the node.
-	summary, err := getStatsSummary(c, nodeName)
+	summary, err := GetStatsSummary(c, nodeName)
 	if err != nil {
 		return nil, err
 	}

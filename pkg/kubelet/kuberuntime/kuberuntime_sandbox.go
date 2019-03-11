@@ -103,7 +103,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.Hostname = hostname
 	}
 
-	logDir := buildPodLogsDirectory(pod.UID)
+	logDir := BuildPodLogsDirectory(pod.Namespace, pod.Name, pod.UID)
 	podSandboxConfig.LogDirectory = logDir
 
 	portMappings := []*runtimeapi.PortMapping{}

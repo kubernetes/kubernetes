@@ -34,19 +34,13 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
+var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		pod := createRuntimeClassPod(f, rcName)
 		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
-	})
-
-	It("should run a Pod requesting a RuntimeClass with an empty handler", func() {
-		rcName := createRuntimeClass(f, "empty-handler", "")
-		pod := createRuntimeClassPod(f, rcName)
-		expectPodSuccess(f, pod)
 	})
 
 	It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
@@ -57,7 +51,7 @@ var _ = SIGDescribe("RuntimeClass [Feature:RuntimeClass]", func() {
 	})
 
 	It("should reject a Pod requesting a deleted RuntimeClass", func() {
-		rcName := createRuntimeClass(f, "delete-me", "")
+		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 
 		By("Deleting RuntimeClass "+rcName, func() {

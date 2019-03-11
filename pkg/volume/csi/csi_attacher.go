@@ -63,15 +63,15 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", errors.New("missing spec")
 	}
 
-	csiSource, err := getCSISourceFromSpec(spec)
+	pvSrc, err := getPVSourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("attacher.Attach failed to get CSI persistent source: %v", err))
+		klog.Error(log("attacher.Attach failed to get CSIPersistentVolumeSource: %v", err))
 		return "", err
 	}
 
 	node := string(nodeName)
 	pvName := spec.PersistentVolume.GetName()
-	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, node)
+	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
 
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
@@ -79,7 +79,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: node,
-			Attacher: csiSource.Driver,
+			Attacher: pvSrc.Driver,
 			Source: storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			},
@@ -97,12 +97,12 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	if alreadyExist {
-		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, csiSource.VolumeHandle))
+		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, pvSrc.VolumeHandle))
 	} else {
-		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, csiSource.VolumeHandle))
+		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
 	}
 
-	if _, err := c.waitForVolumeAttachment(csiSource.VolumeHandle, attachID, csiTimeout); err != nil {
+	if _, err := c.waitForVolumeAttachment(pvSrc.VolumeHandle, attachID, csiTimeout); err != nil {
 		return "", err
 	}
 
@@ -113,7 +113,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 }
 
 func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, timeout time.Duration) (string, error) {
-	source, err := getCSISourceFromSpec(spec)
+	source, err := getPVSourceFromSpec(spec)
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
 		return "", err
@@ -220,14 +220,18 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			klog.Error(log("attacher.VolumesAreAttached missing volume.Spec"))
 			return nil, errors.New("missing spec")
 		}
-		source, err := getCSISourceFromSpec(spec)
+		pvSrc, err := getPVSourceFromSpec(spec)
 		if err != nil {
-			klog.Error(log("attacher.VolumesAreAttached failed: %v", err))
+			attached[spec] = false
+			klog.Error(log("attacher.VolumesAreAttached failed to get CSIPersistentVolumeSource: %v", err))
 			continue
 		}
-		skip, err := c.plugin.skipAttach(source.Driver)
+		driverName := pvSrc.Driver
+		volumeHandle := pvSrc.VolumeHandle
+
+		skip, err := c.plugin.skipAttach(driverName)
 		if err != nil {
-			klog.Error(log("Failed to check CSIDriver for %s: %s", source.Driver, err))
+			klog.Error(log("Failed to check CSIDriver for %s: %s", driverName, err))
 		} else {
 			if skip {
 				// This volume is not attachable, pretend it's attached
@@ -236,7 +240,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			}
 		}
 
-		attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(nodeName))
+		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
 		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
 		attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
@@ -285,9 +289,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if spec == nil {
 		return fmt.Errorf("attacher.MountDevice failed, spec is nil")
 	}
-	csiSource, err := getCSISourceFromSpec(spec)
+	csiSource, err := getPVSourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("attacher.MountDevice failed to get CSI persistent source: %v", err))
+		klog.Error(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
 		return err
 	}
 
