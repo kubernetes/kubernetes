@@ -313,6 +313,57 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
 			framework.NodeSelection{Name: l.config.ClientNodeName}, resource.pvc, numPods, false /* sameNode */)
 	})
+
+	// The following two iSCSI tests test that the in-tree iSCSI plugin does not
+	// prematurely logout from a target (portal+IQN). This issue is unique to
+	// iSCSI because logging in/out is a node-wide operation, so any time kubelet
+	// detaches a volume, the plugin must ensure that it doesn't log out while
+	// other volumes depending on the same target are in use, otherwise they will
+	// return i/o errors (same target but different lun are unique from kubelet's
+	// perspective).
+	// See #74313 for more information: previously, the plugin always logged out
+	// when a block volume was detached, and the plugin logged out when a file
+	// volume was detached even if a block volume was still in use.
+
+	// This tests below configuration:
+	//      [pod1] [pod2]                         same node    [pod1]
+	//      [   node1   ]                           ==>        [   node1   ]
+	//          /    \      <- same volume mode                    /
+	//   [volume1]  [volume2]                               [volume1]
+	It("should access an iSCSI volume after a different pod on the same node using a volume with the same volume mode, same target, & different lun is deleted", func() {
+		// in-tree driver drivers.iSCSIDriver has name "iscsi"
+		if dInfo.Name != "iscsi" {
+			framework.Skipf("This test doesn't work with non-iscsi volume -- skipping")
+		}
+		if pattern.VolType != testpatterns.PreprovisionedPV {
+			framework.Skipf("This test only works with pre-provisioned volume -- skipping")
+		}
+
+		init()
+		defer cleanup()
+
+		testIscsiDifferentLunSameNode(driver, pattern, l.config, l.resources, l.cs, l.ns, true)
+	})
+
+	// This tests below configuration:
+	//      [pod1] [pod2]                         same node    [pod1]
+	//      [   node1   ]                           ==>        [   node1   ]
+	//          /    \      <- different volume mode               /
+	//   [volume1]  [volume2]                               [volume1]
+	It("should access an iSCSI volume after a different pod on the same node using a volume with a different volume mode, same target, & different lun is deleted", func() {
+		// in-tree driver drivers.iSCSIDriver has name "iscsi"
+		if dInfo.Name != "iscsi" {
+			framework.Skipf("This test doesn't work with non-iscsi volume -- skipping")
+		}
+		if pattern.VolType != testpatterns.PreprovisionedPV {
+			framework.Skipf("This test only works with pre-provisioned volume -- skipping")
+		}
+
+		init()
+		defer cleanup()
+
+		testIscsiDifferentLunSameNode(driver, pattern, l.config, l.resources, l.cs, l.ns, false)
+	})
 }
 
 // testAccessMultipleVolumes tests access to multiple volumes from single pod on the specified node
@@ -471,4 +522,60 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		By(fmt.Sprintf("Rechecking if read from the volume in pod%d works properly", index))
 		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
+}
+
+func testIscsiDifferentLunSameNode(driver TestDriver, pattern testpatterns.TestPattern, config *PerTestConfig, resources []*genericVolumeTestResource, cs clientset.Interface, ns *v1.Namespace, sameVolumeMode bool) {
+	var pvcs []*v1.PersistentVolumeClaim
+	var pods []*v1.Pod
+	numVols := 2
+	nodeSelection := framework.NodeSelection{}
+	if config.ClientNodeName != "" {
+		nodeSelection.Name = config.ClientNodeName
+	}
+	path := "/mnt/volume1"
+
+	// The iscsi driver creates 1 volume server with 2 luns. Subsequent calls to
+	// its GetPersistentVolumeSource cycle through lun 0 and 1
+	// So create a pod 0 using lun 0 and and pod 1 using lun 1
+	for i := 0; i < numVols; i++ {
+		if i > 0 && !sameVolumeMode {
+			if pattern.VolMode == v1.PersistentVolumeBlock {
+				pattern.VolMode = v1.PersistentVolumeFilesystem
+			} else {
+				pattern.VolMode = v1.PersistentVolumeBlock
+			}
+		}
+
+		resource := createGenericVolumeTestResource(driver, config, pattern)
+		resources = append(resources, resource)
+		pvcs = append(pvcs, resource.pvc)
+
+		description := fmt.Sprintf("Creating pod %d on %+v using volume lun %d", i, nodeSelection, i)
+		By(description)
+		pod, err := framework.CreateSecPodWithNodeSelection(cs, ns.Name, []*v1.PersistentVolumeClaim{resource.pvc},
+			false, "", false, false, framework.SELinuxLabel,
+			nil, nodeSelection, framework.PodStartTimeout)
+		defer func() {
+			framework.ExpectNoError(framework.DeletePodWithWait(config.Framework, cs, pod))
+		}()
+		Expect(err).NotTo(HaveOccurred(), description)
+
+		By(fmt.Sprintf("Checking in pod %d if volume1 exists as expected volume mode (%s)", i, *resource.pvc.Spec.VolumeMode))
+		utils.CheckVolumeModeOfPath(pod, *resource.pvc.Spec.VolumeMode, path)
+
+		By(fmt.Sprintf("Checking in pod %d if read and write to volume1 works properly", i))
+		utils.CheckReadWriteToPath(pod, *resource.pvc.Spec.VolumeMode, path)
+
+		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "get pod")
+		nodeSelection.Name = pod.Spec.NodeName
+		pods = append(pods, pod)
+	}
+
+	description := fmt.Sprintf("Deleting pod 1 %q on %+v using volume lun 1", pods[1].Name, nodeSelection)
+	By(description)
+	framework.ExpectNoError(framework.DeletePodWithWait(config.Framework, cs, pods[1]), description)
+
+	By("Checking in pod 0 if read and write to the volume1 still works properly")
+	utils.CheckReadWriteToPath(pods[0], *pvcs[0].Spec.VolumeMode, path)
 }
