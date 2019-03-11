@@ -741,6 +741,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
 			staleServices.Insert(svcInfo.ClusterIPString())
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 
