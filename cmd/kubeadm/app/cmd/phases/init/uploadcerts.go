@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -40,6 +39,7 @@ func NewUploadCertsPhase() workflow.Phase {
 			options.CfgPath,
 			options.UploadCerts,
 			options.CertificateKey,
+			options.SkipCertificateKeyPrint,
 		},
 	}
 }
@@ -51,7 +51,7 @@ func runUploadCerts(c workflow.RunData) error {
 	}
 
 	if !data.UploadCerts() {
-		klog.V(1).Infoln("[upload-certs] Skipping certs upload")
+		fmt.Printf("[upload-certs] Skipping phase. Please see --%s\n", options.UploadCerts)
 		return nil
 	}
 	client, err := data.Client()
@@ -69,6 +69,9 @@ func runUploadCerts(c workflow.RunData) error {
 
 	if err := copycerts.UploadCerts(client, data.Cfg(), data.CertificateKey()); err != nil {
 		return errors.Wrap(err, "error uploading certs")
+	}
+	if !data.SkipCertificateKeyPrint() {
+		fmt.Printf("[upload-certs] Using certificate key:\n%s\n", data.CertificateKey())
 	}
 	return nil
 }
