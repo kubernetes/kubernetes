@@ -134,23 +134,31 @@ type rbdVolumeExpander struct {
 	*rbdMounter
 }
 
+// Get the admin and secret from pv firstly, if not, get from storageclass
 func (plugin *rbdPlugin) getAdminAndSecret(spec *volume.Spec) (string, string, error) {
-	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
-	if err != nil {
-		return "", "", err
-	}
 	adminSecretName := ""
 	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	admin := ""
+	if spec.PersistentVolume.Spec.RBD.RadosUser != "" && spec.PersistentVolume.Spec.RBD.SecretRef.Name != "" {
+		adminSecretName = spec.PersistentVolume.Spec.RBD.SecretRef.Name
+		adminSecretNamespace = spec.PersistentVolume.Spec.RBD.SecretRef.Namespace
+		admin = spec.PersistentVolume.Spec.RBD.RadosUser
+	} else {
+		klog.Warning("Can not get admin and secret from pv. Getting from class")
+		class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
+		if err != nil {
+			return "", "", err
+		}
 
-	for k, v := range class.Parameters {
-		switch dstrings.ToLower(k) {
-		case "adminid":
-			admin = v
-		case "adminsecretname":
-			adminSecretName = v
-		case "adminsecretnamespace":
-			adminSecretNamespace = v
+		for k, v := range class.Parameters {
+			switch dstrings.ToLower(k) {
+			case "adminid":
+				admin = v
+			case "adminsecretname":
+				adminSecretName = v
+			case "adminsecretnamespace":
+				adminSecretNamespace = v
+			}
 		}
 	}
 
