@@ -184,7 +184,7 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 
 // writeCertificateAuthorithyFilesIfNotExist write a new certificate Authority to the given path.
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
-// existing and the eexpected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
+// existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
 func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
 
