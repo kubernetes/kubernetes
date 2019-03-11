@@ -63,6 +63,10 @@
 			"Rev": "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 		},
 		{
+			"ImportPath": "github.com/google/uuid",
+			"Rev": "8c31c18f31ede9fc8eae72290a7e7a8064e9b3e3"
+		},
+		{
 			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
 			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
@@ -97,10 +101,6 @@
 		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
-		},
-		{
-			"ImportPath": "github.com/pborman/uuid",
-			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
