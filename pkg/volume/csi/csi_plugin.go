@@ -287,7 +287,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		// This function prevents Kubelet from posting Ready status until CSINodeInfo
 		// is both installed and initialized
-		if err := initializeCSINode(host); err != nil {
+		if err := initializeCSINode(host, p.nim); err != nil {
 			return fmt.Errorf("failed to initialize CSINodeInfo: %v", err)
 		}
 	}
@@ -295,7 +295,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func initializeCSINode(host volume.VolumeHost) error {
+func initializeCSINode(host volume.VolumeHost, nim nodeinfomanager.Interface) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
 		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINodeInfo initialization, not running on kubelet")
@@ -323,7 +323,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 		}
 		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
 			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
-			err := PluginHandler.nim.InitializeCSINodeWithAnnotation()
+			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
 				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
