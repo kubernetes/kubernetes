@@ -177,7 +177,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 
 		// use the loaded config file only, with the exception of --address and --port. This means that
-		// none of the deprectated flags in o.Deprecated are taken into consideration. This is the old
+		// none of the deprecated flags in o.Deprecated are taken into consideration. This is the old
 		// behaviour of the flags we have to keep.
 		c.ComponentConfig = *cfg
 
