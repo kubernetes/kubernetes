@@ -126,6 +126,9 @@ type APIAggregator struct {
 	// handledGroups are the groups that already have routes
 	handledGroups sets.String
 
+	// handledAlwaysLocalDelegatePaths are the URL paths that already have routes registered
+	handledAlwaysLocalDelegatePaths sets.String
+
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
 	lister listers.APIServiceLister
@@ -185,17 +188,18 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s := &APIAggregator{
-		GenericAPIServer:           genericServer,
-		delegateHandler:            delegationTarget.UnprotectedHandler(),
-		proxyTransport:             c.ExtraConfig.ProxyTransport,
-		proxyHandlers:              map[string]*proxyHandler{},
-		handledGroups:              sets.String{},
-		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
-		APIRegistrationInformers:   informerFactory,
-		serviceResolver:            c.ExtraConfig.ServiceResolver,
-		openAPIConfig:              openAPIConfig,
-		egressSelector:             c.GenericConfig.EgressSelector,
-		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
+		GenericAPIServer:                genericServer,
+		delegateHandler:                 delegationTarget.UnprotectedHandler(),
+		proxyTransport:                  c.ExtraConfig.ProxyTransport,
+		proxyHandlers:                   map[string]*proxyHandler{},
+		handledGroups:                   sets.String{},
+		handledAlwaysLocalDelegatePaths: sets.String{},
+		lister:                          informerFactory.Apiregistration().V1().APIServices().Lister(),
+		APIRegistrationInformers:        informerFactory,
+		serviceResolver:                 c.ExtraConfig.ServiceResolver,
+		openAPIConfig:                   openAPIConfig,
+		egressSelector:                  c.GenericConfig.EgressSelector,
+		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
 
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
@@ -387,6 +391,18 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// if we've already registered the path with the handler, we don't want to do it again.
 	if s.handledGroups.Has(apiService.Spec.Group) {
 		return nil
+	}
+
+	// For some resources we always want to delegate to local API server.
+	// These resources have to exists as CRD to be served locally.
+	for _, alwaysLocalDelegatePath := range alwaysLocalDelegatePathPrefixes.List() {
+		if s.handledAlwaysLocalDelegatePaths.Has(alwaysLocalDelegatePath) {
+			continue
+		}
+		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(alwaysLocalDelegatePath, proxyHandler.localDelegate)
+		// Always use local delegate for this prefix
+		s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(alwaysLocalDelegatePath+"/", proxyHandler.localDelegate)
+		s.handledAlwaysLocalDelegatePaths.Insert(alwaysLocalDelegatePath)
 	}
 
 	// it's time to register the group aggregation endpoint
