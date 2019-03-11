@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -806,4 +807,37 @@ func versionRequiresV0Client(version *utilversion.Version) bool {
 	}
 
 	return false
+}
+
+// CSI client getter with cache.
+// This provides a method to initialize CSI client with driver name and caches
+// it for later use. When CSI clients have not been discovered yet (e.g.
+// on kubelet restart), client initialization will fail. Users of CSI client (e.g.
+// mounter manager and block mapper) can use this to delay CSI client
+// initialization until needed.
+type csiClientGetter struct {
+	sync.RWMutex
+	csiClient  csiClient
+	driverName csiDriverName
+}
+
+func (c *csiClientGetter) Get() (csiClient, error) {
+	c.RLock()
+	if c.csiClient != nil {
+		c.RUnlock()
+		return c.csiClient, nil
+	}
+	c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
+	// Double-checking locking criterion.
+	if c.csiClient != nil {
+		return c.csiClient, nil
+	}
+	csi, err := newCsiDriverClient(c.driverName)
+	if err != nil {
+		return nil, err
+	}
+	c.csiClient = csi
+	return c.csiClient, nil
 }
