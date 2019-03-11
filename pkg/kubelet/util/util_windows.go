@@ -21,6 +21,7 @@ package util
 import (
 	"fmt"
 	"net"
+	"syscall"
 	"time"
 )
 
@@ -54,4 +55,16 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 
 func dial(addr string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout(tcpProtocol, addr, timeout)
+}
+
+var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
+
+// GetBootTime returns the time at which the machine was started, truncated to the nearest second
+func GetBootTime() (time.Time, error) {
+	currentTime := time.Now()
+	output, _, err := tickCount.Call()
+	if errno, ok := err.(syscall.Errno); !ok || errno != 0 {
+		return time.Time{}, err
+	}
+	return currentTime.Add(-time.Duration(output) * time.Millisecond).Truncate(time.Second), nil
 }

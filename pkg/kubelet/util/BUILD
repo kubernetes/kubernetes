@@ -27,6 +27,7 @@ go_library(
             "util_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
+            "boottime_util_darwin.go",
             "util_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
@@ -36,6 +37,7 @@ go_library(
             "util_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "boottime_util_linux.go",
             "util_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [

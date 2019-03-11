@@ -21,7 +21,9 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 type SummaryProvider interface {
@@ -32,6 +34,11 @@ type SummaryProvider interface {
 
 // summaryProviderImpl implements the SummaryProvider interface.
 type summaryProviderImpl struct {
+	// kubeletCreationTime is the time at which the summaryProvider was created.
+	kubeletCreationTime metav1.Time
+	// systemBootTime is the time at which the system was started
+	systemBootTime metav1.Time
+
 	provider StatsProvider
 }
 
@@ -40,7 +47,18 @@ var _ SummaryProvider = &summaryProviderImpl{}
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
 func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
-	return &summaryProviderImpl{statsProvider}
+	kubeletCreationTime := metav1.Now()
+	bootTime, err := util.GetBootTime()
+	if err != nil {
+		// bootTime will be zero if we encounter an error getting the boot time.
+		glog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+	}
+
+	return &summaryProviderImpl{
+		kubeletCreationTime: kubeletCreationTime,
+		systemBootTime:      metav1.NewTime(bootTime),
+		provider:            statsProvider,
+	}
 }
 
 func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
@@ -77,7 +95,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		CPU:       rootStats.CPU,
 		Memory:    rootStats.Memory,
 		Network:   networkStats,
-		StartTime: rootStats.StartTime,
+		StartTime: sp.systemBootTime,
 		Fs:        rootFsStats,
 		Runtime:   &statsapi.RuntimeStats{ImageFs: imageFsStats},
 		Rlimit:    rlimit,
@@ -86,11 +104,12 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	systemContainers := map[string]struct {
 		name             string
 		forceStatsUpdate bool
+		startTime        metav1.Time
 	}{
-		statsapi.SystemContainerKubelet: {nodeConfig.KubeletCgroupsName, false},
-		statsapi.SystemContainerRuntime: {nodeConfig.RuntimeCgroupsName, false},
-		statsapi.SystemContainerMisc:    {nodeConfig.SystemCgroupsName, false},
-		statsapi.SystemContainerPods:    {sp.provider.GetPodCgroupRoot(), updateStats},
+		statsapi.SystemContainerKubelet: {name: nodeConfig.KubeletCgroupsName, forceStatsUpdate: false, startTime: sp.kubeletCreationTime},
+		statsapi.SystemContainerRuntime: {name: nodeConfig.RuntimeCgroupsName, forceStatsUpdate: false},
+		statsapi.SystemContainerMisc:    {name: nodeConfig.SystemCgroupsName, forceStatsUpdate: false},
+		statsapi.SystemContainerPods:    {name: sp.provider.GetPodCgroupRoot(), forceStatsUpdate: updateStats},
 	}
 	for sys, cont := range systemContainers {
 		// skip if cgroup name is undefined (not all system containers are required)
@@ -105,6 +124,11 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		// System containers don't have a filesystem associated with them.
 		s.Logs, s.Rootfs = nil, nil
 		s.Name = sys
+		// if we know the start time of a system container, use that instead of the start time provided by cAdvisor
+		if !cont.startTime.IsZero() {
+			s.StartTime = cont.startTime
+		}
+
 		nodeStats.SystemContainers = append(nodeStats.SystemContainers, *s)
 	}
 

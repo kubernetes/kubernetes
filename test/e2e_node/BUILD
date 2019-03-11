@@ -60,6 +60,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/api/v1/node:go_default_library",
+            "//pkg/kubelet/util:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//test/e2e/perftype:go_default_library",
             "//test/e2e_node/perftype:go_default_library",
