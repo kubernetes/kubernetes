@@ -443,8 +443,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	AppArmor:             {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig: {Default: true, PreRelease: utilfeature.Beta},
+	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
+	DynamicKubeletConfig:                        {Default: true, PreRelease: utilfeature.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
@@ -486,8 +486,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA},
-	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
-	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigration:                                {Default: true, PreRelease: utilfeature.Alpha},
+	CSIMigrationGCE:                             {Default: true, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: utilfeature.Beta},
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: utilfeature.Alpha},
