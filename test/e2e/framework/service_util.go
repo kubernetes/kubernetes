@@ -623,6 +623,7 @@ func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout 
 // name as the jig and runs the "netexec" container.
 func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationController {
 	var replicas int32 = 1
+	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -654,7 +655,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: new(int64),
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -735,6 +736,28 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 		Failf("Failed waiting for pods to be running: %v", err)
 	}
 	return result
+}
+
+func (j *ServiceTestJig) Scale(namespace string, replicas int) {
+	rc := j.Name
+	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
+	if err != nil {
+		Failf("Failed to get scale for RC %q: %v", rc, err)
+	}
+
+	scale.Spec.Replicas = int32(replicas)
+	_, err = j.Client.CoreV1().ReplicationControllers(namespace).UpdateScale(rc, scale)
+	if err != nil {
+		Failf("Failed to scale RC %q: %v", rc, err)
+	}
+	pods, err := j.waitForPodsCreated(namespace, replicas)
+	if err != nil {
+		Failf("Failed waiting for pods: %v", err)
+	}
+	if err := j.waitForPodsReady(namespace, pods); err != nil {
+		Failf("Failed waiting for pods to be running: %v", err)
+	}
+	return
 }
 
 func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
@@ -875,9 +898,19 @@ func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.D
 }
 
 func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		return TestReachableHTTPWithRetriableErrorCodes(host, port, "/echo?msg=hello", "hello", retriableErrCodes)
-	}); err != nil {
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/echo?msg=hello",
+			&HTTPPokeParams{
+				BodyContains:   "hello",
+				RetriableCodes: retriableErrCodes,
+			})
+		if result.Status == HTTPSuccess {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		if err == wait.ErrWaitTimeout {
 			Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {
@@ -887,36 +920,87 @@ func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, p
 }
 
 func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestNotReachableHTTP(host, port) }); err != nil {
-		Failf("Could still reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/", nil)
+		if result.Code == 0 {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/", nil)
+		if result.Status == HTTPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestReachableUDP(host, port, "echo hello", "hello") }); err != nil {
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
+			Timeout:  3 * time.Second,
+			Response: "hello",
+		})
+		if result.Status == UDPSuccess {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestNotReachableUDP(host, port, "echo hello") }); err != nil {
-		Failf("Could still reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status != UDPSuccess && result.Status != UDPError {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status == UDPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
-	var err error
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		var result bool
-		result, err = TestReachableHTTPWithContent(host, port, url, "", &body)
-		if err != nil {
-			Logf("Error hitting %v:%v%v, retrying: %v", host, port, url, err)
-			return false, nil
+		result := PokeHTTP(host, port, url, nil)
+		if result.Status == HTTPSuccess {
+			body.Write(result.Body)
+			return true, nil
 		}
-		return result, nil
+		return false, nil
 	}); pollErr != nil {
-		Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, err)
+		Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body
 }
@@ -929,7 +1013,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		return false, fmt.Errorf("Invalid input ip or port")
 	}
 	Logf("Testing HTTP health check on %v", url)
-	resp, err := httpGetNoConnectionPool(url)
+	resp, err := httpGetNoConnectionPoolTimeout(url, 5*time.Second)
 	if err != nil {
 		Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
