@@ -119,6 +119,19 @@ func TestApplyAlsoCreates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to retrieve object: %v", err)
 		}
+
+		// Test that we can re apply with a different field manager and don't get conflicts
+		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+			Namespace("default").
+			Resource(tc.resource).
+			Name(tc.name).
+			Param("fieldManager", "apply_test_2").
+			Body([]byte(tc.body)).
+			Do().
+			Get()
+		if err != nil {
+			t.Fatalf("Failed to re-apply object using Apply patch: %v", err)
+		}
 	}
 }
 
