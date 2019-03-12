@@ -254,6 +254,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	os.MkdirAll(dir, 0750)
 	var options []string
+	options = append(options, "allow-usermapping-in-volumename")
 	if mounter.readOnly {
 		options = append(options, "ro")
 	}

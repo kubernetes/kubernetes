@@ -85,7 +85,7 @@ func CreateCertificateKey() (string, error) {
 
 //UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[upload-certs] storing the certificates in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	fmt.Printf("[upload-certs] Storing the certificates in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return err

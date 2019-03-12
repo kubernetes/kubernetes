@@ -374,6 +374,21 @@ function setup-logrotate() {
 }
 EOF
 
+  # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
+  cat > /etc/logrotate.d/allpodlogs <<EOF
+/var/log/pods/*/*.log {
+    rotate ${POD_LOG_MAX_FILE:-5}
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize ${POD_LOG_MAX_SIZE:-5M}
+    daily
+    dateext
+    dateformat -%Y%m%d-%s
+    create 0644 root root
+}
+EOF
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE

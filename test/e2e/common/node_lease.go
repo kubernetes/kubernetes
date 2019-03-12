@@ -101,20 +101,37 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			By("verify NodeStatus report period is longer than lease duration")
 			// NodeStatus is reported from node to master when there is some change or
 			// enough time has passed. So for here, keep checking the time diff
-			// between 2 NodeStatus report, until it is longer than lease duration (
-			// the same as nodeMonitorGracePeriod).
-			heartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, metav1.Time{})
+			// between 2 NodeStatus report, until it is longer than lease duration
+			// (the same as nodeMonitorGracePeriod), or it doesn't change for at least leaseDuration
+			lastHeartbeatTime := getReadyConditionHeartbeatTime(f.ClientSet, nodeName)
+			lastObserved := time.Now()
 			Eventually(func() error {
-				nextHeartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, heartbeatTime)
+				currentHeartbeatTime := getReadyConditionHeartbeatTime(f.ClientSet, nodeName)
+				currentObserved := time.Now()
 
-				if nextHeartbeatTime.Time.After(heartbeatTime.Time.Add(leaseDuration)) {
-					return nil
+				switch {
+				case currentHeartbeatTime == lastHeartbeatTime:
+					if currentObserved.Sub(lastObserved) > 2*leaseDuration {
+						// heartbeat hasn't changed while watching for at least 2*leaseDuration, success!
+						framework.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
+						return nil
+					}
+					framework.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
+					return fmt.Errorf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
+
+				case currentHeartbeatTime != lastHeartbeatTime:
+					if currentHeartbeatTime.Sub(lastHeartbeatTime) > leaseDuration {
+						// heartbeat time changed, but the diff was greater than leaseDuration, success!
+						framework.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+						return nil
+					}
+					lastHeartbeatTime = currentHeartbeatTime
+					lastObserved = currentObserved
+					framework.Logf("node status heartbeat changed in %s, waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					return fmt.Errorf("node status heartbeat changed in %s, waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
 				}
-				heartbeatTime = nextHeartbeatTime
-				return fmt.Errorf("node status report period is shorter than lease duration")
-
-				// Enter next round immediately.
-			}, 5*time.Minute, time.Nanosecond).Should(BeNil())
+				return nil
+			}, 5*time.Minute, time.Second).Should(BeNil())
 
 			By("verify node is still in ready status even though node status report is infrequent")
 			// This check on node status is only meaningful when this e2e test is
@@ -128,22 +145,12 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 	})
 })
 
-func getNextReadyConditionHeartbeatTime(clientSet clientset.Interface, nodeName string, prevHeartbeatTime metav1.Time) metav1.Time {
-	var newHeartbeatTime metav1.Time
-	Eventually(func() error {
-		node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
-		Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
-		newHeartbeatTime = readyCondition.LastHeartbeatTime
-		if prevHeartbeatTime.Before(&newHeartbeatTime) {
-			return nil
-		}
-		return fmt.Errorf("heartbeat has not changed yet")
-	}, 5*time.Minute, 5*time.Second).Should(BeNil())
-	return newHeartbeatTime
+func getReadyConditionHeartbeatTime(clientSet clientset.Interface, nodeName string) time.Time {
+	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	Expect(err).To(BeNil())
+	_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
+	Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
+	return readyCondition.LastHeartbeatTime.Time
 }
 
 func expectLease(lease *coordv1beta1.Lease, nodeName string) error {

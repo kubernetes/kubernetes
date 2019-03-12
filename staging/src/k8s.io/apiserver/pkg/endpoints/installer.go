@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -133,6 +134,20 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
+// calculate the storage gvk, the gvk objects are converted to before persisted to the etcd.
+func getStorageVersionKind(storageVersioner runtime.GroupVersioner, storage rest.Storage, typer runtime.ObjectTyper) (schema.GroupVersionKind, error) {
+	object := storage.New()
+	fqKinds, _, err := typer.ObjectKinds(object)
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
+	gvk, ok := storageVersioner.KindForGroupVersionKinds(fqKinds)
+	if !ok {
+		return schema.GroupVersionKind{}, fmt.Errorf("cannot find the storage version kind for %v", reflect.TypeOf(object))
+	}
+	return gvk, nil
+}
+
 // GetResourceKind returns the external group version kind registered for the given storage
 // object. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
@@ -227,6 +242,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	watcher, isWatcher := storage.(rest.Watcher)
 	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
+	storageVersionProvider, isStorageVersionProvider := storage.(rest.StorageVersionProvider)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
@@ -365,6 +381,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	tableProvider, _ := storage.(rest.TableConvertor)
 
 	var apiResource metav1.APIResource
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
+		isStorageVersionProvider &&
+		storageVersionProvider.StorageVersion() != nil {
+		versioner := storageVersionProvider.StorageVersion()
+		gvk, err := getStorageVersionKind(versioner, storage, a.group.Typer)
+		if err != nil {
+			return nil, err
+		}
+		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
+	}
+
 	// Get the list of actions for the given scope.
 	switch {
 	case !namespaceScoped:

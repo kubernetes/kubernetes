@@ -413,6 +413,14 @@ if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
 fi
 
+if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
+fi
+
+if [[ -n "${POD_LOG_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_SIZE"
+fi
+
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.2.0"
