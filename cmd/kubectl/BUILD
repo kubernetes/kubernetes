@@ -20,6 +20,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//pkg/kubectl/cmd:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",

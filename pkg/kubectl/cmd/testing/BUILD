@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake.go",
+        "treadsafebuffer.go",
         "util.go",
         "zz_generated.deepcopy.go",
     ],
