@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,17 +40,22 @@ const (
 	testAPIVersion = "testgroup/testversion"
 )
 
-func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
+func newUnstructuredWithRV(apiVersion, kind, namespace, name string, rv string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": apiVersion,
 			"kind":       kind,
 			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
+				"namespace":       namespace,
+				"name":            name,
+				"resourceVersion": rv,
 			},
 		},
 	}
+}
+
+func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
+	return newUnstructuredWithRV(apiVersion, kind, namespace, name, "1")
 }
 
 func newUnstructuredWithSpec(spec map[string]interface{}) *unstructured.Unstructured {
@@ -61,25 +67,82 @@ func newUnstructuredWithSpec(spec map[string]interface{}) *unstructured.Unstruct
 func TestList(t *testing.T) {
 	scheme := runtime.NewScheme()
 
-	client := NewSimpleDynamicClient(scheme,
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
-		newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
-		newUnstructured("group2/version", "TheKind", "ns-foo", "name2-baz"),
-	)
-	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
+	tt := []struct {
+		name     string
+		objs     []runtime.Object
+		expected *metav1unstructured.UnstructuredList
+	}{
+		{
+			name: "unstructured input",
+			objs: []runtime.Object{
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo", "42"),
+				newUnstructuredWithRV("group2/version", "TheKind", "ns-foo", "name2-foo", "6"),
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-bar", "1"),
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-baz", "2"),
+				newUnstructuredWithRV("group2/version", "TheKind", "ns-foo", "name2-baz", "1"),
+			},
+			expected: &metav1unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"resourceVersion": "42",
+					},
+				},
+				Items: []metav1unstructured.Unstructured{
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo", "42"),
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-bar", "1"),
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-baz", "2"),
+				},
+			},
+		},
+		{
+			name: "unstructured input RV test",
+			objs: []runtime.Object{
+				newUnstructuredWithRV("group2/version", "TheKind", "ns-foo", "name2-foo1", "99"),
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo1", "1"),
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo3", "3"),
+				newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo2", "2"),
+				newUnstructuredWithRV("group2/version", "TheKind", "ns-foo", "name2-foo2", "100"),
+			},
+			expected: &metav1unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"resourceVersion": "3",
+					},
+				},
+				Items: []metav1unstructured.Unstructured{
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo1", "1"),
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo3", "3"),
+					*newUnstructuredWithRV("group/version", "TheKind", "ns-foo", "name-foo2", "2"),
+				},
+			},
+		},
+		{
+			name: "RV is set even with empty list",
+			objs: []runtime.Object{},
+			expected: &metav1unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						// We use RV "1" to simulate any RV in the real word but " " and "0" which are reserved values
+						"resourceVersion": "1",
+					},
+				},
+				Items: []metav1unstructured.Unstructured{},
+			},
+		},
 	}
 
-	expected := []unstructured.Unstructured{
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
-	}
-	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
-		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			client := NewSimpleDynamicClient(scheme, tc.objs...)
+			list, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !equality.Semantic.DeepEqual(tc.expected, list) {
+				t.Errorf("\nexpected: %#v\ngot:      %#v\ndiff: %s", tc.expected, list, diff.ObjectReflectDiff(tc.expected, list))
+			}
+		})
 	}
 }
 
