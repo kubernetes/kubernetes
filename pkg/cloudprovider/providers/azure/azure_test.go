@@ -1137,6 +1137,13 @@ func getInternalTestService(identifier string, requestedPorts ...int32) v1.Servi
 	return svc
 }
 
+func getResourceGroupTestService(identifier, resourceGroup, loadBalancerIP string, requestedPorts ...int32) v1.Service {
+	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
+	svc.Spec.LoadBalancerIP = loadBalancerIP
+	svc.Annotations[ServiceAnnotationLoadBalancerResourceGroup] = resourceGroup
+	return svc
+}
+
 func setLoadBalancerModeAnnotation(service *v1.Service, lbMode string) {
 	service.Annotations[ServiceAnnotationLoadBalancerMode] = lbMode
 }
