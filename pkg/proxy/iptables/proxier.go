@@ -754,7 +754,7 @@ func (proxier *Proxier) syncProxyRules() {
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
 		"-m", "mark", "--mark", proxier.masqueradeMark,
-		"-j", "MASQUERADE",
+		"-j", "SNAT", "--to-source", proxier.nodeIP.String(),
 	}...)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
