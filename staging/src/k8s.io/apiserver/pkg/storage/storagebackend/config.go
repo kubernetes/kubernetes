@@ -57,6 +57,11 @@ type Config struct {
 	Paging bool
 
 	Codec runtime.Codec
+	// EncodeVersioner is the same groupVersioner used to build the
+	// storage encoder. Given a list of kinds the input object might belong
+	// to, the EncodeVersioner outputs the gvk the object will be
+	// converted to before persisted in etcd.
+	EncodeVersioner runtime.GroupVersioner
 	// Transformer allows the value to be transformed prior to persisting into etcd.
 	Transformer value.Transformer
 

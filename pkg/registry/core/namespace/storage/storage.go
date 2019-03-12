@@ -226,6 +226,12 @@ func (r *REST) ShortNames() []string {
 	return []string{"ns"}
 }
 
+var _ rest.StorageVersionProvider = &REST{}
+
+func (r *REST) StorageVersion() runtime.GroupVersioner {
+	return r.store.StorageVersion()
+}
+
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
