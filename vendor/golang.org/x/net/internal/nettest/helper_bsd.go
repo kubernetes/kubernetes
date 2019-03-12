@@ -8,27 +8,7 @@ package nettest
 
 import (
 	"runtime"
-	"strconv"
-	"strings"
-	"syscall"
 )
-
-var darwinVersion int
-
-func init() {
-	if runtime.GOOS == "darwin" {
-		// See http://support.apple.com/kb/HT1633.
-		s, err := syscall.Sysctl("kern.osrelease")
-		if err != nil {
-			return
-		}
-		ss := strings.Split(s, ".")
-		if len(ss) == 0 {
-			return
-		}
-		darwinVersion, _ = strconv.Atoi(ss[0])
-	}
-}
 
 func supportsIPv6MulticastDeliveryOnLoopback() bool {
 	switch runtime.GOOS {
@@ -38,16 +18,7 @@ func supportsIPv6MulticastDeliveryOnLoopback() bool {
 		// kernels don't deliver link-local scoped multicast
 		// packets correctly.
 		return false
-	case "darwin":
-		return !causesIPv6Crash()
 	default:
 		return true
 	}
-}
-
-func causesIPv6Crash() bool {
-	// We see some kernel crash when running IPv6 with IP-level
-	// options on Darwin kernel version 12 or below.
-	// See golang.org/issues/17015.
-	return darwinVersion < 13
 }

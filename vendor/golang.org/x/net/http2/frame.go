@@ -1477,7 +1477,7 @@ func (fr *Framer) maxHeaderStringLen() int {
 }
 
 // readMetaFrame returns 0 or more CONTINUATION frames from fr and
-// merge them into into the provided hf and returns a MetaHeadersFrame
+// merge them into the provided hf and returns a MetaHeadersFrame
 // with the decoded hpack values.
 func (fr *Framer) readMetaFrame(hf *HeadersFrame) (*MetaHeadersFrame, error) {
 	if fr.AllowIllegalReads {

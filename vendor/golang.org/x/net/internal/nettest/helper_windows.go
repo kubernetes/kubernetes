@@ -36,7 +36,3 @@ func supportsRawIPSocket() (string, bool) {
 func supportsIPv6MulticastDeliveryOnLoopback() bool {
 	return true
 }
-
-func causesIPv6Crash() bool {
-	return false
-}

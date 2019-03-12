@@ -23,10 +23,6 @@ func supportsIPv6MulticastDeliveryOnLoopback() bool {
 	return false
 }
 
-func causesIPv6Crash() bool {
-	return false
-}
-
 func protocolNotSupported(err error) bool {
 	return false
 }
