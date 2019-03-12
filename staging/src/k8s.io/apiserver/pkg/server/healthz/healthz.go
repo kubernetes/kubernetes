@@ -168,7 +168,7 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
 				klog.V(4).Infof("healthz check %v failed: %v", check.Name(), err)
-				fmt.Fprintf(&verboseOut, "[-]%v failed: reason withheld\n", check.Name())
+				fmt.Fprintf(&verboseOut, "[-]%v failed: reason NOT withheld: %v\n", check.Name(), err)
 				failed = true
 			} else {
 				fmt.Fprintf(&verboseOut, "[+]%v ok\n", check.Name())
