@@ -35,6 +35,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,11 +53,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -719,6 +722,24 @@ func (nc *Controller) monitorNodeHealth() error {
 			}
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
+					// If useTaintBasedEvictions is true, we would not evict pods
+					// But we still want to mark Pod.Status.Reason as "NodeLost"
+					selector := fields.OneTermEqualSelector(core.PodHostField, node.Name).String()
+					options := metav1.ListOptions{FieldSelector: selector}
+					pods, err := nc.kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(options)
+					if err != nil {
+						return err
+					}
+					for _, pod := range pods.Items {
+						// Defensive check
+						if pod.Spec.NodeName != node.Name {
+							continue
+						}
+						if _, err = nodeutil.SetPodTerminationReason(nc.kubeClient, &pod, node.Name); err != nil {
+							fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err)
+						}
+					}
+
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
 					if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
