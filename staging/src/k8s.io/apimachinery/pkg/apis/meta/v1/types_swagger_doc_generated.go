@@ -294,8 +294,9 @@ func (PatchOptions) SwaggerDoc() map[string]string {
 }
 
 var map_Preconditions = map[string]string{
-	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
-	"uid": "Specifies the target UID.",
+	"":                "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid":             "Specifies the target UID.",
+	"resourceVersion": "Specifies the target ResourceVersion",
 }
 
 func (Preconditions) SwaggerDoc() map[string]string {
