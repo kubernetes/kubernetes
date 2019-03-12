@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -434,11 +434,19 @@ type chaosMonkeyAdapter struct {
 
 func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 	start := time.Now()
-	var once sync.Once
+
+	// Using an atomic with a CAS is a potential workaround for #74890.
+	//
+	// This is a speculative workaround - we are really seeing if
+	// this is better; if not we should revert.
+	//
+	// If it is better we should file a bug against go 1.12, and
+	// then revert!
+	var onceWithoutMutex uint32
 	ready := func() {
-		once.Do(func() {
+		if atomic.CompareAndSwapUint32(&onceWithoutMutex, 0, 1) {
 			sem.Ready()
-		})
+		}
 	}
 	defer finalizeUpgradeTest(start, cma.testReport)
 	defer ready()
