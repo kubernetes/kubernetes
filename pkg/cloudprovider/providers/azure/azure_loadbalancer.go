@@ -711,10 +711,11 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				BackendAddressPool: &network.SubResource{
 					ID: to.StringPtr(lbBackendPoolID),
 				},
-				LoadDistribution: loadDistribution,
-				FrontendPort:     to.Int32Ptr(port.Port),
-				BackendPort:      to.Int32Ptr(port.Port),
-				EnableFloatingIP: to.BoolPtr(true),
+				LoadDistribution:    loadDistribution,
+				FrontendPort:        to.Int32Ptr(port.Port),
+				BackendPort:         to.Int32Ptr(port.Port),
+				EnableFloatingIP:    to.BoolPtr(true),
+				DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 			},
 		}
 		if port.Protocol == v1.ProtocolTCP {
