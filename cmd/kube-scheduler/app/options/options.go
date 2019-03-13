@@ -23,11 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
-
 	corev1 "k8s.io/api/core/v1"
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -41,10 +37,14 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	cliflag "k8s.io/component-base/cli/flag"
+	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/klog"
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/master/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -56,7 +56,7 @@ type Options struct {
 	// The default values. These are overridden if ConfigFile is set or by values in InsecureServing.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
-	SecureServing           *apiserveroptions.SecureServingOptions
+	SecureServing           *apiserveroptions.SecureServingOptionsWithLoopback
 	CombinedInsecureServing *CombinedInsecureServingOptions
 	Authentication          *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization           *apiserveroptions.DelegatingAuthorizationOptions
@@ -85,24 +85,34 @@ func NewOptions() (*Options, error) {
 
 	o := &Options{
 		ComponentConfig: *cfg,
-		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
+		SecureServing:   apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
-			Healthz: &apiserveroptions.DeprecatedInsecureServingOptions{
+			Healthz: (&apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
-			},
-			Metrics: &apiserveroptions.DeprecatedInsecureServingOptions{
+			}).WithLoopback(),
+			Metrics: (&apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
-			},
+			}).WithLoopback(),
 			BindPort:    hport,
 			BindAddress: hhost,
 		},
-		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
 			UseLegacyPolicyConfig:    false,
 			PolicyConfigMapNamespace: metav1.NamespaceSystem,
 		},
 	}
+
+	o.Authentication.TolerateInClusterLookupFailure = true
+	o.Authentication.RemoteKubeConfigFileOptional = true
+	o.Authorization.RemoteKubeConfigFileOptional = true
+	o.Authorization.AlwaysAllowPaths = []string{"/healthz"}
+
+	// Set the PairName but leave certificate directory blank to generate in-memory by default
+	o.SecureServing.ServerCert.CertDirectory = ""
+	o.SecureServing.ServerCert.PairName = "kube-scheduler"
+	o.SecureServing.BindPort = ports.KubeSchedulerPort
 
 	return o, nil
 }
@@ -129,20 +139,23 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 	return &cfg, nil
 }
 
-// AddFlags adds flags for the scheduler options.
-func (o *Options) AddFlags(fs *pflag.FlagSet) {
+// Flags returns flags for a specific scheduler by section name
+func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
+	fs := nfs.FlagSet("misc")
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file. Flags override values in this file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
-	o.SecureServing.AddFlags(fs)
-	o.CombinedInsecureServing.AddFlags(fs)
-	o.Authentication.AddFlags(fs)
-	o.Authorization.AddFlags(fs)
-	o.Deprecated.AddFlags(fs, &o.ComponentConfig)
+	o.SecureServing.AddFlags(nfs.FlagSet("secure serving"))
+	o.CombinedInsecureServing.AddFlags(nfs.FlagSet("insecure serving"))
+	o.Authentication.AddFlags(nfs.FlagSet("authentication"))
+	o.Authorization.AddFlags(nfs.FlagSet("authorization"))
+	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"), &o.ComponentConfig)
 
-	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, fs)
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
+	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
+
+	return nfs
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
@@ -173,13 +186,19 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 
-	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
+	if o.SecureServing != nil && (o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil) {
+		if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+			return err
+		}
+		if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
+			return err
+		}
 	}
-	return o.Authorization.ApplyTo(&c.Authorization)
+
+	return nil
 }
 
 // Validate validates all the required options.
@@ -200,6 +219,12 @@ func (o *Options) Validate() []error {
 
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
+	if o.SecureServing != nil {
+		if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+			return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
+		}
+	}
+
 	c := &schedulerappconfig.Config{}
 	if err := o.ApplyTo(c); err != nil {
 		return nil, err
@@ -249,6 +274,7 @@ func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElec
 		config.LockObjectNamespace,
 		config.LockObjectName,
 		client.CoreV1(),
+		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
@@ -262,14 +288,16 @@ func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElec
 		LeaseDuration: config.LeaseDuration.Duration,
 		RenewDeadline: config.RenewDeadline.Duration,
 		RetryPeriod:   config.RetryPeriod.Duration,
+		WatchDog:      leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
+		Name:          "kube-scheduler",
 	}, nil
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+		klog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig

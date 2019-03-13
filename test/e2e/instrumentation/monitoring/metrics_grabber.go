@@ -32,7 +32,7 @@ import (
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
 	var c, ec clientset.Interface
-	var grabber *metrics.MetricsGrabber
+	var grabber *metrics.Grabber
 	gin.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
@@ -44,7 +44,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	gin.It("should grab all metrics from API server.", func() {
 		gin.By("Connecting to /metrics endpoint")
-		response, err := grabber.GrabFromApiServer()
+		response, err := grabber.GrabFromAPIServer()
 		framework.ExpectNoError(err)
 		gom.Expect(response).NotTo(gom.BeEmpty())
 	})

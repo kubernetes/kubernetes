@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -69,11 +71,16 @@ func (c *podMetricses) Get(name string, options v1.GetOptions) (result *v1beta1.
 
 // List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
 func (c *podMetricses) List(opts v1.ListOptions) (result *v1beta1.PodMetricsList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1beta1.PodMetricsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -81,10 +88,15 @@ func (c *podMetricses) List(opts v1.ListOptions) (result *v1beta1.PodMetricsList
 
 // Watch returns a watch.Interface that watches the requested podMetricses.
 func (c *podMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }

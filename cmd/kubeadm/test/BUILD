@@ -13,10 +13,10 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
-        "//cmd/kubeadm/test/certs:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
+        "//vendor/github.com/lithammer/dedent:go_default_library",
     ],
 )
 
@@ -31,7 +31,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//cmd/kubeadm/test/certs:all-srcs",
         "//cmd/kubeadm/test/cmd:all-srcs",
         "//cmd/kubeadm/test/kubeconfig:all-srcs",
     ],

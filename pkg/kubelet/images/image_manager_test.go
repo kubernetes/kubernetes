@@ -151,7 +151,7 @@ func TestParallelPuller(t *testing.T) {
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
@@ -176,7 +176,7 @@ func TestSerializedPuller(t *testing.T) {
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}

@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - lavalamp
@@ -8,6 +10,7 @@ reviewers:
 - a-robinson
 - brendandburns
 - caesarxuchao
+- cheftako
 - cjcullen
 - dalanlan
 - david-mcmahon
@@ -60,6 +63,7 @@ reviewers:
 - smarterclayton
 - soltysh
 - spiffxp
+- stewart-yu
 - sttts
 - thockin
 - timothysc

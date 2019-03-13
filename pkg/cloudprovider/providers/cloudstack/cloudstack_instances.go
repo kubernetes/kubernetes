@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
 // NodeAddresses returns the addresses of the specified instance.
@@ -78,7 +78,7 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 	} else {
 		// Since there is no sane way to determine the external IP if the host isn't
 		// using static NAT, we will just fire a log message and omit the external IP.
-		glog.V(4).Infof("Could not determine the public IP of host %v (%v)", instance.Name, instance.Id)
+		klog.V(4).Infof("Could not determine the public IP of host %v (%v)", instance.Name, instance.Id)
 	}
 
 	return addresses, nil

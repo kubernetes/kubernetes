@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
@@ -70,8 +70,8 @@ func (ec *EstablishingController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ec.queue.ShutDown()
 
-	glog.Infof("Starting EstablishingController")
-	defer glog.Infof("Shutting down EstablishingController")
+	klog.Infof("Starting EstablishingController")
+	defer klog.Infof("Shutting down EstablishingController")
 
 	if !cache.WaitForCacheSync(stopCh, ec.crdSynced) {
 		return

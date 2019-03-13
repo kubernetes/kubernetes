@@ -24,7 +24,9 @@ import (
 
 type doNothingAdmission struct{}
 
-func (doNothingAdmission) Admit(a admission.Attributes) error { return nil }
+func (doNothingAdmission) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
 func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
 func (doNothingAdmission) Validate() error                    { return nil }
 
@@ -33,8 +35,8 @@ type WantsCloudConfigAdmissionPlugin struct {
 	cloudConfig []byte
 }
 
-func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
-	self.cloudConfig = cloudConfig
+func (p *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
+	p.cloudConfig = cloudConfig
 }
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {

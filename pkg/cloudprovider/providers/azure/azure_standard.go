@@ -26,17 +26,17 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	cloudprovider "k8s.io/cloud-provider"
-
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
 const (
@@ -70,7 +70,7 @@ func (az *Cloud) getStandardMachineID(resourceGroup, machineName string) string 
 	return fmt.Sprintf(
 		machineIDTemplate,
 		az.SubscriptionID,
-		resourceGroup,
+		strings.ToLower(resourceGroup),
 		machineName)
 }
 
@@ -84,13 +84,13 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 }
 
 // returns the full identifier of a loadbalancer frontendipconfiguration.
-func (az *Cloud) getFrontendIPConfigID(lbName, backendPoolName string) string {
+func (az *Cloud) getFrontendIPConfigID(lbName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
 		az.SubscriptionID,
 		az.ResourceGroup,
 		lbName,
-		backendPoolName)
+		fipConfigName)
 }
 
 // returns the full identifier of a loadbalancer backendpool.
@@ -223,12 +223,12 @@ func getBackendPoolName(clusterName string) string {
 	return clusterName
 }
 
-func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetName *string) string {
+func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32, subnetName *string) string {
 	prefix := az.getRulePrefix(service)
 	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d", prefix, port.Protocol, port.Port)
+		return fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
 	}
-	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, port.Protocol, port.Port)
+	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, protocol, port)
 }
 
 func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
@@ -294,10 +294,6 @@ outer:
 	return -1, fmt.Errorf("securityGroup priorities are exhausted")
 }
 
-func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
-	return az.vmSet.GetIPByNodeName(string(nodeName))
-}
-
 var polyTable = crc32.MakeTable(crc32.Koopman)
 
 //MakeCRC32 : convert string to CRC32 format
@@ -333,17 +329,24 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {
-			glog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
+			klog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
 			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name))
 			if err != nil {
-				glog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
+				klog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
 				return "", err
 			}
 		} else {
 			return "", err
 		}
 	}
-	return *machine.ID, nil
+
+	resourceID := *machine.ID
+	convertedResourceID, err := convertResourceGroupNameToLower(resourceID)
+	if err != nil {
+		klog.Errorf("convertResourceGroupNameToLower failed with error: %v", err)
+		return "", err
+	}
+	return convertedResourceID, nil
 }
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
@@ -381,7 +384,7 @@ func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.Nod
 func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
 	machine, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
-		glog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
+		klog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
 	}
 
@@ -433,7 +436,7 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
-		glog.Errorf("as.GetIPByNodeName(%s) failed: getPrimaryIPConfig(%v), err=%v", name, nic, err)
+		klog.Errorf("as.GetIPByNodeName(%s) failed: getPrimaryIPConfig(%v), err=%v", name, nic, err)
 		return "", "", err
 	}
 
@@ -460,9 +463,9 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 // getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
 func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
-	vms, err := as.VirtualMachineClientListWithRetry(as.ResourceGroup)
+	vms, err := as.ListVirtualMachines(as.ResourceGroup)
 	if err != nil {
-		glog.Errorf("as.getNodeAvailabilitySet - VirtualMachineClientListWithRetry failed, err=%v", err)
+		klog.Errorf("as.getNodeAvailabilitySet - ListVirtualMachines failed, err=%v", err)
 		return nil, err
 	}
 	vmNameToAvailabilitySetID := make(map[string]string, len(vms))
@@ -481,7 +484,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 		}
 		asID, ok := vmNameToAvailabilitySetID[nodeName]
 		if !ok {
-			glog.Errorf("as.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
+			klog.Errorf("as.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
 			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
 		}
 		if availabilitySetIDs.Has(asID) {
@@ -490,7 +493,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 		}
 		asName, err := getLastSegment(asID)
 		if err != nil {
-			glog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
+			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
 		}
 		// AvailabilitySet ID is currently upper cased in a indeterministic way
@@ -516,11 +519,11 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 	}
 	availabilitySetNames, err = as.getAgentPoolAvailabiliySets(nodes)
 	if err != nil {
-		glog.Errorf("as.GetVMSetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
+		klog.Errorf("as.GetVMSetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
 		return nil, err
 	}
 	if len(*availabilitySetNames) == 0 {
-		glog.Errorf("as.GetVMSetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
+		klog.Errorf("as.GetVMSetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
 		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
 	}
 	// sort the list to have deterministic selection
@@ -540,7 +543,7 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 				}
 			}
 			if !found {
-				glog.Errorf("as.GetVMSetNames - Availability set (%s) in service annotation not found", serviceAvailabilitySetNames[sasx])
+				klog.Errorf("as.GetVMSetNames - Availability set (%s) in service annotation not found", serviceAvailabilitySetNames[sasx])
 				return nil, fmt.Errorf("availability set (%s) - not found", serviceAvailabilitySetNames[sasx])
 			}
 		}
@@ -581,7 +584,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
 	if err != nil {
-		glog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
+		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
 	}
 
@@ -608,7 +611,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 	if vmSetName != "" && !as.useStandardLoadBalancer() {
 		expectedAvailabilitySetName := as.getAvailabilitySetID(nodeResourceGroup, vmSetName)
 		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
-			glog.V(3).Infof(
+			klog.V(3).Infof(
 				"GetPrimaryInterface: nic (%s) is not in the availabilitySet(%s)", nicName, vmSetName)
 			return network.Interface{}, errNotInVMSet
 		}
@@ -637,16 +640,16 @@ func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.
 	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
-			glog.V(3).Infof("ensureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
+			klog.V(3).Infof("ensureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
 			return nil
 		}
 
-		glog.Errorf("error: az.ensureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
+		klog.Errorf("error: az.ensureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
 		return err
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
-		glog.V(3).Infof("ensureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
+		klog.V(3).Infof("ensureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
 		return nil
 	}
 
@@ -679,7 +682,7 @@ func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.
 				if len(matches) == 2 {
 					lbName := matches[1]
 					if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
-						glog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, lbName)
+						klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, lbName)
 						return nil
 					}
 				}
@@ -694,19 +697,8 @@ func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.
 		primaryIPConfig.LoadBalancerBackendAddressPools = &newBackendPools
 
 		nicName := *nic.Name
-		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-		resp, err := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, *nic.Name, nic)
-		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): end", *nic.Name)
-		if as.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
-			retryErr := as.CreateOrUpdateInterfaceWithRetry(service, nic)
-			if retryErr != nil {
-				err = retryErr
-				glog.V(2).Infof("nicupdate(%s) abort backoff: nic(%s) - updating", serviceName, nicName)
-			}
-		}
+		klog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
+		err := as.CreateOrUpdateInterface(service, nic)
 		if err != nil {
 			return err
 		}
@@ -721,12 +713,12 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 	for _, node := range nodes {
 		localNodeName := node.Name
 		if as.useStandardLoadBalancer() && as.excludeMasterNodesFromStandardLB() && isMasterNode(node) {
-			glog.V(4).Infof("Excluding master node %q from load balancer backendpool %q", localNodeName, backendPoolID)
+			klog.V(4).Infof("Excluding master node %q from load balancer backendpool %q", localNodeName, backendPoolID)
 			continue
 		}
 
 		if as.ShouldNodeExcludedFromLoadBalancer(node) {
-			glog.V(4).Infof("Excluding unmanaged/external-resource-group node %q", localNodeName)
+			klog.V(4).Infof("Excluding unmanaged/external-resource-group node %q", localNodeName)
 			continue
 		}
 

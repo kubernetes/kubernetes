@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
@@ -83,7 +83,7 @@ func RunKubelet() {
 	defer e.Stop()
 	e.kubelet, err = e.startKubelet()
 	if err != nil {
-		glog.Fatalf("Failed to start kubelet: %v", err)
+		klog.Fatalf("Failed to start kubelet: %v", err)
 	}
 	// Wait until receiving a termination signal.
 	waitForTerminationSignal()
@@ -105,10 +105,10 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, fmt.Errorf("the --hyperkube-image option must be set")
 	}
 
-	glog.Info("Starting kubelet")
+	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
+	utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -263,7 +263,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
 	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", utilflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
 		kc.FeatureGates = framework.TestContext.FeatureGates
 	}
 

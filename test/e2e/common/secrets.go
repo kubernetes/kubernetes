@@ -26,6 +26,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[sig-api-machinery] Secrets", func() {
@@ -124,6 +125,11 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
 		})
 	})
+
+	It("should fail to create secret in volume due to empty secret key", func() {
+		secret, err := createEmptyKeySecretForTest(f)
+		Expect(err).To(HaveOccurred(), "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+	})
 })
 
 func newEnvFromSecret(namespace, name string) *v1.Secret {
@@ -138,4 +144,19 @@ func newEnvFromSecret(namespace, name string) *v1.Secret {
 			"data_3": []byte("value-3\n"),
 		},
 	}
+}
+
+func createEmptyKeySecretForTest(f *framework.Framework) (*v1.Secret, error) {
+	secretName := "secret-emptyKey-test-" + string(uuid.NewUUID())
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			"": []byte("value-1\n"),
+		},
+	}
+	By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
+	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
 }

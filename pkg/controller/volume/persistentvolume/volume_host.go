@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 // VolumeHost interface implementation for PersistentVolumeController.
@@ -112,7 +112,7 @@ func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ s
 
 func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		glog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
+		klog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }
 
@@ -132,7 +132,7 @@ func (ctrl *PersistentVolumeController) GetEventRecorder() record.EventRecorder 
 	return ctrl.eventRecorder
 }
 
-func (ctrl *PersistentVolumeController) GetCSIClient() csiclientset.Interface {
-	// No volume plugin needs csi.storage.k8s.io client in PV controller.
+func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
+	// No volume plugin needs Subpaths in PV controller.
 	return nil
 }

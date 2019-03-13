@@ -39,10 +39,11 @@ func (b *Backend) Shutdown() {
 }
 
 // ProcessEvents calls a callback on a batch, if present.
-func (b *Backend) ProcessEvents(ev ...*auditinternal.Event) {
+func (b *Backend) ProcessEvents(ev ...*auditinternal.Event) bool {
 	if b.OnRequest != nil {
 		b.OnRequest(ev)
 	}
+	return true
 }
 
 func (b *Backend) String() string {

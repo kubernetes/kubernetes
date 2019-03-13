@@ -24,7 +24,7 @@ import (
 
 // ReplicaSetControllerOptions holds the ReplicaSetController options.
 type ReplicaSetControllerOptions struct {
-	ConcurrentRSSyncs int32
+	*kubectrlmgrconfig.ReplicaSetControllerConfiguration
 }
 
 // AddFlags adds flags related to ReplicaSetController for controller manager to the specified FlagSet.

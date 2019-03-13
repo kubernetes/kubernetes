@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -50,7 +50,7 @@ func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
 func extractVmssVMName(name string) (string, string, error) {
 	split := strings.SplitAfter(name, vmssNameSeparator)
 	if len(split) < 2 {
-		glog.V(3).Infof("Failed to extract vmssVMName %q", name)
+		klog.V(3).Infof("Failed to extract vmssVMName %q", name)
 		return "", "", ErrorNotVmssInstance
 	}
 
@@ -74,7 +74,7 @@ func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 		}
 
 		if !exists {
-			glog.V(2).Infof("Virtual machine scale set %q not found with message: %q", key, message)
+			klog.V(2).Infof("Virtual machine scale set %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -107,7 +107,7 @@ func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 
 				for _, vm := range vms {
 					if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
-						glog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
+						klog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
 						continue
 					}
 
@@ -132,7 +132,7 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 		}
 
 		for _, resourceGroup := range resourceGroups.List() {
-			vmList, err := ss.Cloud.VirtualMachineClientListWithRetry(resourceGroup)
+			vmList, err := ss.Cloud.ListVirtualMachines(resourceGroup)
 			if err != nil {
 				return nil, err
 			}
@@ -152,14 +152,14 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 
 func buildVmssCacheKey(resourceGroup, name string) string {
 	// key is composed of <resourceGroup>#<vmName>
-	return fmt.Sprintf("%s%s%s", resourceGroup, vmssCacheSeparator, name)
+	return fmt.Sprintf("%s%s%s", strings.ToLower(resourceGroup), vmssCacheSeparator, name)
 }
 
 func extractVmssCacheKey(key string) (string, string, error) {
 	// key is composed of <resourceGroup>#<vmName>
 	keyItems := strings.Split(key, vmssCacheSeparator)
 	if len(keyItems) != 2 {
-		return "", "", fmt.Errorf("key %q is not in format '<resouceGroup>#<vmName>'", key)
+		return "", "", fmt.Errorf("key %q is not in format '<resourceGroup>#<vmName>'", key)
 	}
 
 	resourceGroup := keyItems[0]
@@ -195,7 +195,7 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 		}
 
 		if !exists {
-			glog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
+			klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -210,7 +210,7 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 				return nil, realErr
 			}
 			if !exists {
-				glog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
+				klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
 				return nil, nil
 			}
 

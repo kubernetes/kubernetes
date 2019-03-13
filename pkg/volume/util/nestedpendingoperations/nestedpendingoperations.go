@@ -28,9 +28,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -240,7 +240,7 @@ func (grm *nestedPendingOperations) operationComplete(
 		if *err != nil {
 			// Log error
 			logOperationName := getOperationName(volumeName, podName)
-			glog.Errorf("operation %s failed with: %v",
+			klog.Errorf("operation %s failed with: %v",
 				logOperationName,
 				*err)
 		}
@@ -252,7 +252,7 @@ func (grm *nestedPendingOperations) operationComplete(
 	if getOpErr != nil {
 		// Failed to find existing operation
 		logOperationName := getOperationName(volumeName, podName)
-		glog.Errorf("Operation %s completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
+		klog.Errorf("Operation %s completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
 			logOperationName,
 			*err)
 		return
@@ -264,7 +264,7 @@ func (grm *nestedPendingOperations) operationComplete(
 	// Log error
 	operationName :=
 		getOperationName(volumeName, podName)
-	glog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
+	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
 		GenerateNoRetriesPermittedMsg(operationName))
 }
 

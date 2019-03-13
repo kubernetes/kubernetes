@@ -17,8 +17,10 @@ limitations under the License.
 package workflow
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 var myWorkflowRunner = NewRunner()
@@ -100,10 +102,10 @@ func ExampleRunner_Run() {
 
 	// Defines the method that creates the runtime data shared
 	// among all the phases included in the workflow
-	myWorkflowRunner.SetDataInitializer(func() (RunData, error) {
+	myWorkflowRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (RunData, error) {
 		return myWorkflowData{data: "some data"}, nil
 	})
 
-	// Runs the workflow
-	myWorkflowRunner.Run()
+	// Runs the workflow by passing a list of arguments
+	myWorkflowRunner.Run([]string{})
 }

@@ -25,7 +25,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/klog"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -77,6 +77,7 @@ type ServiceStorage interface {
 	rest.Watcher
 	rest.TableConvertor
 	rest.Exporter
+	rest.StorageVersionProvider
 }
 
 type EndpointsStorage interface {
@@ -108,10 +109,15 @@ func NewREST(
 }
 
 var (
-	_ ServiceStorage          = &REST{}
-	_ rest.CategoriesProvider = &REST{}
-	_ rest.ShortNamesProvider = &REST{}
+	_ ServiceStorage              = &REST{}
+	_ rest.CategoriesProvider     = &REST{}
+	_ rest.ShortNamesProvider     = &REST{}
+	_ rest.StorageVersionProvider = &REST{}
 )
+
+func (rs *REST) StorageVersion() runtime.GroupVersioner {
+	return rs.services.StorageVersion()
+}
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (rs *REST) ShortNames() []string {
@@ -306,7 +312,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	// Allocate a health check node port or attempt to reserve the user-specified one if provided.
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
-		glog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
+		klog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
 		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 			return false, errors.NewInternalError(err)
 		}
@@ -314,8 +320,8 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	// Case 2: Transition from needs HealthCheckNodePort to don't need HealthCheckNodePort.
 	// Free the existing healthCheckNodePort and clear the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && !needsHealthCheckNodePort:
-		glog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTrafficPolicy=Global")
-		glog.V(4).Infof("Releasing healthCheckNodePort: %d", oldHealthCheckNodePort)
+		klog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTrafficPolicy=Global")
+		klog.V(4).Infof("Releasing healthCheckNodePort: %d", oldHealthCheckNodePort)
 		nodePortOp.ReleaseDeferred(int(oldHealthCheckNodePort))
 		// Clear the HealthCheckNodePort field.
 		service.Spec.HealthCheckNodePort = 0
@@ -324,7 +330,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	// Reject changing the value of the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && needsHealthCheckNodePort:
 		if oldHealthCheckNodePort != newHealthCheckNodePort {
-			glog.Warningf("Attempt to change value of health check node port DENIED")
+			klog.Warningf("Attempt to change value of health check node port DENIED")
 			fldPath := field.NewPath("spec", "healthCheckNodePort")
 			el := field.ErrorList{field.Invalid(fldPath, newHealthCheckNodePort,
 				"cannot change healthCheckNodePort on loadBalancer service with externalTraffic=Local during update")}
@@ -337,6 +343,18 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
+		// Support create on update, if forced to.
+		if forceAllowCreate {
+			obj, err := objInfo.UpdatedObject(ctx, nil)
+			if err != nil {
+				return nil, false, err
+			}
+			createdObj, err := rs.Create(ctx, obj, createValidation, &metav1.CreateOptions{DryRun: options.DryRun})
+			if err != nil {
+				return nil, false, err
+			}
+			return createdObj, true, nil
+		}
 		return nil, false, err
 	}
 	oldService := oldObj.(*api.Service)
@@ -571,7 +589,7 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
 				healthCheckNodePort, err)
 		}
-		glog.V(4).Infof("Reserved user requested healthCheckNodePort: %d", healthCheckNodePort)
+		klog.V(4).Infof("Reserved user requested healthCheckNodePort: %d", healthCheckNodePort)
 	} else {
 		// If the request has no health check nodePort specified, allocate any.
 		healthCheckNodePort, err := nodePortOp.AllocateNext()
@@ -579,7 +597,7 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 			return fmt.Errorf("failed to allocate a HealthCheck NodePort %v: %v", healthCheckNodePort, err)
 		}
 		service.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
-		glog.V(4).Infof("Reserved allocated healthCheckNodePort: %d", healthCheckNodePort)
+		klog.V(4).Infof("Reserved allocated healthCheckNodePort: %d", healthCheckNodePort)
 	}
 	return nil
 }

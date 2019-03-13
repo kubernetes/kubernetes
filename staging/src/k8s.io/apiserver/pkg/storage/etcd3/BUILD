@@ -47,6 +47,7 @@ go_library(
         "errors.go",
         "event.go",
         "lease_manager.go",
+        "logger.go",
         "store.go",
         "watcher.go",
     ],
@@ -62,11 +63,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/trace:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 

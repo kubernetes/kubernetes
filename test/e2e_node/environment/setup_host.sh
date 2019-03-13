@@ -100,7 +100,7 @@ if [ $? -ne 0 ]; then
     sudo apt-get install lxc -y
     lxc-checkconfig
     sudo sed -i 's/GRUB_CMDLINE_LINUX="\(.*\)"/GRUB_CMDLINE_LINUX="\1 cgroup_enable=memory"/' /etc/default/grub
-    sudo update-grub  
+    sudo update-grub
   fi
 fi
 

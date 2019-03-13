@@ -4,7 +4,7 @@ args:
 - configmap
 namespace: "edit-test"
 expectedStderr:
-- edit cancelled, no objects found.
+- edit cancelled, no objects found
 expectedExitCode: 1
 steps:
 - type: request

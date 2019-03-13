@@ -26,11 +26,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/miekg/dns"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/ipconfig"
 	"k8s.io/utils/exec"
@@ -133,10 +133,10 @@ func tryConnect(service ServicePortPortalName, srcAddr net.Addr, protocol string
 		}
 		endpoint, err := proxier.loadBalancer.NextEndpoint(servicePortName, srcAddr, sessionAffinityReset)
 		if err != nil {
-			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
+			klog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
 		}
-		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
+		klog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
 		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
@@ -144,7 +144,7 @@ func tryConnect(service ServicePortPortalName, srcAddr net.Addr, protocol string
 			if isTooManyFDsError(err) {
 				panic("Dial failed: " + err.Error())
 			}
-			glog.Errorf("Dial failed: %v", err)
+			klog.Errorf("Dial failed: %v", err)
 			sessionAffinityReset = true
 			continue
 		}
@@ -173,13 +173,13 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 				// Then the service port was just closed so the accept failure is to be expected.
 				return
 			}
-			glog.Errorf("Accept failed: %v", err)
+			klog.Errorf("Accept failed: %v", err)
 			continue
 		}
-		glog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
+		klog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
 		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
 		if err != nil {
-			glog.Errorf("Failed to connect to balancer: %v", err)
+			klog.Errorf("Failed to connect to balancer: %v", err)
 			inConn.Close()
 			continue
 		}
@@ -192,7 +192,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 func proxyTCP(in, out *net.TCPConn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
-	glog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
+	klog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	go copyBytes("from backend", in, out, &wg)
 	go copyBytes("to backend", out, in, &wg)
@@ -201,14 +201,14 @@ func proxyTCP(in, out *net.TCPConn) {
 
 func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
 	defer wg.Done()
-	glog.V(4).Infof("Copying %s: %s -> %s", direction, src.RemoteAddr(), dest.RemoteAddr())
+	klog.V(4).Infof("Copying %s: %s -> %s", direction, src.RemoteAddr(), dest.RemoteAddr())
 	n, err := io.Copy(dest, src)
 	if err != nil {
 		if !isClosedError(err) {
-			glog.Errorf("I/O error: %v", err)
+			klog.Errorf("I/O error: %v", err)
 		}
 	}
-	glog.V(4).Infof("Copied %d bytes %s: %s -> %s", n, direction, src.RemoteAddr(), dest.RemoteAddr())
+	klog.V(4).Infof("Copied %d bytes %s: %s -> %s", n, direction, src.RemoteAddr(), dest.RemoteAddr())
 	dest.Close()
 	src.Close()
 }
@@ -283,7 +283,7 @@ func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) 
 	msg.Question[0].Name = origName
 
 	if err != nil {
-		glog.Warningf("Unable to pack DNS packet. Error is: %v", err)
+		klog.Warningf("Unable to pack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -310,7 +310,7 @@ func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int
 	mbuf, err := msg.PackBuffer(buffer)
 
 	if err != nil {
-		glog.Warningf("Unable to pack DNS packet. Error is: %v", err)
+		klog.Warningf("Unable to pack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -330,7 +330,7 @@ func processUnpackedDNSQueryPacket(
 	length int,
 	dnsSearch []string) int {
 	if dnsSearch == nil || len(dnsSearch) == 0 {
-		glog.V(1).Infof("DNS search list is not initialized and is empty.")
+		klog.V(1).Infof("DNS search list is not initialized and is empty.")
 		return length
 	}
 
@@ -348,13 +348,13 @@ func processUnpackedDNSQueryPacket(
 	state.msg.MsgHdr.Id = msg.MsgHdr.Id
 
 	if index < 0 || index >= int32(len(dnsSearch)) {
-		glog.V(1).Infof("Search index %d is out of range.", index)
+		klog.V(1).Infof("Search index %d is out of range.", index)
 		return length
 	}
 
 	length, err := appendDNSSuffix(msg, buffer, length, dnsSearch[index])
 	if err != nil {
-		glog.Errorf("Append DNS suffix failed: %v", err)
+		klog.Errorf("Append DNS suffix failed: %v", err)
 	}
 
 	return length
@@ -373,7 +373,7 @@ func processUnpackedDNSResponsePacket(
 	var drop bool
 	var err error
 	if dnsSearch == nil || len(dnsSearch) == 0 {
-		glog.V(1).Infof("DNS search list is not initialized and is empty.")
+		klog.V(1).Infof("DNS search list is not initialized and is empty.")
 		return drop, length
 	}
 
@@ -389,19 +389,19 @@ func processUnpackedDNSResponsePacket(
 			drop = true
 			length, err = appendDNSSuffix(state.msg, buffer, length, dnsSearch[index])
 			if err != nil {
-				glog.Errorf("Append DNS suffix failed: %v", err)
+				klog.Errorf("Append DNS suffix failed: %v", err)
 			}
 
 			_, err = svrConn.Write(buffer[0:length])
 			if err != nil {
 				if !logTimeout(err) {
-					glog.Errorf("Write failed: %v", err)
+					klog.Errorf("Write failed: %v", err)
 				}
 			}
 		} else {
 			length, err = recoverDNSQuestion(state.msg.Question[0].Name, msg, buffer, length)
 			if err != nil {
-				glog.Errorf("Recover DNS question failed: %v", err)
+				klog.Errorf("Recover DNS question failed: %v", err)
 			}
 
 			dnsClients.mu.Lock()
@@ -421,7 +421,7 @@ func processDNSQueryPacket(
 	dnsSearch []string) (int, error) {
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
-		glog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
+		klog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -432,14 +432,14 @@ func processDNSQueryPacket(
 
 	// QDCOUNT
 	if len(msg.Question) != 1 {
-		glog.V(1).Infof("Number of entries in the question section of the DNS packet is: %d", len(msg.Question))
-		glog.V(1).Infof("DNS suffix appending does not support more than one question.")
+		klog.V(1).Infof("Number of entries in the question section of the DNS packet is: %d", len(msg.Question))
+		klog.V(1).Infof("DNS suffix appending does not support more than one question.")
 		return length, nil
 	}
 
 	// ANCOUNT, NSCOUNT, ARCOUNT
 	if len(msg.Answer) != 0 || len(msg.Ns) != 0 || len(msg.Extra) != 0 {
-		glog.V(1).Infof("DNS packet contains more than question section.")
+		klog.V(1).Infof("DNS packet contains more than question section.")
 		return length, nil
 	}
 
@@ -448,7 +448,7 @@ func processDNSQueryPacket(
 	if packetRequiresDNSSuffix(dnsQType, dnsQClass) {
 		host, _, err := net.SplitHostPort(cliAddr.String())
 		if err != nil {
-			glog.V(1).Infof("Failed to get host from client address: %v", err)
+			klog.V(1).Infof("Failed to get host from client address: %v", err)
 			host = cliAddr.String()
 		}
 
@@ -468,7 +468,7 @@ func processDNSResponsePacket(
 	var drop bool
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
-		glog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
+		klog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
 		return drop, length, err
 	}
 
@@ -479,7 +479,7 @@ func processDNSResponsePacket(
 
 	// QDCOUNT
 	if len(msg.Question) != 1 {
-		glog.V(1).Infof("Number of entries in the response section of the DNS packet is: %d", len(msg.Answer))
+		klog.V(1).Infof("Number of entries in the response section of the DNS packet is: %d", len(msg.Answer))
 		return drop, length, nil
 	}
 
@@ -488,7 +488,7 @@ func processDNSResponsePacket(
 	if packetRequiresDNSSuffix(dnsQType, dnsQClass) {
 		host, _, err := net.SplitHostPort(cliAddr.String())
 		if err != nil {
-			glog.V(1).Infof("Failed to get host from client address: %v", err)
+			klog.V(1).Infof("Failed to get host from client address: %v", err)
 			host = cliAddr.String()
 		}
 
@@ -525,11 +525,11 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 		if err != nil {
 			if e, ok := err.(net.Error); ok {
 				if e.Temporary() {
-					glog.V(1).Infof("ReadFrom had a temporary failure: %v", err)
+					klog.V(1).Infof("ReadFrom had a temporary failure: %v", err)
 					continue
 				}
 			}
-			glog.Errorf("ReadFrom failed, exiting ProxyLoop: %v", err)
+			klog.Errorf("ReadFrom failed, exiting ProxyLoop: %v", err)
 			break
 		}
 
@@ -537,7 +537,7 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 		if isDNSService(service.Port) {
 			n, err = processDNSQueryPacket(myInfo.dnsClients, cliAddr, buffer[:], n, dnsSearch)
 			if err != nil {
-				glog.Errorf("Process DNS query packet failed: %v", err)
+				klog.Errorf("Process DNS query packet failed: %v", err)
 			}
 		}
 
@@ -551,14 +551,14 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 		_, err = svrConn.Write(buffer[0:n])
 		if err != nil {
 			if !logTimeout(err) {
-				glog.Errorf("Write failed: %v", err)
+				klog.Errorf("Write failed: %v", err)
 				// TODO: Maybe tear down the goroutine for this client/server pair?
 			}
 			continue
 		}
 		err = svrConn.SetDeadline(time.Now().Add(myInfo.timeout))
 		if err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
+			klog.Errorf("SetDeadline failed: %v", err)
 			continue
 		}
 	}
@@ -572,14 +572,14 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, dnsClients
 	if !found {
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
-		glog.V(3).Infof("New UDP connection from %s", cliAddr)
+		klog.V(3).Infof("New UDP connection from %s", cliAddr)
 		var err error
 		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
 		if err != nil {
 			return nil, err
 		}
 		if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
+			klog.Errorf("SetDeadline failed: %v", err)
 			return nil, err
 		}
 		activeClients.clients[cliAddr.String()] = svrConn
@@ -600,7 +600,7 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 		n, err := svrConn.Read(buffer[0:])
 		if err != nil {
 			if !logTimeout(err) {
-				glog.Errorf("Read failed: %v", err)
+				klog.Errorf("Read failed: %v", err)
 			}
 			break
 		}
@@ -609,20 +609,20 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 		if isDNSService(service.Port) {
 			drop, n, err = processDNSResponsePacket(svrConn, dnsClients, cliAddr, buffer[:], n, dnsSearch)
 			if err != nil {
-				glog.Errorf("Process DNS response packet failed: %v", err)
+				klog.Errorf("Process DNS response packet failed: %v", err)
 			}
 		}
 
 		if !drop {
 			err = svrConn.SetDeadline(time.Now().Add(timeout))
 			if err != nil {
-				glog.Errorf("SetDeadline failed: %v", err)
+				klog.Errorf("SetDeadline failed: %v", err)
 				break
 			}
 			n, err = udp.WriteTo(buffer[0:n], cliAddr)
 			if err != nil {
 				if !logTimeout(err) {
-					glog.Errorf("WriteTo failed: %v", err)
+					klog.Errorf("WriteTo failed: %v", err)
 				}
 				break
 			}

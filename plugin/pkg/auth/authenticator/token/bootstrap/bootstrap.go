@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -62,7 +62,7 @@ type TokenAuthenticator struct {
 //
 func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 	format = fmt.Sprintf("Bootstrap secret %s/%s matching bearer token ", s.Namespace, s.Name) + format
-	glog.V(3).Infof(format, i...)
+	klog.V(3).Infof(format, i...)
 }
 
 // AuthenticateToken tries to match the provided token to a bootstrap token secret
@@ -102,7 +102,7 @@ func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string
 	secret, err := t.lister.Get(secretName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			glog.V(3).Infof("No secret of name %s to match bootstrap bearer token", secretName)
+			klog.V(3).Infof("No secret of name %s to match bootstrap bearer token", secretName)
 			return nil, false, nil
 		}
 		return nil, false, err
@@ -170,12 +170,12 @@ func isSecretExpired(secret *corev1.Secret) bool {
 	if len(expiration) > 0 {
 		expTime, err2 := time.Parse(time.RFC3339, expiration)
 		if err2 != nil {
-			glog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
+			klog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
 				expiration, secret.Namespace, secret.Name, err2)
 			return true
 		}
 		if time.Now().After(expTime) {
-			glog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
+			klog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
 				secret.Namespace, secret.Name, expiration)
 			return true
 		}

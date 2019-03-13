@@ -40,6 +40,7 @@ message APIService {
   optional APIServiceStatus status = 3;
 }
 
+// APIServiceCondition describes the state of an APIService at a particular point
 message APIServiceCondition {
   // Type is the type of the condition.
   optional string type = 1;

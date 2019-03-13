@@ -2,8 +2,9 @@ package matchers
 
 import (
 	"fmt"
-	"github.com/onsi/gomega/format"
 	"time"
+
+	"github.com/onsi/gomega/format"
 )
 
 type BeTemporallyMatcher struct {

@@ -14,7 +14,6 @@ go_library(
     deps = [
         "//vendor/github.com/Rican7/retry:go_default_library",
         "//vendor/github.com/Rican7/retry/strategy:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",
         "//vendor/github.com/google/cadvisor/container/libcontainer:go_default_library",
@@ -29,6 +28,7 @@ go_library(
         "//vendor/github.com/mesos/mesos-go/api/v1/lib/httpcli:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

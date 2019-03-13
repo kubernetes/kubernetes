@@ -37,9 +37,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
@@ -132,14 +132,14 @@ func loadTestProfiles() error {
 	// apparmor_parser does not always return an error code, so consider any stderr output an error.
 	if err != nil || stderr.Len() > 0 {
 		if stderr.Len() > 0 {
-			glog.Warning(stderr.String())
+			klog.Warning(stderr.String())
 		}
 		if len(out) > 0 {
-			glog.Infof("apparmor_parser: %s", out)
+			klog.Infof("apparmor_parser: %s", out)
 		}
 		return fmt.Errorf("failed to load profiles: %v", err)
 	}
-	glog.V(2).Infof("Loaded profiles: %v", out)
+	klog.V(2).Infof("Loaded profiles: %v", out)
 	return nil
 }
 
@@ -211,7 +211,7 @@ func isAppArmorEnabled() bool {
 		if len(matches) == 2 {
 			version, err := strconv.Atoi(matches[1])
 			if err != nil {
-				glog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
+				klog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
 				return false
 			}
 			return version >= 54

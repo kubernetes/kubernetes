@@ -45,7 +45,7 @@ import (
 )
 
 const (
-	topPathPrefix           = baseMetricsAddress + "/" + metricsApiVersion
+	topPathPrefix           = baseMetricsAddress + "/" + metricsAPIVersion
 	topMetricsAPIPathPrefix = "/apis/metrics.k8s.io/v1beta1"
 	apibody                 = `{
 	"kind": "APIVersions",
@@ -405,8 +405,14 @@ func (d *fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 }
 
 // ServerResources returns the supported resources for all groups and versions.
+// Deprecated: use ServerGroupsAndResources instead.
 func (d *fakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
+}
+
+// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
+func (d *fakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return nil, nil, nil
 }
 
 // ServerPreferredResources returns the supported resources with the version preferred by the
@@ -440,7 +446,7 @@ func (d *fakeDiscovery) RESTClient() restclient.Interface {
 func TestTopPodCustomDefaults(t *testing.T) {
 	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
 	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
-	customTopPathPrefix := customBaseMetricsAddress + "/" + metricsApiVersion
+	customTopPathPrefix := customBaseMetricsAddress + "/" + metricsAPIVersion
 
 	testNS := "custom-namespace"
 	testCases := []struct {

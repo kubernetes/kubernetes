@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/glog"
 	"google.golang.org/api/container/v1"
+	"k8s.io/klog"
 )
 
 func newClustersMetricContext(request, zone string) *metricContext {
@@ -97,7 +97,7 @@ func (g *Cloud) getClustersInLocation(zoneOrRegion string) ([]*container.Cluster
 		return nil, mc.Observe(err)
 	}
 	if list.Header.Get("nextPageToken") != "" {
-		glog.Errorf("Failed to get all clusters for request, received next page token %s", list.Header.Get("nextPageToken"))
+		klog.Errorf("Failed to get all clusters for request, received next page token %s", list.Header.Get("nextPageToken"))
 	}
 
 	return list.Clusters, mc.Observe(nil)

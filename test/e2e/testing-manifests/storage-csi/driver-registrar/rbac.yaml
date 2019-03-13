@@ -11,7 +11,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-driver-registrar
+  name: csi-node-sa
   # replace with non-default namespace name
   namespace: default
 
@@ -42,7 +42,7 @@ metadata:
   name: csi-driver-registrar-role
 subjects:
   - kind: ServiceAccount
-    name: csi-driver-registrar
+    name: csi-node-sa
     # replace with non-default namespace name
     namespace: default
 roleRef:

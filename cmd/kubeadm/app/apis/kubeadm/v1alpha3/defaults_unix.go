@@ -21,8 +21,4 @@ package v1alpha3
 const (
 	// DefaultCACertPath defines default location of CA certificate on Linux
 	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
-	// DefaultUrlScheme defines default socket url prefix
-	DefaultUrlScheme = "unix"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "/var/run/dockershim.sock"
 )

@@ -9,6 +9,7 @@ http://onsi.github.io/gomega/
 package matchers
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 )
@@ -53,9 +54,8 @@ func toInteger(a interface{}) int64 {
 		return int64(reflect.ValueOf(a).Uint())
 	} else if isFloat(a) {
 		return int64(reflect.ValueOf(a).Float())
-	} else {
-		panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 	}
+	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
 func toUnsignedInteger(a interface{}) uint64 {
@@ -65,9 +65,8 @@ func toUnsignedInteger(a interface{}) uint64 {
 		return reflect.ValueOf(a).Uint()
 	} else if isFloat(a) {
 		return uint64(reflect.ValueOf(a).Float())
-	} else {
-		panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 	}
+	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
 func toFloat(a interface{}) float64 {
@@ -77,9 +76,8 @@ func toFloat(a interface{}) float64 {
 		return float64(reflect.ValueOf(a).Uint())
 	} else if isFloat(a) {
 		return reflect.ValueOf(a).Float()
-	} else {
-		panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 	}
+	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
 func isError(a interface{}) bool {
@@ -134,6 +132,11 @@ func toString(a interface{}) (string, bool) {
 	aStringer, isStringer := a.(fmt.Stringer)
 	if isStringer {
 		return aStringer.String(), true
+	}
+
+	aJSONRawMessage, isJSONRawMessage := a.(json.RawMessage)
+	if isJSONRawMessage {
+		return string(aJSONRawMessage), true
 	}
 
 	return "", false

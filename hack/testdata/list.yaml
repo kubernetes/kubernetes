@@ -11,7 +11,7 @@ items:
       port: 80
     selector:
       app: list-deployment-test
-- apiVersion: extensions/v1beta1
+- apiVersion: apps/v1
   kind: Deployment
   metadata:
     name: list-deployment-test
@@ -19,6 +19,9 @@ items:
       app: list-deployment-test
   spec:
     replicas: 1
+    selector:
+      matchLabels:
+        app: list-deployment-test
     template:
       metadata:
         labels:

@@ -10,6 +10,8 @@ go_library(
     srcs = [
         "deployment.go",
         "framework.go",
+        "host_exec.go",
+        "local.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/utils",
@@ -20,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",

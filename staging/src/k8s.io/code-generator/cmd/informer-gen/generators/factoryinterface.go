@@ -23,7 +23,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // factoryInterfaceGenerator produces a file of interfaces used to break a dependency cycle for
@@ -60,7 +60,7 @@ func (g *factoryInterfaceGenerator) Imports(c *generator.Context) (imports []str
 func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 
-	glog.V(5).Infof("processing type %v", t)
+	klog.V(5).Infof("processing type %v", t)
 
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer": c.Universe.Type(cacheSharedIndexInformer),

@@ -69,10 +69,11 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 		caCert,
 		cert,
 		key,
+		cfg,
 	)
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to write certificate %q", k.Name)
+		return errors.Wrapf(err, "failed to write or validate certificate %q", k.Name)
 	}
 
 	return nil
@@ -264,7 +265,7 @@ var (
 		CAName:   "ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}
@@ -340,7 +341,7 @@ var (
 		CAName:   "etcd-ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}
@@ -352,7 +353,7 @@ var (
 		CAName:   "etcd-ca",
 		config: certutil.Config{
 			CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-			Organization: []string{kubeadmconstants.MastersGroup},
+			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
 	}

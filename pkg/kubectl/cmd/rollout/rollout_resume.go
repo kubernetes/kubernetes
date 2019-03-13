@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -52,18 +52,19 @@ type ResumeOptions struct {
 }
 
 var (
-	resume_long = templates.LongDesc(`
+	resumeLong = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = templates.Examples(`
+	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
+// NewRolloutResumeOptions returns an initialized ResumeOptions instance
 func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
 	return &ResumeOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
@@ -71,6 +72,7 @@ func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions
 	}
 }
 
+// NewCmdRolloutResume returns a Command instance for 'rollout resume' sub command
 func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutResumeOptions(streams)
 
@@ -80,8 +82,8 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Use:                   "resume RESOURCE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Resume a paused resource"),
-		Long:                  resume_long,
-		Example:               resume_example,
+		Long:                  resumeLong,
+		Example:               resumeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -96,6 +98,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
@@ -118,12 +121,13 @@ func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 }
 
 func (o *ResumeOptions) Validate() error {
-	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
 	return nil
 }
 
+// RunResume performs the execution of 'rollout resume' sub command
 func (o ResumeOptions) RunResume() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).

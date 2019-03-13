@@ -2,7 +2,6 @@ package matchers
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/onsi/gomega/format"
@@ -10,7 +9,8 @@ import (
 )
 
 type MatchYAMLMatcher struct {
-	YAMLToMatch interface{}
+	YAMLToMatch      interface{}
+	firstFailurePath []interface{}
 }
 
 func (matcher *MatchYAMLMatcher) Match(actual interface{}) (success bool, err error) {
@@ -29,17 +29,19 @@ func (matcher *MatchYAMLMatcher) Match(actual interface{}) (success bool, err er
 		return false, fmt.Errorf("Expected '%s' should be valid YAML, but it is not.\nUnderlying error:%s", expectedString, err)
 	}
 
-	return reflect.DeepEqual(aval, eval), nil
+	var equal bool
+	equal, matcher.firstFailurePath = deepEqual(aval, eval)
+	return equal, nil
 }
 
 func (matcher *MatchYAMLMatcher) FailureMessage(actual interface{}) (message string) {
 	actualString, expectedString, _ := matcher.toNormalisedStrings(actual)
-	return format.Message(actualString, "to match YAML of", expectedString)
+	return formattedMessage(format.Message(actualString, "to match YAML of", expectedString), matcher.firstFailurePath)
 }
 
 func (matcher *MatchYAMLMatcher) NegatedFailureMessage(actual interface{}) (message string) {
 	actualString, expectedString, _ := matcher.toNormalisedStrings(actual)
-	return format.Message(actualString, "not to match YAML of", expectedString)
+	return formattedMessage(format.Message(actualString, "not to match YAML of", expectedString), matcher.firstFailurePath)
 }
 
 func (matcher *MatchYAMLMatcher) toNormalisedStrings(actual interface{}) (actualFormatted, expectedFormatted string, err error) {
@@ -51,11 +53,11 @@ func normalise(input string) string {
 	var val interface{}
 	err := yaml.Unmarshal([]byte(input), &val)
 	if err != nil {
-		panic(err) // guarded by Match
+		panic(err) // unreachable since Match already calls Unmarshal
 	}
 	output, err := yaml.Marshal(val)
 	if err != nil {
-		panic(err) // guarded by Unmarshal
+		panic(err) // untested section, unreachable since we Unmarshal above
 	}
 	return strings.TrimSpace(string(output))
 }

@@ -31,8 +31,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/gengo/types"
+	"k8s.io/klog"
 )
 
 // This clarifies when a pkg path has been canonicalized.
@@ -89,7 +89,7 @@ func New() *Builder {
 			// The returned string will have some/path/bin/go, so remove the last two elements.
 			c.GOROOT = filepath.Dir(filepath.Dir(strings.Trim(string(p), "\n")))
 		} else {
-			glog.Warningf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
+			klog.Warningf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
 		}
 	}
 	// Force this to off, since we don't properly parse CGo.  All symbols must
@@ -136,7 +136,7 @@ func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
 	}
 
 	// Remember it under the user-provided name.
-	glog.V(5).Infof("saving buildPackage %s", dir)
+	klog.V(5).Infof("saving buildPackage %s", dir)
 	b.buildPackages[dir] = buildPkg
 	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
 	if dir != string(canonicalPackage) {
@@ -145,7 +145,7 @@ func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
 			return buildPkg, nil
 		}
 		// Must be new, save it under the canonical name, too.
-		glog.V(5).Infof("saving buildPackage %s", canonicalPackage)
+		klog.V(5).Infof("saving buildPackage %s", canonicalPackage)
 		b.buildPackages[string(canonicalPackage)] = buildPkg
 	}
 
@@ -175,11 +175,11 @@ func (b *Builder) AddFileForTest(pkg string, path string, src []byte) error {
 func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, userRequested bool) error {
 	for _, p := range b.parsed[pkgPath] {
 		if path == p.name {
-			glog.V(5).Infof("addFile %s %s already parsed, skipping", pkgPath, path)
+			klog.V(5).Infof("addFile %s %s already parsed, skipping", pkgPath, path)
 			return nil
 		}
 	}
-	glog.V(6).Infof("addFile %s %s", pkgPath, path)
+	klog.V(6).Infof("addFile %s %s", pkgPath, path)
 	p, err := parser.ParseFile(b.fset, path, src, parser.DeclarationErrors|parser.ParseComments)
 	if err != nil {
 		return err
@@ -221,7 +221,7 @@ func (b *Builder) AddDir(dir string) error {
 func (b *Builder) AddDirRecursive(dir string) error {
 	// Add the root.
 	if _, err := b.importPackage(dir, true); err != nil {
-		glog.Warningf("Ignoring directory %v: %v", dir, err)
+		klog.Warningf("Ignoring directory %v: %v", dir, err)
 	}
 
 	// filepath.Walk includes the root dir, but we already did that, so we'll
@@ -236,7 +236,7 @@ func (b *Builder) AddDirRecursive(dir string) error {
 
 				// Add it.
 				if _, err := b.importPackage(pkg, true); err != nil {
-					glog.Warningf("Ignoring child directory %v: %v", pkg, err)
+					klog.Warningf("Ignoring child directory %v: %v", pkg, err)
 				}
 			}
 		}
@@ -284,7 +284,7 @@ func (b *Builder) AddDirectoryTo(dir string, u *types.Universe) (*types.Package,
 // The implementation of AddDir. A flag indicates whether this directory was
 // user-requested or just from following the import graph.
 func (b *Builder) addDir(dir string, userRequested bool) error {
-	glog.V(5).Infof("addDir %s", dir)
+	klog.V(5).Infof("addDir %s", dir)
 	buildPkg, err := b.importBuildPackage(dir)
 	if err != nil {
 		return err
@@ -292,7 +292,7 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
 	pkgPath := canonicalPackage
 	if dir != string(canonicalPackage) {
-		glog.V(5).Infof("addDir %s, canonical path is %s", dir, pkgPath)
+		klog.V(5).Infof("addDir %s, canonical path is %s", dir, pkgPath)
 	}
 
 	// Sanity check the pkg dir has not changed.
@@ -324,13 +324,13 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 // importPackage is a function that will be called by the type check package when it
 // needs to import a go package. 'path' is the import path.
 func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, error) {
-	glog.V(5).Infof("importPackage %s", dir)
+	klog.V(5).Infof("importPackage %s", dir)
 	var pkgPath = importPathString(dir)
 
 	// Get the canonical path if we can.
 	if buildPkg := b.buildPackages[dir]; buildPkg != nil {
 		canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-		glog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+		klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
 		pkgPath = canonicalPackage
 	}
 
@@ -349,7 +349,7 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 		// Get the canonical path now that it has been added.
 		if buildPkg := b.buildPackages[dir]; buildPkg != nil {
 			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-			glog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+			klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
 			pkgPath = canonicalPackage
 		}
 	}
@@ -365,9 +365,9 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 	if err != nil {
 		switch {
 		case ignoreError && pkg != nil:
-			glog.V(2).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
+			klog.V(2).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
 		case !ignoreError && pkg != nil:
-			glog.V(2).Infof("type checking encountered some errors in %q\n", pkgPath)
+			klog.V(2).Infof("type checking encountered some errors in %q\n", pkgPath)
 			return nil, err
 		default:
 			return nil, err
@@ -389,10 +389,10 @@ func (a importAdapter) Import(path string) (*tc.Package, error) {
 // errors, so you may check whether the package is nil or not even if you get
 // an error.
 func (b *Builder) typeCheckPackage(pkgPath importPathString) (*tc.Package, error) {
-	glog.V(5).Infof("typeCheckPackage %s", pkgPath)
+	klog.V(5).Infof("typeCheckPackage %s", pkgPath)
 	if pkg, ok := b.typeCheckedPackages[pkgPath]; ok {
 		if pkg != nil {
-			glog.V(6).Infof("typeCheckPackage %s already done", pkgPath)
+			klog.V(6).Infof("typeCheckPackage %s already done", pkgPath)
 			return pkg, nil
 		}
 		// We store a nil right before starting work on a package. So
@@ -416,7 +416,7 @@ func (b *Builder) typeCheckPackage(pkgPath importPathString) (*tc.Package, error
 		// method. So there can't be cycles in the import graph.
 		Importer: importAdapter{b},
 		Error: func(err error) {
-			glog.V(2).Infof("type checker: %v\n", err)
+			klog.V(2).Infof("type checker: %v\n", err)
 		},
 	}
 	pkg, err := c.Check(string(pkgPath), b.fset, files, nil)
@@ -469,7 +469,7 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 // findTypesIn finalizes the package import and searches through the package
 // for types.
 func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error {
-	glog.V(5).Infof("findTypesIn %s", pkgPath)
+	klog.V(5).Infof("findTypesIn %s", pkgPath)
 	pkg := b.typeCheckedPackages[pkgPath]
 	if pkg == nil {
 		return fmt.Errorf("findTypesIn(%s): package is not known", pkgPath)
@@ -479,7 +479,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 		// packages they asked for depend on will be included.
 		// But we don't need to include all types in all
 		// *packages* they depend on.
-		glog.V(5).Infof("findTypesIn %s: package is not user requested", pkgPath)
+		klog.V(5).Infof("findTypesIn %s: package is not user requested", pkgPath)
 		return nil
 	}
 
@@ -775,7 +775,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			return out
 		}
 		out.Kind = types.Unsupported
-		glog.Warningf("Making unsupported type entry %q for: %#v\n", out, t)
+		klog.Warningf("Making unsupported type entry %q for: %#v\n", out, t)
 		return out
 	}
 }

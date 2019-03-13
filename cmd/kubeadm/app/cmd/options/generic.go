@@ -18,12 +18,15 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
+	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations can be searched for an existing kubeconfig file.")
+	// Note that DefValue is the text shown in the terminal and not the default value assigned to the flag
+	fs.Lookup(KubeconfigPath).DefValue = constants.GetAdminKubeConfigPath()
 }
 
 // AddKubeConfigDirFlag adds the --kubeconfig-dir flag to the given flagset
@@ -33,7 +36,7 @@ func AddKubeConfigDirFlag(fs *pflag.FlagSet, kubeConfigDir *string) {
 
 // AddConfigFlag adds the --config flag to the given flagset
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
-	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental).")
+	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to a kubeadm configuration file.")
 }
 
 // AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset
@@ -46,7 +49,12 @@ func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]st
 
 // AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
 func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *map[string]string) {
-	fs.Var(utilflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
-	fs.Var(utilflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
-	fs.Var(utilflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+}
+
+// AddImageMetaFlags adds the --image-repository flag to the given flagset
+func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
+	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
 }

@@ -52,18 +52,35 @@ if [[ -d Godeps ]]; then
     mv Godeps "${BACKUP}/Godeps"
 fi
 
+## Workaround "httplex" was dropped from golang.org/x/net repo and the code
+## was moved to the "golang.org/x/net/http/httpguts" directory, we do not use
+## this directly, however many packages we vendor are still using the older
+## golang.org/x/net and we need to keep this until all those dependencies
+## are switched to newer golang.org/x/net.
+IGNORED_PACKAGES=(
+  "golang.org/x/net/lex/httplex"
+)
+REQUIRED_BINS=(
+  "golang.org/x/net/internal/nettest"
+  "golang.org/x/net/internal/socks"
+  "golang.org/x/net/internal/sockstest"
+)
+
 # Some things we want in godeps aren't code dependencies, so ./...
 # won't pick them up.
-REQUIRED_BINS=(
-  "github.com/onsi/ginkgo/ginkgo"
-  "github.com/jteeuwen/go-bindata/go-bindata"
-  "github.com/tools/godep"
+REQUIRED_BINS+=(
+  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/bazelbuild/buildtools/buildozer"
+  "github.com/cespare/prettybench"
   "github.com/client9/misspell/cmd/misspell"
   "github.com/cloudflare/cfssl/cmd/cfssl"
   "github.com/cloudflare/cfssl/cmd/cfssljson"
-  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
-  "github.com/kubernetes/repo-infra/kazel"
+  "github.com/jstemmer/go-junit-report"
+  "github.com/jteeuwen/go-bindata/go-bindata"
+  "github.com/onsi/ginkgo/ginkgo"
+  "golang.org/x/lint/golint"
   "k8s.io/kube-openapi/cmd/openapi-gen"
+  "k8s.io/repo-infra/kazel"
   "./..."
 )
 
@@ -71,7 +88,7 @@ kube::log::status "Running godep save - this might take a while"
 # This uses $(pwd) rather than ${KUBE_ROOT} because KUBE_ROOT will be
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
-GOPATH="${GOPATH}:$(pwd)/staging" godep save "${REQUIRED_BINS[@]}"
+GOPATH="${GOPATH}:$(pwd)/staging" ${KUBE_GODEP:?} save -i $(IFS=,; echo "${IGNORED_PACKAGES[*]}") "${REQUIRED_BINS[@]}"
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.
@@ -99,6 +116,8 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - dep-approvers
 __EOF__

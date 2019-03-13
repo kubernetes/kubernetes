@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -64,6 +63,17 @@ func GetHostname(hostnameOverride string) (string, error) {
 	return strings.ToLower(hostName), nil
 }
 
+// NoMatchError is a typed implementation of the error interface. It indicates a failure to get a matching Node.
+type NoMatchError struct {
+	addresses []v1.NodeAddress
+}
+
+// Error is the implementation of the conventional interface for
+// representing an error condition, with the nil value representing no error.
+func (e *NoMatchError) Error() string {
+	return fmt.Sprintf("no preferred addresses found; known addresses: %v", e.addresses)
+}
+
 // GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.
 // If none of the preferred address types are found, an error is returned.
 func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddressType) (string, error) {
@@ -74,7 +84,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 			}
 		}
 	}
-	return "", fmt.Errorf("no preferred addresses found; known addresses: %v", node.Status.Addresses)
+	return "", &NoMatchError{addresses: node.Status.Addresses}
 }
 
 // GetNodeHostIP returns the provided node's IP, based on the priority:
@@ -100,12 +110,12 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
 	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
-		glog.Warningf("Failed to retrieve node info: %v", err)
+		klog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
 	nodeIP, err = GetNodeHostIP(node)
 	if err != nil {
-		glog.Warningf("Failed to retrieve node IP: %v", err)
+		klog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil
 	}
 	return nodeIP
@@ -119,8 +129,8 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	region, _ := labels[kubeletapis.LabelZoneRegion]
-	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
+	region, _ := labels[v1.LabelZoneRegion]
+	failureDomain, _ := labels[v1.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""

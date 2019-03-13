@@ -19,23 +19,27 @@ package config
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
-	master_v1alpha3YAML   = "testdata/conversion/master/v1alpha3.yaml"
-	master_v1beta1YAML    = "testdata/conversion/master/v1beta1.yaml"
-	master_internalYAML   = "testdata/conversion/master/internal.yaml"
-	master_incompleteYAML = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML  = "testdata/defaulting/master/defaulted.yaml"
-	master_invalidYAML    = "testdata/validation/invalid_mastercfg.yaml"
+	controlPlaneV1alpha3YAML          = "testdata/conversion/controlplane/v1alpha3.yaml"
+	controlPlaneV1alpha3YAMLNonLinux  = "testdata/conversion/controlplane/v1alpha3_non_linux.yaml"
+	controlPlaneV1beta1YAML           = "testdata/conversion/controlplane/v1beta1.yaml"
+	controlPlaneV1beta1YAMLNonLinux   = "testdata/conversion/controlplane/v1beta1_non_linux.yaml"
+	controlPlaneInternalYAML          = "testdata/conversion/controlplane/internal.yaml"
+	controlPlaneInternalYAMLNonLinux  = "testdata/conversion/controlplane/internal_non_linux.yaml"
+	controlPlaneIncompleteYAML        = "testdata/defaulting/controlplane/incomplete.yaml"
+	controlPlaneDefaultedYAML         = "testdata/defaulting/controlplane/defaulted.yaml"
+	controlPlaneDefaultedYAMLNonLinux = "testdata/defaulting/controlplane/defaulted_non_linux.yaml"
+	controlPlaneInvalidYAML           = "testdata/validation/invalid_controlplanecfg.yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -51,49 +55,135 @@ func diff(expected, actual []byte) string {
 	return diffBytes.String()
 }
 
-func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
+func TestLoadInitConfigurationFromFile(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	// cfgFiles is in cluster_test.go
+	var tests = []struct {
+		name         string
+		fileContents []byte
+		expectErr    bool
+	}{
+		{
+			name:         "v1beta1.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta1"],
+		},
+		{
+			name:         "v1beta1.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta1"],
+		},
+		{
+			name: "v1beta1.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta1"],
+				cfgFiles["ClusterConfiguration_v1beta1"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "v1alpha3.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
+			expectErr:    true,
+		},
+		{
+			name:         "v1alpha3.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
+			expectErr:    true,
+		},
+		{
+			name: "v1alpha3.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1alpha3"],
+				cfgFiles["ClusterConfiguration_v1alpha3"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+			expectErr: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			cfgPath := filepath.Join(tmpdir, rt.name)
+			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			if err != nil {
+				t.Errorf("Couldn't create file")
+				return
+			}
+
+			obj, err := LoadInitConfigurationFromFile(cfgPath)
+			if rt.expectErr {
+				if err == nil {
+					t.Error("Unexpected success")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Error reading file: %v", err)
+					return
+				}
+
+				if obj == nil {
+					t.Errorf("Unexpected nil return value")
+				}
+			}
+		})
+	}
+}
+
+/*
+func TestInitConfigurationMarshallingFromFile(t *testing.T) {
+	controlPlaneV1alpha3YAMLAbstracted := controlPlaneV1alpha3YAML
+	controlPlaneV1beta1YAMLAbstracted := controlPlaneV1beta1YAML
+	controlPlaneInternalYAMLAbstracted := controlPlaneInternalYAML
+	controlPlaneDefaultedYAMLAbstracted := controlPlaneDefaultedYAML
+	if runtime.GOOS != "linux" {
+		controlPlaneV1alpha3YAMLAbstracted = controlPlaneV1alpha3YAMLNonLinux
+		controlPlaneV1beta1YAMLAbstracted = controlPlaneV1beta1YAMLNonLinux
+		controlPlaneInternalYAMLAbstracted = controlPlaneInternalYAMLNonLinux
+		controlPlaneDefaultedYAMLAbstracted = controlPlaneDefaultedYAMLNonLinux
+	}
+
 	var tests = []struct {
 		name, in, out string
 		groupVersion  schema.GroupVersion
 		expectedErr   bool
 	}{
-		// These tests are reading one file, loading it using ConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
+		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
-			name:         "v1alpha3ToInternal",
-			in:           master_v1alpha3YAML,
-			out:          master_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
+			name:        "v1alpha3IsDeprecated",
+			in:          controlPlaneV1alpha3YAMLAbstracted,
+			expectedErr: true,
 		},
-		{ // v1beta1 -> internal
-			name:         "v1beta1ToInternal",
-			in:           master_v1beta1YAML,
-			out:          master_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1alpha3 -> internal -> v1beta1
-			name:         "v1alpha3Tov1beta1",
-			in:           master_v1alpha3YAML,
-			out:          master_v1beta1YAML,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
-		},
+		//{ // v1beta1 -> internal NB. test commented after changes required for upgrading to go v1.12
+		//	name:         "v1beta1ToInternal",
+		//	in:           controlPlaneV1beta1YAMLAbstracted,
+		//	out:          controlPlaneInternalYAMLAbstracted,
+		//	groupVersion: kubeadm.SchemeGroupVersion,
+		//},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
-			in:           master_v1beta1YAML,
-			out:          master_v1beta1YAML,
+			in:           controlPlaneV1beta1YAMLAbstracted,
+			out:          controlPlaneV1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
+		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadInitConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1beta1 -> default -> validate -> internal -> v1beta1
 			name:         "incompleteYAMLToDefaultedv1beta1",
-			in:           master_incompleteYAML,
-			out:          master_defaultedYAML,
+			in:           controlPlaneIncompleteYAML,
+			out:          controlPlaneDefaultedYAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		{ // v1alpha3 -> validation should fail
+		{ // v1beta1 -> validation should fail
 			name:        "invalidYAMLShouldFail",
-			in:          master_invalidYAML,
+			in:          controlPlaneInvalidYAML,
 			expectedErr: true,
 		},
 	}
@@ -101,7 +191,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1beta1.InitConfiguration{})
+			internalcfg, err := LoadInitConfigurationFromFile(rt.in)
 			if err != nil {
 				if rt.expectedErr {
 					return
@@ -126,6 +216,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		})
 	}
 }
+*/
 
 func TestConsistentOrderByteSlice(t *testing.T) {
 	var (

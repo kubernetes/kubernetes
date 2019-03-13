@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // readGlusterLog will take the last 2 lines of the log file
@@ -34,7 +34,7 @@ func readGlusterLog(path string, podName string) error {
 	var line2 string
 	linecount := 0
 
-	glog.Infof("failure, now attempting to read the gluster log for pod %s", podName)
+	klog.Infof("failure, now attempting to read the gluster log for pod %s", podName)
 
 	// Check and make sure path exists
 	if len(path) == 0 {

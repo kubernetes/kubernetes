@@ -22,6 +22,7 @@ filegroup(
         "//third_party/forked/etcd221/wal:all-srcs",
         "//third_party/forked/etcd237/pkg/fileutil:all-srcs",
         "//third_party/forked/etcd237/wal:all-srcs",
+        "//third_party/forked/godep:all-srcs",
         "//third_party/forked/golang/expansion:all-srcs",
         "//third_party/forked/golang/reflect:all-srcs",
         "//third_party/forked/golang/template:all-srcs",

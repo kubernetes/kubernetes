@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.
@@ -210,7 +210,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
 			// An error in parsing request will result in default to "list" and not setting "name" field.
-			glog.Errorf("Couldn't parse request %#v: %v", req.URL.Query(), err)
+			klog.Errorf("Couldn't parse request %#v: %v", req.URL.Query(), err)
 			// Reset opts to not rely on partial results from parsing.
 			// However, if watch is set, let's report it.
 			opts = metainternalversion.ListOptions{}

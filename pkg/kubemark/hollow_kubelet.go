@@ -35,9 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type HollowKubelet struct {
@@ -78,6 +79,7 @@ func NewHollowKubelet(
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
+		Subpather:          &subpath.FakeSubpath{},
 	}
 
 	return &HollowKubelet{
@@ -93,7 +95,7 @@ func (hk *HollowKubelet) Run() {
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
 	}, hk.KubeletDeps, false); err != nil {
-		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
 	select {}
 }
@@ -109,7 +111,7 @@ func GetHollowKubeletConfig(
 
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
-	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()

@@ -22,14 +22,14 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 func newRoutesMetricContext(request string) *metricContext {
@@ -83,7 +83,7 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 	}
 	err = g.c.Routes().Insert(ctx, meta.GlobalKey(cr.Name), cr)
 	if isHTTPErrorCode(err, http.StatusConflict) {
-		glog.Infof("Route %q already exists.", cr.Name)
+		klog.Infof("Route %q already exists.", cr.Name)
 		err = nil
 	}
 	return mc.Observe(err)

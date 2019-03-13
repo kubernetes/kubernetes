@@ -36,6 +36,7 @@ var (
 	kubectl create deployment my-dep --image=busybox`))
 )
 
+// DeploymentOpts is returned by NewCmdCreateDeployment
 type DeploymentOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -112,6 +113,7 @@ func generatorFromName(
 	return nil, false
 }
 
+// Complete completes all the options
 func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -147,10 +149,7 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// createDeployment
-// 1. Reads user config values from Cobra.
-// 2. Sets up the correct Generator object.
-// 3. Calls RunCreateSubcommand.
+// Run performs the execution of 'create deployment' sub command
 func (o *DeploymentOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

@@ -20,11 +20,14 @@ import (
 	"strings"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -95,13 +98,15 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: KubeDNSDeployment,
-			data: struct{ ImageRepository, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
-				ImageRepository: "foo",
-				Version:         "foo",
-				DNSBindAddr:     "foo",
-				DNSProbeAddr:    "foo",
-				DNSDomain:       "foo",
-				MasterTaintKey:  "foo",
+			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+				DeploymentName:       "foo",
+				KubeDNSImage:         "foo",
+				DNSMasqImage:         "foo",
+				SidecarImage:         "foo",
+				DNSBindAddr:          "foo",
+				DNSProbeAddr:         "foo",
+				DNSDomain:            "foo",
+				ControlPlaneTaintKey: "foo",
 			},
 			expected: true,
 		},
@@ -114,10 +119,10 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSDeployment,
-			data: struct{ ImageRepository, MasterTaintKey, Version string }{
-				ImageRepository: "foo",
-				MasterTaintKey:  "foo",
-				Version:         "foo",
+			data: struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+				DeploymentName:       "foo",
+				Image:                "foo",
+				ControlPlaneTaintKey: "foo",
 			},
 			expected: true,
 		},
@@ -204,28 +209,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300 3.3.3.3
+       forward . 1.2.3.4:5300 3.3.3.3
     }`,
 		},
 		{
@@ -255,28 +260,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }
     
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }`,
 			expectTwo: `
     my.cluster.local:53 {
        errors
        cache 30
        loop
-       proxy . 2.3.4.5
+       forward . 2.3.4.5
     }
     
     foo.com:53 {
        errors
        cache 30
        loop
-       proxy . 1.2.3.4:5300
+       forward . 1.2.3.4:5300
     }`,
 		},
 		{
@@ -294,7 +299,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		out, err := translateStubDomainOfKubeDNSToProxyCoreDNS(kubeDNSStubDomain, testCase.configMap)
+		out, err := translateStubDomainOfKubeDNSToForwardCoreDNS(kubeDNSStubDomain, testCase.configMap)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -420,6 +425,45 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 		}
 		if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
 			t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
+		}
+	}
+}
+
+func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		manifest string
+		data     interface{}
+	}{
+		{
+			manifest: KubeDNSDeployment,
+			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+				DeploymentName:       "foo",
+				KubeDNSImage:         "foo",
+				DNSMasqImage:         "foo",
+				SidecarImage:         "foo",
+				DNSBindAddr:          "foo",
+				DNSProbeAddr:         "foo",
+				DNSDomain:            "foo",
+				ControlPlaneTaintKey: "foo",
+			},
+		},
+		{
+			manifest: CoreDNSDeployment,
+			data: struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+				DeploymentName:       "foo",
+				Image:                "foo",
+				ControlPlaneTaintKey: "foo",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		deploymentBytes, _ := kubeadmutil.ParseTemplate(testCase.manifest, testCase.data)
+		deployment := &apps.Deployment{}
+		if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, deployment); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if deployment.Spec.Template.Spec.PriorityClassName != "system-cluster-critical" {
+			t.Errorf("expected to see system-cluster-critical priority class name. Got %q instead", deployment.Spec.Template.Spec.PriorityClassName)
 		}
 	}
 }

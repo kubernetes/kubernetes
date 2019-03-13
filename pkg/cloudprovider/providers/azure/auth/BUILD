@@ -8,8 +8,8 @@ go_library(
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/crypto/pkcs12:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

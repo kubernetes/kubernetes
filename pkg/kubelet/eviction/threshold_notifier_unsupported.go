@@ -18,11 +18,11 @@ limitations under the License.
 
 package eviction
 
-import "github.com/golang/glog"
+import "k8s.io/klog"
 
 // NewCgroupNotifier creates a cgroup notifier that does nothing because cgroups do not exist on non-linux systems.
 func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
-	glog.V(5).Infof("cgroup notifications not supported")
+	klog.V(5).Infof("cgroup notifications not supported")
 	return &unsupportedThresholdNotifier{}, nil
 }
 

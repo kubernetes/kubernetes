@@ -41,9 +41,12 @@ type RecommendedOptions struct {
 	// admission plugin initializers to Admission.ApplyTo.
 	ExtraAdmissionInitializers func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error)
 	Admission                  *AdmissionOptions
+	// ProcessInfo is used to identify events created by the server.
+	ProcessInfo *ProcessInfo
+	Webhook     *WebhookOptions
 }
 
-func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
+func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *ProcessInfo) *RecommendedOptions {
 	sso := NewSecureServingOptions()
 
 	// We are composing recommended options for an aggregated api-server,
@@ -62,6 +65,8 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		CoreAPI:                    NewCoreAPIOptions(),
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
+		ProcessInfo:                processInfo,
+		Webhook:                    NewWebhookOptions(),
 	}
 }
 
@@ -77,9 +82,8 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo adds RecommendedOptions to the server configuration.
-// scheme is the scheme of the apiserver types that are sent to the admission chain.
 // pluginInitializers can be empty, it is only need for additional initializers.
-func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *runtime.Scheme) error {
+func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
@@ -92,7 +96,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
 		return err
 	}
-	if err := o.Audit.ApplyTo(&config.Config); err != nil {
+	if err := o.Audit.ApplyTo(&config.Config, config.ClientConfig, config.SharedInformerFactory, o.ProcessInfo, o.Webhook); err != nil {
 		return err
 	}
 	if err := o.Features.ApplyTo(&config.Config); err != nil {
@@ -103,7 +107,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
 		return err
-	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, scheme, initializers...); err != nil {
+	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, initializers...); err != nil {
 		return err
 	}
 

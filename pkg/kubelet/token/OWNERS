@@ -1,6 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- mikedanese
+- sig-auth-serviceaccounts-approvers
 reviewers:
-- mikedanese
-- awly
-- tallclair
+- sig-auth-serviceaccounts-reviewers
+labels:
+- sig/auth
+

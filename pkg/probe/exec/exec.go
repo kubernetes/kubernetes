@@ -20,7 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // New creates a Prober.
@@ -40,7 +40,7 @@ type execProber struct{}
 // errors if any.
 func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	data, err := e.CombinedOutput()
-	glog.V(4).Infof("Exec probe response: %q", string(data))
+	klog.V(4).Infof("Exec probe response: %q", string(data))
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
 		if ok {

@@ -146,7 +146,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters))
+	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 

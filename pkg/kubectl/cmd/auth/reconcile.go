@@ -20,15 +20,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -59,13 +60,22 @@ var (
 	reconcileLong = templates.LongDesc(`
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects.
 
-		This is preferred to 'apply' for RBAC resources so that proper rule coverage checks are done.`)
+		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
+
+		Existing roles are updated to include the permissions in the input objects,
+		and remove extra permissions if --remove-extra-permissions is specified.
+
+		Existing bindings are updated to include the subjects in the input objects,
+		and remove extra subjects if --remove-extra-subjects is specified.
+
+		This is preferred to 'apply' for RBAC resources so that semantically-aware merging of rules and subjects is done.`)
 
 	reconcileExample = templates.Examples(`
 		# Reconcile rbac resources from a file
 		kubectl auth reconcile -f my-rbac-rules.yaml`)
 )
 
+// NewReconcileOptions returns a new ReconcileOptions instance
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
@@ -74,6 +84,7 @@ func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOption
 	}
 }
 
+// NewCmdReconcile holds the options for 'auth reconcile' sub command
 func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewReconcileOptions(streams)
 
@@ -96,12 +107,16 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", o.DryRun, "If true, display results but do not submit changes")
 	cmd.Flags().BoolVar(&o.RemoveExtraPermissions, "remove-extra-permissions", o.RemoveExtraPermissions, "If true, removes extra permissions added to roles")
 	cmd.Flags().BoolVar(&o.RemoveExtraSubjects, "remove-extra-subjects", o.RemoveExtraSubjects, "If true, removes extra subjects added to rolebindings")
-	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
+	if err := o.FilenameOptions.RequireFilenameOrKustomize(); err != nil {
+		return err
+	}
+
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
 	}
@@ -149,6 +164,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	return nil
 }
 
+// Validate makes sure provided values for ReconcileOptions are valid
 func (o *ReconcileOptions) Validate() error {
 	if o.Visitor == nil {
 		return errors.New("ReconcileOptions.Visitor must be set")
@@ -171,6 +187,7 @@ func (o *ReconcileOptions) Validate() error {
 	return nil
 }
 
+// RunReconcile performs the execution
 func (o *ReconcileOptions) RunReconcile() error {
 	return o.Visitor.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -192,7 +209,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.Role.GetObject(), o.Out)
+			o.printResults(result.Role.GetObject(), nil, nil, result.MissingRules, result.ExtraRules, result.Operation, result.Protected)
 
 		case *rbacv1.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
@@ -207,7 +224,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.Role.GetObject(), o.Out)
+			o.printResults(result.Role.GetObject(), nil, nil, result.MissingRules, result.ExtraRules, result.Operation, result.Protected)
 
 		case *rbacv1.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -223,7 +240,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
+			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -238,7 +255,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
+			o.printResults(result.RoleBinding.GetObject(), result.MissingSubjects, result.ExtraSubjects, nil, nil, result.Operation, result.Protected)
 
 		case *rbacv1beta1.Role,
 			*rbacv1beta1.RoleBinding,
@@ -251,10 +268,63 @@ func (o *ReconcileOptions) RunReconcile() error {
 			return fmt.Errorf("only rbac.authorization.k8s.io/v1 is supported: not %T", t)
 
 		default:
-			glog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
+			klog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
 			// skip ignored resources
 		}
 
 		return nil
 	})
+}
+
+func (o *ReconcileOptions) printResults(object runtime.Object,
+	missingSubjects, extraSubjects []rbacv1.Subject,
+	missingRules, extraRules []rbacv1.PolicyRule,
+	operation reconciliation.ReconcileOperation,
+	protected bool) {
+
+	o.PrintObject(object, o.Out)
+
+	caveat := ""
+	if protected {
+		caveat = ", but object opted out (rbac.authorization.kubernetes.io/autoupdate: false)"
+	}
+	switch operation {
+	case reconciliation.ReconcileNone:
+		return
+	case reconciliation.ReconcileCreate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required create%s\n", caveat)
+	case reconciliation.ReconcileUpdate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required update%s\n", caveat)
+	case reconciliation.ReconcileRecreate:
+		fmt.Fprintf(o.ErrOut, "\treconciliation required recreate%s\n", caveat)
+	}
+
+	if len(missingSubjects) > 0 {
+		fmt.Fprintf(o.ErrOut, "\tmissing subjects added:\n")
+		for _, s := range missingSubjects {
+			fmt.Fprintf(o.ErrOut, "\t\t%+v\n", s)
+		}
+	}
+	if o.RemoveExtraSubjects {
+		if len(extraSubjects) > 0 {
+			fmt.Fprintf(o.ErrOut, "\textra subjects removed:\n")
+			for _, s := range extraSubjects {
+				fmt.Fprintf(o.ErrOut, "\t\t%+v\n", s)
+			}
+		}
+	}
+	if len(missingRules) > 0 {
+		fmt.Fprintf(o.ErrOut, "\tmissing rules added:\n")
+		for _, r := range missingRules {
+			fmt.Fprintf(o.ErrOut, "\t\t%+v\n", r)
+		}
+	}
+	if o.RemoveExtraPermissions {
+		if len(extraRules) > 0 {
+			fmt.Fprintf(o.ErrOut, "\textra rules removed:\n")
+			for _, r := range extraRules {
+				fmt.Fprintf(o.ErrOut, "\t\t%+v\n", r)
+			}
+		}
+	}
 }

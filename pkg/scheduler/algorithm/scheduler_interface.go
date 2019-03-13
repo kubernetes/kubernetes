@@ -19,18 +19,21 @@ package algorithm
 import (
 	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // SchedulerExtender is an interface for external processes to influence scheduling
 // decisions made by Kubernetes. This is typically needed for resources not directly
 // managed by Kubernetes.
 type SchedulerExtender interface {
+	// Name returns a unique name that identifies the extender.
+	Name() string
+
 	// Filter based on extender-implemented predicate functions. The filtered list is
 	// expected to be a subset of the supplied list. failedNodesMap optionally contains
 	// the list of failed nodes and failure reasons.
 	Filter(pod *v1.Pod,
-		nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo,
+		nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
@@ -59,7 +62,7 @@ type SchedulerExtender interface {
 	ProcessPreemption(
 		pod *v1.Pod,
 		nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-		nodeNameToInfo map[string]*schedulercache.NodeInfo,
+		nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	) (map[*v1.Node]*schedulerapi.Victims, error)
 
 	// SupportsPreemption returns if the scheduler extender support preemption or not.
@@ -68,21 +71,4 @@ type SchedulerExtender interface {
 	// IsIgnorable returns true indicates scheduling should not fail when this extender
 	// is unavailable. This gives scheduler ability to fail fast and tolerate non-critical extenders as well.
 	IsIgnorable() bool
-}
-
-// ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
-// onto machines.
-type ScheduleAlgorithm interface {
-	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)
-	// Preempt receives scheduling errors for a pod and tries to create room for
-	// the pod by preempting lower priority pods if possible.
-	// It returns the node where preemption happened, a list of preempted pods, a
-	// list of pods whose nominated node name should be removed, and error if any.
-	Preempt(*v1.Pod, NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
-	// Predicates() returns a pointer to a map of predicate functions. This is
-	// exposed for testing.
-	Predicates() map[string]FitPredicate
-	// Prioritizers returns a slice of priority config. This is exposed for
-	// testing.
-	Prioritizers() []PriorityConfig
 }

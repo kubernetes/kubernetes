@@ -90,25 +90,28 @@ func TestCmdTokenDelete(t *testing.T) {
 	}
 
 	var tests = []struct {
+		name     string
 		args     string
 		expected bool
 	}{
-		{"", false},       // no token provided
-		{"foobar", false}, // invalid token
+		{"no token provided", "", false},
+		{"invalid token", "foobar", false},
 	}
 
 	kubeadmPath := getKubeadmPath()
 	for _, rt := range tests {
-		_, _, actual := RunCmd(kubeadmPath, "token", "delete", rt.args)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed CmdTokenDelete running 'kubeadm token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
-				rt.args,
-				actual,
-				rt.expected,
-				(actual == nil),
-			)
-		}
-		kubeadmReset()
+		t.Run(rt.name, func(t *testing.T) {
+			_, _, actual := RunCmd(kubeadmPath, "token", "delete", rt.args)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed CmdTokenDelete running 'kubeadm token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+					rt.args,
+					actual,
+					rt.expected,
+					(actual == nil),
+				)
+			}
+			kubeadmReset()
+		})
 	}
 }

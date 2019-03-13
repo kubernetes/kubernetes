@@ -104,10 +104,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		oldMeta.SetInitializers(nil)
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	oldMeta.SetInitializers(nil)
+	objectMeta.SetInitializers(nil)
+
+	// Ensure managedFields state is removed unless ServerSideApply is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		oldMeta.SetManagedFields(nil)
+		objectMeta.SetManagedFields(nil)
 	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
@@ -252,7 +256,7 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 }
 
 // AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func
-func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
+func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
 		return func(obj, old runtime.Object) error { return nil }
@@ -273,6 +277,6 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes)
+		return validatingAdmission.Validate(finalAttributes, o)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,9 +25,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -141,7 +143,7 @@ const (
 	// the TLS bootstrap to get itself an unique credential
 	KubeletBootstrapKubeConfigFileName = "bootstrap-kubelet.conf"
 
-	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the master kubelet will use for talking
+	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the control-plane kubelet will use for talking
 	// to the API server
 	KubeletKubeConfigFileName = "kubelet.conf"
 	// ControllerManagerKubeConfigFileName defines the file name for the controller manager's kubeconfig file
@@ -155,9 +157,9 @@ const (
 	ControllerManagerUser = "system:kube-controller-manager"
 	// SchedulerUser defines the well-known user the scheduler should be authenticated as
 	SchedulerUser = "system:kube-scheduler"
-	// MastersGroup defines the well-known group for the apiservers. This group is also superuser by default
+	// SystemPrivilegedGroup defines the well-known group for the apiservers. This group is also superuser by default
 	// (i.e. bound to the cluster-admin ClusterRole)
-	MastersGroup = "system:masters"
+	SystemPrivilegedGroup = "system:masters"
 	// NodesGroup defines the well-known group for all nodes.
 	NodesGroup = "system:nodes"
 	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
@@ -169,9 +171,9 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
-	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
+	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the control-plane when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
 	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
@@ -189,7 +191,14 @@ const (
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
 
-	// LabelNodeRoleMaster specifies that a node is a master
+	// DefaultCertTokenDuration specifies the default amount of time that the token used by upload certs will be valid
+	// Default behaviour is 2 hours
+	DefaultCertTokenDuration = 2 * time.Hour
+
+	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
+	CertificateKeySize = 32
+
+	// LabelNodeRoleMaster specifies that a node is a control-plane
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
@@ -248,7 +257,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.2.24"
+	DefaultEtcdVersion = "3.3.10"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -263,6 +272,8 @@ const (
 	KubeScheduler = "kube-scheduler"
 	// KubeProxy defines variable used internally when referring to kube-proxy component
 	KubeProxy = "kube-proxy"
+	// HyperKube defines variable used internally when referring to the hyperkube image
+	HyperKube = "hyperkube"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"
@@ -279,10 +290,29 @@ const (
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 
-	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
-	CoreDNS = "coredns"
-	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
-	KubeDNS = "kube-dns"
+	// CoreDNSConfigMap specifies in what ConfigMap in the kube-system namespace the CoreDNS config should be stored
+	CoreDNSConfigMap = "coredns"
+
+	// CoreDNSDeploymentName specifies the name of the Deployment for CoreDNS add-on
+	CoreDNSDeploymentName = "coredns"
+
+	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
+	CoreDNSImageName = "coredns"
+
+	// KubeDNSConfigMap specifies in what ConfigMap in the kube-system namespace the kube-dns config should be stored
+	KubeDNSConfigMap = "kube-dns"
+
+	// KubeDNSDeploymentName specifies the name of the Deployment for kube-dns add-on
+	KubeDNSDeploymentName = "kube-dns"
+
+	// KubeDNSKubeDNSImageName specifies the name of the image for the kubedns container in the kube-dns add-on
+	KubeDNSKubeDNSImageName = "k8s-dns-kube-dns"
+
+	// KubeDNSSidecarImageName specifies the name of the image for the sidecar container in the kube-dns add-on
+	KubeDNSSidecarImageName = "k8s-dns-sidecar"
+
+	// KubeDNSDnsMasqNannyImageName specifies the name of the image for the dnsmasq container in the kube-dns add-on
+	KubeDNSDnsMasqNannyImageName = "k8s-dns-dnsmasq-nanny"
 
 	// CRICtlPackage defines the go package that installs crictl
 	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
@@ -309,7 +339,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.2.4"
+	CoreDNSVersion = "1.3.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -327,19 +357,22 @@ const (
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 
-	// MasterNumCPU is the number of CPUs required on master
-	MasterNumCPU = 2
+	// ControlPlaneNumCPU is the number of CPUs required on control-plane
+	ControlPlaneNumCPU = 2
+
+	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
+	KubeadmCertsSecret = "kubeadm-certs"
 )
 
 var (
-	// MasterTaint is the taint to apply on the PodSpec for being able to run that Pod on the master
-	MasterTaint = v1.Taint{
+	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
-	MasterToleration = v1.Toleration{
+	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneToleration = v1.Toleration{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
@@ -350,21 +383,28 @@ var (
 	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
 	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
 
-	// MasterComponents defines the master component names
-	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+	// ControlPlaneComponents defines the control-plane component names
+	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.11.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.13.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.13.0")
+
+	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.14.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		10: "3.1.12",
-		11: "3.2.18",
 		12: "3.2.24",
+		13: "3.2.24",
+		14: "3.3.10",
 	}
+
+	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
+	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
+	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
 )
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release
@@ -382,7 +422,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, fmt.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -420,12 +460,12 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
-		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}
 	return tempDir, nil
 }
@@ -435,13 +475,13 @@ func CreateTimestampDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
 	timestampDir := path.Join(tempDir, timestampDirName)
 	if err := os.Mkdir(timestampDir, 0700); err != nil {
-		return "", fmt.Errorf("could not create timestamp directory: %v", err)
+		return "", errors.Wrap(err, "could not create timestamp directory")
 	}
 
 	return timestampDir, nil
@@ -452,13 +492,13 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	// Get the service subnet CIDR
 	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
+		return nil, errors.Wrapf(err, "couldn't parse service subnet CIDR %q", svcSubnet)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
+		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
 	}
 
 	return dnsIP, nil
@@ -470,12 +510,12 @@ func GetStaticPodAuditPolicyFile() string {
 }
 
 // GetDNSVersion is a handy function that returns the DNS version by DNS type
-func GetDNSVersion(dnsType string) string {
+func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
 	switch dnsType {
-	case CoreDNS:
-		return CoreDNSVersion
-	default:
+	case kubeadmapi.KubeDNS:
 		return KubeDNSVersion
+	default:
+		return CoreDNSVersion
 	}
 }
 

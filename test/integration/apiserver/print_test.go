@@ -26,8 +26,12 @@ import (
 	"testing"
 	"time"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1beta1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
@@ -35,8 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
@@ -58,6 +63,7 @@ var kindWhiteList = sets.NewString(
 	"ListOptions",
 	"CreateOptions",
 	"UpdateOptions",
+	"PatchOptions",
 	"NodeProxyOptions",
 	"PodAttachOptions",
 	"PodExecOptions",
@@ -72,10 +78,6 @@ var kindWhiteList = sets.NewString(
 
 	// k8s.io/api/admission
 	"AdmissionReview",
-	// --
-
-	// k8s.io/api/admissionregistration
-	"InitializerConfiguration",
 	// --
 
 	// k8s.io/api/authentication
@@ -132,17 +134,33 @@ var missingHanlders = sets.NewString(
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
+	"CSINode",
+	"CSIDriver",
 )
 
 func TestServerSidePrint(t *testing.T) {
-	s, _, closeFn := setup(t,
+	s, _, closeFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
-		auditregv1alpha1.SchemeGroupVersion,
-		batchv2alpha1.SchemeGroupVersion,
-		rbacv1alpha1.SchemeGroupVersion,
-		settingsv1alpha1.SchemeGroupVersion,
-		schedulerapi.SchemeGroupVersion,
-		storagev1alpha1.SchemeGroupVersion)
+		[]schema.GroupVersion{
+			auditregv1alpha1.SchemeGroupVersion,
+			batchv2alpha1.SchemeGroupVersion,
+			rbacv1alpha1.SchemeGroupVersion,
+			settingsv1alpha1.SchemeGroupVersion,
+			schedulerapi.SchemeGroupVersion,
+			storagev1alpha1.SchemeGroupVersion,
+			appsv1beta1.SchemeGroupVersion,
+			appsv1beta2.SchemeGroupVersion,
+			extensionsv1beta1.SchemeGroupVersion,
+			nodev1alpha1.SchemeGroupVersion,
+		},
+		[]schema.GroupVersionResource{
+			extensionsv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+			extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"),
+			extensionsv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
+			extensionsv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
+			extensionsv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		},
+	)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("server-print", s, t)
@@ -167,7 +185,7 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -17,10 +17,12 @@ limitations under the License.
 package gc
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,13 +30,11 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/restmapper"
+	coretesting "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-
-	// Manually initialize legacy scheme to make test rest mapper work with built-in resources.
-	// See issue #70192 for more details
-	_ "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 type fakeAuthorizer struct{}
@@ -100,8 +100,31 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), nil)
+	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{})
+	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
+	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: corev1.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "nodes", Namespaced: false, Kind: "Node"},
+				{Name: "pods", Namespaced: true, Kind: "Pod"},
+				{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
+			},
+		},
+		{
+			GroupVersion: appsv1.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "daemonsets", Namespaced: true, Kind: "DaemonSet"},
+			},
+		},
+	}
+
+	restMapperRes, err := restmapper.GetAPIGroupResources(fakeDiscoveryClient)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
+	}
+	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
@@ -285,7 +308,7 @@ func TestGCAdmission(t *testing.T) {
 			user := &user.DefaultInfo{Name: tc.username}
 			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-			err = gcAdmit.Validate(attributes)
+			err = gcAdmit.Validate(attributes, nil)
 			if !tc.checkError(err) {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -349,13 +372,13 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		Name:       "rc2",
 	}
 	blockDS1 := metav1.OwnerReference{
-		APIVersion:         "extensions/v1beta1",
+		APIVersion:         "apps/v1",
 		Kind:               "DaemonSet",
 		Name:               "ds1",
 		BlockOwnerDeletion: getTrueVar(),
 	}
 	notBlockDS1 := metav1.OwnerReference{
-		APIVersion:         "extensions/v1beta1",
+		APIVersion:         "apps/v1",
 		Kind:               "DaemonSet",
 		Name:               "ds1",
 		BlockOwnerDeletion: getFalseVar(),
@@ -588,7 +611,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-		err := gcAdmit.Validate(attributes)
+		err := gcAdmit.Validate(attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

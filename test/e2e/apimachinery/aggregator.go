@@ -72,11 +72,12 @@ var _ = SIGDescribe("Aggregator", func() {
 		aggrclient = f.AggregatorClient
 	})
 
-	It("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
-		// Make sure the relevant provider supports Agggregator
-		framework.SkipUnlessServerVersionGTE(serverAggregatorVersion, f.ClientSet.Discovery())
-		framework.SkipUnlessProviderIs("gce", "gke")
-
+	/*
+		    Testname: aggregator-supports-the-sample-apiserver
+		    Description: Ensure that the sample-apiserver code from 1.10 and compiled against 1.10
+			will work on the current Aggregator/API-Server.
+	*/
+	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
 		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
 	})
@@ -179,7 +180,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 
 	// kubectl create -f deploy.yaml
 	deploymentName := "sample-apiserver-deployment"
-	etcdImage := "quay.io/coreos/etcd:v3.2.24"
+	etcdImage := imageutils.GetE2EImage(imageutils.Etcd)
 	podLabels := map[string]string{"app": "sample-apiserver", "apiserver": "true"}
 	replicas := int32(1)
 	zero := int64(0)

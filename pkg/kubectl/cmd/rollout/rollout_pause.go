@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -51,20 +51,21 @@ type PauseOptions struct {
 }
 
 var (
-	pause_long = templates.LongDesc(`
+	pauseLong = templates.LongDesc(`
 		Mark the provided resource as paused
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
 		Currently only deployments support being paused.`)
 
-	pause_example = templates.Examples(`
+	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
 		# the deployment will continue its function, new updates to the deployment will not
 		# have an effect as long as the deployment is paused.
 		kubectl rollout pause deployment/nginx`)
 )
 
+// NewCmdRolloutPause returns a Command instance for 'rollout pause' sub command
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PauseOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme),
@@ -77,8 +78,8 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Use:                   "pause RESOURCE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Mark the provided resource as paused"),
-		Long:                  pause_long,
-		Example:               pause_example,
+		Long:                  pauseLong,
+		Example:               pauseExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -94,6 +95,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PauseOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Pauser = polymorphichelpers.ObjectPauserFn
 
@@ -115,13 +117,14 @@ func (o *PauseOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 func (o *PauseOptions) Validate() error {
-	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
 	return nil
 }
 
-func (o PauseOptions) RunPause() error {
+// RunPause performs the execution of 'rollout pause' sub command
+func (o *PauseOptions) RunPause() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().

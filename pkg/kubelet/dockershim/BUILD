@@ -7,6 +7,8 @@ go_library(
         "doc.go",
         "docker_checkpoint.go",
         "docker_container.go",
+        "docker_container_unsupported.go",
+        "docker_container_windows.go",
         "docker_image.go",
         "docker_image_linux.go",
         "docker_image_unsupported.go",
@@ -67,12 +69,13 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/strslice:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/go-connections/nat:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
+            "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -84,6 +87,7 @@ go_test(
         "convert_test.go",
         "docker_checkpoint_test.go",
         "docker_container_test.go",
+        "docker_container_windows_test.go",
         "docker_image_test.go",
         "docker_sandbox_test.go",
         "docker_service_test.go",
@@ -117,6 +121,9 @@ go_test(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/api/core/v1:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],
     }),

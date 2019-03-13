@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -35,6 +34,7 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -49,7 +49,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
 	return allErrs
 }
 
@@ -78,10 +78,19 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	allErrs = append(allErrs, ValidateJoinControlPlane(c.ControlPlane, field.NewPath("controlPlane"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
+	}
+	return allErrs
+}
+
+// ValidateJoinControlPlane validates joining control plane configuration and collects all encountered errors
+func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c != nil {
+		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
 	}
 	return allErrs
 }
@@ -138,7 +147,7 @@ func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification to continue"))
 	}
 
-	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child("token"))...)
+	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child(kubeadmcmdoptions.TokenStr))...)
 	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoint, fldPath.Child("apiServerEndpoints"))...)
 
 	return allErrs
@@ -191,9 +200,9 @@ func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	for i, bt := range bts {
 		btPath := fldPath.Child(fmt.Sprintf("%d", i))
-		allErrs = append(allErrs, ValidateToken(bt.Token.String(), btPath.Child("token"))...)
-		allErrs = append(allErrs, ValidateTokenUsages(bt.Usages, btPath.Child("usages"))...)
-		allErrs = append(allErrs, ValidateTokenGroups(bt.Usages, bt.Groups, btPath.Child("groups"))...)
+		allErrs = append(allErrs, ValidateToken(bt.Token.String(), btPath.Child(kubeadmcmdoptions.TokenStr))...)
+		allErrs = append(allErrs, ValidateTokenUsages(bt.Usages, btPath.Child(kubeadmcmdoptions.TokenUsages))...)
+		allErrs = append(allErrs, ValidateTokenGroups(bt.Usages, bt.Groups, btPath.Child(kubeadmcmdoptions.TokenGroups))...)
 
 		if bt.Expires != nil && bt.TTL != nil {
 			allErrs = append(allErrs, field.Invalid(btPath, "", "the BootstrapToken .TTL and .Expires fields are mutually exclusive"))
@@ -298,8 +307,10 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
-		if len(validation.IsDNS1123Subdomain(altname)) != 0 && net.ParseIP(altname) == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, altname, "altname is not a valid dns label or ip address"))
+		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
+			if net.ParseIP(altname) == nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address or DNS label: %s", strings.Join(errs, "; "))))
+			}
 		}
 	}
 	return allErrs
@@ -310,11 +321,15 @@ func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	for _, urlstr := range urls {
 		u, err := url.Parse(urlstr)
-		if err != nil || u.Scheme == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "not a valid URL"))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, fmt.Sprintf("URL parse error: %v", err)))
+			continue
 		}
 		if requireHTTPS && u.Scheme != "https" {
 			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "the URL must be using the HTTPS scheme"))
+		}
+		if u.Scheme == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "the URL without scheme is not allowed"))
 		}
 	}
 	return allErrs
@@ -391,8 +406,8 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" || f.Name == "rootfs" || f.Name == "print-join-command" {
-			// "--skip-*" flags or other whitelisted flags can be set with --config
+		if isAllowedFlag(f.Name) {
+			// "--skip-*" flags or other allowed flags can be set with --config
 			return
 		}
 		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
@@ -404,16 +419,32 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	return nil
 }
 
+func isAllowedFlag(flagName string) bool {
+	knownFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
+		kubeadmcmdoptions.IgnorePreflightErrors,
+		kubeadmcmdoptions.DryRun,
+		kubeadmcmdoptions.KubeconfigPath,
+		kubeadmcmdoptions.NodeName,
+		kubeadmcmdoptions.NodeCRISocket,
+		kubeadmcmdoptions.KubeconfigDir,
+		kubeadmcmdoptions.UploadCerts,
+		kubeadmcmdoptions.CertificateKey,
+		"print-join-command", "rootfs", "v")
+	if knownFlags.Has(flagName) {
+		return true
+	}
+	return strings.HasPrefix(flagName, "skip-")
+}
+
 // ValidateFeatureGates validates provided feature gates
 func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	validFeatures := features.Keys(features.InitFeatureGates)
 
 	// check valid feature names are provided
 	for k := range featureGates {
 		if !features.Supports(features.InitFeatureGates, k) {
 			allErrs = append(allErrs, field.Invalid(fldPath, featureGates,
-				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
+				fmt.Sprintf("%s is not a valid feature name.", k)))
 		}
 	}
 
@@ -450,7 +481,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 
 	u, err := url.Parse(socket)
 	if err != nil {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url parsing error: %v", err)))
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL parsing error: %v", err)))
 	}
 
 	if u.Scheme == "" {
@@ -458,7 +489,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
 		}
 	} else if u.Scheme != kubeadmapiv1beta1.DefaultUrlScheme {
-		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url scheme %s is not supported", u.Scheme)))
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
 	}
 
 	return allErrs

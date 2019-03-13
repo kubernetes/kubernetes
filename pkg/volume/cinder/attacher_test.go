@@ -31,8 +31,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 const (
@@ -468,7 +468,7 @@ func (testcase *testcase) AttachDisk(instanceID, volumeID string) (string, error
 		return "", errors.New("unexpected AttachDisk call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
 
 	testcase.attachOrDetach = &attachStatus
 	return expected.retDeviceName, expected.ret
@@ -494,7 +494,7 @@ func (testcase *testcase) DetachDisk(instanceID, volumeID string) error {
 		return errors.New("unexpected DetachDisk call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
 
 	testcase.attachOrDetach = &detachStatus
 	return expected.ret
@@ -504,11 +504,11 @@ func (testcase *testcase) OperationPending(diskName string) (bool, string, error
 	expected := &testcase.operationPending
 
 	if expected.volumeStatus == VolumeStatusPending {
-		glog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
+		klog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
 		return true, expected.volumeStatus, expected.ret
 	}
 
-	glog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
+	klog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
 
 	return false, expected.volumeStatus, expected.ret
 }
@@ -542,7 +542,7 @@ func (testcase *testcase) DiskIsAttached(instanceID, volumeID string) (bool, err
 		return false, errors.New("unexpected DiskIsAttached call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", volumeID, instanceID, expected.isAttached, expected.ret)
+	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", volumeID, instanceID, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
 }
@@ -566,7 +566,7 @@ func (testcase *testcase) GetAttachmentDiskPath(instanceID, volumeID string) (st
 		return "", errors.New("unexpected GetAttachmentDiskPath call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("GetAttachmentDiskPath call: %s, %s, returning %v, %v", volumeID, instanceID, expected.retPath, expected.ret)
+	klog.V(4).Infof("GetAttachmentDiskPath call: %s, %s, returning %v, %v", volumeID, instanceID, expected.retPath, expected.ret)
 
 	return expected.retPath, expected.ret
 }
@@ -610,7 +610,7 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
+	klog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
 
 	return expected.isAttached, expected.instanceID, expected.ret
 }
@@ -664,7 +664,7 @@ func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string
 		return areAttached, errors.New("Unexpected DisksAreAttached call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
+	klog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
 
 	return expected.areAttached, expected.ret
 }
@@ -694,7 +694,7 @@ func (testcase *testcase) DisksAreAttachedByName(nodeName types.NodeName, volume
 		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DisksAreAttachedByName call: %v, %s, returning %v, %v", volumeIDs, nodeName, expected.areAttached, expected.ret)
+	klog.V(4).Infof("DisksAreAttachedByName call: %v, %s, returning %v, %v", volumeIDs, nodeName, expected.areAttached, expected.ret)
 
 	return expected.areAttached, expected.ret
 }

@@ -30,26 +30,26 @@ import (
 func BuildArgumentListFromMap(baseArguments map[string]string, overrideArguments map[string]string) []string {
 	var command []string
 	var keys []string
-	for k := range overrideArguments {
+
+	argsMap := make(map[string]string)
+
+	for k, v := range baseArguments {
+		argsMap[k] = v
+	}
+
+	for k, v := range overrideArguments {
+		argsMap[k] = v
+	}
+
+	for k := range argsMap {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
 	for _, k := range keys {
-		v := overrideArguments[k]
-		// values of "" are allowed as well
-		command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		command = append(command, fmt.Sprintf("--%s=%s", k, argsMap[k]))
 	}
-	keys = []string{}
-	for k := range baseArguments {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := baseArguments[k]
-		if _, overrideExists := overrideArguments[k]; !overrideExists {
-			command = append(command, fmt.Sprintf("--%s=%s", k, v))
-		}
-	}
+
 	return command
 }
 

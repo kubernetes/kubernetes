@@ -25,9 +25,9 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // TODO TODO write a test for GetDiskByNameUnknownZone and make sure casting logic works
@@ -110,7 +110,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	tags := make(map[string]string)
 	tags["test-tag"] = "test-value"
 
-	expectedDiskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(
+	expectedDiskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(
 		diskTypeURITemplateRegional, gceProjectID, gceRegion, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
@@ -463,12 +463,12 @@ func TestGetAutoLabelsForPD_Basic(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+			labels[v1.LabelZoneFailureDomain], zone)
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-central1'", labels[kubeletapis.LabelZoneRegion])
+	if labels[v1.LabelZoneRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-central1'", labels[v1.LabelZoneRegion])
 	}
 }
 
@@ -499,12 +499,12 @@ func TestGetAutoLabelsForPD_NoZone(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+			labels[v1.LabelZoneFailureDomain], zone)
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[kubeletapis.LabelZoneRegion])
+	if labels[v1.LabelZoneRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[v1.LabelZoneRegion])
 	}
 }
 
@@ -585,12 +585,12 @@ func TestGetAutoLabelsForPD_DupDisk(t *testing.T) {
 	if err != nil {
 		t.Error("Disk name and zone uniquely identifies a disk, yet an error is returned.")
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+			labels[v1.LabelZoneFailureDomain], zone)
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-west1'", labels[kubeletapis.LabelZoneRegion])
+	if labels[v1.LabelZoneRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-west1'", labels[v1.LabelZoneRegion])
 	}
 }
 
@@ -723,9 +723,9 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 	tagsStr string,
 	diskType string,
 	zones sets.String) error {
-	manager.createDiskCalled = true
-	diskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
 
+	manager.createDiskCalled = true
+	diskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
 	switch t := manager.targetAPI; t {
 	case targetStable:
 		diskToCreateV1 := &compute.Disk{
@@ -737,10 +737,6 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 		manager.diskToCreateStable = diskToCreateV1
 		manager.regionalDisks[diskToCreateV1.Name] = zones
 		return nil
-	case targetBeta:
-		return fmt.Errorf("regionalDisk CreateDisk op not supported in beta")
-	case targetAlpha:
-		return fmt.Errorf("regionalDisk CreateDisk op not supported in alpha")
 	default:
 		return fmt.Errorf("unexpected type: %T", t)
 	}

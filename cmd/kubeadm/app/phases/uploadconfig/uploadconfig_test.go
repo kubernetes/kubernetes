@@ -65,11 +65,11 @@ func TestUploadConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
 			initialcfg := &kubeadmapiv1beta1.InitConfiguration{
-				APIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: "v1.11.10",
+					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
 				},
 				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
 					{
@@ -84,7 +84,7 @@ func TestUploadConfiguration(t *testing.T) {
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
-			cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", initialcfg)
+			cfg, err := configutil.DefaultedInitConfiguration(initialcfg)
 
 			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
 			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}
@@ -95,7 +95,7 @@ func TestUploadConfiguration(t *testing.T) {
 
 			status := &kubeadmapi.ClusterStatus{
 				APIEndpoints: map[string]kubeadmapi.APIEndpoint{
-					"node-foo": cfg.APIEndpoint,
+					"node-foo": cfg.LocalAPIEndpoint,
 				},
 			}
 
@@ -120,11 +120,11 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
-				configData := masterCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
+				configData := controlPlaneCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
 				if configData == "" {
 					t2.Fatal("Fail to find ClusterConfigurationConfigMapKey key")
 				}
@@ -138,7 +138,7 @@ func TestUploadConfiguration(t *testing.T) {
 					t2.Errorf("the initial and decoded ClusterConfiguration didn't match")
 				}
 
-				statusData := masterCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
+				statusData := controlPlaneCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
 				if statusData == "" {
 					t2.Fatal("failed to find ClusterStatusConfigMapKey key")
 				}

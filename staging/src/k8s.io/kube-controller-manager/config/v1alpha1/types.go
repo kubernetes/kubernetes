@@ -17,9 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // PersistentVolumeRecyclerConfiguration contains elements describing persistent volume plugins.
@@ -161,11 +160,11 @@ type GenericControllerManagerConfiguration struct {
 	MinResyncPeriod metav1.Duration
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration
+	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfigv1alpha1.LeaderElectionConfiguration
+	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration
 	// Controllers is the list of controllers to enable or disable
 	// '*' means "all enabled by default controllers"
 	// 'foo' means "enable 'foo'"
@@ -173,7 +172,7 @@ type GenericControllerManagerConfiguration struct {
 	// first item for a particular name wins
 	Controllers []string
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
+	Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
 }
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager

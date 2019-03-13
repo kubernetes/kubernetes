@@ -24,11 +24,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -43,6 +42,7 @@ func BenchmarkScheduling(b *testing.B) {
 		{nodes: 100, existingPods: 1000, minPods: 100},
 		{nodes: 1000, existingPods: 0, minPods: 100},
 		{nodes: 1000, existingPods: 1000, minPods: 100},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
 	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
@@ -62,6 +62,7 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
@@ -86,6 +87,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
@@ -95,7 +97,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	)
 	// The test strategy creates pods with affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(apis.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -112,13 +114,14 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
+		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
-	testBasePod := makeBasePodWithNodeAffinity(apis.LabelZoneFailureDomain, []string{"zone1", "zone2"})
+	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
 	// The test strategy creates pods with node-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(apis.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -144,7 +147,7 @@ func makeBasePodWithPodAntiAffinity(podLabels, affinityLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityLabels,
 					},
-					TopologyKey: apis.LabelHostname,
+					TopologyKey: v1.LabelHostname,
 				},
 			},
 		},
@@ -169,7 +172,7 @@ func makeBasePodWithPodAffinity(podLabels, affinityZoneLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityZoneLabels,
 					},
-					TopologyKey: apis.LabelZoneFailureDomain,
+					TopologyKey: v1.LabelZoneFailureDomain,
 				},
 			},
 		},
@@ -227,7 +230,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		"scheduler-perf-",
 	)
 	if err := nodePreparer.PrepareNodes(); err != nil {
-		glog.Fatalf("%v", err)
+		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
 
@@ -239,7 +242,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	for {
 		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		if len(scheduled) >= numExistingPods {
 			break
@@ -257,7 +260,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		if len(scheduled) >= numExistingPods+b.N {
 			break

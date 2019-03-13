@@ -22,13 +22,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
@@ -76,7 +76,7 @@ type AttachOptions struct {
 	AttachFunc       func(*AttachOptions, *corev1.Container, bool, remotecommand.TerminalSizeQueue) func() error
 	Resources        []string
 	Builder          func() *resource.Builder
-	AttachablePodFn  polymorphichelpers.AttachableLogsForObjectFunc
+	AttachablePodFn  polymorphichelpers.AttachablePodForObjectFunc
 	restClientGetter genericclioptions.RESTClientGetter
 
 	Attach        RemoteAttach
@@ -326,7 +326,7 @@ func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container,
 		fmt.Fprintf(o.ErrOut, "%s\n", o.SuggestedCmdUsage)
 	}
 
-	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
 	return &pod.Spec.Containers[0], nil
 }
 

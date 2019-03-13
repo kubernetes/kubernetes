@@ -52,6 +52,17 @@ const (
 	VCPPerfIterations    = "VCP_PERF_ITERATIONS"
 )
 
+const (
+	VCPZoneVsanDatastore1      = "VCP_ZONE_VSANDATASTORE1"
+	VCPZoneVsanDatastore2      = "VCP_ZONE_VSANDATASTORE2"
+	VCPZoneCompatPolicyName    = "VCP_ZONE_COMPATPOLICY_NAME"
+	VCPZoneNonCompatPolicyName = "VCP_ZONE_NONCOMPATPOLICY_NAME"
+	VCPZoneA                   = "VCP_ZONE_A"
+	VCPZoneB                   = "VCP_ZONE_B"
+	VCPZoneC                   = "VCP_ZONE_C"
+	VCPZoneD                   = "VCP_ZONE_D"
+)
+
 func GetAndExpectStringEnvVar(varName string) string {
 	varValue := os.Getenv(varName)
 	Expect(varValue).NotTo(BeEmpty(), "ENV "+varName+" is not set")

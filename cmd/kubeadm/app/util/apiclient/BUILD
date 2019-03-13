@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -62,6 +61,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "dryrunclient_test.go",
+        "idempotency_test.go",
         "init_dryrun_test.go",
     ],
     embed = [":go_default_library"],
@@ -70,6 +70,7 @@ go_test(
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )

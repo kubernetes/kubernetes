@@ -15,13 +15,16 @@ Repositories currently staged here:
 - [`k8s.io/cloud-provider`](https://github.com/kubernetes/cloud-provider)
 - [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
+- [`k8s.io/component-base`](https://github.com/kubernetes/component-base)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
+- [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
 - [`k8s.io/kube-proxy`](https://github.com/kubernetes/kube-proxy)
 - [`k8s.io/kube-scheduler`](https://github.com/kubernetes/kube-scheduler)
 - [`k8s.io/kubelet`](https://github.com/kubernetes/kubelet)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
+- [`k8s.io/node-api`](https://github.com/kubernetes/node-api)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
 - [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
 - [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
@@ -62,7 +65,7 @@ for creating the staging repository.
 
 3. Add a symlink to the staging repo in `vendor/k8s.io`.
 
-4. Update [`hack/import-restrictions.yaml`](https://github.com/kubernetes/kubernetes/blob/master/hack/import-restrictions.yaml)
+4. Update [`import-restrictions.yaml`](/staging/publishing/import-restrictions.yaml)
 to add the list of other staging repos that this new repo can import.
 
 5. Add all mandatory template files to the staging repo as mentioned in
@@ -89,7 +92,7 @@ for an example.
 3. Once the repository has been created in the Kubernetes org,
 update the publishing-bot to publish the staging repository by updating:
 
-    - [`kubernetes-rules-configmap.yaml`](https://github.com/kubernetes/publishing-bot/blob/master/configs/kubernetes-rules-configmap.yaml):
+    - [`rules.yaml`](/staging/publishing/rules.yaml):
     Make sure that the list of dependencies reflects the staging repos in the `Godeps.json` file.
 
     - [`fetch-all-latest-and-push.sh`](https://github.com/kubernetes/publishing-bot/blob/master/hack/fetch-all-latest-and-push.sh):

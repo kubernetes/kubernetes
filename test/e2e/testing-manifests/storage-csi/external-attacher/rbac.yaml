@@ -79,3 +79,4 @@ subjects:
 roleRef:
   kind: Role
   name: external-attacher-cfg
+  apiGroup: rbac.authorization.k8s.io

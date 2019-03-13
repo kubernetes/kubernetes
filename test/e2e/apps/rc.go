@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,9 +51,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.ServeHostname
+		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
-		TestReplicationControllerServeImageOrFail(f, "private", imageutils.GetE2EImage(privateimage))
+		TestReplicationControllerServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
@@ -114,7 +114,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 
 	// Create a replication controller for a service
 	// that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image)
@@ -264,7 +264,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImageName,
+					Image: NginxImage,
 				},
 			},
 		},
@@ -272,7 +272,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
@@ -301,7 +301,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())

@@ -18,6 +18,8 @@ package storage
 
 import (
 	"fmt"
+	"path"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
@@ -26,20 +28,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"path"
 )
-
-func createStorageClass(ns string, c clientset.Interface) (*storage.StorageClass, error) {
-	bindingMode := storage.VolumeBindingImmediate
-	stKlass := getStorageClass("flex-expand", map[string]string{}, &bindingMode, ns, "resizing")
-	allowExpansion := true
-	stKlass.AllowVolumeExpansion = &allowExpansion
-
-	var err error
-	stKlass, err = c.StorageV1().StorageClasses().Create(stKlass)
-	return stKlass, err
-}
 
 var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
 	var (
@@ -59,6 +50,9 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "local")
+		framework.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		framework.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
+		framework.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
@@ -79,7 +73,14 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			isNodeLabeled = true
 		}
 
-		resizableSc, err = createStorageClass(ns, c)
+		test := testsuites.StorageClassTest{
+			Name:                 "flexvolume-resize",
+			ClaimSize:            "2Gi",
+			AllowVolumeExpansion: true,
+			Provisioner:          "flex-expand",
+		}
+
+		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
@@ -117,6 +118,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		node := nodeList.Items[0]
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, &node, "k8s", driver, path.Join(driverDir, driver))
+		By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
+		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{
@@ -161,7 +164,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		}
 
 		By("Waiting for cloudprovider resize to finish")
-		err = waitForControllerVolumeResize(pvc, c)
+		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
 		Expect(err).NotTo(HaveOccurred(), "While waiting for pvc resize to finish")
 
 		By("Waiting for file system resize to finish")

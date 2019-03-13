@@ -32,8 +32,8 @@ import (
 	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -103,19 +103,24 @@ const (
 	filenameWidgetServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
 )
 
-func readConfigMapList(t *testing.T, filename string) []byte {
+func readConfigMapList(t *testing.T, filename string) [][]byte {
 	data := readBytesFromFile(t, filename)
 	cmList := corev1.ConfigMapList{}
 	if err := runtime.DecodeInto(codec, data, &cmList); err != nil {
 		t.Fatal(err)
 	}
 
-	cmListBytes, err := runtime.Encode(codec, &cmList)
-	if err != nil {
-		t.Fatal(err)
+	var listCmBytes [][]byte
+
+	for _, cm := range cmList.Items {
+		cmBytes, err := runtime.Encode(codec, &cm)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listCmBytes = append(listCmBytes, cmBytes)
 	}
 
-	return cmListBytes
+	return listCmBytes
 }
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -270,7 +275,7 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 
 func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
-	cmBytes := readConfigMapList(t, filenameCM)
+	configMapList := readConfigMapList(t, filenameCM)
 	pathCM := "/namespaces/test/configmaps"
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -280,12 +285,21 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, pathCM) && m != "GET":
-				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: pod}, nil
-			case strings.HasPrefix(p, pathCM) && m != "PATCH":
-				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: pod}, nil
+			case strings.HasPrefix(p, pathCM) && m == "GET":
+				fallthrough
+			case strings.HasPrefix(p, pathCM) && m == "PATCH":
+				var body io.ReadCloser
+
+				switch p {
+				case pathCM + "/test0":
+					body = ioutil.NopCloser(bytes.NewReader(configMapList[0]))
+				case pathCM + "/test1":
+					body = ioutil.NopCloser(bytes.NewReader(configMapList[1]))
+				default:
+					t.Errorf("unexpected request to %s", p)
+				}
+
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -305,6 +319,16 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmList := corev1.List{}
 	if err := runtime.DecodeInto(codec, buf.Bytes(), &cmList); err != nil {
 		t.Fatal(err)
+	}
+
+	if len(cmList.Items) != 2 {
+		t.Fatalf("Expected 2 items in the result; got %d", len(cmList.Items))
+	}
+	if !strings.Contains(string(cmList.Items[0].Raw), "key1") {
+		t.Fatalf("Did not get first ConfigMap at the first position")
+	}
+	if !strings.Contains(string(cmList.Items[1].Raw), "key2") {
+		t.Fatalf("Did not get second ConfigMap at the second position")
 	}
 }
 
@@ -353,7 +377,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			name:         "view resource/name invalid format",
 			filePath:     "",
 			outputFormat: "wide",
-			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
+			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples",
 			expectedOut:  "",
 			selector:     "",
 			args:         []string{"replicationcontroller", "test-rc"},
@@ -624,7 +648,7 @@ func TestApplyRetry(t *testing.T) {
 					case p == pathRC && m == "PATCH":
 						if firstPatch {
 							firstPatch = false
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil
@@ -852,7 +876,7 @@ const (
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
-	obj := &extensionsv1beta1.Deployment{}
+	obj := &appsv1.Deployment{}
 	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
@@ -924,7 +948,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 			cmd.Run(cmd, []string{})
 
-			expected := "deployment.extensions/" + deploymentName + "\n"
+			expected := "deployment.apps/" + deploymentName + "\n"
 			if buf.String() != expected {
 				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 			}
@@ -1256,7 +1280,7 @@ func TestForceApply(t *testing.T) {
 					case strings.HasSuffix(p, pathRC) && m == "PATCH":
 						counts["patch"]++
 						if counts["patch"] <= 6 {
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil

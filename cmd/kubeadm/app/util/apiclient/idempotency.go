@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
@@ -194,25 +194,28 @@ func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBin
 	return nil
 }
 
-// PatchNode tries to patch a node using the following client, executing patchFn for the actual mutating logic
-func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
-	// Loop on every false return. Return with an error if raised. Exit successfully if true is returned.
-	return wait.Poll(constants.APICallRetryInterval, constants.PatchNodeTimeout, func() (bool, error) {
+// PatchNodeOnce executes patchFn on the node object found by the node name.
+// This is a condition function meant to be used with wait.Poll. false, nil
+// implies it is safe to try again, an error indicates no more tries should be
+// made and true indicates success.
+func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) func() (bool, error) {
+	return func() (bool, error) {
 		// First get the node object
 		n, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
+			// TODO this should only be for timeouts
 			return false, nil
 		}
 
 		// The node may appear to have no labels at first,
 		// so we wait for it to get hostname label.
-		if _, found := n.ObjectMeta.Labels[kubeletapis.LabelHostname]; !found {
+		if _, found := n.ObjectMeta.Labels[v1.LabelHostname]; !found {
 			return false, nil
 		}
 
 		oldData, err := json.Marshal(n)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "failed to marshal unmodified node %q into JSON", n.Name)
 		}
 
 		// Execute the mutating function
@@ -220,22 +223,32 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 
 		newData, err := json.Marshal(n)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "failed to marshal modified node %q into JSON", n.Name)
 		}
 
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 		if err != nil {
-			return false, err
+			return false, errors.Wrap(err, "failed to create two way merge patch")
 		}
 
 		if _, err := client.CoreV1().Nodes().Patch(n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+			// TODO also check for timeouts
 			if apierrors.IsConflict(err) {
-				fmt.Println("[patchnode] Temporarily unable to update node metadata due to conflict (will retry)")
+				fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
 				return false, nil
 			}
-			return false, err
+			return false, errors.Wrapf(err, "error patching node %q through apiserver", n.Name)
 		}
 
 		return true, nil
-	})
+	}
+}
+
+// PatchNode tries to patch a node using patchFn for the actual mutating logic.
+// Retries are provided by the wait package.
+func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
+	// wait.Poll will rerun the condition function every interval function if
+	// the function returns false. If the condition function returns an error
+	// then the retries end and the error is returned.
+	return wait.Poll(constants.APICallRetryInterval, constants.PatchNodeTimeout, PatchNodeOnce(client, nodeName, patchFn))
 }

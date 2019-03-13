@@ -25,7 +25,8 @@ type Sink interface {
 	// Errors might be logged by the sink itself. If an error should be fatal, leading to an internal
 	// error, ProcessEvents is supposed to panic. The event must not be mutated and is reused by the caller
 	// after the call returns, i.e. the sink has to make a deepcopy to keep a copy around if necessary.
-	ProcessEvents(events ...*auditinternal.Event)
+	// Returns true on success, may return false on error.
+	ProcessEvents(events ...*auditinternal.Event) bool
 }
 
 type Backend interface {

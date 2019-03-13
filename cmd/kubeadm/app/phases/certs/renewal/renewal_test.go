@@ -33,9 +33,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 func TestRenewImplementations(t *testing.T) {
@@ -49,8 +49,12 @@ func TestRenewImplementations(t *testing.T) {
 		Fake: &k8stesting.Fake{},
 	}
 	certReq := getCertReq(t, caCert, caKey)
+	certReqNoCert := certReq.DeepCopy()
+	certReqNoCert.Status.Certificate = nil
 	client.AddReactor("get", "certificatesigningrequests", defaultReactionFunc(certReq))
-	watcher := watch.NewFakeWithChanSize(1, false)
+	watcher := watch.NewFakeWithChanSize(3, false)
+	watcher.Add(certReqNoCert)
+	watcher.Modify(certReqNoCert)
 	watcher.Modify(certReq)
 	client.AddWatchReactor("certificatesigningrequests", k8stesting.DefaultWatchReactor(watcher, nil))
 
@@ -132,7 +136,7 @@ func getCertReq(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) *
 					Type: certsapi.CertificateApproved,
 				},
 			},
-			Certificate: cert.Raw,
+			Certificate: pkiutil.EncodeCertPEM(cert),
 		},
 	}
 }

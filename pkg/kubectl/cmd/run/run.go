@@ -22,21 +22,23 @@ import (
 	"time"
 
 	"github.com/docker/distribution/reference"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
@@ -241,6 +243,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
+	deleteOpts.Quiet = o.Quiet
 
 	o.DeleteOptions = deleteOpts
 
@@ -316,7 +319,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case corev1.RestartPolicyAlways:
-			generatorName = generateversioned.DeploymentAppsV1Beta1GeneratorName
+			generatorName = generateversioned.DeploymentAppsV1GeneratorName
 		case corev1.RestartPolicyOnFailure:
 			generatorName = generateversioned.JobV1GeneratorName
 		case corev1.RestartPolicyNever:
@@ -360,9 +363,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
 		return err
-	} else {
-		createdObjects = append(createdObjects, runObject)
 	}
+	createdObjects = append(createdObjects, runObject)
+
 	allErrs := []error{}
 	if o.Expose {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
@@ -489,18 +492,41 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 
 // waitForPod watches the given pod until the exitCondition is true
 func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
-	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
-	if err != nil {
-		return nil, err
-	}
-
 	// TODO: expose the timeout
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0*time.Second)
 	defer cancel()
+
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: ns, Name: name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// We need to make sure we see the object in the cache before we start waiting for events
+			// or we would be waiting for the timeout if such object didn't exist.
+			// (e.g. it was deleted before we started informers so they wouldn't even see the delete event)
+			return true, errors.NewNotFound(corev1.Resource("pods"), name)
+		}
+
+		return false, nil
+	}
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return podClient.Pods(ns).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return podClient.Pods(ns).Watch(options)
+		},
+	}
+
 	intr := interrupt.New(nil, cancel)
 	var result *corev1.Pod
-	err = intr.Run(func() error {
-		ev, err := watchtools.UntilWithoutRetry(ctx, w, func(ev watch.Event) (bool, error) {
+	err := intr.Run(func() error {
+		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, preconditionFunc, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
 		if ev != nil {
@@ -508,11 +534,6 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitConditio
 		}
 		return err
 	})
-
-	// Fix generic not found error.
-	if err != nil && errors.IsNotFound(err) {
-		err = errors.NewNotFound(corev1.Resource("pods"), name)
-	}
 
 	return result, err
 }
@@ -567,9 +588,8 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolic
 	if len(restart) == 0 {
 		if interactive {
 			return corev1.RestartPolicyOnFailure, nil
-		} else {
-			return corev1.RestartPolicyAlways, nil
 		}
+		return corev1.RestartPolicyAlways, nil
 	}
 	switch corev1.RestartPolicy(restart) {
 	case corev1.RestartPolicyAlways:
@@ -655,7 +675,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return nil, err
 	}
-	// run has compiled knowledge of the thing is is creating
+	// run has compiled knowledge of the thing is creating
 	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, err
@@ -674,7 +694,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if err := o.Recorder.Record(obj); err != nil {
-		glog.V(4).Infof("error recording current command: %v", err)
+		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
 	actualObj := obj

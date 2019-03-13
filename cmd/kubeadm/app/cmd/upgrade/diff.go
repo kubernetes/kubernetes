@@ -20,13 +20,12 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -78,8 +77,7 @@ func NewCmdDiff(out io.Writer) *cobra.Command {
 func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
-	glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
+	cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	if err != nil {
 		return err
 	}
@@ -105,7 +103,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		return err
 	}
 
-	specs := controlplane.GetStaticPodSpecs(cfg, k8sVer)
+	specs := controlplane.GetStaticPodSpecs(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, k8sVer)
 	for spec, pod := range specs {
 		var path string
 		switch spec {
@@ -116,7 +114,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		case constants.KubeScheduler:
 			path = flags.schedulerManifestPath
 		default:
-			glog.Errorf("[diff] unknown spec %v", spec)
+			klog.Errorf("[diff] unknown spec %v", spec)
 			continue
 		}
 

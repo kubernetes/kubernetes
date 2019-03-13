@@ -26,7 +26,7 @@ import (
 
 	"net/http"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -35,7 +35,7 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 	var resource = "poddisruptionbudgets"
 
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
-		glog.Infof(
+		klog.Infof(
 			"Refusing to start disruption because resource %q in group %q is not available.",
 			resource, group+"/"+version)
 		return nil, false, nil
@@ -44,9 +44,9 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
-		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
-		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
+		ctx.InformerFactory.Apps().V1().ReplicaSets(),
+		ctx.InformerFactory.Apps().V1().Deployments(),
+		ctx.InformerFactory.Apps().V1().StatefulSets(),
 		ctx.ClientBuilder.ClientOrDie("disruption-controller"),
 	).Run(ctx.Stop)
 	return nil, true, nil

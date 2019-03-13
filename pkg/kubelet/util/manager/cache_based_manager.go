@@ -259,7 +259,7 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 // necessary for registered pods.
 // It implements the following logic:
 // - whenever a pod is created or updated, the cached versions of all objects
-//   is is referencing are invalidated
+//   is referencing are invalidated
 // - every GetObject() call tries to fetch the value from local cache; if it is
 //   not there, invalidated or too old, we fetch it from apiserver and refresh the
 //   value in cache; otherwise it is just fetched from cache

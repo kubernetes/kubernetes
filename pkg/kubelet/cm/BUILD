@@ -27,6 +27,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/podresources/v1alpha1:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -34,13 +35,13 @@ go_library(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/util/pluginwatcher:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/cadvisor:go_default_library",
@@ -72,8 +73,8 @@ go_library(
             "//pkg/kubelet/events:go_default_library",
             "//pkg/kubelet/metrics:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//pkg/kubelet/types:go_default_library",
-            "//pkg/util/file:go_default_library",
             "//pkg/util/mount:go_default_library",
             "//pkg/util/oom:go_default_library",
             "//pkg/util/procfs:go_default_library",
@@ -87,6 +88,7 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/kubelet/cadvisor:go_default_library",

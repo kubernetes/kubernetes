@@ -19,12 +19,12 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=$(REGISTRY)/debian-hyperkube-base
-TAG=0.12.0
+TAG=0.12.1
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
 CNI_VERSION=v0.6.0
 
 TEMP_DIR:=$(shell mktemp -d)
@@ -32,6 +32,8 @@ CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
 
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 .PHONY: all build push clean all-build all-push-images all-push push-manifest
 
@@ -74,7 +76,7 @@ endif
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)

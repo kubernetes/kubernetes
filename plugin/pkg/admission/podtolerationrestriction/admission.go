@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +35,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -82,7 +81,7 @@ type podTolerationsPlugin struct {
 // instead if specified. Tolerations to a namespace are assigned via
 // scheduler.alpha.kubernetes.io/defaultTolerations and scheduler.alpha.kubernetes.io/tolerationsWhitelist
 // annotations keys.
-func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -93,11 +92,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 	pod := a.GetObject().(*api.Pod)
 	var finalTolerations []api.Toleration
-	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
-	if err != nil {
-		return err
-	}
-	if a.GetOperation() == admission.Create || updateUninitialized {
+	if a.GetOperation() == admission.Create {
 		ts, err := p.getNamespaceDefaultTolerations(a.GetNamespace())
 		if err != nil {
 			return err
@@ -139,9 +134,9 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 	pod.Spec.Tolerations = finalTolerations
 
-	return p.Validate(a)
+	return p.Validate(a, o)
 }
-func (p *podTolerationsPlugin) Validate(a admission.Attributes) error {
+func (p *podTolerationsPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -188,7 +183,7 @@ func shouldIgnore(a admission.Attributes) bool {
 	obj := a.GetObject()
 	_, ok := obj.(*api.Pod)
 	if !ok {
-		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
+		klog.Errorf("expected pod but got %s", a.GetKind().Kind)
 		return true
 	}
 

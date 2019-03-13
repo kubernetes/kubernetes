@@ -23,16 +23,16 @@ SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=E
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-readonly ROOT=$(dirname "${BASH_SOURCE}")
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+readonly ROOT=$(dirname "${BASH_SOURCE[0]}")
 source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 source "$KUBE_ROOT/cluster/common.sh"
 
-
+# shellcheck disable=SC2034 # Can't tell if this is still needed or not
 KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
 
 # Directory to be used for master and node provisioning.
-KUBE_TEMP="~/kube_temp"
+KUBE_TEMP="${HOME}/kube_temp"
 
 
 # Get master IP addresses and store in KUBE_MASTER_IP_ADDRESSES[]
@@ -88,12 +88,13 @@ function trap-add {
   local signal="${2-EXIT}"
   local cur
 
-  cur="$(eval "sh -c 'echo \$3' -- $(trap -p ${signal})")"
+  cur="$(eval "sh -c 'echo \$3' -- $(trap -p "${signal}")")"
   if [[ -n "${cur}" ]]; then
     handler="${cur}; ${handler}"
   fi
 
-  trap "${handler}" ${signal}
+  # shellcheck disable=SC2064 # Early expansion is intentional here.
+  trap "${handler}" "${signal}"
 }
 
 # Validate a kubernetes cluster
@@ -101,13 +102,12 @@ function validate-cluster() {
   # by default call the generic validate-cluster.sh script, customizable by
   # any cluster provider if this does not fit.
   set +e
-  "${KUBE_ROOT}/cluster/validate-cluster.sh"
-  if [[ "$?" -ne "0" ]]; then
+  if ! "${KUBE_ROOT}/cluster/validate-cluster.sh"; then
     for master in ${MASTERS}; do
-      troubleshoot-master ${master}
+      troubleshoot-master "${master}"
     done
     for node in ${NODES}; do
-      troubleshoot-node ${node}
+      troubleshoot-node "${node}"
     done
     exit 1
   fi
@@ -121,7 +121,7 @@ function kube-up() {
   local num_infra=0
   for master in ${MASTERS}; do
     provision-master "${master}" "infra${num_infra}"
-    let ++num_infra
+    ((++num_infra))
   done
 
   for master in ${MASTERS}; do
@@ -147,11 +147,11 @@ function kube-up() {
 # Delete a kubernetes cluster
 function kube-down() {
   for master in ${MASTERS}; do
-    tear-down-master ${master}
+    tear-down-master "${master}"
   done
 
   for node in ${NODES}; do
-    tear-down-node ${node}
+    tear-down-node "${node}"
   done
 }
 
@@ -170,7 +170,7 @@ function troubleshoot-master() {
     else
       daemon_status="active"
     fi
-    printf "%-24s %s\n" ${daemon} ${daemon_status}
+    printf "%-24s %s\n" "${daemon}" ${daemon_status}
   done
   printf "\n"
 }
@@ -190,7 +190,7 @@ function troubleshoot-node() {
     else
       daemon_status="active"
     fi
-    printf "%-24s %s\n" ${daemon} ${daemon_status}
+    printf "%-24s %s\n" "${daemon}" ${daemon_status}
   done
   printf "\n"
 }
@@ -307,8 +307,9 @@ function provision-node() {
   local node=$1
   local node_ip=${node#*@}
   local dns_ip=${DNS_SERVER_IP#*@}
+  # shellcheck disable=SC2153  # DNS_DOMAIN sourced from external file
   local dns_domain=${DNS_DOMAIN#*@}
-  ensure-setup-dir ${node}
+  ensure-setup-dir "${node}"
 
   kube-scp "${node}" "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
   kube-scp "${node}" "${ROOT}/etcd-cert/ca.pem \
@@ -360,15 +361,15 @@ function ensure-etcd-cert() {
 function kube-ssh() {
   local host="$1"
   shift
-  ssh ${SSH_OPTS} -t "${host}" "$@" >/dev/null 2>&1
+  ssh "${SSH_OPTS}" -t "${host}" "$@" >/dev/null 2>&1
 }
 
 # Copy file recursively over ssh
 function kube-scp() {
   local host="$1"
-  local src=($2)
+  local src=("$2")
   local dst="$3"
-  scp -r ${SSH_OPTS} ${src[*]} "${host}:${dst}"
+  scp -r "${SSH_OPTS}" "${src[*]}" "${host}:${dst}"
 }
 
 # Ensure that we have a password created for validating to the master. Will
@@ -380,8 +381,8 @@ function kube-scp() {
 function get-password {
   load-or-gen-kube-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; \
-      print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+    KUBE_USER="admin"
+    KUBE_PASSWORD=$(python -c 'import string,random; '\
+      'print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
   fi
 }

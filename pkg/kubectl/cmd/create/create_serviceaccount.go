@@ -36,6 +36,7 @@ var (
 	  kubectl create serviceaccount my-service-account`))
 )
 
+// ServiceAccountOpts holds the options for 'create serviceaccount' sub command
 type ServiceAccountOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -67,6 +68,7 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericclioptions.I
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -84,7 +86,7 @@ func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateServiceAccount implements the behavior to run the create service account command
+// Run calls the CreateSubcommandOptions.Run in ServiceAccountOpts instance
 func (o *ServiceAccountOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

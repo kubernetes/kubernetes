@@ -33,11 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/utils/integer"
 )
 
 func newInt32Ptr(val int) *int32 {
@@ -101,7 +101,7 @@ type RollingUpdaterConfig struct {
 	// when the rolling update starts, such that the total number of old and new pods do not exceed
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
-	// the update is atmost 130% of desired pods.
+	// the update is at most 130% of desired pods.
 	MaxSurge intstr.IntOrString
 	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
 	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value

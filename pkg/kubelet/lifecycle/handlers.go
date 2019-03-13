@@ -23,10 +23,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -59,20 +59,20 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			glog.V(1).Infof(msg)
+			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
 			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
-			glog.V(1).Infof(msg)
+			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	default:
 		err := fmt.Errorf("Invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
-		glog.Errorf(msg)
+		klog.Errorf(msg)
 		return msg, err
 	}
 }
@@ -105,7 +105,7 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
+			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return "", err
 		}
 		if status.IP == "" {

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -355,11 +354,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
-		{"invalid missing master configuration",
+		{"invalid missing InitConfiguration",
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -374,7 +373,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -389,7 +388,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -401,9 +400,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 			}, false},
-		{"valid master configuration with incorrect IPv4 pod subnet",
+		{"valid InitConfiguration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -417,9 +416,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
-		{"valid master configuration with IPv4 service subnet",
+		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -464,9 +463,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
-		{"valid master configuration using IPv6 service subnet",
+		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
@@ -541,6 +540,84 @@ func TestValidateJoinConfiguration(t *testing.T) {
 				},
 			},
 		}, false},
+		{&kubeadm.JoinConfiguration{ // Pass without JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Pass with JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         1234,
+				},
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "aaa",
+					BindPort:         1234,
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         -1,
+				},
+			},
+		}, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateJoinConfiguration(rt.s)
@@ -603,17 +680,15 @@ func TestValidateFeatureGates(t *testing.T) {
 		featureGates featureFlag
 		expected     bool
 	}{
-		{featureFlag{"SelfHosting": true}, true},
-		{featureFlag{"SelfHosting": false}, true},
-		{featureFlag{"StoreCertsInSecrets": true}, true},
-		{featureFlag{"StoreCertsInSecrets": false}, true},
-		{featureFlag{"Foo": true}, false},
+		{featureFlag{"Unknown": true}, false},
+		{featureFlag{"Unknown": false}, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed featureGates:\n\texpected: %t\n\t  actual: %t",
+				"failed featureGates %v:\n\texpected: %t\n\t  actual: %t",
+				rt.featureGates,
 				rt.expected,
 				(len(actual) == 0),
 			)

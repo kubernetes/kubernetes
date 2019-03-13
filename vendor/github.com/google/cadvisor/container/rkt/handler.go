@@ -27,9 +27,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"golang.org/x/net/context"
 
-	"github.com/golang/glog"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/klog"
 )
 
 type rktContainerHandler struct {
@@ -89,7 +89,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 	annotations := resp.Pod.Annotations
 	if parsed.Container != "" { // As not empty string, an App container
 		if contAnnotations, ok := findAnnotations(resp.Pod.Apps, parsed.Container); !ok {
-			glog.Warningf("couldn't find app %v in pod", parsed.Container)
+			klog.Warningf("couldn't find app %v in pod", parsed.Container)
 		} else {
 			annotations = append(annotations, contAnnotations...)
 		}

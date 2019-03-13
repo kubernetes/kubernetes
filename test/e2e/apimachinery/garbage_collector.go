@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -111,17 +111,17 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 	}
 }
 
-func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *v1beta1.Deployment {
+func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *apps.Deployment {
 	replicas := int32(2)
-	return &v1beta1.Deployment{
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: v1beta1.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Strategy: v1beta1.DeploymentStrategy{
-				Type: v1beta1.RollingUpdateDeploymentStrategyType,
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
 			},
 			Template: getPodTemplateSpec(labels),
 		},
@@ -185,7 +185,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d pods, got %d pods", num, len(pods.Items)))
 			}
 		case "Deployments":
-			deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
+			deployments, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %v", err)
 			}
@@ -194,7 +194,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d Deployments, got %d Deployments", num, len(deployments.Items)))
 			}
 		case "ReplicaSets":
-			rs, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+			rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
@@ -480,8 +480,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	*/
 	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
-		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		uniqLabels := getUniqLabel("gctest", "delete_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
@@ -539,8 +539,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	*/
 	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
-		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		uniqLabels := getUniqLabel("gctest", "orphan_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
@@ -593,7 +593,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			aggregatedError := utilerrors.NewAggregate(errList)
 			framework.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
 		}
-		rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+		rs, err := clientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}

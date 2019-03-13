@@ -17,14 +17,16 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
+	"bytes"
 	"net"
+	"reflect"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -33,28 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
-
-// AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or JoinConfiguration and unmarshals it
-func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) {
-	b, err := ioutil.ReadFile(cfgPath)
-	if err != nil {
-		return nil, err
-	}
-
-	gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
-	if err != nil {
-		return nil, err
-	}
-
-	// First, check if the gvk list has InitConfiguration and in that case try to unmarshal it
-	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
-		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
-	}
-	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		return JoinConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.JoinConfiguration{})
-	}
-	return nil, errors.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
-}
 
 // MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
@@ -68,42 +48,33 @@ func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	}
 }
 
-// DetectUnsupportedVersion reads YAML bytes, extracts the TypeMeta information and errors out with an user-friendly message if the API spec is too old for this kubeadm version
-func DetectUnsupportedVersion(b []byte) error {
-	gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
-	if err != nil {
-		return err
-	}
-
-	// TODO: On our way to making the kubeadm API beta and higher, give good user output in case they use an old config file with a new kubeadm version, and
-	// tell them how to upgrade. The support matrix will look something like this now and in the future:
+// validateSupportedVersion checks if the supplied GroupVersion is not on the lists of old unsupported or deprecated GVs.
+// If it is, an error is returned.
+func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) error {
+	// The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
-	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1 or v1alpha2
+	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Errors if the user tries to use v1alpha1
+	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
+	// v1.14: v1alpha3 convert only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
-	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
-	knownKinds := map[string]bool{}
-	for _, gvk := range gvks {
-		if useKubeadmVersion := oldKnownAPIVersions[gvk.GroupVersion().String()]; len(useKubeadmVersion) != 0 {
-			return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvk.GroupVersion().String(), useKubeadmVersion)
-		}
-		knownKinds[gvk.Kind] = true
+
+	// Deprecated API versions are supported by us, but can only be used for migration.
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1alpha3": {}, // Can be migrated with kubeadm 1.13+
 	}
 
-	// InitConfiguration and JoinConfiguration may not apply together, warn if more than one is specified
-	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
-	mutuallyExclusiveCount := 0
-	for _, kind := range mutuallyExclusive {
-		if knownKinds[kind] {
-			mutuallyExclusiveCount++
-		}
+	gvString := gv.String()
+
+	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
+		return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
 	}
-	if mutuallyExclusiveCount > 1 {
-		glog.Warningf("WARNING: Detected resource kinds that may not apply: %v", mutuallyExclusive)
+
+	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
+		return errors.Errorf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
 	}
 
 	return nil
@@ -141,7 +112,7 @@ func LowercaseSANs(sans []string) {
 	for i, san := range sans {
 		lowercase := strings.ToLower(san)
 		if lowercase != san {
-			glog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
+			klog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
 			sans[i] = lowercase
 		}
 	}
@@ -166,7 +137,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	ip, err := netutil.ChooseBindAddress(bindAddress)
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
-			glog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
+			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
 			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
 			if defaultIP == nil {
 				return nil, errors.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
@@ -175,5 +146,52 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 		}
 		return nil, err
 	}
+	if bindAddress != nil && !bindAddress.IsUnspecified() && !reflect.DeepEqual(ip, bindAddress) {
+		klog.Warningf("WARNING: overriding requested API server bind address: requested %q, actual %q", bindAddress, ip)
+	}
 	return ip, nil
+}
+
+// MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
+// Only kubeadm kinds are migrated. Others are silently ignored.
+func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
+	newConfig := [][]byte{}
+
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gvks := []schema.GroupVersionKind{}
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+
+	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
+	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
+		o, err := documentMapToInitConfiguration(gvkmap, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
+	// Migrate JoinConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
+		o, err := documentMapToJoinConfiguration(gvkmap, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
+	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }

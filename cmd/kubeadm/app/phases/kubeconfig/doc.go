@@ -22,7 +22,7 @@ package kubeconfig
 
 	INPUTS:
 		From InitConfiguration
-			The Master API Server endpoint (AdvertiseAddress + BindPort) is required so the kubeconfig file knows where to find the master
+			The API Server endpoint (AdvertiseAddress + BindPort) is required so the kubeconfig file knows where to find the control-plane
 			The KubernetesDir path is required for knowing where to put the kubeconfig files
 			The PKIPath is required for knowing where all certificates should be stored
 

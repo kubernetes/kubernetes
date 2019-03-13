@@ -23,10 +23,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -63,19 +65,19 @@ func scsiHostScan() {
 			name := scsi_path + f.Name() + "/scan"
 			data := []byte("- - -")
 			ioutil.WriteFile(name, data, 0666)
-			glog.Errorf("scsiHostScan scan for %s", name)
+			klog.Errorf("scsiHostScan scan for %s", name)
 		}
 	}
 }
 
 func verifyDevicePath(path string) (string, error) {
-	if pathExists, err := volumeutil.PathExists(path); err != nil {
+	if pathExists, err := mount.PathExists(path); err != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil
 	}
 
-	glog.V(4).Infof("verifyDevicePath: path not exists yet")
+	klog.V(4).Infof("verifyDevicePath: path not exists yet")
 	return "", nil
 }
 
@@ -83,13 +85,13 @@ func verifyDevicePath(path string) (string, error) {
 func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pdID string, capacityGB int, fstype string, err error) {
 	cloud, err := getCloudProvider(p.plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.Errorf("Photon Controller Util: CreateVolume failed to get cloud provider. Error [%v]", err)
+		klog.Errorf("Photon Controller Util: CreateVolume failed to get cloud provider. Error [%v]", err)
 		return "", 0, "", err
 	}
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// PhotonController works with GiB, convert to GiB with rounding up
-	volSizeGB, err := volumeutil.RoundUpToGiBInt(capacity)
+	volSizeGB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return "", 0, "", err
 	}
@@ -106,20 +108,20 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 			volumeOptions.Flavor = value
 		case volume.VolumeParameterFSType:
 			fstype = value
-			glog.V(4).Infof("Photon Controller Util: Setting fstype to %s", fstype)
+			klog.V(4).Infof("Photon Controller Util: Setting fstype to %s", fstype)
 		default:
-			glog.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
+			klog.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
 			return "", 0, "", fmt.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
 		}
 	}
 
 	pdID, err = cloud.CreateDisk(volumeOptions)
 	if err != nil {
-		glog.Errorf("Photon Controller Util: failed to CreateDisk. Error [%v]", err)
+		klog.Errorf("Photon Controller Util: failed to CreateDisk. Error [%v]", err)
 		return "", 0, "", err
 	}
 
-	glog.V(4).Infof("Successfully created Photon Controller persistent disk %s", name)
+	klog.V(4).Infof("Successfully created Photon Controller persistent disk %s", name)
 	return pdID, volSizeGB, "", nil
 }
 
@@ -127,28 +129,28 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 func (util *PhotonDiskUtil) DeleteVolume(pd *photonPersistentDiskDeleter) error {
 	cloud, err := getCloudProvider(pd.plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.Errorf("Photon Controller Util: DeleteVolume failed to get cloud provider. Error [%v]", err)
+		klog.Errorf("Photon Controller Util: DeleteVolume failed to get cloud provider. Error [%v]", err)
 		return err
 	}
 
 	if err = cloud.DeleteDisk(pd.pdID); err != nil {
-		glog.Errorf("Photon Controller Util: failed to DeleteDisk for pdID %s. Error [%v]", pd.pdID, err)
+		klog.Errorf("Photon Controller Util: failed to DeleteDisk for pdID %s. Error [%v]", pd.pdID, err)
 		return err
 	}
 
-	glog.V(4).Infof("Successfully deleted PhotonController persistent disk %s", pd.pdID)
+	klog.V(4).Infof("Successfully deleted PhotonController persistent disk %s", pd.pdID)
 	return nil
 }
 
 func getCloudProvider(cloud cloudprovider.Interface) (*photon.PCCloud, error) {
 	if cloud == nil {
-		glog.Errorf("Photon Controller Util: Cloud provider not initialized properly")
+		klog.Errorf("Photon Controller Util: Cloud provider not initialized properly")
 		return nil, fmt.Errorf("Photon Controller Util: Cloud provider not initialized properly")
 	}
 
 	pcc := cloud.(*photon.PCCloud)
 	if pcc == nil {
-		glog.Errorf("Invalid cloud provider: expected Photon Controller")
+		klog.Errorf("Invalid cloud provider: expected Photon Controller")
 		return nil, fmt.Errorf("Invalid cloud provider: expected Photon Controller")
 	}
 	return pcc, nil

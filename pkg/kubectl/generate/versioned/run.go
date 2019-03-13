@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -197,6 +198,94 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 			Labels: labels,
 		},
 		Spec: appsv1beta1.DeploymentSpec{
+			Replicas: &count32,
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: *podSpec,
+			},
+		},
+	}
+	return &deployment, nil
+}
+
+type DeploymentAppsV1 struct{}
+
+func (DeploymentAppsV1) ParamNames() []generate.GeneratorParam {
+	return []generate.GeneratorParam{
+		{Name: "labels", Required: false},
+		{Name: "default-name", Required: false},
+		{Name: "name", Required: true},
+		{Name: "replicas", Required: true},
+		{Name: "image", Required: true},
+		{Name: "image-pull-policy", Required: false},
+		{Name: "port", Required: false},
+		{Name: "hostport", Required: false},
+		{Name: "stdin", Required: false},
+		{Name: "tty", Required: false},
+		{Name: "command", Required: false},
+		{Name: "args", Required: false},
+		{Name: "env", Required: false},
+		{Name: "requests", Required: false},
+		{Name: "limits", Required: false},
+		{Name: "serviceaccount", Required: false},
+	}
+}
+
+func (DeploymentAppsV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getEnvs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	count, err := strconv.Atoi(params["replicas"])
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makePodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	if err := updatePodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	count32 := int32(count)
+	deployment := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &count32,
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: v1.PodTemplateSpec{

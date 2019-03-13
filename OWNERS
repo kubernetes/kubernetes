@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 filters:
   ".*":
     reviewers:
@@ -7,6 +9,7 @@ filters:
       - lavalamp
       - smarterclayton
       - thockin
+      - liggitt
     approvers:
       - bgrant0607
       - brendandburns
@@ -17,6 +20,7 @@ filters:
       - smarterclayton
       - thockin
       - wojtek-t
+      - liggitt
 
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":

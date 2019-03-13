@@ -19,16 +19,16 @@ package set
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -63,16 +63,16 @@ type SetImageOptions struct {
 }
 
 var (
-	image_resources = `
+	imageResources = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = templates.LongDesc(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + image_resources)
+		` + imageResources)
 
-	image_example = templates.Examples(`
+	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -86,6 +86,7 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
+// NewImageOptions returns an initialized SetImageOptions instance
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
@@ -97,6 +98,7 @@ func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	}
 }
 
+// NewCmdImage returns an initialized Command instance for the 'set image' sub command
 func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewImageOptions(streams)
 
@@ -104,8 +106,8 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Update image of a pod template"),
-		Long:                  image_long,
-		Example:               image_example,
+		Long:                  imageLong,
+		Example:               imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -126,6 +128,7 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
+// Complete completes all required options
 func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
@@ -160,14 +163,12 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.Local {
@@ -191,12 +192,13 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return nil
 }
 
+// Validate makes sure provided values in SetImageOptions are valid
 func (o *SetImageOptions) Validate() error {
 	errors := []error{}
 	if o.All && len(o.Selector) > 0 {
 		errors = append(errors, fmt.Errorf("cannot set --all and --selector at the same time"))
 	}
-	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
 	if len(o.ContainerImages) < 1 {
@@ -207,42 +209,25 @@ func (o *SetImageOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
+// Run performs the execution of 'set image' sub command
 func (o *SetImageOptions) Run() error {
 	allErrs := []error{}
 
 	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
-		transformed := false
 		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
-				var (
-					containerFound bool
-					err            error
-					resolved       string
-				)
-				// Find the container to update, and update its image
-				for i, c := range spec.Containers {
-					if c.Name == name || name == "*" {
-						containerFound = true
-						if len(resolved) == 0 {
-							if resolved, err = o.ResolveImage(image); err != nil {
-								allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
-								// Do not loop again if the image resolving failed for wildcard case as we
-								// will report the same error again for the next container.
-								if name == "*" {
-									break
-								}
-								continue
-							}
-						}
-						if spec.Containers[i].Image != resolved {
-							spec.Containers[i].Image = resolved
-							// Perform updates
-							transformed = true
-						}
+				resolvedImageName, err := o.ResolveImage(image)
+				if err != nil {
+					allErrs = append(allErrs, fmt.Errorf("error: unable to resolve image %q for container %q: %v", image, name, err))
+					if name == "*" {
+						break
 					}
+					continue
 				}
-				// Add a new container if not found
-				if !containerFound {
+
+				initContainerFound := setImage(spec.InitContainers, name, resolvedImageName)
+				containerFound := setImage(spec.Containers, name, resolvedImageName)
+				if !containerFound && !initContainerFound {
 					allErrs = append(allErrs, fmt.Errorf("error: unable to find container named %q", name))
 				}
 			}
@@ -251,12 +236,9 @@ func (o *SetImageOptions) Run() error {
 		if err != nil {
 			return nil, err
 		}
-		if !transformed {
-			return nil, nil
-		}
 		// record this change (for rollout history)
 		if err := o.Recorder.Record(obj); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
@@ -265,7 +247,8 @@ func (o *SetImageOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			name := info.ObjectName()
+			allErrs = append(allErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 
@@ -284,7 +267,7 @@ func (o *SetImageOptions) Run() error {
 		// patch the change
 		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v", err))
 			continue
 		}
 
@@ -293,6 +276,18 @@ func (o *SetImageOptions) Run() error {
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func setImage(containers []v1.Container, containerName string, image string) bool {
+	containerFound := false
+	// Find the container to update, and update its image
+	for i, c := range containers {
+		if c.Name == containerName || containerName == "*" {
+			containerFound = true
+			containers[i].Image = image
+		}
+	}
+	return containerFound
 }
 
 // getResourcesAndImages retrieves resources and container name:images pair from given args

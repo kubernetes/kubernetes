@@ -39,8 +39,8 @@ const (
 	dekKeySizeLen = 2
 
 	kmsConfigYAML = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -80,7 +80,7 @@ func (r rawDEKKEKSecret) getPayload() []byte {
 // 4. The payload (ex. Secret) should be encrypted via AES CBC transform
 // 5. Prefix-EncryptedDEK-EncryptedPayload structure should be deposited to ETCD
 func TestKMSProvider(t *testing.T) {
-	pluginMock, err := NewBase64Plugin()
+	pluginMock, err := newBase64Plugin()
 	if err != nil {
 		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
 	}

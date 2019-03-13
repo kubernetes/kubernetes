@@ -71,7 +71,7 @@ func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
 	return nil
 }
 
-func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error {
+func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

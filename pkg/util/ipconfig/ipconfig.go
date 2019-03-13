@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -66,7 +66,7 @@ func (runner *runner) GetDNSSuffixSearchList() ([]string, error) {
 	// TODO: this does not work when the label is localized
 	suffixList := []string{}
 	if runtime.GOOS != "windows" {
-		glog.V(1).Infof("ipconfig not supported on GOOS=%s", runtime.GOOS)
+		klog.V(1).Infof("ipconfig not supported on GOOS=%s", runtime.GOOS)
 		return suffixList, nil
 	}
 
@@ -92,7 +92,7 @@ func (runner *runner) GetDNSSuffixSearchList() ([]string, error) {
 			}
 		}
 	} else {
-		glog.V(1).Infof("Running %s %s failed: %v", cmdIpconfig, cmdDefaultArgs, err)
+		klog.V(1).Infof("Running %s %s failed: %v", cmdIpconfig, cmdDefaultArgs, err)
 	}
 
 	return suffixList, err

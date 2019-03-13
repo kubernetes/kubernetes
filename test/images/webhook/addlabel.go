@@ -19,9 +19,9 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/golang/glog"
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 
 // Add a label {"added-label": "yes"} to the object
 func addLabel(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("calling add-label")
+	klog.V(2).Info("calling add-label")
 	obj := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -43,7 +43,7 @@ func addLabel(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	raw := ar.Request.Object.Raw
 	err := json.Unmarshal(raw, &obj)
 	if err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
 

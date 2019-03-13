@@ -50,7 +50,6 @@ func TestShouldRetryHTTPRequest(t *testing.T) {
 			expected: false,
 		},
 	}
-
 	for _, test := range tests {
 		resp := &http.Response{
 			StatusCode: test.code,
@@ -85,7 +84,7 @@ func TestIsSuccessResponse(t *testing.T) {
 		resp := http.Response{
 			StatusCode: test.code,
 		}
-		res := isSuccessHTTPResponse(resp)
+		res := isSuccessHTTPResponse(&resp)
 		if res != test.expected {
 			t.Errorf("expected: %v, saw: %v", test.expected, res)
 		}

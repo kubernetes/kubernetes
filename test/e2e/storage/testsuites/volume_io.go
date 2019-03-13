@@ -24,7 +24,7 @@ package testsuites
 import (
 	"fmt"
 	"math"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -48,6 +47,8 @@ var md5hashes = map[int64]string{
 	testpatterns.FileSizeMedium: "f2fa202b1ffeedda5f3a58bd1ae81104",
 	testpatterns.FileSizeLarge:  "8d763edc71bd16217664793b5a15e403",
 }
+
+const mountPath = "/opt"
 
 type volumeIOTestSuite struct {
 	tsInfo TestSuiteInfo
@@ -73,87 +74,65 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
-}
+func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	type local struct {
+		config      *PerTestConfig
+		testCleanup func()
 
-func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
-	var fsGroup *int64
-	driver := resource.driver
-	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
-	fileSizes := createFileSizes(dInfo.MaxFileSize)
-	volSource := resource.volSource
+		resource *genericVolumeTestResource
+	}
+	var (
+		dInfo = driver.GetDriverInfo()
+		l     local
+	)
 
-	if volSource == nil {
-		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+	// No preconditions to test. Normally they would be in a BeforeEach here.
+
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
+	f := framework.NewDefaultFramework("volumeio")
+
+	init := func() {
+		l = local{}
+
+		// Now do the more expensive test initialization.
+		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		if l.resource.volSource == nil {
+			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+		}
 	}
 
-	if dInfo.IsFsGroupSupported {
-		fsGroupVal := int64(1234)
-		fsGroup = &fsGroupVal
+	cleanup := func() {
+		if l.resource != nil {
+			l.resource.cleanupResource()
+			l.resource = nil
+		}
+
+		if l.testCleanup != nil {
+			l.testCleanup()
+			l.testCleanup = nil
+		}
 	}
 
-	return volumeIOTestInput{
-		f:         f,
-		name:      dInfo.Name,
-		config:    dInfo.Config,
-		volSource: *volSource,
-		testFile:  fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name),
-		podSec: v1.PodSecurityContext{
-			FSGroup: fsGroup,
-		},
-		fileSizes: fileSizes,
-	}
-}
-
-func (t *volumeIOTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
-	Context(getTestNameStr(t, pattern), func() {
-		var (
-			resource     genericVolumeTestResource
-			input        volumeIOTestInput
-			needsCleanup bool
-		)
-
-		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
-			// Setup test resource for driver and testpattern
-			resource = genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
-
-			// Create test input
-			input = createVolumeIOTestInput(pattern, resource)
-		})
-
-		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
-		})
-
-		execTestVolumeIO(&input)
-	})
-}
-
-type volumeIOTestInput struct {
-	f         *framework.Framework
-	name      string
-	config    framework.VolumeTestConfig
-	volSource v1.VolumeSource
-	testFile  string
-	podSec    v1.PodSecurityContext
-	fileSizes []int64
-}
-
-func execTestVolumeIO(input *volumeIOTestInput) {
 	It("should write files of various sizes, verify size, validate content [Slow]", func() {
-		f := input.f
-		cs := f.ClientSet
+		init()
+		defer cleanup()
 
-		err := testVolumeIO(f, cs, input.config, input.volSource, &input.podSec, input.testFile, input.fileSizes)
+		cs := f.ClientSet
+		fileSizes := createFileSizes(dInfo.MaxFileSize)
+		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
+		var fsGroup *int64
+		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
+			fsGroupVal := int64(1234)
+			fsGroup = &fsGroupVal
+		}
+		podSec := v1.PodSecurityContext{
+			FSGroup: fsGroup,
+		}
+		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }
@@ -176,10 +155,9 @@ func createFileSizes(maxFileSize int64) []int64 {
 }
 
 // Return the plugin's client pod spec. Use an InitContainer to setup the file i/o test env.
-func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
-	volName := fmt.Sprintf("%s-%s", config.Prefix, "io-volume")
-
+func makePodSpec(config framework.VolumeTestConfig, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
 	var gracePeriod int64 = 1
+	volName := fmt.Sprintf("io-volume-%s", config.Namespace)
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -204,7 +182,7 @@ func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc 
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volName,
-							MountPath: dir,
+							MountPath: mountPath,
 						},
 					},
 				},
@@ -221,7 +199,7 @@ func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc 
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volName,
-							MountPath: dir,
+							MountPath: mountPath,
 						},
 					},
 				},
@@ -302,8 +280,7 @@ func deleteFile(pod *v1.Pod, fpath string) {
 // Note: `fsizes` values are enforced to each be at least `MinFileSize` and a multiple of `MinFileSize`
 //   bytes.
 func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framework.VolumeTestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
-	dir := path.Join("/opt", config.Prefix, config.Namespace)
-	ddInput := path.Join(dir, "dd_if")
+	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
 	loopCnt := testpatterns.MinFileSize / int64(len(writeBlk))
 	// initContainer cmd to create and fill dd's input file. The initContainer is used to create
@@ -311,7 +288,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 	// used to create a 1MiB file in the target directory.
 	initCmd := fmt.Sprintf("i=0; while [ $i -lt %d ]; do echo -n %s >>%s; let i+=1; done", loopCnt, writeBlk, ddInput)
 
-	clientPod := makePodSpec(config, dir, initCmd, volsrc, podSecContext)
+	clientPod := makePodSpec(config, initCmd, volsrc, podSecContext)
 
 	By(fmt.Sprintf("starting %s", clientPod.Name))
 	podsNamespacer := cs.CoreV1().Pods(config.Namespace)
@@ -320,7 +297,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 		return fmt.Errorf("failed to create client pod %q: %v", clientPod.Name, err)
 	}
 	defer func() {
-		// note the test dir will be removed when the kubelet unmounts it
+		deleteFile(clientPod, ddInput)
 		By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
 		e := framework.DeletePodWithWait(f, cs, clientPod)
 		if e != nil {
@@ -345,14 +322,16 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 		if math.Mod(float64(fsize), float64(testpatterns.MinFileSize)) != 0 {
 			fsize = fsize/testpatterns.MinFileSize + testpatterns.MinFileSize
 		}
-		fpath := path.Join(dir, fmt.Sprintf("%s-%d", file, fsize))
+		fpath := filepath.Join(mountPath, fmt.Sprintf("%s-%d", file, fsize))
+		defer func() {
+			deleteFile(clientPod, fpath)
+		}()
 		if err = writeToFile(clientPod, fpath, ddInput, fsize); err != nil {
 			return err
 		}
 		if err = verifyFile(clientPod, fpath, fsize, ddInput); err != nil {
 			return err
 		}
-		deleteFile(clientPod, fpath)
 	}
 
 	return

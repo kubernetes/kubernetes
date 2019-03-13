@@ -51,8 +51,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
 
 var statusOk = []autoscalingv2.HorizontalPodAutoscalerCondition{
@@ -665,9 +665,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
-		eventClient.Core(),
+		eventClient.CoreV1(),
 		testScaleClient,
-		testClient.Autoscaling(),
+		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		metricsClient,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
@@ -862,7 +862,7 @@ func TestScaleUpDeployment(t *testing.T) {
 		useMetricsAPI:           true,
 		resource: &fakeResource{
 			name:       "test-dep",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "Deployment",
 		},
 	}
@@ -882,7 +882,7 @@ func TestScaleUpReplicaSet(t *testing.T) {
 		useMetricsAPI:           true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "ReplicaSet",
 		},
 	}
@@ -1033,7 +1033,7 @@ func TestScaleUpCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1047,6 +1047,37 @@ func TestScaleUpCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{20000},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpPerPodCMObject(t *testing.T) {
+	targetAverageValue := resource.MustParse("10.0")
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &targetAverageValue,
+					},
+				},
+			},
+		},
+		reportedLevels: []uint64{40000},
 	}
 	tc.runTest(t)
 }
@@ -1183,7 +1214,7 @@ func TestScaleDownCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1197,6 +1228,39 @@ func TestScaleDownCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels:      []uint64{12000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownPerPodCMObject(t *testing.T) {
+	targetAverageValue := resource.MustParse("20.0")
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &targetAverageValue,
+					},
+				},
+			},
+		},
+		reportedLevels:      []uint64{60000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
 	}
@@ -1392,7 +1456,7 @@ func TestToleranceCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1432,6 +1496,41 @@ func TestToleranceCMExternal(t *testing.T) {
 					},
 					Target: autoscalingv2.MetricTarget{
 						Value: resource.NewMilliQuantity(8666, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		reportedLevels: []uint64{8600},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestTolerancePerPodCMObject(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         4,
+		expectedDesiredReplicas: 4,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
 					},
 				},
 			},
@@ -1860,7 +1959,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -2176,7 +2275,7 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 	finalPods := int32(math.Ceil(resourcesUsedRatio * float64(startPods)))
 
 	// To breach tolerance we will create a utilization ratio difference of tolerance to usageRatioToleranceValue)
-	tc := testCase{
+	tc1 := testCase{
 		minReplicas:             0,
 		maxReplicas:             1000,
 		initialReplicas:         startPods,
@@ -2209,22 +2308,49 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 		useMetricsAPI:   true,
 		recommendations: []timestampedRecommendation{},
 	}
+	tc1.runTest(t)
 
-	tc.runTest(t)
-
-	// Reuse the data structure above, now testing "unscaling".
-	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
 	target = math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .004
 	finalCPUPercentTarget = int32(target * 100)
-	tc.CPUTarget = finalCPUPercentTarget
-	tc.initialReplicas = startPods
-	tc.expectedDesiredReplicas = startPods
-	tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-		Type:   autoscalingv2.AbleToScale,
-		Status: v1.ConditionTrue,
-		Reason: "ReadyForNewScale",
-	})
-	tc.runTest(t)
+	tc2 := testCase{
+		minReplicas:             0,
+		maxReplicas:             1000,
+		initialReplicas:         startPods,
+		expectedDesiredReplicas: startPods,
+		CPUTarget:               finalCPUPercentTarget,
+		reportedLevels: []uint64{
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+		},
+		reportedCPURequests: []resource.Quantity{
+			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+		},
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc2.runTest(t)
 }
 
 func TestScaleUpRCImmediately(t *testing.T) {

@@ -24,31 +24,31 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 )
 
 // This Pod's /checknosnat takes `target` and `ips` arguments, and queries {target}/checknosnat?ips={ips}
 
-type MasqTestProxy struct {
+type masqTestProxy struct {
 	Port string
 }
 
-func NewMasqTestProxy() *MasqTestProxy {
-	return &MasqTestProxy{
+func newMasqTestProxy() *masqTestProxy {
+	return &masqTestProxy{
 		Port: "31235",
 	}
 }
 
-func (m *MasqTestProxy) AddFlags(fs *pflag.FlagSet) {
+func (m *masqTestProxy) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat endpoint on.")
 }
 
 func main() {
-	m := NewMasqTestProxy()
+	m := newMasqTestProxy()
 	m.AddFlags(pflag.CommandLine)
 
-	flag.InitFlags()
+	cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -58,7 +58,7 @@ func main() {
 	}
 }
 
-func (m *MasqTestProxy) Run() error {
+func (m *masqTestProxy) Run() error {
 	// register handler
 	http.HandleFunc("/checknosnat", checknosnat)
 

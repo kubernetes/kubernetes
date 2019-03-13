@@ -18,11 +18,12 @@ package e2e_node
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
@@ -46,7 +47,6 @@ var NodeImageWhiteList = sets.NewString(
 	"k8s.gcr.io/stress:v1",
 	busyboxImage,
 	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
-	"k8s.gcr.io/node-problem-detector:v0.4.1",
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),
@@ -58,9 +58,24 @@ var NodeImageWhiteList = sets.NewString(
 	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
 )
 
-func init() {
+// updateImageWhiteList updates the framework.ImageWhiteList with
+// 1. the hard coded lists
+// 2. the ones passed in from framework.TestContext.ExtraEnvs
+// So this function needs to be called after the extra envs are applied.
+func updateImageWhiteList() {
 	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
 	framework.ImageWhiteList = NodeImageWhiteList.Union(commontest.CommonImageWhiteList)
+	// Images from extra envs
+	framework.ImageWhiteList.Insert(getNodeProblemDetectorImage())
+}
+
+func getNodeProblemDetectorImage() string {
+	const defaultImage string = "k8s.gcr.io/node-problem-detector:v0.6.2"
+	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
+	if image == "" {
+		image = defaultImage
+	}
+	return image
 }
 
 // puller represents a generic image puller
@@ -96,7 +111,7 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 	if err == nil && imageStatus != nil {
 		return nil, nil
 	}
-	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil)
+	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
 	return nil, err
 }
 
@@ -128,7 +143,7 @@ func PrePullAllImages() error {
 		return err
 	}
 	images := framework.ImageWhiteList.List()
-	glog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
+	klog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
 	for _, image := range images {
 		var (
 			err    error
@@ -141,11 +156,11 @@ func PrePullAllImages() error {
 			if output, err = puller.Pull(image); err == nil {
 				break
 			}
-			glog.Warningf("Failed to pull %s as user %q, retrying in %s (%d of %d): %v",
+			klog.Warningf("Failed to pull %s as user %q, retrying in %s (%d of %d): %v",
 				image, usr.Username, imagePullRetryDelay.String(), i+1, maxImagePullRetries, err)
 		}
 		if err != nil {
-			glog.Warningf("Could not pre-pull image %s %v output: %s", image, err, output)
+			klog.Warningf("Could not pre-pull image %s %v output: %s", image, err, output)
 			return err
 		}
 	}

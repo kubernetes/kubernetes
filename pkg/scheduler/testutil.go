@@ -24,9 +24,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -36,12 +38,12 @@ type FakeConfigurator struct {
 }
 
 // GetPredicateMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
+func (fc *FakeConfigurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // GetPredicates is not implemented yet.
-func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
+func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -88,4 +90,27 @@ func (fc *FakeConfigurator) CreateFromConfig(policy schedulerapi.Policy) (*facto
 // CreateFromKeys returns FakeConfigurator.Config
 func (fc *FakeConfigurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*factory.Config, error) {
 	return fc.Config, nil
+}
+
+// EmptyPluginSet is the default plugin registrar used by the default scheduler.
+type EmptyPluginSet struct{}
+
+var _ = plugins.PluginSet(EmptyPluginSet{})
+
+// ReservePlugins returns a slice of default reserve plugins.
+func (r EmptyPluginSet) ReservePlugins() []plugins.ReservePlugin {
+	return []plugins.ReservePlugin{}
+}
+
+// PrebindPlugins returns a slice of default prebind plugins.
+func (r EmptyPluginSet) PrebindPlugins() []plugins.PrebindPlugin {
+	return []plugins.PrebindPlugin{}
+}
+
+// Data returns a pointer to PluginData.
+func (r EmptyPluginSet) Data() *plugins.PluginData {
+	return &plugins.PluginData{
+		Ctx:            nil,
+		SchedulerCache: nil,
+	}
 }

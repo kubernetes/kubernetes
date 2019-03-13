@@ -19,7 +19,7 @@ package pod
 import (
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -163,9 +163,13 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.updatePodsInternal(pod)
 	if pm.checkpointManager != nil {
 		if err := checkpoint.WritePod(pm.checkpointManager, pod); err != nil {
-			glog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
+			klog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
 		}
 	}
+}
+
+func isPodInTerminatedState(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
 // updatePodsInternal replaces the given pods in the current state of the
@@ -174,14 +178,30 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
 		if pm.secretManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.secretManager.RegisterPod(pod)
+			if isPodInTerminatedState(pod) {
+				// Pods that are in terminated state and no longer running can be
+				// ignored as they no longer require access to secrets.
+				// It is especially important in watch-based manager, to avoid
+				// unnecessary watches for terminated pods waiting for GC.
+				pm.secretManager.UnregisterPod(pod)
+			} else {
+				// TODO: Consider detecting only status update and in such case do
+				// not register pod, as it doesn't really matter.
+				pm.secretManager.RegisterPod(pod)
+			}
 		}
 		if pm.configMapManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.configMapManager.RegisterPod(pod)
+			if isPodInTerminatedState(pod) {
+				// Pods that are in terminated state and no longer running can be
+				// ignored as they no longer require access to configmaps.
+				// It is especially important in watch-based manager, to avoid
+				// unnecessary watches for terminated pods waiting for GC.
+				pm.configMapManager.UnregisterPod(pod)
+			} else {
+				// TODO: Consider detecting only status update and in such case do
+				// not register pod, as it doesn't really matter.
+				pm.configMapManager.RegisterPod(pod)
+			}
 		}
 		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
@@ -226,7 +246,7 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	}
 	if pm.checkpointManager != nil {
 		if err := checkpoint.DeletePod(pm.checkpointManager, pod); err != nil {
-			glog.Errorf("Error deleting checkpoint for pod: %v", pod.GetName())
+			klog.Errorf("Error deleting checkpoint for pod: %v", pod.GetName())
 		}
 	}
 }

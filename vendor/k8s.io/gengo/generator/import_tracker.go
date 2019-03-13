@@ -19,7 +19,7 @@ package generator
 import (
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -42,7 +42,7 @@ func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {
 	// Using backslashes in package names causes gengo to produce Go code which
 	// will not compile with the gc compiler. See the comment on GoSeperator.
 	if strings.ContainsRune(path, '\\') {
-		glog.Warningf("Warning: backslash used in import path '%v', this is unsupported.\n", path)
+		klog.Warningf("Warning: backslash used in import path '%v', this is unsupported.\n", path)
 	}
 
 	dirs := strings.Split(path, namer.GoSeperator)

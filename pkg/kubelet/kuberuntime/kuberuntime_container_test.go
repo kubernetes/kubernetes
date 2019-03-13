@@ -61,7 +61,7 @@ func TestRemoveContainer(t *testing.T) {
 	err = m.removeContainer(containerID)
 	assert.NoError(t, err)
 	// Verify container log is removed
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo", "0.log")
+	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
 	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
@@ -323,7 +323,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "", kubecontainer.ContainerTypeRegular)
+		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "")
 		if err != nil {
 			t.Errorf("startContainer erro =%v", err)
 		}

@@ -39,13 +39,14 @@ type fakeAuditSink struct {
 	events []*auditinternal.Event
 }
 
-func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) {
+func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	for _, ev := range evs {
 		e := ev.DeepCopy()
 		s.events = append(s.events, e)
 	}
+	return true
 }
 
 func (s *fakeAuditSink) Events() []*auditinternal.Event {

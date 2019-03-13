@@ -138,7 +138,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 	}
 
-	expectConfig := kubeauthenticator.AuthenticatorConfig{
+	expectConfig := kubeauthenticator.Config{
 		APIAudiences:                authenticator.Audiences{"http://foo.bar.com"},
 		Anonymous:                   false,
 		BasicAuthFile:               "/testBasicAuthFile",

@@ -19,15 +19,15 @@ package gce
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 )
 
 func newAddressMetricContext(request, region string) *metricContext {
@@ -149,7 +149,7 @@ func (g *Cloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Address
 	}
 
 	if len(addrs) > 1 {
-		glog.Warningf("More than one addresses matching the IP %q: %v", ipAddress, addrNames(addrs))
+		klog.Warningf("More than one addresses matching the IP %q: %v", ipAddress, addrNames(addrs))
 	}
 	for _, addr := range addrs {
 		if addr.Address == ipAddress {
@@ -173,7 +173,7 @@ func (g *Cloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta
 	}
 
 	if len(addrs) > 1 {
-		glog.Warningf("More than one addresses matching the IP %q: %v", ipAddress, addrNames(addrs))
+		klog.Warningf("More than one addresses matching the IP %q: %v", ipAddress, addrNames(addrs))
 	}
 	for _, addr := range addrs {
 		if addr.Address == ipAddress {

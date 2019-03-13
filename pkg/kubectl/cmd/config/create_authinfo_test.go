@@ -23,13 +23,13 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
-func stringFlagFor(s string) flag.StringFlag {
-	var f flag.StringFlag
+func stringFlagFor(s string) cliflag.StringFlag {
+	var f cliflag.StringFlag
 	f.Set(s)
 	return f
 }

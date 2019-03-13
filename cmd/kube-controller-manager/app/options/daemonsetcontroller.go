@@ -24,7 +24,7 @@ import (
 
 // DaemonSetControllerOptions holds the DaemonSetController options.
 type DaemonSetControllerOptions struct {
-	ConcurrentDaemonSetSyncs int32
+	*kubectrlmgrconfig.DaemonSetControllerConfiguration
 }
 
 // AddFlags adds flags related to DaemonSetController for controller manager to the specified FlagSet.

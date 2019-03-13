@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/util/mount"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	siotypes "github.com/codedellemc/goscaleio/types/v1"
 )
@@ -57,22 +57,22 @@ func newSioMgr(configs map[string]string, exec mount.Exec) (*sioMgr, error) {
 // getClient safely returns an sioInterface
 func (m *sioMgr) getClient() (sioInterface, error) {
 	if m.client == nil {
-		glog.V(4).Info(log("creating scaleio client"))
+		klog.V(4).Info(log("creating scaleio client"))
 		configs := m.configData
 		username := configs[confKey.username]
 		password := configs[confKey.password]
 		gateway := configs[confKey.gateway]
 		b, err := strconv.ParseBool(configs[confKey.sslEnabled])
 		if err != nil {
-			glog.Error(log("failed to parse sslEnabled, must be either \"true\" or \"false\""))
+			klog.Error(log("failed to parse sslEnabled, must be either \"true\" or \"false\""))
 			return nil, err
 		}
 		certsEnabled := b
 
-		glog.V(4).Info(log("creating new client for gateway %s", gateway))
+		klog.V(4).Info(log("creating new client for gateway %s", gateway))
 		client, err := newSioClient(gateway, username, password, certsEnabled, m.exec)
 		if err != nil {
-			glog.Error(log("failed to create scaleio client: %v", err))
+			klog.Error(log("failed to create scaleio client: %v", err))
 			return nil, err
 		}
 
@@ -85,7 +85,7 @@ func (m *sioMgr) getClient() (sioInterface, error) {
 
 		m.client = client
 
-		glog.V(4).Info(log("client created successfully [gateway=%s]", gateway))
+		klog.V(4).Info(log("client created successfully [gateway=%s]", gateway))
 	}
 	return m.client, nil
 }
@@ -97,13 +97,13 @@ func (m *sioMgr) CreateVolume(volName string, sizeGB int64) (*siotypes.Volume, e
 		return nil, err
 	}
 
-	glog.V(4).Infof("scaleio: creating volume %s", volName)
+	klog.V(4).Infof("scaleio: creating volume %s", volName)
 	vol, err := client.CreateVolume(volName, sizeGB)
 	if err != nil {
-		glog.V(4).Infof("scaleio: failed creating volume %s: %v", volName, err)
+		klog.V(4).Infof("scaleio: failed creating volume %s: %v", volName, err)
 		return nil, err
 	}
-	glog.V(4).Infof("scaleio: created volume %s successfully", volName)
+	klog.V(4).Infof("scaleio: created volume %s successfully", volName)
 	return vol, nil
 }
 
@@ -112,17 +112,17 @@ func (m *sioMgr) CreateVolume(volName string, sizeGB int64) (*siotypes.Volume, e
 func (m *sioMgr) AttachVolume(volName string, multipleMappings bool) (string, error) {
 	client, err := m.getClient()
 	if err != nil {
-		glog.Error(log("attach volume failed: %v", err))
+		klog.Error(log("attach volume failed: %v", err))
 		return "", err
 	}
 
-	glog.V(4).Infoln(log("attaching volume %s", volName))
+	klog.V(4).Infoln(log("attaching volume %s", volName))
 	iid, err := client.IID()
 	if err != nil {
-		glog.Error(log("failed to get instanceID"))
+		klog.Error(log("failed to get instanceID"))
 		return "", err
 	}
-	glog.V(4).Info(log("attaching volume %s to host instance %s", volName, iid))
+	klog.V(4).Info(log("attaching volume %s to host instance %s", volName, iid))
 
 	devs, err := client.Devs()
 	if err != nil {
@@ -131,29 +131,29 @@ func (m *sioMgr) AttachVolume(volName string, multipleMappings bool) (string, er
 
 	vol, err := client.FindVolume(volName)
 	if err != nil {
-		glog.Error(log("failed to find volume %s: %v", volName, err))
+		klog.Error(log("failed to find volume %s: %v", volName, err))
 		return "", err
 	}
 
 	// handle vol if already attached
 	if len(vol.MappedSdcInfo) > 0 {
 		if m.isSdcMappedToVol(iid, vol) {
-			glog.V(4).Info(log("skippping attachment, volume %s already attached to sdc %s", volName, iid))
+			klog.V(4).Info(log("skippping attachment, volume %s already attached to sdc %s", volName, iid))
 			return devs[vol.ID], nil
 		}
 	}
 
 	// attach volume, get deviceName
 	if err := client.AttachVolume(sioVolumeID(vol.ID), multipleMappings); err != nil {
-		glog.Error(log("attachment for volume %s failed :%v", volName, err))
+		klog.Error(log("attachment for volume %s failed :%v", volName, err))
 		return "", err
 	}
 	device, err := client.WaitForAttachedDevice(vol.ID)
 	if err != nil {
-		glog.Error(log("failed while waiting for device to attach: %v", err))
+		klog.Error(log("failed while waiting for device to attach: %v", err))
 		return "", err
 	}
-	glog.V(4).Info(log("volume %s attached successfully as %s to instance %s", volName, device, iid))
+	klog.V(4).Info(log("volume %s attached successfully as %s to instance %s", volName, device, iid))
 	return device, nil
 }
 
@@ -165,7 +165,7 @@ func (m *sioMgr) IsAttached(volName string) (bool, error) {
 	}
 	iid, err := client.IID()
 	if err != nil {
-		glog.Error("scaleio: failed to get instanceID")
+		klog.Error("scaleio: failed to get instanceID")
 		return false, err
 	}
 
@@ -184,7 +184,7 @@ func (m *sioMgr) DetachVolume(volName string) error {
 	}
 	iid, err := client.IID()
 	if err != nil {
-		glog.Error(log("failed to get instanceID: %v", err))
+		klog.Error(log("failed to get instanceID: %v", err))
 		return err
 	}
 
@@ -193,7 +193,7 @@ func (m *sioMgr) DetachVolume(volName string) error {
 		return err
 	}
 	if !m.isSdcMappedToVol(iid, vol) {
-		glog.Warning(log(
+		klog.Warning(log(
 			"skipping detached, vol %s not attached to instance %s",
 			volName, iid,
 		))
@@ -201,11 +201,11 @@ func (m *sioMgr) DetachVolume(volName string) error {
 	}
 
 	if err := client.DetachVolume(sioVolumeID(vol.ID)); err != nil {
-		glog.Error(log("failed to detach vol %s: %v", volName, err))
+		klog.Error(log("failed to detach vol %s: %v", volName, err))
 		return err
 	}
 
-	glog.V(4).Info(log("volume %s detached successfully", volName))
+	klog.V(4).Info(log("volume %s detached successfully", volName))
 
 	return nil
 }
@@ -223,11 +223,11 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 	}
 
 	if err := client.DeleteVolume(sioVolumeID(vol.ID)); err != nil {
-		glog.Error(log("failed to delete volume %s: %v", volName, err))
+		klog.Error(log("failed to delete volume %s: %v", volName, err))
 		return err
 	}
 
-	glog.V(4).Info(log("deleted volume %s successfully", volName))
+	klog.V(4).Info(log("deleted volume %s successfully", volName))
 	return nil
 
 }
@@ -235,7 +235,7 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 // isSdcMappedToVol returns true if the sdc is mapped to the volume
 func (m *sioMgr) isSdcMappedToVol(sdcID string, vol *siotypes.Volume) bool {
 	if len(vol.MappedSdcInfo) == 0 {
-		glog.V(4).Info(log("no attachment found"))
+		klog.V(4).Info(log("no attachment found"))
 		return false
 	}
 

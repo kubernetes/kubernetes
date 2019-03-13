@@ -21,12 +21,12 @@ import (
 	"net"
 	"sync"
 
-	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
@@ -96,7 +96,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
+		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
 		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 		return err
 	}
@@ -132,15 +132,14 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
-	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
 	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 	return err
 }
 
-func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
-	r.stopReconcilingCalled = true
 
 	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
@@ -165,6 +164,12 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 		return err
 	})
 	return err
+}
+
+func (r *masterCountEndpointReconciler) StopReconciling() {
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+	r.stopReconcilingCalled = true
 }
 
 // Determine if the endpoint is in the format ReconcileEndpoints expects.

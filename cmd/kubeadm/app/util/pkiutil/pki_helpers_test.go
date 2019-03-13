@@ -52,40 +52,43 @@ func TestNewCertificateAuthority(t *testing.T) {
 
 func TestNewCertAndKey(t *testing.T) {
 	var tests = []struct {
+		name      string
 		caKeySize int
 		expected  bool
 	}{
 		{
-			// RSA key too small
+			name:      "RSA key too small",
 			caKeySize: 128,
 			expected:  false,
 		},
 		{
-			// Should succeed
+			name:      "Should succeed",
 			caKeySize: 2048,
 			expected:  true,
 		},
 	}
 
 	for _, rt := range tests {
-		caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
-		if err != nil {
-			t.Fatalf("Couldn't create rsa Private Key")
-		}
-		caCert := &x509.Certificate{}
-		config := &certutil.Config{
-			CommonName:   "test",
-			Organization: []string{"test"},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		}
-		_, _, actual := NewCertAndKey(caCert, caKey, config)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed NewCertAndKey:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
+			if err != nil {
+				t.Fatalf("Couldn't create rsa Private Key")
+			}
+			caCert := &x509.Certificate{}
+			config := &certutil.Config{
+				CommonName:   "test",
+				Organization: []string{"test"},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			}
+			_, _, actual := NewCertAndKey(caCert, caKey, config)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed NewCertAndKey:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
@@ -93,10 +96,12 @@ func TestHasServerAuth(t *testing.T) {
 	caCert, caKey, _ := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 
 	var tests = []struct {
+		name     string
 		config   certutil.Config
 		expected bool
 	}{
 		{
+			name: "has ServerAuth",
 			config: certutil.Config{
 				CommonName: "test",
 				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
@@ -104,6 +109,7 @@ func TestHasServerAuth(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "doesn't have ServerAuth",
 			config: certutil.Config{
 				CommonName: "test",
 				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
@@ -113,18 +119,20 @@ func TestHasServerAuth(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		cert, _, err := NewCertAndKey(caCert, caKey, &rt.config)
-		if err != nil {
-			t.Fatalf("Couldn't create cert: %v", err)
-		}
-		actual := HasServerAuth(cert)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed HasServerAuth:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			cert, _, err := NewCertAndKey(caCert, caKey, &rt.config)
+			if err != nil {
+				t.Fatalf("Couldn't create cert: %v", err)
+			}
+			actual := HasServerAuth(cert)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed HasServerAuth:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -227,30 +235,35 @@ func TestCertOrKeyExist(t *testing.T) {
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		actual := CertOrKeyExist(rt.path, rt.name)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := CertOrKeyExist(rt.path, rt.name)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
@@ -277,30 +290,35 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
@@ -327,30 +345,35 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		_, actual := TryLoadCertFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			_, actual := TryLoadCertFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
@@ -377,30 +400,35 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
@@ -435,18 +463,27 @@ func TestPathForPublicKey(t *testing.T) {
 	}
 }
 
+func TestPathForCSR(t *testing.T) {
+	csrPath := pathForCSR("/foo", "bar")
+	if csrPath != "/foo/bar.csr" {
+		t.Errorf("unexpected certificate path: %s", csrPath)
+	}
+}
+
 func TestGetAPIServerAltNames(t *testing.T) {
 
 	var tests = []struct {
+		desc                string
 		name                string
 		cfg                 *kubeadmapi.InitConfiguration
 		expectedDNSNames    []string
 		expectedIPAddresses []string
 	}{
 		{
-			name: "ControlPlaneEndpoint DNS",
+			desc: "empty name",
+			name: "",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ControlPlaneEndpoint: "api.k8s.io:6443",
 					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
@@ -460,9 +497,10 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95"},
 		},
 		{
+			desc: "ControlPlaneEndpoint IP",
 			name: "ControlPlaneEndpoint IP",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ControlPlaneEndpoint: "4.5.6.7:6443",
 					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
@@ -478,38 +516,40 @@ func TestGetAPIServerAltNames(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		altNames, err := GetAPIServerAltNames(rt.cfg)
-		if err != nil {
-			t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			altNames, err := GetAPIServerAltNames(rt.cfg)
+			if err != nil {
+				t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
+			}
 
-		for _, DNSName := range rt.expectedDNSNames {
-			found := false
-			for _, val := range altNames.DNSNames {
-				if val == DNSName {
-					found = true
-					break
+			for _, DNSName := range rt.expectedDNSNames {
+				found := false
+				for _, val := range altNames.DNSNames {
+					if val == DNSName {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
 				}
 			}
 
-			if !found {
-				t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
-			}
-		}
+			for _, IPAddress := range rt.expectedIPAddresses {
+				found := false
+				for _, val := range altNames.IPs {
+					if val.Equal(net.ParseIP(IPAddress)) {
+						found = true
+						break
+					}
+				}
 
-		for _, IPAddress := range rt.expectedIPAddresses {
-			found := false
-			for _, val := range altNames.IPs {
-				if val.Equal(net.ParseIP(IPAddress)) {
-					found = true
-					break
+				if !found {
+					t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
 				}
 			}
-
-			if !found {
-				t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
-			}
-		}
+		})
 	}
 }
 
@@ -517,7 +557,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
 	cfg := &kubeadmapi.InitConfiguration{
-		APIEndpoint: kubeadmapi.APIEndpoint{
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 			AdvertiseAddress: "1.2.3.4",
 		},
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
@@ -544,32 +584,36 @@ func TestGetEtcdAltNames(t *testing.T) {
 
 	expectedDNSNames := []string{"myNode", "localhost", proxy}
 	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
+		t.Run(DNSName, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.DNSNames {
+				if val == DNSName {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
-		}
+			if !found {
+				t.Errorf("altNames does not contain DNSName %s", DNSName)
+			}
+		})
 	}
 
 	expectedIPAddresses := []string{"1.2.3.4", "127.0.0.1", net.IPv6loopback.String(), proxyIP}
 	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
+		t.Run(IPAddress, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.IPs {
+				if val.Equal(net.ParseIP(IPAddress)) {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
-		}
+			if !found {
+				t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+			}
+		})
 	}
 }
 
@@ -579,7 +623,7 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 	proxyIP := "10.10.10.100"
 	advertiseIP := "1.2.3.4"
 	cfg := &kubeadmapi.InitConfiguration{
-		APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: advertiseIP},
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: advertiseIP},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
@@ -602,31 +646,33 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 
 	expectedDNSNames := []string{hostname, proxy}
 	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
+		t.Run(DNSName, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.DNSNames {
+				if val == DNSName {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
-		}
-	}
-
-	expectedIPAddresses := []string{advertiseIP, proxyIP}
-	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
+			if !found {
+				t.Errorf("altNames does not contain DNSName %s", DNSName)
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
-		}
+			expectedIPAddresses := []string{advertiseIP, proxyIP}
+			for _, IPAddress := range expectedIPAddresses {
+				found := false
+				for _, val := range altNames.IPs {
+					if val.Equal(net.ParseIP(IPAddress)) {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+				}
+			}
+		})
 	}
 }

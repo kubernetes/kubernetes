@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	informers "k8s.io/client-go/informers/core/v1"
@@ -99,7 +99,7 @@ func NewController(
 // registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
-	glog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
+	klog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
 
 	nodes, err := listNodes(c.adapter.k8s)
 	if err != nil {
@@ -110,9 +110,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			_, cidrRange, err := net.ParseCIDR(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
-				glog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
+				klog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
 			} else {
-				glog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
+				klog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
 			}
 		}
 
@@ -180,7 +180,7 @@ func (c *Controller) onAdd(node *v1.Node) error {
 		c.syncers[node.Name] = syncer
 		go syncer.Loop(nil)
 	} else {
-		glog.Warningf("Add for node %q that already exists", node.Name)
+		klog.Warningf("Add for node %q that already exists", node.Name)
 	}
 	syncer.Update(node)
 
@@ -194,7 +194,7 @@ func (c *Controller) onUpdate(_, node *v1.Node) error {
 	if sync, ok := c.syncers[node.Name]; ok {
 		sync.Update(node)
 	} else {
-		glog.Errorf("Received update for non-existent node %q", node.Name)
+		klog.Errorf("Received update for non-existent node %q", node.Name)
 		return fmt.Errorf("unknown node %q", node.Name)
 	}
 
@@ -209,7 +209,7 @@ func (c *Controller) onDelete(node *v1.Node) error {
 		syncer.Delete(node)
 		delete(c.syncers, node.Name)
 	} else {
-		glog.Warningf("Node %q was already deleted", node.Name)
+		klog.Warningf("Node %q was already deleted", node.Name)
 	}
 
 	return nil

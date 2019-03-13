@@ -40,7 +40,10 @@
 			"SelectorRegexp": "k8s[.]io/utils",
 			"AllowedPrefixes": [
 				"k8s.io/utils/exec",
-				"k8s.io/utils/pointer"
+				"k8s.io/utils/integer",
+				"k8s.io/utils/path",
+				"k8s.io/utils/pointer",
+				"k8s.io/utils/net"
 			]
 		},
 		{
@@ -51,9 +54,6 @@
 				"k8s.io/kubernetes/pkg/apis/core",
 				"k8s.io/kubernetes/pkg/api/service",
 				"k8s.io/kubernetes/pkg/apis/apps",
-				"k8s.io/kubernetes/pkg/apis/extensions",
-				"k8s.io/kubernetes/pkg/apis/networking",
-				"k8s.io/kubernetes/pkg/apis/policy",
 				"k8s.io/kubernetes/pkg/apis/rbac",
 				"k8s.io/kubernetes/pkg/apis/scheduling",
 				"k8s.io/kubernetes/pkg/api/v1/pod",
@@ -69,28 +69,19 @@
 				"k8s.io/kubernetes/pkg/proxy/apis/config",
 				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
 				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
-				"k8s.io/kubernetes/pkg/scheduler/algorithm",
-				"k8s.io/kubernetes/pkg/scheduler/api",
-				"k8s.io/kubernetes/pkg/scheduler/cache",
-				"k8s.io/kubernetes/pkg/scheduler/internal/cache",
-				"k8s.io/kubernetes/pkg/scheduler/util",
 				"k8s.io/kubernetes/pkg/security/apparmor",
 				"k8s.io/kubernetes/pkg/serviceaccount",
-				"k8s.io/kubernetes/pkg/util/file",
 				"k8s.io/kubernetes/pkg/util/hash",
 				"k8s.io/kubernetes/pkg/util/initsystem",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
-				"k8s.io/kubernetes/pkg/util/net/sets",
 				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/normalizer",
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/taints",
 				"k8s.io/kubernetes/pkg/util/ipvs",
-				"k8s.io/kubernetes/pkg/version",
-				"k8s.io/kubernetes/pkg/volume",
-				"k8s.io/kubernetes/pkg/volume/util"
+				"k8s.io/kubernetes/pkg/version"
 			],
 			"ForbiddenPrefixes": [
 				"k8s.io/kubernetes/pkg/cloudprovider/providers",
@@ -129,13 +120,10 @@
 				"github.com/docker/go-connections/tlsconfig",
 				"github.com/docker/go-units",
 				"github.com/docker/libnetwork/ipvs",
-				"github.com/ghodss/yaml",
 				"github.com/gogo/protobuf/proto",
 				"github.com/gogo/protobuf/sortkeys",
-				"github.com/golang/glog",
 				"github.com/golang/groupcache/lru",
 				"github.com/golang/protobuf/proto",
-				"github.com/golang/protobuf/protoc-gen-go/descriptor",
 				"github.com/golang/protobuf/ptypes",
 				"github.com/googleapis/gnostic/compiler",
 				"github.com/googleapis/gnostic/extensions",
@@ -164,14 +152,11 @@
 				"github.com/prometheus/procfs",
 				"github.com/PuerkitoBio/purell",
 				"github.com/PuerkitoBio/urlesc",
-				"github.com/renstrom/dedent",
+				"github.com/lithammer/dedent",
 				"github.com/russross/blackfriday",
 				"github.com/shurcooL/sanitized_anchor_name",
-				"github.com/sirupsen/logrus",
 				"github.com/spf13/cobra",
-				"github.com/spf13/pflag",
-				"github.com/vishvananda/netlink/nl",
-				"github.com/vishvananda/netns"
+				"github.com/spf13/pflag"
 			]
 		},
 		{
@@ -204,7 +189,6 @@
 		{
 			"SelectorRegexp": "google[.]golang[.]org",
 			"AllowedPrefixes": [
-				"google.golang.org/genproto/googleapis/api/annotations",
 				"google.golang.org/genproto/googleapis/rpc/status",
 				"google.golang.org/grpc"
 			]

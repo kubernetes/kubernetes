@@ -24,9 +24,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/proxy"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -119,9 +119,9 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if staticDir != "" {
 		fileInfo, err := os.Stat(staticDir)
 		if err != nil {
-			glog.Warning("Failed to stat static file directory "+staticDir+": ", err)
+			klog.Warning("Failed to stat static file directory "+staticDir+": ", err)
 		} else if !fileInfo.IsDir() {
-			glog.Warning("Static file directory " + staticDir + " is not a directory")
+			klog.Warning("Static file directory " + staticDir + " is not a directory")
 		}
 	}
 
@@ -137,7 +137,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	}
 	if cmdutil.GetFlagBool(cmd, "disable-filter") {
 		if path == "" {
-			glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
 		}
 		filter = nil
 	}
@@ -155,9 +155,9 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		l, err = server.ListenUnix(path)
 	}
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	fmt.Fprintf(out, "Starting to serve on %s\n", l.Addr().String())
-	glog.Fatal(server.ServeOnListener(l))
+	klog.Fatal(server.ServeOnListener(l))
 	return nil
 }

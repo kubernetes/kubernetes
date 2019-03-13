@@ -17,42 +17,29 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
 const (
-	testConfig = `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data:
-    server: localhost:9008
-  name: prod
-contexts:
-- context:
-    cluster: prod
-    namespace: default
-    user: default-service-account
-  name: default
-current-context: default
-kind: Config
-preferences: {}
-users:
-- name: kubernetes-admin
-  user:
-    client-certificate-data:
-    client-key-data:
+	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta1
+kind: JoinConfiguration
+discovery:
+  bootstrapToken:
+    token: abcdef.0123456789abcdef
+    apiServerEndpoint: 1.2.3.4:6443
+    unsafeSkipCAVerification: true
+nodeRegistration:
+  criSocket: /run/containerd/containerd.sock
+  name: someName
 `
 )
 
-func TestNewValidJoin(t *testing.T) {
+func TestNewJoinData(t *testing.T) {
 	// create temp directory
 	tmpDir, err := ioutil.TempDir("", "kubeadm-join-test")
 	if err != nil {
@@ -67,116 +54,192 @@ func TestNewValidJoin(t *testing.T) {
 		t.Errorf("Unable to create file %q: %v", configFilePath, err)
 	}
 	defer cfgFile.Close()
-
-	testCases := []struct {
-		name                  string
-		skipPreFlight         bool
-		cfgPath               string
-		configToWrite         string
-		featureGatesString    string
-		ignorePreflightErrors []string
-		testJoinValidate      bool
-		testJoinRun           bool
-		cmdPersistentFlags    map[string]string
-		nodeConfig            *kubeadm.JoinConfiguration
-		expectedError         bool
-	}{
-		{
-			name:          "invalid: missing config file",
-			skipPreFlight: true,
-			cfgPath:       "missing-path-to-a-config",
-			expectedError: true,
-		},
-		{
-			name:          "invalid: incorrect config file",
-			skipPreFlight: true,
-			cfgPath:       configFilePath,
-			configToWrite: "bad-config-contents",
-			expectedError: true,
-		},
-		{
-			name:          "invalid: fail at preflight.RunJoinNodeChecks()",
-			skipPreFlight: false,
-			cfgPath:       configFilePath,
-			configToWrite: testConfig,
-			expectedError: true,
-		},
-		{
-			name:                  "invalid: incorrect ignorePreflight argument",
-			skipPreFlight:         true,
-			cfgPath:               configFilePath,
-			configToWrite:         testConfig,
-			ignorePreflightErrors: []string{"some-unsupported-preflight-arg"},
-			expectedError:         true,
-		},
-		{
-			name:               "invalid: incorrect featureGatesString",
-			featureGatesString: "bad-feature-gate-string",
-			expectedError:      true,
-		},
-		{
-			name:             "invalid: fail Join.Validate() with wrong flags",
-			skipPreFlight:    true,
-			cfgPath:          configFilePath,
-			configToWrite:    testConfig,
-			testJoinValidate: true,
-			cmdPersistentFlags: map[string]string{
-				"config":    "some-config",
-				"node-name": "some-node-name",
-			},
-			expectedError: true,
-		},
-		{
-			name:             "invalid: fail Join.Validate() with wrong node configuration",
-			skipPreFlight:    true,
-			cfgPath:          configFilePath,
-			configToWrite:    testConfig,
-			testJoinValidate: true,
-			expectedError:    true,
-		},
-		{
-			name:          "invalid: fail Join.Run() with invalid node config",
-			skipPreFlight: true,
-			cfgPath:       configFilePath,
-			configToWrite: testConfig,
-			testJoinRun:   true,
-			expectedError: true,
-		},
+	if _, err = cfgFile.WriteString(testJoinConfig); err != nil {
+		t.Fatalf("Unable to write file %q: %v", configFilePath, err)
 	}
 
-	var out bytes.Buffer
-	cfg := &kubeadmapiv1beta1.JoinConfiguration{}
-	kubeadmscheme.Scheme.Default(cfg)
+	testCases := []struct {
+		name        string
+		args        []string
+		flags       map[string]string
+		validate    func(*testing.T, *joinData)
+		expectError bool
+	}{
+		// Join data passed using flags
+		{
+			name:        "fails if no discovery method set",
+			expectError: true,
+		},
+		{
+			name: "fails if both file and bootstrap discovery methods set",
+			args: []string{"1.2.3.4:6443"},
+			flags: map[string]string{
+				options.FileDiscovery:            "https://foo",
+				options.TokenDiscovery:           "abcdef.0123456789abcdef",
+				options.TokenDiscoverySkipCAHash: "true",
+			},
+			expectError: true,
+		},
+		{
+			name: "pass if file discovery is set",
+			flags: map[string]string{
+				options.FileDiscovery: "https://foo",
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that file discovery settings are set into join data
+				if data.cfg.Discovery.File == nil || data.cfg.Discovery.File.KubeConfigPath != "https://foo" {
+					t.Errorf("Invalid data.cfg.Discovery.File")
+				}
+			},
+		},
+		{
+			name: "pass if bootstrap discovery is set",
+			args: []string{"1.2.3.4:6443", "5.6.7.8:6443"},
+			flags: map[string]string{
+				options.TokenDiscovery:           "abcdef.0123456789abcdef",
+				options.TokenDiscoverySkipCAHash: "true",
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that bootstrap discovery settings are set into join data
+				if data.cfg.Discovery.BootstrapToken == nil ||
+					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
+					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
+					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
+					t.Errorf("Invalid data.cfg.Discovery.BootstrapToken")
+				}
+			},
+		},
+		{
+			name: "--token sets TLSBootstrapToken and BootstrapToken.Token if unset",
+			args: []string{"1.2.3.4:6443"},
+			flags: map[string]string{
+				options.TokenStr:                 "abcdef.0123456789abcdef",
+				options.TokenDiscoverySkipCAHash: "true",
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that token sets both TLSBootstrapToken and BootstrapToken.Token into join data
+				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
+					data.cfg.Discovery.BootstrapToken == nil ||
+					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
+					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+				}
+			},
+		},
+		{
+			name: "--token doesn't override TLSBootstrapToken and BootstrapToken.Token if set",
+			args: []string{"1.2.3.4:6443"},
+			flags: map[string]string{
+				options.TokenStr:                 "aaaaaa.0123456789aaaaaa",
+				options.TLSBootstrapToken:        "abcdef.0123456789abcdef",
+				options.TokenDiscovery:           "defghi.0123456789defghi",
+				options.TokenDiscoverySkipCAHash: "true",
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that TLSBootstrapToken and BootstrapToken.Token values are preserved into join data
+				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
+					data.cfg.Discovery.BootstrapToken == nil ||
+					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi" {
+					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+				}
+			},
+		},
+		{
+			name: "control plane setting are preserved if --control-plane flag is set",
+			flags: map[string]string{
+				options.ControlPlane:              "true",
+				options.APIServerAdvertiseAddress: "1.2.3.4",
+				options.APIServerBindPort:         "1234",
+				options.FileDiscovery:             "https://foo", //required only to pass discovery validation
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that control plane attributes are set in join data
+				if data.cfg.ControlPlane == nil ||
+					data.cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" ||
+					data.cfg.ControlPlane.LocalAPIEndpoint.BindPort != 1234 {
+					t.Errorf("Invalid ControlPlane")
+				}
+			},
+		},
+		{
+			name: "control plane setting are cleaned up if --control-plane flag is not set",
+			flags: map[string]string{
+				options.ControlPlane:              "false",
+				options.APIServerAdvertiseAddress: "1.2.3.4",
+				options.APIServerBindPort:         "1.2.3.4",
+				options.FileDiscovery:             "https://foo", //required only to pass discovery validation
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that control plane attributes are unset in join data
+				if data.cfg.ControlPlane != nil {
+					t.Errorf("Invalid ControlPlane")
+				}
+			},
+		},
+		{
+			name: "fails if invalid preflight checks are provided",
+			flags: map[string]string{
+				options.IgnorePreflightErrors: "all,something-else",
+			},
+			expectError: true,
+		},
 
-	errorFormat := "Test case %q: NewValidJoin expected error: %v, saw: %v, error: %v"
-
+		// Join data passed using config file
+		{
+			name: "Pass with config from file",
+			flags: map[string]string{
+				options.CfgPath: configFilePath,
+			},
+		},
+		{
+			name: "--cri-socket and --node-name flags override config from file",
+			flags: map[string]string{
+				options.CfgPath:       configFilePath,
+				options.NodeCRISocket: "/var/run/crio/crio.sock",
+				options.NodeName:      "anotherName",
+			},
+			validate: func(t *testing.T, data *joinData) {
+				// validate that cri-socket and node-name are overwritten
+				if data.cfg.NodeRegistration.CRISocket != "/var/run/crio/crio.sock" {
+					t.Errorf("Invalid NodeRegistration.CRISocket")
+				}
+				if data.cfg.NodeRegistration.Name != "anotherName" {
+					t.Errorf("Invalid NodeRegistration.Name")
+				}
+			},
+		},
+		{
+			name: "fail if mixedArguments are passed",
+			flags: map[string]string{
+				options.CfgPath:                   configFilePath,
+				options.APIServerAdvertiseAddress: "1.2.3.4",
+			},
+			expectError: true,
+		},
+	}
 	for _, tc := range testCases {
-		if _, err = cfgFile.WriteString(tc.configToWrite); err != nil {
-			t.Fatalf("Unable to write file %q: %v", tc.cfgPath, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			// initialize an external join option and inject it to the join cmd
+			joinOptions := newJoinOptions()
+			cmd := NewCmdJoin(nil, joinOptions)
 
-		cmd := NewCmdJoin(&out)
-		if tc.cmdPersistentFlags != nil {
-			for key, value := range tc.cmdPersistentFlags {
-				cmd.PersistentFlags().Set(key, value)
+			// sets cmd flags (that will be reflected on the join options)
+			for f, v := range tc.flags {
+				cmd.Flags().Set(f, v)
 			}
-		}
 
-		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
-
-		if tc.nodeConfig != nil {
-			join.cfg = tc.nodeConfig
-		}
-
-		// test Join.Run()
-		if err == nil && tc.testJoinRun {
-			err = join.Run(&out)
-			if (err != nil) != tc.expectedError {
-				t.Fatalf(errorFormat, tc.name, tc.expectedError, (err != nil), err)
+			// test newJoinData method
+			data, err := newJoinData(cmd, tc.args, joinOptions, nil)
+			if err != nil && !tc.expectError {
+				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
-			// check error for NewValidJoin()
-		} else if (err != nil) != tc.expectedError {
-			t.Fatalf(errorFormat, tc.name, tc.expectedError, (err != nil), err)
-		}
+			if err == nil && tc.expectError {
+				t.Fatalf("newJoinData didn't return error when expected")
+			}
+
+			// exec additional validation on the returned value
+			if tc.validate != nil {
+				tc.validate(t, data)
+			}
+		})
 	}
 }

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,8 +37,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
-	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
-	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
@@ -143,7 +141,7 @@ func (e *quotaEvaluator) run() {
 		go wait.Until(e.doWork, time.Second, e.stopCh)
 	}
 	<-e.stopCh
-	glog.Infof("Shutting down quota evaluator")
+	klog.Infof("Shutting down quota evaluator")
 	e.queue.ShutDown()
 }
 
@@ -162,7 +160,7 @@ func (e *quotaEvaluator) doWork() {
 	}
 	for {
 		if quit := workFunc(); quit {
-			glog.Infof("quota evaluator worker shutdown")
+			klog.Infof("quota evaluator worker shutdown")
 			return
 		}
 	}
@@ -379,7 +377,7 @@ func getMatchedLimitedScopes(evaluator quota.Evaluator, inputObject runtime.Obje
 	for _, limitedResource := range limitedResources {
 		matched, err := evaluator.MatchingScopes(inputObject, limitedResource.MatchScopes)
 		if err != nil {
-			glog.Errorf("Error while matching limited Scopes: %v", err)
+			klog.Errorf("Error while matching limited Scopes: %v", err)
 			return []corev1.ScopedResourceSelectorRequirement{}, err
 		}
 		for _, scope := range matched {
@@ -450,7 +448,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 
 		match, err := evaluator.Matches(&resourceQuota, inputObject)
 		if err != nil {
-			glog.Errorf("Error occurred while matching resource quota, %v, against input object. Err: %v", resourceQuota, err)
+			klog.Errorf("Error occurred while matching resource quota, %v, against input object. Err: %v", resourceQuota, err)
 			return quotas, err
 		}
 		if !match {
@@ -605,7 +603,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 		// note, we do not need aggregate usage here, so we pass a nil informer func
 		evaluator = generic.NewObjectCountEvaluator(gr, nil, "")
 		e.registry.Add(evaluator)
-		glog.Infof("quota admission added evaluator for: %s", gr)
+		klog.Infof("quota admission added evaluator for: %s", gr)
 	}
 	// for this kind, check if the operation could mutate any quota resources
 	// if no resources tracked by quota are impacted, then just return

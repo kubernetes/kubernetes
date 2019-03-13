@@ -23,12 +23,13 @@ import (
 )
 
 func (c *FakeEvictions) Evict(eviction *policy.Eviction) error {
-	action := core.GetActionImpl{}
-	action.Verb = "post"
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
 	action.Namespace = c.ns
 	action.Resource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	action.Subresource = "eviction"
-	action.Name = eviction.Name
+	action.Object = eviction
+
 	_, err := c.Fake.Invokes(action, eviction)
 	return err
 }

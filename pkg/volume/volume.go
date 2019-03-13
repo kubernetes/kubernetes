@@ -260,28 +260,3 @@ type DeviceUnmounter interface {
 	// unmounted.
 	UnmountDevice(deviceMountPath string) error
 }
-
-// NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError
-// error.
-func NewDeletedVolumeInUseError(message string) error {
-	return deletedVolumeInUseError(message)
-}
-
-type deletedVolumeInUseError string
-
-var _ error = deletedVolumeInUseError("")
-
-// IsDeletedVolumeInUse returns true if an error returned from Delete() is
-// deletedVolumeInUseError
-func IsDeletedVolumeInUse(err error) bool {
-	switch err.(type) {
-	case deletedVolumeInUseError:
-		return true
-	default:
-		return false
-	}
-}
-
-func (err deletedVolumeInUseError) Error() string {
-	return string(err)
-}

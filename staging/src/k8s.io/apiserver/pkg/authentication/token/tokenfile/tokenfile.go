@@ -24,9 +24,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/klog"
 )
 
 type TokenAuthenticator struct {
@@ -67,7 +67,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 
 		recordNum++
 		if record[0] == "" {
-			glog.Warningf("empty token has been found in token file '%s', record number '%d'", path, recordNum)
+			klog.Warningf("empty token has been found in token file '%s', record number '%d'", path, recordNum)
 			continue
 		}
 
@@ -76,7 +76,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			UID:  record[2],
 		}
 		if _, exist := tokens[record[0]]; exist {
-			glog.Warningf("duplicate token has been found in token file '%s', record number '%d'", path, recordNum)
+			klog.Warningf("duplicate token has been found in token file '%s', record number '%d'", path, recordNum)
 		}
 		tokens[record[0]] = obj
 

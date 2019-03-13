@@ -72,7 +72,7 @@ func TestDaemonsetDefaultGarbageCollectionPolicy(t *testing.T) {
 			false,
 		},
 		{
-			expectedGCPolicy: rest.OrphanDependents,
+			expectedGCPolicy: rest.DeleteDependents,
 			isNilRequestInfo: true,
 		},
 	}
