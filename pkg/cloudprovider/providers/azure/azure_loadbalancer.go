@@ -959,10 +959,11 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendAddressPool: &network.SubResource{
 						ID: to.StringPtr(lbBackendPoolID),
 					},
-					LoadDistribution: loadDistribution,
-					FrontendPort:     to.Int32Ptr(port.Port),
-					BackendPort:      to.Int32Ptr(port.Port),
-					EnableFloatingIP: to.BoolPtr(true),
+					LoadDistribution:    loadDistribution,
+					FrontendPort:        to.Int32Ptr(port.Port),
+					BackendPort:         to.Int32Ptr(port.Port),
+					EnableFloatingIP:    to.BoolPtr(true),
+					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 				},
 			}
 			if protocol == v1.ProtocolTCP {
