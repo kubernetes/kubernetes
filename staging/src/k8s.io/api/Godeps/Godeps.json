@@ -55,20 +55,20 @@
 			"Rev": "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
 		},
 		{
+			"ImportPath": "golang.org/x/net/http/httpguts",
+			"Rev": "65e2d4e15006aab9813ff8769e768bbf4bb667a0"
+		},
+		{
 			"ImportPath": "golang.org/x/net/http2",
-			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
+			"Rev": "65e2d4e15006aab9813ff8769e768bbf4bb667a0"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2/hpack",
-			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
+			"Rev": "65e2d4e15006aab9813ff8769e768bbf4bb667a0"
 		},
 		{
 			"ImportPath": "golang.org/x/net/idna",
-			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
-		},
-		{
-			"ImportPath": "golang.org/x/net/lex/httplex",
-			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
+			"Rev": "65e2d4e15006aab9813ff8769e768bbf4bb667a0"
 		},
 		{
 			"ImportPath": "golang.org/x/text/secure/bidirule",
