@@ -92,7 +92,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
 		Status:      &StatusREST{store: &statusStore},
 		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
-		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport, KubeletConn: k},
 		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
 		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
 		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},

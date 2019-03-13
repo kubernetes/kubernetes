@@ -274,6 +274,59 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 	return loc, rt, nil
 }
 
+// ProxyLocation returns a URL to which one can send traffic for the specified pod.
+func ProxyLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
+	// If port is not specified, try to use the first defined port on the pod.
+	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
+	}
+	if len(scheme) == 0 {
+		scheme = "http"
+	}
+	// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
+
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a port.
+	if port == "" {
+		for i := range pod.Spec.Containers {
+			if len(pod.Spec.Containers[i].Ports) > 0 {
+				port = fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[0].ContainerPort)
+				break
+			}
+		}
+	}
+
+	podAddr := ""
+	if port == "" {
+		podAddr = pod.Status.PodIP
+	} else {
+		podAddr = net.JoinHostPort(pod.Status.PodIP, port)
+	}
+
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	if len(nodeName) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, nil
+	}
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	loc := &url.URL{
+		Scheme: nodeInfo.Scheme,
+		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:   fmt.Sprintf("/podProxy/%s/%s/", scheme, podAddr),
+	}
+	return loc, nodeInfo.Transport, nil
+}
+
 // getContainerNames returns a formatted string containing the container names
 func getContainerNames(containers []api.Container) string {
 	names := []string{}

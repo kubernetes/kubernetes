@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -424,6 +425,22 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
 
+	ws = new(restful.WebService)
+	ws.
+		Path("/podProxy")
+	ws.Route(ws.GET("/{scheme}/{podAddr}/").
+		To(s.getPodProxy).
+		Operation("getPodProxy").
+		Param(ws.PathParameter("scheme", "todo fixme").DataType("string")).
+		Param(ws.PathParameter("podAddr", "todo fixme").DataType("string")))
+	ws.Route(ws.GET("/{scheme}/{podAddr}/{podProxyOpts:*}").
+		To(s.getPodProxy).
+		Operation("getPodProxy").
+		Param(ws.PathParameter("scheme", "todo fixme").DataType("string")).
+		Param(ws.PathParameter("podAddr", "todo fixme").DataType("string")).
+		Param(ws.PathParameter("podProxyOpts", "todo fixme").DataType("string")))
+	s.restfulCont.Add(ws)
+
 	configz.InstallHandler(s.restfulCont)
 
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
@@ -758,6 +775,50 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 		return
 	}
 	writeJSONResponse(response, data)
+}
+
+// getPodProxy forwards the requests to pods.
+func (s *Server) getPodProxy(request *restful.Request, response *restful.Response) {
+	scheme := request.PathParameter("scheme")
+	podAddr := request.PathParameter("podAddr")
+	podProxyOpts := request.PathParameter("podProxyOpts")
+
+	if len(scheme) == 0 {
+		scheme = "http"
+	}
+	if len(podAddr) == 0 {
+		// TODO: Why return JSON when the rest return plaintext errors?
+		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Missing pod addr."}`))
+		return
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Get(fmt.Sprintf("%s://%s/%s", scheme, podAddr, podProxyOpts))
+	if err != nil {
+		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": %s}`, err.Error()))
+		return
+	}
+	contentType := resp.Header.Get(restful.HEADER_ContentType)
+	if len(contentType) > 0 {
+		response.ResponseWriter.Header().Set(restful.HEADER_ContentType, contentType)
+	}
+
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf(`{"message": %s}`, err.Error()))
+		return
+	}
+
+	response.ResponseWriter.WriteHeader(resp.StatusCode)
+	response.ResponseWriter.Write(data)
+
+	//http.Redirect(response.ResponseWriter, request.Request, fmt.Sprintf("%s://%s/%s", scheme, podAddr, podProxyOpts), http.StatusFound)
+	//http.Redirect(response.ResponseWriter, request.Request, fmt.Sprintf("%s://%s", scheme, podAddr), http.StatusFound)
+	return
 }
 
 // Derived from go-restful writeJSON.

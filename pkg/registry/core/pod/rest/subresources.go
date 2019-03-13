@@ -39,6 +39,7 @@ import (
 type ProxyREST struct {
 	Store          *genericregistry.Store
 	ProxyTransport http.RoundTripper
+	KubeletConn    client.ConnectionInfoGetter
 }
 
 // Implement Connecter
@@ -67,12 +68,15 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ResourceLocation(r.Store, r.ProxyTransport, ctx, id)
+	location, transport, err := pod.ProxyLocation(r.Store, r.KubeletConn, ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
-	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
+	//handler := proxy.NewUpgradeAwareHandler(location, transport, true, false, proxy.NewErrorResponder(responder))
+	//handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	//// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
+	//return handler, nil
 	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
 }
 
