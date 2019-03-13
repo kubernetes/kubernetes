@@ -73,6 +73,8 @@ var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update field(s) of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
+               It has different limitations for different resource and is hard to record in docs, please try by yourself.
+
 		JSON and YAML formats are accepted.`))
 
 	patchExample = templates.Examples(i18n.T(`
