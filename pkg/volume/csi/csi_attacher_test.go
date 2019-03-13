@@ -1161,7 +1161,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			volName:         "test-vol1",
 			devicePath:      "path1",
 			deviceMountPath: "path2",
-			shouldFail:      true,
+			shouldFail:      false,
 			spec:            volume.NewSpecFromVolume(makeTestVol(pvName, testDriver)),
 		},
 		{

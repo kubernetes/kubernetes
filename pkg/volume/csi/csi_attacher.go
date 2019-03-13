@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -286,14 +288,24 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	// Setup
-	if spec == nil {
-		return fmt.Errorf("attacher.MountDevice failed, spec is nil")
-	}
-	csiSource, err := getPVSourceFromSpec(spec)
+	volSrc, pvSrc, err := getSourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
+		klog.Error(log("attacher.MountDevice failed to get volume source: %v", err))
 		return err
 	}
+
+	// CSIVolumeSource for ephemeral volumes not supported
+	// simply return quietly
+	// TODO (#75352) ability to skip DeviceMount when ephemeral volume
+	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		klog.Info(log("attacher.MountDevice skipping device mount from ephemeral CSIVolumeSource"))
+		return nil
+	}
+	if pvSrc == nil {
+		return fmt.Errorf("attacher.MountDevice missing CSIPersistentVolume source")
+	}
+
+	csiSource := pvSrc
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
@@ -589,16 +601,24 @@ func isAttachmentName(unknownString string) bool {
 }
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
-	if spec == nil {
-		return "", fmt.Errorf("makeDeviceMountPath failed, spec is nil")
+	volSrc, pvSrc, err := getSourceFromSpec(spec)
+	if err != nil {
+		return "", err
 	}
 
-	pvName := spec.PersistentVolume.Name
-	if pvName == "" {
-		return "", fmt.Errorf("makeDeviceMountPath failed, pv name empty")
+	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		// generate a name to avoid possible cluster-wide collision
+		name := getNameForVolSource(spec.Name(), volSrc.Driver, string(plugin.host.GetNodeName()))
+		return path.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, name, globalMountInGlobalPath), nil
+	} else if pvSrc != nil {
+		pvName := spec.PersistentVolume.Name
+		if pvName == "" {
+			return "", fmt.Errorf("makeDeviceMountPath failed, pv name empty")
+		}
+		return path.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
 	}
 
-	return path.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
+	return "", fmt.Errorf("volume source not found in spec")
 }
 
 func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMountPath string) (string, string, error) {
@@ -629,4 +649,12 @@ func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMoun
 	}
 
 	return csiSource.Driver, csiSource.VolumeHandle, nil
+}
+
+// getNameForVolSource builds a unique name with sha256(specName,csiDriverName,NodeName).
+// This generates a predictable string used in building devicepath when an ephemeral volume
+// is encountered.
+func getNameForVolSource(specName, csiDriverName, nodeName string) string {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", specName, csiDriverName, nodeName)))
+	return fmt.Sprintf("%x", hash)
 }

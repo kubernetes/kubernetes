@@ -307,17 +307,32 @@ func (p *csiPlugin) GetPluginName() string {
 	return CSIPluginName
 }
 
-// GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
+// GetvolumeName returns a concatenated string of DriverName<volNameSe>VolumeHandle
+// when the spec is sourced by a PVC and DriverName<volNameSep>volumeSpecName
 // That string value is used in Detach() to extract driver name and volumeName.
 func (p *csiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	csi, err := getPVSourceFromSpec(spec)
+	volSrc, pvSrc, err := getSourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %v", err))
+		klog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %s", err))
 		return "", err
 	}
 
-	// return driverName<separator>volumeHandle
-	return fmt.Sprintf("%s%s%s", csi.Driver, volNameSep, csi.VolumeHandle), nil
+	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		// When a volume is ephemeral and is sourced by a CSIVolumeSource, there
+		// is no way to properly formulate the volume name using the same scheme
+		// as when it is sourced from a PVC using driverName and VolumeHandle.
+		// A different scheme must be used to generate the volume name here using a
+		// combination of the driverName and the volumeSpec driverName<separator>volumeSpec.Name.
+		// This is here to maintain API sanity and satisfy startup reconciliation loops by volume controller.
+		// Under normal operartion, this should never be used since ephemeral volumes
+		// should never trigger attach/detach operations.
+		return fmt.Sprintf("%s%s%s", volSrc.Driver, volNameSep, spec.Name()), nil
+	} else if pvSrc != nil {
+		// return driverName<separator>volumeHandle
+		return fmt.Sprintf("%s%s%s", pvSrc.Driver, volNameSep, pvSrc.VolumeHandle), nil
+	}
+
+	return "", fmt.Errorf("volume source not found in volume.Spec")
 }
 
 func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
@@ -583,7 +598,7 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
 	}
 
 	if driverMode == ephemeralDriverMode {
-		klog.V(4).Info(log("driver ephemeral mode detected for spec %v", spec.Name))
+		klog.V(4).Info(log("driver ephemeral mode detected for spec %s", spec.Name()))
 		return false
 	}
 

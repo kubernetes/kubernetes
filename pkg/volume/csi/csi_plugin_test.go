@@ -209,28 +209,30 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
-		name       string
-		driverName string
-		volName    string
-		shouldFail bool
-		spec       *volume.Spec
+		name         string
+		driverName   string
+		volName      string
+		expectedName string
+		shouldFail   bool
+		spec         *volume.Spec
 	}{
 		{
 			name:       "missing spec",
 			shouldFail: true,
 		},
 		{
-			name:       "alphanum names for pv",
-			driverName: "testdr",
-			volName:    "testvol",
-			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "testdr", "testvol"), false),
+			name:         "alphanum names for pv",
+			driverName:   "testdr",
+			volName:      "testvol",
+			spec:         volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "testdr", "testvol"), false),
+			expectedName: fmt.Sprintf("%s%s%s", "testdr", volNameSep, "testvol"),
 		},
 		{
-			name:       "alphanum names for vol source",
-			driverName: "testdr",
-			volName:    "testvol",
-			spec:       volume.NewSpecFromVolume(makeTestVol("test-pv", "testdr")),
-			shouldFail: true,
+			name:         "alphanum names for vol source",
+			driverName:   "testdr",
+			volName:      "testvol",
+			spec:         volume.NewSpecFromVolume(makeTestVol("test-pv", "testdr")),
+			expectedName: fmt.Sprintf("%s%s%s", "testdr", volNameSep, "test-pv"),
 		},
 	}
 
@@ -245,7 +247,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 			t.Log(err)
 			continue
 		}
-		if name != fmt.Sprintf("%s%s%s", tc.driverName, volNameSep, tc.volName) {
+		if name != tc.expectedName {
 			t.Errorf("unexpected volume name %s", name)
 		}
 	}

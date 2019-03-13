@@ -411,7 +411,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
 func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 	mounter := plug.host.GetMounter(plug.GetPluginName())
-	notMnt, err := mounter.IsLikelyNotMountPoint(dir)
+	notMnt, err := mounter.IsNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Error(log("isDirMounted IsLikelyNotMountPoint test failed for dir [%v]", dir))
 		return false, err
