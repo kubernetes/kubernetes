@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -186,6 +186,21 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		sysadmin.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(sysadmin)
 	})
+
+	By("Running a RunAsGroup pod", func() {
+		sysadmin := restrictedPod("runasgroup")
+		gid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsGroup = &gid
+		tester(sysadmin)
+	})
+
+	By("Running a RunAsUser pod", func() {
+		sysadmin := restrictedPod("runasuser")
+		uid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsUser = &uid
+		tester(sysadmin)
+	})
+
 }
 
 // createAndBindPSP creates a PSP in the policy API group.
@@ -245,6 +260,7 @@ func restrictedPod(name string) *v1.Pod {
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
 					RunAsUser:                utilpointer.Int64Ptr(65534),
+					RunAsGroup:               utilpointer.Int64Ptr(65534),
 				},
 			}},
 		},
@@ -269,6 +285,9 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:                  true,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
@@ -324,6 +343,11 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:     false,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAsNonRoot,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: int64(65534), Max: int64(65534)}},
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
