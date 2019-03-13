@@ -833,7 +833,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 			if err := createApplyCustomResource(randomCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -854,7 +854,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 			if err := createApplyCustomResource(validCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -875,7 +875,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)

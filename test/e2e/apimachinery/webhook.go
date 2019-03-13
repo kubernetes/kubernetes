@@ -1203,7 +1203,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1244,7 +1244,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1263,7 +1263,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1361,7 +1361,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 
 	By("Patching Custom Resource Definition to set v2 as storage")
 	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
-	_, err = testcrd.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
+	_, err = testcrd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
 	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
 
 	By("Patching the custom resource while v2 is storage version")
@@ -1431,7 +1431,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	testcrd := &crd.TestCrd{
 		Name:     name,
 		Kind:     kind,
-		ApiGroup: group,
+		APIGroup: group,
 		Versions: apiVersions,
 	}
 
@@ -1454,7 +1454,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:    testcrd.ApiGroup,
+			Group:    testcrd.APIGroup,
 			Versions: testcrd.Versions,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   testcrd.GetPluralName(),

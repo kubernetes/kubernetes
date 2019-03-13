@@ -37,15 +37,15 @@ type CleanCrdFn func() error
 type TestCrd struct {
 	Name               string
 	Kind               string
-	ApiGroup           string
+	APIGroup           string
 	Versions           []apiextensionsv1beta1.CustomResourceDefinitionVersion
-	ApiExtensionClient *crdclientset.Clientset
+	APIExtensionClient *crdclientset.Clientset
 	Crd                *apiextensionsv1beta1.CustomResourceDefinition
 	DynamicClients     map[string]dynamic.ResourceInterface
 	CleanUp            CleanCrdFn
 }
 
-// CreateTestCRD creates a new CRD specifically for the calling test.
+// CreateMultiVersionTestCRD creates a new CRD specifically for the calling test.
 func CreateMultiVersionTestCRD(f *framework.Framework, group string, apiVersions []apiextensionsv1beta1.CustomResourceDefinitionVersion, conversionWebhook *apiextensionsv1beta1.WebhookClientConfig) (*TestCrd, error) {
 	suffix := framework.RandomSuffix()
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
@@ -53,7 +53,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, apiVersions
 	testcrd := &TestCrd{
 		Name:     name,
 		Kind:     kind,
-		ApiGroup: group,
+		APIGroup: group,
 		Versions: apiVersions,
 	}
 
@@ -98,7 +98,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, apiVersions
 		}
 	}
 
-	testcrd.ApiExtensionClient = apiExtensionClient
+	testcrd.APIExtensionClient = apiExtensionClient
 	testcrd.Crd = crd
 	testcrd.DynamicClients = resourceClients
 	testcrd.CleanUp = func() error {
@@ -124,7 +124,7 @@ func CreateTestCRD(f *framework.Framework) (*TestCrd, error) {
 	return CreateMultiVersionTestCRD(f, group, apiVersions, nil)
 }
 
-// CreateTestCRD creates a new CRD specifically for the calling test.
+// CreateMultiVersionTestCRDWithV1Storage creates a new CRD specifically for the calling test.
 func CreateMultiVersionTestCRDWithV1Storage(f *framework.Framework) (*TestCrd, error) {
 	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
 	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
@@ -147,7 +147,7 @@ func newCRDForTest(testcrd *TestCrd) *apiextensionsv1beta1.CustomResourceDefinit
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: testcrd.GetMetaName()},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:    testcrd.ApiGroup,
+			Group:    testcrd.APIGroup,
 			Versions: testcrd.Versions,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   testcrd.GetPluralName(),
@@ -162,7 +162,7 @@ func newCRDForTest(testcrd *TestCrd) *apiextensionsv1beta1.CustomResourceDefinit
 
 // GetMetaName returns the metaname for the CRD.
 func (c *TestCrd) GetMetaName() string {
-	return c.Name + "s." + c.ApiGroup
+	return c.Name + "s." + c.APIGroup
 }
 
 // GetPluralName returns the plural form of the CRD name
@@ -175,6 +175,7 @@ func (c *TestCrd) GetListName() string {
 	return c.Name + "List"
 }
 
+// GetAPIVersions returns the API versions served by the CRD.
 func (c *TestCrd) GetAPIVersions() []string {
 	ret := []string{}
 	for _, v := range c.Versions {
@@ -185,6 +186,7 @@ func (c *TestCrd) GetAPIVersions() []string {
 	return ret
 }
 
+// GetV1DynamicClient returns the dynamic client for v1.
 func (c *TestCrd) GetV1DynamicClient() dynamic.ResourceInterface {
 	return c.DynamicClients["v1"]
 }
@@ -196,6 +198,6 @@ func (c *TestCrd) PatchSchema(schema []byte) error {
 		return fmt.Errorf("failed to create json patch: %v", err)
 	}
 	patch := []byte(fmt.Sprintf(`{"spec":{"validation":{"openAPIV3Schema":%s}}}`, string(s)))
-	c.Crd, err = c.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(c.GetMetaName(), types.MergePatchType, patch)
+	c.Crd, err = c.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(c.GetMetaName(), types.MergePatchType, patch)
 	return err
 }

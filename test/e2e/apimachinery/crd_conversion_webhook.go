@@ -347,7 +347,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	Expect(err).To(BeNil())
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
-	crd, err = integration.UpdateCustomResourceDefinitionWithRetry(testCrd.ApiExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
+	crd, err = integration.UpdateCustomResourceDefinitionWithRetry(testCrd.APIExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
 		c.Spec.Versions = alternativeApiVersions
 	})
 	Expect(err).To(BeNil())

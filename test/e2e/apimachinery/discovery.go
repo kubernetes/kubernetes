@@ -47,7 +47,7 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 		defer testcrd.CleanUp()
 		spec := testcrd.Crd.Spec
-		resources, err := testcrd.ApiExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
+		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
 			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}
