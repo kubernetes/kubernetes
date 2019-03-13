@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/crd"
 	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo"
@@ -823,7 +824,7 @@ metadata:
 	framework.KubeDescribe("Kubectl client-side validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -841,7 +842,7 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
 			ginkgo.By("prepare CRD with validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -862,7 +863,7 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -2226,7 +2227,7 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 
 // createApplyCustomResource asserts that given CustomResource be created and applied
 // without being rejected by client-side validation
-func createApplyCustomResource(resource, namespace, name string, crd *framework.TestCrd) error {
+func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ns := fmt.Sprintf("--namespace=%v", namespace)
 	ginkgo.By("successfully create CR")
 	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package crd
 
 import (
 	"fmt"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // CleanCrdFn declares the clean up function needed to remove the CRD
@@ -45,8 +46,8 @@ type TestCrd struct {
 }
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
-func CreateMultiVersionTestCRD(f *Framework, group string, apiVersions []apiextensionsv1beta1.CustomResourceDefinitionVersion, conversionWebhook *apiextensionsv1beta1.WebhookClientConfig) (*TestCrd, error) {
-	suffix := randomSuffix()
+func CreateMultiVersionTestCRD(f *framework.Framework, group string, apiVersions []apiextensionsv1beta1.CustomResourceDefinitionVersion, conversionWebhook *apiextensionsv1beta1.WebhookClientConfig) (*TestCrd, error) {
+	suffix := framework.RandomSuffix()
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, suffix)
 	testcrd := &TestCrd{
@@ -57,19 +58,19 @@ func CreateMultiVersionTestCRD(f *Framework, group string, apiVersions []apiexte
 	}
 
 	// Creating a custom resource definition for use by assorted tests.
-	config, err := LoadConfig()
+	config, err := framework.LoadConfig()
 	if err != nil {
-		Failf("failed to load config: %v", err)
+		framework.Failf("failed to load config: %v", err)
 		return nil, err
 	}
 	apiExtensionClient, err := crdclientset.NewForConfig(config)
 	if err != nil {
-		Failf("failed to initialize apiExtensionClient: %v", err)
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
 		return nil, err
 	}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		Failf("failed to initialize dynamic client: %v", err)
+		framework.Failf("failed to initialize dynamic client: %v", err)
 		return nil, err
 	}
 
@@ -85,7 +86,7 @@ func CreateMultiVersionTestCRD(f *Framework, group string, apiVersions []apiexte
 	//create CRD and waits for the resource to be recognized and available.
 	crd, err = fixtures.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
-		Failf("failed to create CustomResourceDefinition: %v", err)
+		framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err
 	}
 
@@ -103,7 +104,7 @@ func CreateMultiVersionTestCRD(f *Framework, group string, apiVersions []apiexte
 	testcrd.CleanUp = func() error {
 		err := fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 		if err != nil {
-			Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
+			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
 		}
 		return err
 	}
@@ -111,7 +112,7 @@ func CreateMultiVersionTestCRD(f *Framework, group string, apiVersions []apiexte
 }
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
-func CreateTestCRD(f *Framework) (*TestCrd, error) {
+func CreateTestCRD(f *framework.Framework) (*TestCrd, error) {
 	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
 	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 		{
@@ -124,7 +125,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 }
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
-func CreateMultiVersionTestCRDWithV1Storage(f *Framework) (*TestCrd, error) {
+func CreateMultiVersionTestCRDWithV1Storage(f *framework.Framework) (*TestCrd, error) {
 	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
 	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 		{

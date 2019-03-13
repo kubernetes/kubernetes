@@ -37,6 +37,7 @@ import (
 	k8sclientset "k8s.io/client-go/kubernetes"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 	"sigs.k8s.io/yaml"
 )
 
@@ -327,7 +328,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 	})
 })
 
-func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*framework.TestCrd, error) {
+func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-test-%s.k8s.io", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
@@ -343,7 +344,7 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	}
 	apiVersions[0].Storage = true
 
-	crd, err := framework.CreateMultiVersionTestCRD(f, group, apiVersions, nil)
+	crd, err := crd.CreateMultiVersionTestCRD(f, group, apiVersions, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
@@ -366,7 +367,7 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	return crd, nil
 }
 
-func cleanupCRD(f *framework.Framework, crd *framework.TestCrd) error {
+func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
 	crd.CleanUp()
 	for _, v := range crd.Versions {
 		name := definitionName(crd, v.Name)
@@ -378,7 +379,7 @@ func cleanupCRD(f *framework.Framework, crd *framework.TestCrd) error {
 }
 
 // patchSchema takes schema in YAML and patches it to given CRD in given version
-func patchSchema(schema []byte, crd *framework.TestCrd) error {
+func patchSchema(schema []byte, crd *crd.TestCrd) error {
 	s, err := utilyaml.ToJSON(schema)
 	if err != nil {
 		return fmt.Errorf("failed to create json patch: %v", err)
@@ -484,7 +485,7 @@ func verifyKubectlExplain(name, pattern string) error {
 }
 
 // definitionName returns the openapi definition name for given CRD in given version
-func definitionName(crd *framework.TestCrd, version string) string {
+func definitionName(crd *crd.TestCrd, version string) string {
 	return openapiutil.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", crd.ApiGroup, version, crd.Kind))
 }
 

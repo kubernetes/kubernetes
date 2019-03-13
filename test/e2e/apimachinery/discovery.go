@@ -20,6 +20,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -40,7 +41,7 @@ var _ = SIGDescribe("Discovery", func() {
 	})
 
 	It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
