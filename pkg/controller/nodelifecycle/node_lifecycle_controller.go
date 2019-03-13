@@ -736,7 +736,7 @@ func (nc *Controller) monitorNodeHealth() error {
 							continue
 						}
 						if _, err = nodeutil.SetPodTerminationReason(nc.kubeClient, &pod, node.Name); err != nil {
-							fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err)
+							klog.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err)
 						}
 					}
 
