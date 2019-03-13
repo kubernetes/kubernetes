@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -185,7 +184,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
-	kubeletDir, err := getKubeletDir(dryRun)
+	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
@@ -221,11 +220,10 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-// getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
-// TODO: Consolidate this with similar funcs?
-func getKubeletDir(dryRun bool) (string, error) {
+// GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
+func GetKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
-		return ioutil.TempDir("", "kubeadm-upgrade-dryrun")
+		return kubeadmconstants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
 }
