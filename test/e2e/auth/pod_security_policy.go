@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+        "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
