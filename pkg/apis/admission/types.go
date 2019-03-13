@@ -92,6 +92,7 @@ type AdmissionResponse struct {
 	// +optional
 	Result *metav1.Status
 	// Patch contains the actual patch. Currently we only support a response in the form of JSONPatch, RFC 6902.
+	// The value of []byte is base64 encoded when specified in JSON or YAML.
 	// +optional
 	Patch []byte
 	// PatchType indicates the form the Patch will take. Currently we only support "JSONPatch".
