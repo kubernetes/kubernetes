@@ -115,7 +115,6 @@ pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark
 pkg/master/controller/crdregistration
-pkg/master/tunneler
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
 pkg/proxy/userspace
