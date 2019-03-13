@@ -25,7 +25,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	goruntime "runtime"
+	"runtime/debug"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 	"testing"
@@ -339,6 +342,43 @@ func TestPrepareRun(t *testing.T) {
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
+func TestAPIServer500v3(t *testing.T) {
+	s, config, assert := newMaster(t)
+
+	timeout := time.Duration(1 * time.Nanosecond)
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	assert.NotNil(config.OpenAPIConfig)
+
+	server := httptest.NewServer(s.Handler.Director)
+	defer server.Close()
+
+	// var resp *http.Response
+	var err error
+	// openapi is installed in PrepareRunq
+	for i := 0; i < 100; i++ {
+		// _, err = client.Get(server.URL + "/api")
+		_, err = client.Get(server.URL + "/apis")
+		// t.Log(string(debug.Stack()))
+		t.Log(pprof.Lookup("goroutine").WriteTo(os.Stdout, 1))
+	}
+
+	// assert.NoError(err)
+	time.Sleep(3 * time.Second)
+	assert.Error(err)
+	// assert.Equal(http.StatusInternalServerError, resp.StatusCode)
+
+	// healthz checks are installed in PrepareRun
+	// resp, err = http.Get(server.URL + "/healthz")
+	// assert.NoError(err)
+	// assert.Equal(http.StatusOK, resp.StatusCode)
+	// resp, err = http.Get(server.URL + "/healthz/ping")
+	// assert.NoError(err)
+	// assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
 func TestUpdateOpenAPISpec(t *testing.T) {
 	s, _, assert := newMaster(t)
 	s.PrepareRun()
@@ -377,6 +417,86 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 	body, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(err)
 	assert.Equal(newSpec, body)
+}
+func TestAPIserver500(t *testing.T) {
+	timeout := time.Duration(5 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	// s, _, _ := newMaster(t)
+	s, _, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
+	server := httptest.NewServer(s.Handler.Director)
+	defer server.Close()
+
+	// var called bool
+	resp, err := client.Get(server.URL + "/")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+	t.Log(string(debug.Stack()))
+
+	time.Sleep(20 * time.Second)
+	// if !called {
+	// 	t.Errorf("Expected handler to be called.")
+	// }
+}
+
+// TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
+func TestAPIServer500v2(t *testing.T) {
+	config, _ := setUp(t)
+
+	var protected, called bool
+
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// time.Sleep(20 * time.Second)
+			protected = true
+			apiHandler.ServeHTTP(w, req)
+		})
+	}
+	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+		// time.Sleep(20 * time.Second)
+		called = true
+	})
+
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	s.Handler.NonGoRestfulMux.Handle("/nonswagger", handler)
+	s.Handler.NonGoRestfulMux.Handle("/secret", handler)
+
+	type Test struct {
+		handler   http.Handler
+		path      string
+		protected bool
+	}
+	for i, test := range []Test{
+		{s.Handler, "/nonswagger", true},
+		{s.Handler, "/secret", true},
+	} {
+		protected, called = false, false
+
+		var w io.Reader
+		req, err := http.NewRequest("GET", test.path, w)
+		if err != nil {
+			t.Errorf("%d: Unexpected http error: %v", i, err)
+			continue
+		}
+
+		test.handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		if !called {
+			t.Errorf("%d: Expected handler to be called.", i)
+		}
+		if test.protected != protected {
+			t.Errorf("%d: Expected protected=%v, got protected=%v.", i, test.protected, protected)
+		}
+	}
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.

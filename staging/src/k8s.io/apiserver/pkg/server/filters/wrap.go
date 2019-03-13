@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"fmt"
 	"net/http"
 
 	"k8s.io/klog"
@@ -39,6 +40,7 @@ func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWrit
 			crashHandler(w, req, err)
 		})
 
+		fmt.Println("HELLO!!!!!!")
 		logger := httplog.NewLogged(req, &w)
 		defer logger.Log()
 
