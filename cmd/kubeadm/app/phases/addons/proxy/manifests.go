@@ -79,6 +79,24 @@ spec:
         - /usr/local/bin/kube-proxy
         - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
         - --hostname-override=$(NODE_NAME)
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10256
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
+          successThreshold: 1
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10256
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
+          successThreshold: 1
+          failureThreshold: 2
         securityContext:
           privileged: true
         volumeMounts:

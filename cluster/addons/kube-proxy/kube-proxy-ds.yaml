@@ -43,6 +43,24 @@ spec:
         - /bin/sh
         - -c
         - kube-proxy {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10256
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
+          successThreshold: 1
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10256
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
+          successThreshold: 1
+          failureThreshold: 2
         env:
         - name: KUBERNETES_SERVICE_HOST
           value: {{kubernetes_service_host_env_value}}
