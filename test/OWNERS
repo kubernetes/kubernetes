@@ -64,4 +64,5 @@ approvers:
   - vishh
   - MaciekPytel # for test/e2e/common/autoscaling_utils.go
 labels:
+- area/test
 - sig/testing

@@ -142,6 +142,7 @@ func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobr
 	}
 	cmd.Flags().BoolVar(&makeSymlinksFlag, "make-symlinks", makeSymlinksFlag, "create a symlink for each server in current directory")
 	cmd.Flags().MarkHidden("make-symlinks") // hide this flag from appearing in servers' usage output
+	cmd.Flags().MarkDeprecated("make-symlinks", "This feature will be removed in a later release.")
 
 	for i := range commandFns {
 		cmd.AddCommand(commandFns[i]())

@@ -188,11 +188,11 @@ var _ = SIGDescribe("Firewall rule", func() {
 })
 
 func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	unreachable, err := framework.TestNotReachableHTTPTimeout(ip, port, timeout)
-	if err != nil {
-		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, err)
+	result := framework.PokeHTTP(ip, port, "/", &framework.HTTPPokeParams{Timeout: timeout})
+	if result.Status == framework.HTTPError {
+		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}
-	if !unreachable {
+	if result.Code != 0 {
 		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
 	}
 }

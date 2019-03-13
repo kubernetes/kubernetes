@@ -137,7 +137,6 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

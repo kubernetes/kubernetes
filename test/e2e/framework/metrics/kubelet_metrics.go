@@ -43,9 +43,8 @@ func NewKubeletMetrics() KubeletMetrics {
 
 // GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
 // Currently only used in integration tests.
-func GrabKubeletMetricsWithoutProxy(nodeName string) (KubeletMetrics, error) {
-	metricsEndpoint := "http://%s/metrics"
-	resp, err := http.Get(fmt.Sprintf(metricsEndpoint, nodeName))
+func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, error) {
+	resp, err := http.Get(fmt.Sprintf("http://%s%s", nodeName, path))
 	if err != nil {
 		return KubeletMetrics{}, err
 	}

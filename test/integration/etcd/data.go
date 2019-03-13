@@ -485,6 +485,21 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 			ExpectedEtcdPath: "/registry/auditsinks/sink1",
 		},
 		// --
+
+		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
+		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc1",
+			ExpectedGVK:      gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/node/v1beta1
+		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
+		},
+		// --
 	}
 
 	// k8s.io/kubernetes/pkg/apis/storage/v1beta1

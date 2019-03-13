@@ -159,6 +159,10 @@ func (s *serviceStorage) Export(ctx context.Context, name string, opts metav1.Ex
 	panic("not implemented")
 }
 
+func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
+	panic("not implemented")
+}
+
 func generateRandomNodePort() int32 {
 	return int32(rand.IntnRange(30001, 30999))
 }

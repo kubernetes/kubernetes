@@ -2,9 +2,9 @@
 
 ## IMPORTANT PLEASE NOTE!
 Any time the file structure in the `windows` directory changes, `windows/BUILD`
-and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
-We HIGHLY recommend not changing the file structure, because consumers of
-Kubernetes releases depend on the release structure remaining stable.
+and `k8s.io/release/lib/releaselib.sh` must be manually updated with the
+changes. We HIGHLY recommend not changing the file structure, because consumers
+of Kubernetes releases depend on the release structure remaining stable.
 
 ## Bring up the cluster
 
@@ -31,28 +31,32 @@ The most straightforward approach to build those binaries is to run `make
 release`. However, that builds binaries for all supported platforms, and can be
 slow. You can speed up the process by following the instructions below to only
 build the necessary binaries.
+
 ```
-# Fetch the PR: https://github.com/pjh/kubernetes/pull/43
-git remote add pjh https://github.com/pjh/kubernetes
-git fetch pjh pull/43/head
+# Apply https://github.com/pjh/kubernetes/pull/43 to your tree:
+curl \
+  https://patch-diff.githubusercontent.com/raw/pjh/kubernetes/pull/43.patch | \
+  git apply
 
-# Get the commit hash and cherry-pick the commit to your current branch
-BUILD_WIN_COMMIT=$(git ls-remote pjh | grep refs/pull/43/head | cut -f 1)
-git cherry-pick $BUILD_WIN_COMMIT
-
-# Build binaries for both Linux and Windows
+# Build binaries for both Linux and Windows:
 make quick-release
 ```
 
-### 2 Create a Kubernetes cluster
+### 2. Create a Kubernetes cluster
 
 You can create a regular Kubernetes cluster or an end-to-end test cluster.
+End-to-end test clusters support running the Kubernetes e2e tests and enable
+some debugging features such as SSH access on the Windows nodes.
+
 Please make sure you set the environment variables properly following the
 instructions in the previous section.
 
 First, set the following environment variables which are required for
 controlling the number of Linux and Windows nodes in the cluster and for
-enabling IP aliases (which are required for Windows pod routing):
+enabling IP aliases (which are required for Windows pod routing). At least one
+Linux worker node is required and two are recommended because many default
+cluster-addons (e.g., `kube-dns`) need to run on Linux nodes. The master control
+plane only runs on Linux.
 
 ```
 export NUM_NODES=2  # number of Linux nodes
@@ -60,19 +64,9 @@ export NUM_WINDOWS_NODES=2
 export KUBE_GCE_ENABLE_IP_ALIASES=true
 ```
 
-If you wish to use `netd` as the CNI plugin for Linux nodes, set these
-variables:
-
-```
-export KUBE_ENABLE_NETD=true
-export KUBE_CUSTOM_NETD_YAML=$(curl -s \
-  https://raw.githubusercontent.com/GoogleCloudPlatform/netd/master/netd.yaml \
-  | sed -e 's/^/ /')
-```
-
 Now bring up a cluster using one of the following two methods:
 
-#### 2.a Create a regular Kubernetes cluster
+#### 2a. Create a regular Kubernetes cluster
 
 ```
 # Invoke kube-up.sh with these environment variables:
@@ -87,13 +81,15 @@ To teardown the cluster run:
 PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
 ```
 
-#### 2.b Create a Kubernetes end-to-end (E2E) test cluster
+#### 2b. Create a Kubernetes end-to-end (E2E) test cluster
 
 ```
 PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up
 ```
-This command, by default, tears down the existing E2E cluster and create a new
-one.
+
+This command, by default, tears down any existing E2E cluster and creates a new
+one. To teardown the cluster run the same command with `--down` instead of
+`--up`.
 
 No matter what type of cluster you chose to create, the result should be a
 Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes
@@ -108,87 +104,62 @@ brought up correctly:
 cluster/gce/windows/smoke-test.sh
 ```
 
-## Running tests against the cluster
+Sometimes the first run of the smoke test will fail because it took too long to
+pull the Windows test containers. The smoke test will usually pass on the next
+attempt.
 
-These steps are based on
+## Running e2e tests against the cluster
+
+If you brought up an end-to-end test cluster using the steps above then you can
+use the steps below to run K8s e2e tests. These steps are based on
 [kubernetes-sigs/windows-testing](https://github.com/kubernetes-sigs/windows-testing).
 
-*   TODO(pjh): use patched `cluster/local/util.sh` from
-    https://github.com/pjh/kubernetes/blob/windows-up/cluster/local/util.sh.
-
-*   If necessary run `alias kubectl=client/bin/kubectl` .
-
-*   Set the following environment variables (these values should make sense if
-    you built your cluster using the kube-up steps above):
-
-    ```
-    export KUBE_HOME=$(pwd)
-    export KUBECONFIG=~/.kube/config
-    export KUBE_MASTER=local
-    export KUBE_MASTER_NAME=kubernetes-master
-    export KUBE_MASTER_IP=$(kubectl get node ${KUBE_MASTER_NAME} -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}')
-    export KUBE_MASTER_URL=https://${KUBE_MASTER_IP}
-    export KUBE_MASTER_PORT=443
-    ```
-
-*   Download the list of Windows e2e tests:
-
-    ```
-    curl https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/repo-list.txt -o ${KUBE_HOME}/repo-list.yaml
-    export KUBE_TEST_REPO_LIST=${KUBE_HOME}/repo-list.yaml
-    ```
-
-*   Download and configure the list of tests to exclude:
-
-    ```
-    curl https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/exclude_conformance_test.txt -o ${KUBE_HOME}/exclude_conformance_test.txt
-    export EXCLUDED_TESTS=$(cat exclude_conformance_test.txt |
-      tr -d '\r' |                # remove Windows carriage returns
-      tr -s '\n' '|' |            # coalesce newlines into |
-      tr -s ' ' '.' |             # coalesce spaces into .
-      sed -e 's/[]\[()]/\\&/g' |  # escape brackets and parentheses
-      sed -e 's/.$//g')           # remove final | added by tr
-    ```
-
-*   Taint the Linux nodes so that test pods will not land on them:
-
-    ```
-    export LINUX_NODES=$(kubectl get nodes -l beta.kubernetes.io/os=linux,kubernetes.io/hostname!=${KUBE_MASTER_NAME} -o name)
-    export LINUX_NODE_COUNT=$(echo ${LINUX_NODES} | wc -w)
-    for node in $LINUX_NODES; do
-      kubectl taint node $node node-under-test=false:NoSchedule
-    done
-    ```
-
-*   Build necessary test binaries:
+*   Build the necessary test binaries. This must be done after every change to
+    test code.
 
     ```
     make WHAT=test/e2e/e2e.test
     ```
 
-*   Run the tests with flags that point at the "local" (already-running) cluster
-    and that permit the `NoSchedule` Linux nodes:
+*   Set necessary environment variables and fetch the `run-e2e.sh` script:
 
     ```
-    export KUBETEST_ARGS="--ginkgo.noColor=true "\
-    "--report-dir=${KUBE_HOME}/e2e-reports "\
-    "--allowed-not-ready-nodes=${LINUX_NODE_COUNT} "\
-    "--ginkgo.dryRun=false "\
-    "--ginkgo.focus=\[Conformance\] "\
-    "--ginkgo.skip=${EXCLUDED_TESTS}"
+    export KUBECONFIG=~/.kube/config
+    export WORKSPACE=$(pwd)
+    export ARTIFACTS=${WORKSPACE}/e2e-artifacts
 
-    go run ${KUBE_HOME}/hack/e2e.go -- --verbose-commands \
-      --ginkgo-parallel=4 \
-      --check-version-skew=false --test --provider=local \
-      --test_args="${KUBETEST_ARGS}" &> ${KUBE_HOME}/conformance.out
+    curl \
+      https://raw.githubusercontent.com/yujuhong/gce-k8s-windows-testing/master/run-e2e.sh \
+      -o ${WORKSPACE}/run-e2e.sh
+    chmod u+x run-e2e.sh
     ```
 
-    TODO: copy log files from Windows nodes using some command like:
+    NOTE: `run-e2e.sh` begins with a 5 minute sleep to wait for container images
+    to be pre-pulled. You'll probably want to edit the script and remove this.
+
+*   The canonical arguments for running all Windows e2e tests against a cluster
+    on GCE can be seen by searching for `--test-cmd-args` in the [test
+    configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-gcp/sig-gcp-windows.yaml#L78)
+    for the `ci-kubernetes-e2e-windows-gce` continuous test job. These arguments
+    should be passed to the `run-e2e` script; escape the ginkgo arguments by
+    adding quotes around them. For example:
 
     ```
-    scp -r -o PreferredAuthentications=keyboard-interactive,password \
-      -o PubkeyAuthentication=no \
-      user@kubernetes-minion-windows-group-mk0p:C:\\etc\\kubernetes\\logs \
-      kubetest-logs/
+    ./run-e2e.sh --node-os-distro=windows \
+      --ginkgo.focus="\[Conformance\]|\[NodeConformance\]|\[sig-windows\]" \
+      --ginkgo.skip="\[LinuxOnly\]|\[Serial\]|\[Feature:.+\]" --minStartupPods=8
     ```
 
+*   Run a single test by setting the ginkgo focus to match your test name; for
+    example, the "DNS should provide DNS for the cluster" test can be run using:
+
+    ```
+    ./run-e2e.sh --node-os-distro=windows \
+      --ginkgo.focus="provide\sDNS\sfor\sthe\scluster"
+    ```
+
+    Make sure to always include `--node-os-distro=windows` for testing against
+    Windows nodes.
+
+After the test run completes, log files can be found under the `${ARTIFACTS}`
+directory.

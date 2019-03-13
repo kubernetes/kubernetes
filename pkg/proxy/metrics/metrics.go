@@ -63,18 +63,6 @@ var (
 			Buckets: prometheus.ExponentialBuckets(0.001, 2, 20),
 		},
 	)
-
-	// DeprecatedNetworkProgrammingLatency is deprecated, please use NetworkProgrammingLatency.
-	DeprecatedNetworkProgrammingLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: kubeProxySubsystem,
-			Name:      "network_programming_latency_seconds",
-			Help:      "(Deprecated) In Cluster Network Programming Latency in seconds",
-			// TODO(mm4tt): Reevaluate buckets before 1.14 release.
-			// The last bucket will be [0.001s*2^20 ~= 17min, +inf)
-			Buckets: prometheus.ExponentialBuckets(0.001, 2, 20),
-		},
-	)
 )
 
 var registerMetricsOnce sync.Once
@@ -85,7 +73,6 @@ func RegisterMetrics() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
 		prometheus.MustRegister(DeprecatedSyncProxyRulesLatency)
 		prometheus.MustRegister(NetworkProgrammingLatency)
-		prometheus.MustRegister(DeprecatedNetworkProgrammingLatency)
 	})
 }
 

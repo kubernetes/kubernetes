@@ -104,7 +104,11 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: api.VolumeSource{
 					StorageOS: &api.StorageOSVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+				VolumeSource: api.VolumeSource{
+					CSI: &api.CSIVolumeSource{
+						NodePublishSecretRef: &api.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -136,6 +140,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
 	)
 	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&api.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -1088,102 +1093,6 @@ func TestDropAppArmor(t *testing.T) {
 						// new pod should not have AppArmor
 						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
 							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutAppArmor()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestDropReadinessGates(t *testing.T) {
-	podWithoutReadinessGates := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				ReadinessGates: nil,
-			},
-		}
-	}
-	podWithReadinessGates := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				ReadinessGates: []api.PodReadinessGate{
-					{
-						ConditionType: api.PodConditionType("example.com/condition1"),
-					},
-					{
-						ConditionType: api.PodConditionType("example.com/condition2"),
-					},
-				},
-			},
-		}
-	}
-
-	podInfo := []struct {
-		description          string
-		hasPodReadinessGates bool
-		pod                  func() *api.Pod
-	}{
-		{
-			description:          "has ReadinessGates",
-			hasPodReadinessGates: true,
-			pod:                  podWithReadinessGates,
-		},
-		{
-			description:          "does not have ReadinessGates",
-			hasPodReadinessGates: false,
-			pod:                  podWithoutReadinessGates,
-		},
-		{
-			description:          "is nil",
-			hasPodReadinessGates: false,
-			pod:                  func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasReadinessGates, oldPod := oldPodInfo.hasPodReadinessGates, oldPodInfo.pod()
-				newPodHasReadinessGates, newPod := newPodInfo.hasPodReadinessGates, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("featue enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadinessGates, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasReadinessGates:
-						// new pod should not be changed if the feature is enabled, or if the old pod had ReadinessGates
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasReadinessGates:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have ReadinessGates
-						if !reflect.DeepEqual(newPod, podWithoutReadinessGates()) {
-							t.Errorf("new pod had ReadinessGates: %v",
-								diff.ObjectReflectDiff(newPod, podWithoutReadinessGates()))
 						}
 					default:
 						// new pod should not need to be changed

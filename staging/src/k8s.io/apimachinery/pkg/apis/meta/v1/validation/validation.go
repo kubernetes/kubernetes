@@ -17,6 +17,9 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"unicode"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -86,30 +89,67 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 		*options.PropagationPolicy != metav1.DeletePropagationOrphan {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("propagationPolicy"), options.PropagationPolicy, []string{string(metav1.DeletePropagationForeground), string(metav1.DeletePropagationBackground), string(metav1.DeletePropagationOrphan), "nil"}))
 	}
-	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
 	return allErrs
 }
 
 func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
-	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+	return append(
+		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
+		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
+	)
 }
 
 func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
-	return validateDryRun(field.NewPath("dryRun"), options.DryRun)
+	return append(
+		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
+		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
+	)
 }
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if patchType != types.ApplyPatchType && options.Force != nil {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+	if patchType != types.ApplyPatchType {
+		if options.Force != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
+		}
+	} else {
+		if options.FieldManager == "" {
+			// This field is defaulted to "kubectl" by kubectl, but HAS TO be explicitly set by controllers.
+			allErrs = append(allErrs, field.Required(field.NewPath("fieldManager"), "is required for apply patch"))
+		}
 	}
-	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	return allErrs
+}
+
+var FieldManagerMaxLength = 128
+
+// ValidateFieldManager valides that the fieldManager is the proper length and
+// only has printable characters.
+func ValidateFieldManager(fieldManager string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// the field can not be set as a `*string`, so a empty string ("") is
+	// considered as not set and is defaulted by the rest of the process
+	// (unless apply is used, in which case it is required).
+	if len(fieldManager) > FieldManagerMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, fieldManager, FieldManagerMaxLength))
+	}
+	// Verify that all characters are printable.
+	for i, r := range fieldManager {
+		if !unicode.IsPrint(r) {
+			allErrs = append(allErrs, field.Invalid(fldPath, fieldManager, fmt.Sprintf("invalid character %#U (at position %d)", r, i)))
+		}
+	}
+
 	return allErrs
 }
 
 var allowedDryRunValues = sets.NewString(metav1.DryRunAll)
 
-func validateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
+// ValidateDryRun validates that a dryRun query param only contains allowed values.
+func ValidateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !allowedDryRunValues.HasAll(dryRun...) {
 		allErrs = append(allErrs, field.NotSupported(fldPath, dryRun, allowedDryRunValues.List()))

@@ -79,7 +79,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-65-10323-64-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-beta-73-11647-64-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -411,6 +411,14 @@ if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
 fi
 if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
+fi
+
+if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
+fi
+
+if [[ -n "${POD_LOG_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_SIZE"
 fi
 
 # Fluentd requirements

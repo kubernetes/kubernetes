@@ -78,7 +78,7 @@ func TestGetDataFromInitConfig(t *testing.T) {
 
 		decryptedData, err := cryptoutil.DecryptBytes(data, decodedKey)
 		if string(certData) != string(decryptedData) {
-			t.Fatalf(dedent.Dedent("can't decript cert: %s\nfatal error: %v"), name, err)
+			t.Fatalf(dedent.Dedent("can't decrypt cert: %s\nfatal error: %v"), name, err)
 		}
 	}
 }

@@ -378,14 +378,15 @@ func getAllParentLinks(path string) ([]string, error) {
 
 // GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	pathExists, pathErr := PathExists(normalizeWindowsPath(pathname))
-	// TODO(#75012): Need a Windows specific IsCorruptedMnt function that checks against whatever errno's
-	// Windows emits when we try to Stat a corrupted mount
-	// https://golang.org/pkg/syscall/?GOOS=windows&GOARCH=amd64#Errno
+	windowsPath := normalizeWindowsPath(pathname)
+	pathExists, pathErr := PathExists(windowsPath)
 	if !pathExists {
 		return []string{}, nil
+	} else if IsCorruptedMnt(pathErr) {
+		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", windowsPath)
+		return []string{}, nil
 	} else if pathErr != nil {
-		return nil, fmt.Errorf("error checking path %s: %v", normalizeWindowsPath(pathname), pathErr)
+		return nil, fmt.Errorf("error checking path %s: %v", windowsPath, pathErr)
 	}
 	return []string{pathname}, nil
 }

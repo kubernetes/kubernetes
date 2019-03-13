@@ -125,7 +125,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		fileSizes := createFileSizes(dInfo.MaxFileSize)
 		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
 		var fsGroup *int64
-		if dInfo.Capabilities[CapFsGroup] {
+		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}

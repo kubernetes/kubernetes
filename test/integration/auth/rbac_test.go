@@ -567,6 +567,9 @@ func TestRBAC(t *testing.T) {
 			if r.verb == "PATCH" {
 				// For patch operations, use the apply content type
 				req.Header.Add("Content-Type", string(types.ApplyPatchType))
+				q := req.URL.Query()
+				q.Add("fieldManager", "rbac_test")
+				req.URL.RawQuery = q.Encode()
 			}
 
 			if err != nil {

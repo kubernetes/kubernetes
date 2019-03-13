@@ -40,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -68,6 +68,7 @@ type ApplyOptions struct {
 
 	ServerSideApply bool
 	ForceConflicts  bool
+	FieldManager    string
 	Selector        string
 	DryRun          bool
 	ServerDryRun    bool
@@ -196,14 +197,15 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--force-conflicts only works with --server-side")
+		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
 	}
 
 	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --server-side")
+		return fmt.Errorf("--dry-run doesn't work with --experimental-server-side (did you mean --server-dry-run instead?)")
 	}
 
 	if o.DryRun && o.ServerDryRun {
@@ -393,7 +395,8 @@ func (o *ApplyOptions) Run() error {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
 			options := metav1.PatchOptions{
-				Force: &o.ForceConflicts,
+				Force:        &o.ForceConflicts,
+				FieldManager: o.FieldManager,
 			}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}

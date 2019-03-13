@@ -50,6 +50,7 @@ pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy
 pkg/apis/networking
 pkg/apis/networking/v1
+pkg/apis/node/v1alpha1
 pkg/apis/policy
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
@@ -279,6 +280,7 @@ pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
+pkg/registry/node/rest
 pkg/registry/policy/poddisruptionbudget/storage
 pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole
@@ -535,8 +537,8 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions
-staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers
-staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource
+staging/src/k8s.io/cli-runtime/pkg/printers
+staging/src/k8s.io/cli-runtime/pkg/resource
 staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/discovery/fake

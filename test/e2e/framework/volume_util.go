@@ -41,6 +41,7 @@ package framework
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"strconv"
 	"time"
@@ -397,13 +398,21 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	}
 }
 
-// Start a client pod using given VolumeSource (exported by startVolumeServer())
+// TestVolumeClient start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple VolumeTests can be specified to mount multiple volumes to a single
 // pod.
 func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, fsType string, tests []VolumeTest) {
-	By(fmt.Sprint("starting ", config.Prefix, " client"))
+	By(fmt.Sprint("starting ", config.Prefix, "-client"))
 	var gracePeriod int64 = 1
+	var command string
+
+	if !NodeOSDistroIs("windows") {
+		command = "while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done "
+	} else {
+		command = "while(1) {cat /opt/0/index.html ; sleep 2 ; ls /opt/; sleep 2}"
+	}
+	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -419,33 +428,23 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-client",
-					Image:      BusyBoxImage,
+					Image:      GetTestImage(BusyBoxImage),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads vol contents for
 					// us to scan in the tests or by eye.
 					// We expect that /opt is empty in the minimal containers which we use in this test.
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						"while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
-					},
+					Command:      GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					Level: "s0:c0,c1",
-				},
-			},
-			Volumes:      []v1.Volume{},
-			NodeName:     config.ClientNodeName,
-			NodeSelector: config.NodeSelector,
+			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
+			Volumes:                       []v1.Volume{},
+			NodeName:                      config.ClientNodeName,
+			NodeSelector:                  config.NodeSelector,
 		},
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
-
-	clientPod.Spec.SecurityContext.FSGroup = fsGroup
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -461,30 +460,33 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 	clientPod, err := podsNamespacer.Create(clientPod)
 	if err != nil {
 		Failf("Failed to create %s pod: %v", clientPod.Name, err)
+
 	}
 	ExpectNoError(WaitForPodRunningInNamespace(client, clientPod))
 
 	By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"cat", fileName}, test.ExpectedContent, time.Minute)
+		commands := GenerateReadFileCmd(fileName)
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
 		ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 	}
+	if !NodeOSDistroIs("windows") {
+		if fsGroup != nil {
+			By("Checking fsGroup is correct.")
+			_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
+			ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
+		}
 
-	if fsGroup != nil {
-		By("Checking fsGroup is correct.")
-		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-		ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
-	}
-
-	if fsType != "" {
-		By("Checking fsType is correct.")
-		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
-		ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+		if fsType != "" {
+			By("Checking fsType is correct.")
+			_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
+			ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+		}
 	}
 }
 
-// Insert index.html with given content into given volume. It does so by
+// InjectHtml insert index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
 func InjectHtml(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
@@ -492,7 +494,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, fsGroup *in
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
 	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
-	privileged := true
+	fileName := "/mnt/index.html"
 
 	injectPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -509,18 +511,15 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, fsGroup *in
 			Containers: []v1.Container{
 				{
 					Name:    config.Prefix + "-injector",
-					Image:   BusyBoxImage,
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
+					Image:   GetTestImage(BusyBoxImage),
+					Command: GenerateWriteFileCmd(content, fileName),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volMountName,
 							MountPath: "/mnt",
 						},
 					},
-					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
-					},
+					SecurityContext: GenerateSecurityContext(true),
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
@@ -558,4 +557,95 @@ func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
 			ReadOnly: false,
 		},
 	}, diskName
+}
+
+// GenerateScriptCmd generates the corresponding command lines to execute a command.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateScriptCmd(command string) []string {
+	var commands []string
+	if !NodeOSDistroIs("windows") {
+		commands = []string{"/bin/sh", "-c", command}
+	} else {
+		commands = []string{"powershell", "/c", command}
+	}
+	return commands
+}
+
+// GenerateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateWriteFileCmd(content, fullPath string) []string {
+	var commands []string
+	if !NodeOSDistroIs("windows") {
+		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
+	}
+	return commands
+}
+
+// GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateReadFileCmd(fullPath string) []string {
+	var commands []string
+	if !NodeOSDistroIs("windows") {
+		commands = []string{"cat", fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "type " + fullPath}
+	}
+	return commands
+}
+
+// GenerateWriteandExecuteScriptFileCmd generates the corresponding command lines to write a file with the given file path
+// and also execute this file.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []string {
+	// for windows cluster, modify the Pod spec.
+	if NodeOSDistroIs("windows") {
+		scriptName := fmt.Sprintf("%s.ps1", fileName)
+		fullPath := filepath.Join(filePath, scriptName)
+
+		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
+		Logf("generated pod command %s", cmd)
+		return []string{"powershell", "/c", cmd}
+	} else {
+		scriptName := fmt.Sprintf("%s.sh", fileName)
+		fullPath := filepath.Join(filePath, scriptName)
+		cmd := fmt.Sprintf("echo \"%s\" > %s; chmod u+x %s; %s;", content, fullPath, fullPath, fullPath)
+		return []string{"/bin/sh", "-ec", cmd}
+	}
+}
+
+// GenerateSecurityContext generates the corresponding container security context with the given inputs
+// If the Node OS is windows, currently we will ignore the inputs and return nil.
+// TODO: Will modify it after windows has its own security context
+func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
+	if NodeOSDistroIs("windows") {
+		return nil
+	}
+	return &v1.SecurityContext{
+		Privileged: &privileged,
+	}
+}
+
+// GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
+// If the Node OS is windows, currently we will ignore the inputs and return nil.
+// TODO: Will modify it after windows has its own security context
+func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
+	if NodeOSDistroIs("windows") {
+		return nil
+	}
+	return &v1.PodSecurityContext{
+		SELinuxOptions: seLinuxOptions,
+		FSGroup:        fsGroup,
+	}
+}
+
+// GetTestImage returns the image name with the given input
+// If the Node OS is windows, currently we return Nettest image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+func GetTestImage(image string) string {
+	if NodeOSDistroIs("windows") {
+		return imageutils.GetE2EImage(imageutils.Nettest)
+	}
+	return image
 }
