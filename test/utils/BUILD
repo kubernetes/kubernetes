@@ -76,6 +76,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/utils/crd:all-srcs",
         "//test/utils/harness:all-srcs",
         "//test/utils/image:all-srcs",
         "//test/utils/junit:all-srcs",
