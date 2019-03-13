@@ -19,16 +19,6 @@ http_archive(
     urls = mirror("https://github.com/kubernetes/repo-infra/archive/b461270ab6ccfb94ff2d78df96d26f669376d660.tar.gz"),
 )
 
-ETCD_VERSION = "3.3.10"
-
-http_archive(
-    name = "com_coreos_etcd",
-    build_file = "@//third_party:etcd.BUILD",
-    sha256 = "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
-    strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
-    urls = mirror("https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)),
-)
-
 http_archive(
     name = "io_bazel_rules_go",
     sha256 = "6776d68ebb897625dead17ae510eac3d5f6342367327875210df44dbe2aeeb19",
