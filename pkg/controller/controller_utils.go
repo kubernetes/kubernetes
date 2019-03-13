@@ -88,6 +88,12 @@ var UpdateTaintBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
+var UpdateLabelBackoff = wait.Backoff{
+	Steps:    5,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
+}
+
 var (
 	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
@@ -126,7 +132,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // ControllerExpectationsInterface is an interface that allows users to set and wait on expectations.
@@ -291,7 +297,7 @@ var UIDSetKeyFunc = func(obj interface{}) (string, error) {
 	if u, ok := obj.(*UIDSet); ok {
 		return u.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // UIDSet holds a key and a set of UIDs. Used by the
@@ -432,7 +438,7 @@ type RealControllerRevisionControl struct {
 var _ ControllerRevisionControlInterface = &RealControllerRevisionControl{}
 
 func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.AppsV1beta1().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.AppsV1().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
 	return err
 }
 
@@ -627,7 +633,7 @@ func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, 
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *spec)
 	if f.Err != nil {
@@ -641,7 +647,7 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
@@ -656,7 +662,7 @@ func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *template)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
@@ -920,7 +926,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to update taint of node!")
+				return fmt.Errorf("failed to update taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -977,7 +983,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to remove taint of node!")
+				return fmt.Errorf("failed to remove taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -1021,7 +1027,7 @@ func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs 
 	klog.Infof("Waiting for caches to sync for %s controller", controllerName)
 
 	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("Unable to sync caches for %s controller", controllerName))
+		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s controller", controllerName))
 		return false
 	}
 
@@ -1044,4 +1050,49 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 	}
 
 	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+}
+
+func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateLabelBackoff, func() error {
+		var err error
+		var node *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		// Make a copy of the node and update the labels.
+		newNode := node.DeepCopy()
+		if newNode.Labels == nil {
+			newNode.Labels = make(map[string]string)
+		}
+		for key, value := range labelsToUpdate {
+			newNode.Labels[key] = value
+		}
+
+		oldData, err := json.Marshal(node)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the existing node %#v: %v", node, err)
+		}
+		newData, err := json.Marshal(newNode)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the new node %#v: %v", newNode, err)
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
+		if err != nil {
+			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+		}
+		if _, err := kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+			return fmt.Errorf("failed to patch the node: %v", err)
+		}
+		return nil
+	})
 }

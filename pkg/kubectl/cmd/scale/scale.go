@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -228,7 +228,7 @@ func (o *ScaleOptions) RunScale() error {
 			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
 			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.parent)
 
-			if err := ScaleJob(info, o.clientSet.Batch(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
+			if err := ScaleJob(info, o.clientSet.BatchV1(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
 				return err
 			}
 

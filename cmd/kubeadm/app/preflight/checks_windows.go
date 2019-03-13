@@ -43,3 +43,9 @@ func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 
 	return nil, errorList
 }
+
+// Check validates if Docker is setup to use systemd as the cgroup driver.
+// No-op for Windows.
+func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
+	return nil, nil
+}

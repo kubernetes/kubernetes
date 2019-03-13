@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - dchen1107
@@ -6,4 +8,5 @@ approvers:
 - dcbw
 reviewers:
 - sig-network-reviewers
-
+labels:
+- sig/network

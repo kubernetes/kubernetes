@@ -114,11 +114,12 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	policy := &PolicyData{
-		ClusterRoles:            append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
-		ClusterRoleBindings:     append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
-		Roles:                   bootstrappolicy.NamespaceRoles(),
-		RoleBindings:            bootstrappolicy.NamespaceRoleBindings(),
-		ClusterRolesToAggregate: bootstrappolicy.ClusterRolesToAggregate(),
+		ClusterRoles:               append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
+		ClusterRoleBindings:        append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
+		Roles:                      bootstrappolicy.NamespaceRoles(),
+		RoleBindings:               bootstrappolicy.NamespaceRoleBindings(),
+		ClusterRolesToAggregate:    bootstrappolicy.ClusterRolesToAggregate(),
+		ClusterRoleBindingsToSplit: bootstrappolicy.ClusterRoleBindingsToSplit(),
 	}
 	return PostStartHookName, policy.EnsureRBACPolicy(), nil
 }
@@ -130,6 +131,8 @@ type PolicyData struct {
 	RoleBindings        map[string][]rbacapiv1.RoleBinding
 	// ClusterRolesToAggregate maps from previous clusterrole name to the new clusterrole name
 	ClusterRolesToAggregate map[string]string
+	// ClusterRoleBindingsToSplit maps from previous ClusterRoleBinding Name to a template for the new ClusterRoleBinding
+	ClusterRoleBindingsToSplit map[string]rbacapiv1.ClusterRoleBinding
 }
 
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
@@ -163,6 +166,11 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 			// in new locations
 			if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, clientset); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to prime aggregated clusterroles: %v", err))
+				return false, nil
+			}
+
+			if err := primeSplitClusterRoleBindings(p.ClusterRoleBindingsToSplit, clientset); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to prime split ClusterRoleBindings: %v", err))
 				return false, nil
 			}
 
@@ -332,5 +340,42 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 		}
 	}
 
+	return nil
+}
+
+// primeSplitClusterRoleBindings ensures the existence of target ClusterRoleBindings
+// by copying Subjects, Annotations, and Labels from the specified source
+// ClusterRoleBinding, if present.
+func primeSplitClusterRoleBindings(clusterRoleBindingToSplit map[string]rbacapiv1.ClusterRoleBinding, clusterRoleBindingClient rbacv1client.ClusterRoleBindingsGetter) error {
+	for existingBindingName, clusterRoleBindingToCreate := range clusterRoleBindingToSplit {
+		// If source ClusterRoleBinding does not exist, do nothing.
+		existingRoleBinding, err := clusterRoleBindingClient.ClusterRoleBindings().Get(existingBindingName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		// If the target ClusterRoleBinding already exists, do nothing.
+		_, err = clusterRoleBindingClient.ClusterRoleBindings().Get(clusterRoleBindingToCreate.Name, metav1.GetOptions{})
+		if err == nil {
+			continue
+		}
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		// If the source exists, but the target does not,
+		// copy the subjects, labels, and annotations from the former to create the latter.
+		klog.V(1).Infof("copying subjects, labels, and annotations from ClusterRoleBinding %q to template %q", existingBindingName, clusterRoleBindingToCreate.Name)
+		newCRB := clusterRoleBindingToCreate.DeepCopy()
+		newCRB.Subjects = existingRoleBinding.Subjects
+		newCRB.Labels = existingRoleBinding.Labels
+		newCRB.Annotations = existingRoleBinding.Annotations
+		if _, err := clusterRoleBindingClient.ClusterRoleBindings().Create(newCRB); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
 	return nil
 }

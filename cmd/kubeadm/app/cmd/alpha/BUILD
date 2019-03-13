@@ -7,7 +7,6 @@ go_library(
         "certs.go",
         "kubeconfig.go",
         "kubelet.go",
-        "preflight.go",
         "selfhosting.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha",

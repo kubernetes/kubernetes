@@ -36,6 +36,7 @@ go_library(
 go_binary(
     name = "cfssl",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

@@ -86,7 +86,6 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -186,6 +185,9 @@ const (
 	// How long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
+
+	// How long for snapshot to create snapshotContent
+	SnapshotCreateTimeout = 5 * time.Minute
 
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
@@ -827,7 +829,7 @@ func LogContainersInPodsWithLabels(c clientset.Interface, ns string, match map[s
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "Failed to get namespace list")
 	var deleted []string
 	var wg sync.WaitGroup
 OUTER:
@@ -1833,7 +1835,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
@@ -1865,7 +1867,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "Failed to get list of currentPods in namespace: %s", r.ns)
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
 		if !isElementOf(pod.UID, currentPods) {
@@ -2301,7 +2303,7 @@ func (b kubectlBuilder) ExecOrDie() string {
 		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return str
 }
 
@@ -2367,6 +2369,11 @@ func RunKubectl(args ...string) (string, error) {
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
+}
+
+// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+func RunKubectlInput(data string, args ...string) (string, error) {
+	return NewKubectlCommand(args...).WithStdinData(data).Exec()
 }
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
@@ -2496,7 +2503,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to list events in namespace %q", namespace)
 
 	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
@@ -3380,8 +3387,8 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	return hosts
 }
 
-// NewHostExecPodSpec returns the pod spec of hostexec pod
-func NewHostExecPodSpec(ns, name string) *v1.Pod {
+// NewExecPodSpec returns the pod spec of hostexec pod
+func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3396,7 +3403,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-			HostNetwork:                   true,
+			HostNetwork:                   hostNetwork,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &immediate,
 		},
@@ -3407,7 +3414,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-c", cmd)
+	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -3439,7 +3446,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
 func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
+	hostExecPod := NewExecPodSpec(ns, name, true)
 	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
 	ExpectNoError(err)
 	err = WaitForPodRunningInNamespace(client, pod)
@@ -3479,7 +3486,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		tweak(execPod)
 	}
 	created, err := client.CoreV1().Pods(ns).Create(execPod)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
@@ -3490,7 +3497,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	return created.Name
 }
 
@@ -3515,13 +3522,13 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 		},
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -4006,7 +4013,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 		}
 		return s.RestartCount, nil
 	}
-	return -1, fmt.Errorf("failed to find kube-apiserver container in pod")
+	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
 
 func RestartControllerManager() error {
@@ -4222,26 +4229,20 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tls config: %v", err)
+		return nil, fmt.Errorf("Failed to create tls config: %v", err)
 	}
-	if tlsConfig != nil {
+	if url.Scheme == "https" {
 		url.Scheme = "wss"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":443"
-		}
 	} else {
 		url.Scheme = "ws"
-		if !strings.Contains(url.Host, ":") {
-			url.Host += ":80"
-		}
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load http headers: %v", err)
+		return nil, fmt.Errorf("Failed to load http headers: %v", err)
 	}
 	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create websocket config: %v", err)
+		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
 	}
 	cfg.Header = headers
 	cfg.TlsConfig = tlsConfig
@@ -4599,6 +4600,8 @@ func CoreDump(dir string) {
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
 	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -5064,7 +5067,7 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get url: %v", err)
+		return nil, fmt.Errorf("Failed to get url: %v", err)
 	}
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
@@ -5073,17 +5076,17 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read html response body: %v", err)
+		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse data to json: %v", err)
+		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
 	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DaemonSet spec: %v", err)
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &controller, nil
 }
@@ -5135,7 +5138,7 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}
@@ -5147,7 +5150,7 @@ func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.
 	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		has, err := NodeHasTaint(c, nodeName, taint)
 		if err != nil {
-			return false, fmt.Errorf("failed to check taint %s on node %s or not", taint.ToString(), nodeName)
+			return false, fmt.Errorf("Failed to check taint %s on node %s or not", taint.ToString(), nodeName)
 		}
 		return has == wantTrue, nil
 	}); err != nil {

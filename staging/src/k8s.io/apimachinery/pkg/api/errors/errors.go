@@ -184,6 +184,20 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 	}}
 }
 
+// NewApplyConflict returns an error including details on the requests apply conflicts
+func NewApplyConflict(causes []metav1.StatusCause, message string) *StatusError {
+	return &StatusError{ErrStatus: metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: metav1.StatusReasonConflict,
+		Details: &metav1.StatusDetails{
+			// TODO: Get obj details here?
+			Causes: causes,
+		},
+		Message: message,
+	}}
+}
+
 // NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
 func NewGone(message string) *StatusError {
 	return &StatusError{metav1.Status{
@@ -338,6 +352,17 @@ func NewTooManyRequestsError(message string) *StatusError {
 		Code:    StatusTooManyRequests,
 		Reason:  metav1.StatusReasonTooManyRequests,
 		Message: fmt.Sprintf("Too many requests: %s", message),
+	}}
+}
+
+// NewRequestEntityTooLargeError returns an error indicating that the request
+// entity was too large.
+func NewRequestEntityTooLargeError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusRequestEntityTooLarge,
+		Reason:  metav1.StatusReasonRequestEntityTooLarge,
+		Message: fmt.Sprintf("Request entity too large: %s", message),
 	}}
 }
 
@@ -523,6 +548,19 @@ func IsTooManyRequests(err error) bool {
 	switch t := err.(type) {
 	case APIStatus:
 		return t.Status().Code == http.StatusTooManyRequests
+	}
+	return false
+}
+
+// IsRequestEntityTooLargeError determines if err is an error which indicates
+// the request entity is too large.
+func IsRequestEntityTooLargeError(err error) bool {
+	if ReasonForError(err) == metav1.StatusReasonRequestEntityTooLarge {
+		return true
+	}
+	switch t := err.(type) {
+	case APIStatus:
+		return t.Status().Code == http.StatusRequestEntityTooLarge
 	}
 	return false
 }

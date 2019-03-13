@@ -109,7 +109,7 @@ func (a *PodSecurityPolicyPlugin) SetExternalKubeInformerFactory(f informers.Sha
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -149,7 +149,7 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
-func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {

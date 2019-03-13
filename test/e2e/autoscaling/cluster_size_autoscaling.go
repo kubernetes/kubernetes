@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	schedulerapi "k8s.io/api/scheduling/v1beta1"
+	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1975,7 +1975,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}
@@ -1984,7 +1984,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 
 	return func() {
 		for className := range priorityClasses {
-			err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(className, nil)
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(className, nil)
 			if err != nil {
 				klog.Errorf("Error deleting priority class: %v", err)
 			}

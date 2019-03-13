@@ -97,6 +97,10 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
 				return false
 			}
+		case source.CSI != nil:
+			if source.CSI.NodePublishSecretRef != nil && !visitor(source.CSI.NodePublishSecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
@@ -318,10 +322,6 @@ func dropDisabledFields(
 		podSpec.PriorityClassName = ""
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates) && !podReadinessGatesInUse(oldPodSpec) {
-		podSpec.ReadinessGates = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil
@@ -350,6 +350,20 @@ func dropDisabledFields(
 		}
 	}
 
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
+		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].SubPathExpr = ""
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr = ""
+			}
+		}
+	}
+
 	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
@@ -360,6 +374,9 @@ func dropDisabledFields(
 	}
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
+
+	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
+
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -409,6 +426,16 @@ func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
 		}
 		for i := range podSpec.InitContainers {
 			podSpec.InitContainers[i].VolumeDevices = nil
+		}
+	}
+}
+
+// dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
+// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
+func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
+		for i := range podSpec.Volumes {
+			podSpec.Volumes[i].CSI = nil
 		}
 	}
 }
@@ -520,17 +547,6 @@ func podPriorityInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// podReadinessGatesInUse returns true if the pod spec is non-nil and has ReadinessGates
-func podReadinessGatesInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.ReadinessGates != nil {
-		return true
-	}
-	return false
-}
-
 func sysctlsInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -590,6 +606,41 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.InitContainers {
 		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
+func subpathExprInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		for j := range podSpec.Containers[i].VolumeMounts {
+			if len(podSpec.Containers[i].VolumeMounts[j].SubPathExpr) > 0 {
+				return true
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		for j := range podSpec.InitContainers[i].VolumeMounts {
+			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// csiInUse returns true if any pod's spec include inline CSI volumes.
+func csiInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].CSI != nil {
 			return true
 		}
 	}

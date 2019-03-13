@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	genericprinters "k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	genericprinters "k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -50,7 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -1069,7 +1070,7 @@ func contains(fields []string, field string) bool {
 }
 
 func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
-	ingress := extensions.Ingress{
+	ingress := networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
@@ -1077,13 +1078,13 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 				"app_name": "kubectl_test_ingress",
 			},
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: networking.IngressSpec{
+			Backend: &networking.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
 			},
 		},
-		Status: extensions.IngressStatus{
+		Status: networking.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{
@@ -3542,6 +3543,50 @@ func TestPrintPriorityClass(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
 		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintRuntimeClass(t *testing.T) {
+	tests := []struct {
+		rc     nodeapi.RuntimeClass
+		expect string
+	}{
+		{
+			nodeapi.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "rc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Handler: "h1",
+			},
+			"rc1\th1\t0s\n",
+		},
+		{
+			nodeapi.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "rc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Handler: "h2",
+			},
+			"rc2\th2\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.rc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

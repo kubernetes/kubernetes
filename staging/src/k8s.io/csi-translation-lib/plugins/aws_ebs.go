@@ -18,7 +18,10 @@ package plugins
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"k8s.io/api/core/v1"
 )
@@ -40,6 +43,11 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 	return &awsElasticBlockStoreCSITranslator{}
 }
 
+// TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with AWSElasticBlockStore set from in-tree
 // and converts the AWSElasticBlockStore source to a CSIPersistentVolumeSource
 func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
@@ -49,9 +57,14 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.Persis
 
 	ebsSource := pv.Spec.AWSElasticBlockStore
 
+	volumeHandle, err := KubernetesVolumeIDToEBSVolumeID(ebsSource.VolumeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate Kubernetes ID to EBS Volume ID %v", err)
+	}
+
 	csiSource := &v1.CSIPersistentVolumeSource{
 		Driver:       AWSEBSDriverName,
-		VolumeHandle: ebsSource.VolumeID,
+		VolumeHandle: volumeHandle,
 		ReadOnly:     ebsSource.ReadOnly,
 		FSType:       ebsSource.FSType,
 		VolumeAttributes: map[string]string{
@@ -102,4 +115,56 @@ func (t *awsElasticBlockStoreCSITranslator) CanSupport(pv *v1.PersistentVolume) 
 // GetInTreePluginName returns the name of the intree plugin driver
 func (t *awsElasticBlockStoreCSITranslator) GetInTreePluginName() string {
 	return AWSEBSInTreePluginName
+}
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (t *awsElasticBlockStoreCSITranslator) GetCSIPluginName() string {
+	return AWSEBSDriverName
+}
+
+// awsVolumeRegMatch represents Regex Match for AWS volume.
+var awsVolumeRegMatch = regexp.MustCompile("^vol-[^/]*$")
+
+// KubernetesVolumeIDToEBSVolumeID translates Kubernetes volume ID to EBS volume ID
+// KubernetsVolumeID forms:
+//  * aws://<zone>/<awsVolumeId>
+//  * aws:///<awsVolumeId>
+//  * <awsVolumeId>
+// EBS Volume ID form:
+//  * vol-<alphanumberic>
+// This translation shouldn't be needed and should be fixed in long run
+// See https://github.com/kubernetes/kubernetes/issues/73730
+func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {
+	// name looks like aws://availability-zone/awsVolumeId
+
+	// The original idea of the URL-style name was to put the AZ into the
+	// host, so we could find the AZ immediately from the name without
+	// querying the API.  But it turns out we don't actually need it for
+	// multi-AZ clusters, as we put the AZ into the labels on the PV instead.
+	// However, if in future we want to support multi-AZ cluster
+	// volume-awareness without using PersistentVolumes, we likely will
+	// want the AZ in the host.
+	if !strings.HasPrefix(kubernetesID, "aws://") {
+		// Assume a bare aws volume id (vol-1234...)
+		return kubernetesID, nil
+	}
+	url, err := url.Parse(kubernetesID)
+	if err != nil {
+		// TODO: Maybe we should pass a URL into the Volume functions
+		return "", fmt.Errorf("Invalid disk name (%s): %v", kubernetesID, err)
+	}
+	if url.Scheme != "aws" {
+		return "", fmt.Errorf("Invalid scheme for AWS volume (%s)", kubernetesID)
+	}
+
+	awsID := url.Path
+	awsID = strings.Trim(awsID, "/")
+
+	// We sanity check the resulting volume; the two known formats are
+	// vol-12345678 and vol-12345678abcdef01
+	if !awsVolumeRegMatch.MatchString(awsID) {
+		return "", fmt.Errorf("Invalid format for AWS volume (%s)", kubernetesID)
+	}
+
+	return awsID, nil
 }

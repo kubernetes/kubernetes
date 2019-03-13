@@ -14,6 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis",
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
@@ -43,6 +44,7 @@ filegroup(
         "//pkg/kubelet/apis/pluginregistration/v1alpha1:all-srcs",
         "//pkg/kubelet/apis/pluginregistration/v1beta1:all-srcs",
         "//pkg/kubelet/apis/podresources:all-srcs",
+        "//pkg/kubelet/apis/resourcemetrics/v1alpha1:all-srcs",
         "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],

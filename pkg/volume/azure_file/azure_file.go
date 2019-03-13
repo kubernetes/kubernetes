@@ -27,12 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary endpoint for volume plugins
@@ -53,7 +54,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(azureFilePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(azureFilePluginName), volName)
 }
 
 func (plugin *azureFilePlugin) Init(host volume.VolumeHost) error {
@@ -173,7 +174,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volutil.RoundUpToGiB(newSize))); err != nil {
+	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volumehelpers.RoundUpToGiB(newSize))); err != nil {
 		return oldSize, err
 	}
 
@@ -325,7 +326,7 @@ func (c *azureFileUnmounter) TearDown() error {
 }
 
 func (c *azureFileUnmounter) TearDownAt(dir string) error {
-	return volutil.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func getVolumeSource(spec *volume.Spec) (string, bool, error) {

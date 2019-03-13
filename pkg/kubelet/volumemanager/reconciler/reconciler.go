@@ -36,15 +36,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	utilpath "k8s.io/utils/path"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
@@ -341,7 +341,7 @@ func (rc *reconciler) StatesHasBeenSynced() bool {
 type podVolume struct {
 	podName        volumetypes.UniquePodName
 	volumeSpecName string
-	mountPath      string
+	volumePath     string
 	pluginName     string
 	volumeMode     v1.PersistentVolumeMode
 }
@@ -477,7 +477,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		pod.UID,
 		volume.podName,
 		volume.volumeSpecName,
-		volume.mountPath,
+		volume.volumePath,
 		volume.pluginName)
 	if err != nil {
 		return nil, err
@@ -492,15 +492,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	} else {
 		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
 	}
-	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
-	if checkErr != nil {
-		return nil, checkErr
-	}
-	// If mount or symlink doesn't exist, volume reconstruction should be failed
-	if !isExist {
-		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
-	}
 
 	volumeMounter, newMounterErr := plugin.NewMounter(
 		volumeSpec,
@@ -514,6 +505,16 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 			volume.podName,
 			pod.UID,
 			newMounterErr)
+	}
+
+	// Check existence of mount point for filesystem volume or symbolic link for block volume
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volumeMounter.GetPath(), volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	if checkErr != nil {
+		return nil, checkErr
+	}
+	// If mount or symlink doesn't exist, volume reconstruction should be failed
+	if !isExist {
+		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
 	}
 
 	// TODO: remove feature gate check after no longer needed
@@ -673,19 +674,19 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			for _, volumeDir := range volumesDirInfo {
 				pluginName := volumeDir.Name()
 				volumePluginPath := path.Join(volumesDir, pluginName)
-				volumePluginDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
+				volumePluginDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 				if err != nil {
 					klog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
 					continue
 				}
-				unescapePluginName := utilstrings.UnescapeQualifiedNameForDisk(pluginName)
+				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
-					mountPath := path.Join(volumePluginPath, volumeName)
-					klog.V(5).Infof("podName: %v, mount path from volume plugin directory: %v, ", podName, mountPath)
+					volumePath := path.Join(volumePluginPath, volumeName)
+					klog.V(5).Infof("podName: %v, volume path from volume plugin directory: %v, ", podName, volumePath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
 						volumeSpecName: volumeName,
-						mountPath:      mountPath,
+						volumePath:     volumePath,
 						pluginName:     unescapePluginName,
 						volumeMode:     volumeMode,
 					})

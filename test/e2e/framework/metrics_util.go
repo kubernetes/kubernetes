@@ -65,12 +65,12 @@ const (
 	caFunctionMetricLabel = "function"
 )
 
-type MetricsForE2E metrics.MetricsCollection
+type MetricsForE2E metrics.Collection
 
 func (m *MetricsForE2E) filterMetrics() {
-	interestingApiServerMetrics := make(metrics.ApiServerMetrics)
-	for _, metric := range InterestingApiServerMetrics {
-		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
+	interestingAPIServerMetrics := make(metrics.APIServerMetrics)
+	for _, metric := range InterestingAPIServerMetrics {
+		interestingAPIServerMetrics[metric] = (*m).APIServerMetrics[metric]
 	}
 	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
 	for _, metric := range InterestingControllerManagerMetrics {
@@ -87,29 +87,49 @@ func (m *MetricsForE2E) filterMetrics() {
 			interestingKubeletMetrics[kubelet][metric] = grabbed[metric]
 		}
 	}
-	(*m).ApiServerMetrics = interestingApiServerMetrics
+	(*m).APIServerMetrics = interestingAPIServerMetrics
 	(*m).ControllerManagerMetrics = interestingControllerManagerMetrics
 	(*m).KubeletMetrics = interestingKubeletMetrics
 }
 
+func printSample(sample *model.Sample) string {
+	buf := make([]string, 0)
+	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
+	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
+	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
+	// but it works...
+	_, normalContainer := sample.Metric["kubernetes_container_name"]
+	for k, v := range sample.Metric {
+		if strings.HasPrefix(string(k), "__") {
+			continue
+		}
+
+		if string(k) == "id" && normalContainer {
+			continue
+		}
+		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
+	}
+	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
+}
+
 func (m *MetricsForE2E) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
-	for _, interestingMetric := range InterestingApiServerMetrics {
+	for _, interestingMetric := range InterestingAPIServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
-		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		for _, sample := range (*m).APIServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for _, interestingMetric := range InterestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for _, interestingMetric := range InterestingClusterAutoscalerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for kubelet, grabbed := range (*m).KubeletMetrics {
@@ -117,7 +137,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 		for _, interestingMetric := range InterestingKubeletMetrics {
 			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
 			for _, sample := range grabbed[interestingMetric] {
-				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", printSample(sample)))
 			}
 		}
 	}
@@ -135,15 +155,12 @@ func (m *MetricsForE2E) SummaryKind() string {
 
 var SchedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
 
-var InterestingApiServerMetrics = []string{
+var InterestingAPIServerMetrics = []string{
 	"apiserver_request_total",
-	"apiserver_request_latency_seconds_summary",
-	"etcd_helper_cache_entry_total",
-	"etcd_helper_cache_hit_total",
-	"etcd_helper_cache_miss_total",
-	"etcd_request_cache_add_latency_seconds",
-	"etcd_request_cache_get_latency_seconds",
-	"etcd_request_latency_seconds",
+	// TODO(krzysied): apiserver_request_latencies_summary is a deprecated metric.
+	// It should be replaced with new metric.
+	"apiserver_request_latencies_summary",
+	"apiserver_init_events_total",
 }
 
 var InterestingControllerManagerMetrics = []string{
@@ -169,11 +186,11 @@ var InterestingControllerManagerMetrics = []string{
 var InterestingKubeletMetrics = []string{
 	"kubelet_container_manager_latency_microseconds",
 	"kubelet_docker_errors",
-	"kubelet_docker_operations_latency_microseconds",
+	"kubelet_docker_operations_duration_seconds",
 	"kubelet_generate_pod_status_latency_microseconds",
-	"kubelet_pod_start_latency_microseconds",
-	"kubelet_pod_worker_latency_microseconds",
-	"kubelet_pod_worker_start_latency_microseconds",
+	"kubelet_pod_start_duration_seconds",
+	"kubelet_pod_worker_duration_seconds",
+	"kubelet_pod_worker_start_duration_seconds",
 	"kubelet_sync_pods_latency_microseconds",
 }
 
@@ -475,9 +492,9 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 
 	for _, sample := range samples {
 		// Example line:
-		// apiserver_request_latency_seconds_summary{resource="namespaces",verb="LIST",quantile="0.99"} 0.000908
+		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
 		// apiserver_request_total{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latency_seconds_summary" &&
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
 			sample.Metric[model.MetricNameLabel] != "apiserver_request_total" {
 			continue
 		}
@@ -491,13 +508,13 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		}
 
 		switch sample.Metric[model.MetricNameLabel] {
-		case "apiserver_request_latency_seconds_summary":
+		case "apiserver_request_latencies_summary":
 			latency := sample.Value
 			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
 			if err != nil {
 				return nil, err
 			}
-			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Second)
+			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Microsecond)
 		case "apiserver_request_total":
 			count := sample.Value
 			a.addMetricRequestCount(resource, subresource, verb, scope, int(count))
@@ -797,7 +814,7 @@ func PrintLatencies(latencies []PodLatencyData, header string) {
 	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
-func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.MetricsCollection) {
+func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.Collection) {
 	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 			beforeSamplesMap := make(map[string]*model.Sample)

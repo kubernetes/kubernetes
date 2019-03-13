@@ -280,23 +280,6 @@ func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
 }
 
-// AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
-// only if they do not already exist
-func AddToNodeAddresses(addresses *[]core.NodeAddress, addAddresses ...core.NodeAddress) {
-	for _, add := range addAddresses {
-		exists := false
-		for _, existing := range *addresses {
-			if existing.Address == add.Address && existing.Type == add.Type {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			*addresses = append(*addresses, add)
-		}
-	}
-}
-
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *core.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)

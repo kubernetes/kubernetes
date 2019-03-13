@@ -84,35 +84,12 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
-	// SafeMakeDir creates subdir within given base. It makes sure that the
-	// created directory does not escape given base directory mis-using
-	// symlinks. Note that the function makes sure that it creates the directory
-	// somewhere under the base, nothing else. E.g. if the directory already
-	// exists, it may exist outside of the base due to symlinks.
-	// This method should be used if the directory to create is inside volume
-	// that's under user control. User must not be able to use symlinks to
-	// escape the volume to create directories somewhere else.
-	SafeMakeDir(subdir string, base string, perm os.FileMode) error
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	// Error is returned on any other error than "file not found".
 	ExistsPath(pathname string) (bool, error)
 	// EvalHostSymlinks returns the path name after evaluating symlinks.
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	EvalHostSymlinks(pathname string) (string, error)
-	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
-	// pod volume directory.
-	CleanSubPaths(podDir string, volumeName string) error
-	// PrepareSafeSubpath does everything that's necessary to prepare a subPath
-	// that's 1) inside given volumePath and 2) immutable after this call.
-	//
-	// newHostPath - location of prepared subPath. It should be used instead of
-	// hostName when running the container.
-	// cleanupAction - action to run when the container is running or it failed to start.
-	//
-	// CleanupAction must be called immediately after the container with given
-	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
-	// when the pod finishes.
-	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
 	// GetMountRefs finds all mount references to the path, returns a
 	// list of paths. Path could be a mountpoint path, device or a normal
 	// directory (for bind mount).
@@ -143,7 +120,7 @@ type Subpath struct {
 
 // Exec executes command where mount utilities are. This can be either the host,
 // container where kubelet runs or even a remote pod with mount utilities.
-// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// Usual k8s.io/utils/exec interface is not used because kubelet.RunInContainer does
 // not provide stdin/stdout/stderr streams.
 type Exec interface {
 	// Run executes a command and returns its stdout + stderr combined in one
@@ -355,15 +332,15 @@ func PathWithinBase(fullPath, basePath string) bool {
 	if err != nil {
 		return false
 	}
-	if startsWithBackstep(rel) {
+	if StartsWithBackstep(rel) {
 		// Needed to escape the base path
 		return false
 	}
 	return true
 }
 
-// startsWithBackstep checks if the given path starts with a backstep segment
-func startsWithBackstep(rel string) bool {
+// StartsWithBackstep checks if the given path starts with a backstep segment
+func StartsWithBackstep(rel string) bool {
 	// normalize to / and check for ../
 	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
 }

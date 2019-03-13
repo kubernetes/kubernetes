@@ -988,6 +988,22 @@ func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap t
 	return wrapTestWithPluginCalls(nil, nil, expectedProvisionCalls, toWrap)
 }
 
+// wrapTestWithCSIMigrationProvisionCalls returns a testCall that:
+// - configures controller with a volume plugin that emulates CSI migration
+// - calls given testCall
+func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
+	return func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+		plugin := &mockVolumePlugin{
+			isMigratedToCSI: true,
+		}
+		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
+		ctrl.csiNameFromIntreeNameHook = func(string) (string, error) {
+			return "vendor.com/MockCSIPlugin", nil
+		}
+		return toWrap(ctrl, reactor, test)
+	}
+}
+
 // wrapTestWithInjectedOperation returns a testCall that:
 // - starts the controller and lets it run original testCall until
 //   scheduleOperation() call. It blocks the controller there and calls the
@@ -1229,6 +1245,7 @@ type mockVolumePlugin struct {
 	deleteCallCounter    int
 	recycleCalls         []error
 	recycleCallCounter   int
+	isMigratedToCSI      bool
 	provisionOptions     vol.VolumeOptions
 }
 
@@ -1259,7 +1276,7 @@ func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 }
 
 func (plugin *mockVolumePlugin) IsMigratedToCSI() bool {
-	return false
+	return plugin.isMigratedToCSI
 }
 
 func (plugin *mockVolumePlugin) RequiresRemount() bool {

@@ -160,16 +160,6 @@ func TestEtcdSupportedVersion(t *testing.T) {
 			expectedError:     errors.New("Unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
-			kubernetesVersion: "1.10.2",
-			expectedVersion:   version.MustParseSemantic("3.1.12"),
-			expectedError:     nil,
-		},
-		{
-			kubernetesVersion: "1.11.0",
-			expectedVersion:   version.MustParseSemantic("3.2.18"),
-			expectedError:     nil,
-		},
-		{
 			kubernetesVersion: "1.12.1",
 			expectedVersion:   version.MustParseSemantic("3.2.24"),
 			expectedError:     nil,

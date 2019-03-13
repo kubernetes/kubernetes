@@ -17,7 +17,6 @@ package mesos
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
@@ -68,9 +67,6 @@ func newMesosContainerHandler(
 	client mesosAgentClient,
 ) (container.ContainerHandler, error) {
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{

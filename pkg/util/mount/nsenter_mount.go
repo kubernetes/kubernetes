@@ -23,12 +23,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
-	"golang.org/x/sys/unix"
 	"k8s.io/klog"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/utils/nsenter"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -291,160 +289,25 @@ func (mounter *NsenterMounter) ExistsPath(pathname string) (bool, error) {
 		return false, err
 	}
 	kubeletpath := mounter.ne.KubeletPath(hostPath)
-	return utilfile.FileExists(kubeletpath)
+	return utilpath.Exists(utilpath.CheckFollowSymlink, kubeletpath)
 }
 
 func (mounter *NsenterMounter) EvalHostSymlinks(pathname string) (string, error) {
 	return mounter.ne.EvalSymlinks(pathname, true)
 }
 
-func (mounter *NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
-	return doCleanSubPaths(mounter, podDir, volumeName)
-}
-
-func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	// Bind-mount the subpath to avoid using symlinks in subpaths.
-	newHostPath, err = doNsEnterBindSubPath(mounter, subPath)
-
-	// There is no action when the container starts. Bind-mount will be cleaned
-	// when container stops by CleanSubPaths.
-	cleanupAction = nil
-	return newHostPath, cleanupAction, err
-}
-
-func (mounter *NsenterMounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
-	fullSubdirPath := filepath.Join(base, subdir)
-	evaluatedSubdirPath, err := mounter.ne.EvalSymlinks(fullSubdirPath, false /* mustExist */)
-	if err != nil {
-		return fmt.Errorf("error resolving symlinks in %s: %s", fullSubdirPath, err)
-	}
-	evaluatedSubdirPath = filepath.Clean(evaluatedSubdirPath)
-
-	evaluatedBase, err := mounter.ne.EvalSymlinks(base, true /* mustExist */)
-	if err != nil {
-		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
-	}
-	evaluatedBase = filepath.Clean(evaluatedBase)
-
-	rootDir := filepath.Clean(mounter.rootDir)
-	if PathWithinBase(evaluatedBase, rootDir) {
-		// Base is in /var/lib/kubelet. This directory is shared between the
-		// container with kubelet and the host. We don't need to add '/rootfs'.
-		// This is useful when /rootfs is mounted as read-only - we can still
-		// create subpaths for paths in /var/lib/kubelet.
-		return doSafeMakeDir(evaluatedSubdirPath, evaluatedBase, perm)
-	}
-
-	// Base is somewhere on the host's filesystem. Add /rootfs and try to make
-	// the directory there.
-	// This requires /rootfs to be writable.
-	kubeletSubdirPath := mounter.ne.KubeletPath(evaluatedSubdirPath)
-	kubeletBase := mounter.ne.KubeletPath(evaluatedBase)
-	return doSafeMakeDir(kubeletSubdirPath, kubeletBase, perm)
-}
-
 func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
-	exists, err := mounter.ExistsPath(pathname)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
+	pathExists, pathErr := PathExists(pathname)
+	if !pathExists || IsCorruptedMnt(pathErr) {
 		return []string{}, nil
+	} else if pathErr != nil {
+		return nil, fmt.Errorf("Error checking path %s: %v", pathname, pathErr)
 	}
 	hostpath, err := mounter.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return nil, err
 	}
 	return searchMountPoints(hostpath, hostProcMountinfoPath)
-}
-
-func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath string, err error) {
-	// Linux, kubelet runs in a container:
-	// - safely open the subpath
-	// - bind-mount the subpath to target (this can be unsafe)
-	// - check that we mounted the right thing by comparing device ID and inode
-	//   of the subpath (via safely opened fd) and the target (that's under our
-	//   control)
-
-	// Evaluate all symlinks here once for all subsequent functions.
-	evaluatedHostVolumePath, err := mounter.ne.EvalSymlinks(subpath.VolumePath, true /*mustExist*/)
-	if err != nil {
-		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.VolumePath, err)
-	}
-	evaluatedHostSubpath, err := mounter.ne.EvalSymlinks(subpath.Path, true /*mustExist*/)
-	if err != nil {
-		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
-	}
-	klog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, evaluatedHostSubpath, subpath.VolumePath)
-	subpath.VolumePath = mounter.ne.KubeletPath(evaluatedHostVolumePath)
-	subpath.Path = mounter.ne.KubeletPath(evaluatedHostSubpath)
-
-	// Check the subpath is correct and open it
-	fd, err := safeOpenSubPath(mounter, subpath)
-	if err != nil {
-		return "", err
-	}
-	defer syscall.Close(fd)
-
-	alreadyMounted, bindPathTarget, err := prepareSubpathTarget(mounter, subpath)
-	if err != nil {
-		return "", err
-	}
-	if alreadyMounted {
-		return bindPathTarget, nil
-	}
-
-	success := false
-	defer func() {
-		// Cleanup subpath on error
-		if !success {
-			klog.V(4).Infof("doNsEnterBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
-			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
-				klog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
-			}
-		}
-	}()
-
-	// Leap of faith: optimistically expect that nobody has modified previously
-	// expanded evalSubPath with evil symlinks and bind-mount it.
-	// Mount is done on the host! don't use kubelet path!
-	klog.V(5).Infof("bind mounting %q at %q", evaluatedHostSubpath, bindPathTarget)
-	if err = mounter.Mount(evaluatedHostSubpath, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
-		return "", fmt.Errorf("error mounting %s: %s", evaluatedHostSubpath, err)
-	}
-
-	// Check that the bind-mount target is the same inode and device as the
-	// source that we keept open, i.e. we mounted the right thing.
-	err = checkDeviceInode(fd, bindPathTarget)
-	if err != nil {
-		return "", fmt.Errorf("error checking bind mount for subpath %s: %s", subpath.VolumePath, err)
-	}
-
-	success = true
-	klog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
-	return bindPathTarget, nil
-}
-
-// checkDeviceInode checks that opened file and path represent the same file.
-func checkDeviceInode(fd int, path string) error {
-	var srcStat, dstStat unix.Stat_t
-	err := unix.Fstat(fd, &srcStat)
-	if err != nil {
-		return fmt.Errorf("error running fstat on subpath FD: %v", err)
-	}
-
-	err = unix.Stat(path, &dstStat)
-	if err != nil {
-		return fmt.Errorf("error running fstat on %s: %v", path, err)
-	}
-
-	if srcStat.Dev != dstStat.Dev {
-		return fmt.Errorf("different device number")
-	}
-	if srcStat.Ino != dstStat.Ino {
-		return fmt.Errorf("different inode")
-	}
-	return nil
 }
 
 func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {

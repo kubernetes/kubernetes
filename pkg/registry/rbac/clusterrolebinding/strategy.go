@@ -44,7 +44,7 @@ var _ rest.RESTCreateStrategy = Strategy
 // Strategy should implement rest.RESTUpdateStrategy
 var _ rest.RESTUpdateStrategy = Strategy
 
-// NamespaceScoped is true for ClusterRoleBindings.
+// NamespaceScoped is false for ClusterRoleBindings.
 func (strategy) NamespaceScoped() bool {
 	return false
 }

@@ -53,7 +53,9 @@ func (endpointsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 // Validate validates a new endpoints.
 func (endpointsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateEndpoints(obj.(*api.Endpoints))
+	allErrs := validation.ValidateEndpoints(obj.(*api.Endpoints))
+	allErrs = append(allErrs, validation.ValidateConditionalEndpoints(obj.(*api.Endpoints), nil)...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,7 +72,9 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (endpointsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))
-	return append(errorList, validation.ValidateEndpointsUpdate(obj.(*api.Endpoints), old.(*api.Endpoints))...)
+	errorList = append(errorList, validation.ValidateEndpointsUpdate(obj.(*api.Endpoints), old.(*api.Endpoints))...)
+	errorList = append(errorList, validation.ValidateConditionalEndpoints(obj.(*api.Endpoints), old.(*api.Endpoints))...)
+	return errorList
 }
 
 func (endpointsStrategy) AllowUnconditionalUpdate() bool {

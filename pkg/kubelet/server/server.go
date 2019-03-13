@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"path"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -59,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -71,12 +73,13 @@ import (
 )
 
 const (
-	metricsPath         = "/metrics"
-	cadvisorMetricsPath = "/metrics/cadvisor"
-	proberMetricsPath   = "/metrics/probes"
-	specPath            = "/spec/"
-	statsPath           = "/stats/"
-	logsPath            = "/logs/"
+	metricsPath               = "/metrics"
+	cadvisorMetricsPath       = "/metrics/cadvisor"
+	resourceMetricsPathPrefix = "/metrics/resource"
+	proberMetricsPath         = "/metrics/probes"
+	specPath                  = "/spec/"
+	statsPath                 = "/stats/"
+	logsPath                  = "/logs/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -88,6 +91,7 @@ type Server struct {
 	redirectContainerStreaming bool
 }
 
+// TLSOptions holds the TLS options.
 type TLSOptions struct {
 	Config   *tls.Config
 	CertFile string
@@ -165,7 +169,7 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 	klog.Fatal(server.ListenAndServe())
 }
 
-// ListenAndServePodResources initializes a grpc server to serve the PodResources service
+// ListenAndServePodResources initializes a gRPC server to serve the PodResources service
 func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider) {
 	server := grpc.NewServer()
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewPodResourcesServer(podsProvider, devicesProvider))
@@ -186,7 +190,7 @@ type AuthInterface interface {
 // HostInterface contains all the kubelet methods required by the server.
 // For testability.
 type HostInterface interface {
-	stats.StatsProvider
+	stats.Provider
 	GetVersionInfo() (*cadvisorapi.VersionInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetRunningPods() ([]*v1.Pod, error)
@@ -306,6 +310,12 @@ func (s *Server) InstallDefaultHandlers() {
 	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+	)
+
+	v1alpha1ResourceRegistry := prometheus.NewRegistry()
+	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
+		promhttp.HandlerFor(v1alpha1ResourceRegistry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
 	// prober metrics are exposed under a different endpoint
@@ -533,7 +543,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
 	if !ok {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("pod %q does not exist\n", podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod %q does not exist", podID))
 		return
 	}
 	// Check if containerName is valid.
@@ -553,12 +563,12 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		}
 	}
 	if !containerExists {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q\n", containerName, podID))
+		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q", containerName, podID))
 		return
 	}
 
 	if _, ok := response.ResponseWriter.(http.Flusher); !ok {
-		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs\n", reflect.TypeOf(response)))
+		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs", reflect.TypeOf(response)))
 		return
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
@@ -591,7 +601,7 @@ func (s *Server) getPods(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJsonResponse(response, data)
+	writeJSONResponse(response, data)
 }
 
 // getRunningPods returns a list of pods running on Kubelet. The list is
@@ -608,7 +618,7 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJsonResponse(response, data)
+	writeJSONResponse(response, data)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -747,11 +757,11 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJsonResponse(response, data)
+	writeJSONResponse(response, data)
 }
 
 // Derived from go-restful writeJSON.
-func writeJsonResponse(response *restful.Response, data []byte) {
+func writeJSONResponse(response *restful.Response, data []byte) {
 	if data == nil {
 		response.WriteHeader(http.StatusOK)
 		// do not write a nil representation
@@ -834,7 +844,7 @@ func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error
 	return a.host.GetCachedMachineInfo()
 }
 
-func containerPrometheusLabelsFunc(s stats.StatsProvider) metrics.ContainerLabelsFunc {
+func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc {
 	// containerPrometheusLabels maps cAdvisor labels to prometheus labels.
 	return func(c *cadvisorapi.ContainerInfo) map[string]string {
 		// Prometheus requires that all metrics in the same family have the same labels,
@@ -865,8 +875,10 @@ func containerPrometheusLabelsFunc(s stats.StatsProvider) metrics.ContainerLabel
 			metrics.LabelName:  name,
 			metrics.LabelImage: image,
 			"pod_name":         podName,
+			"pod":              podName,
 			"namespace":        namespace,
 			"container_name":   containerName,
+			"container":        containerName,
 		}
 		return set
 	}

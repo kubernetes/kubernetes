@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "create_test.go",
         "namer_test.go",
         "rest_test.go",
     ],
@@ -27,6 +28,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
@@ -73,6 +75,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
@@ -86,7 +89,6 @@ go_library(
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
@@ -102,6 +104,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:all-srcs",
     ],

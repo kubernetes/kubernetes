@@ -29,8 +29,8 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // VSphereConnection contains information for connecting to vCenter

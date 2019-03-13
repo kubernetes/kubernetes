@@ -511,6 +511,18 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(resourceGroup, vmName string, newVM c
 	})
 }
 
+// UpdateVmssVMWithRetry invokes az.VirtualMachineScaleSetVMsClient.Update with exponential backoff retry
+func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM) error {
+	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
+		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		return az.processHTTPRetryResponse(nil, "", resp, err)
+	})
+}
+
 // isSuccessHTTPResponse determines if the response from an HTTP request suggests success
 func isSuccessHTTPResponse(resp *http.Response) bool {
 	if resp == nil {

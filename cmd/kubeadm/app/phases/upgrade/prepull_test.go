@@ -141,7 +141,7 @@ func TestPrepullImagesInParallel(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualErr := PrepullImagesInParallel(rt.p, rt.timeout, append(constants.MasterComponents, constants.Etcd))
+			actualErr := PrepullImagesInParallel(rt.p, rt.timeout, append(constants.ControlPlaneComponents, constants.Etcd))
 			if (actualErr != nil) != rt.expectedErr {
 				t.Errorf(
 					"failed TestPrepullImagesInParallel\n\texpected error: %t\n\tgot: %t",

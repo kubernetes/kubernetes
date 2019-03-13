@@ -137,10 +137,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	return err
 }
 
-func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
-	r.stopReconcilingCalled = true
 
 	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
@@ -165,6 +164,12 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 		return err
 	})
 	return err
+}
+
+func (r *masterCountEndpointReconciler) StopReconciling() {
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+	r.stopReconcilingCalled = true
 }
 
 // Determine if the endpoint is in the format ReconcileEndpoints expects.

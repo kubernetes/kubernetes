@@ -22,7 +22,7 @@ go_library(
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/storage:go_default_library",
-        "//pkg/kubeapiserver/options:go_default_library",
+        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
@@ -30,6 +30,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

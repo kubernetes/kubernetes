@@ -49,7 +49,31 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string
+
+	// scope specifies the scope of this rule.
+	// Valid values are "Cluster", "Namespaced", and "*"
+	// "Cluster" means that only cluster-scoped resources will match this rule.
+	// Namespace API objects are cluster-scoped.
+	// "Namespaced" means that only namespaced resources will match this rule.
+	// "*" means that there are no scope restrictions.
+	// Subresources match the scope of their parent resource.
+	// Default is "*".
+	//
+	// +optional
+	Scope *ScopeType
 }
+
+type ScopeType string
+
+const (
+	// ClusterScope means that scope is limited to cluster-scoped objects.
+	// Namespace objects are cluster-scoped.
+	ClusterScope ScopeType = "Cluster"
+	// NamespacedScope means that scope is limited to namespaced objects.
+	NamespacedScope ScopeType = "Namespaced"
+	// AllScopes means that all scopes are included.
+	AllScopes ScopeType = "*"
+)
 
 type FailurePolicyType string
 
@@ -208,6 +232,22 @@ type Webhook struct {
 	// sideEffects == Unknown or Some. Defaults to Unknown.
 	// +optional
 	SideEffects *SideEffectClass
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// +optional
+	TimeoutSeconds *int32
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If the webhook configuration has already been persisted with a version apiserver
+	// does not understand, calls to the webhook will fail and be subject to the failure policy.
+	// +optional
+	AdmissionReviewVersions []string
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make

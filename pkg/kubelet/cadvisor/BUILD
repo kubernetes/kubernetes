@@ -21,11 +21,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
@@ -51,11 +49,8 @@ go_test(
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/features:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
             "//vendor/github.com/google/cadvisor/container/crio:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

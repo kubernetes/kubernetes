@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -147,7 +147,7 @@ var _ volume.Volume = &gitRepoVolume{}
 
 func (gr *gitRepoVolume) GetPath() string {
 	name := gitRepoPluginName
-	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedNameForDisk(name), gr.volName)
+	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedName(name), gr.volName)
 }
 
 // gitRepoVolumeMounter builds git repo volumes.
@@ -248,7 +248,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (b *gitRepoVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedName(gitRepoPluginName)), b.volName)
 }
 
 func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir string) ([]byte, error) {

@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - thockin
   - brendandburns
@@ -7,3 +9,5 @@ approvers:
   - thockin
   - brendandburns
   - m1093782566
+labels:
+- sig/network

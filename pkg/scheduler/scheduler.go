@@ -138,7 +138,6 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
-
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  options.schedulerName,
@@ -193,8 +192,11 @@ func New(client clientset.Interface,
 	config.Recorder = recorder
 	config.DisablePreemption = options.disablePreemption
 	config.StopEverything = stopCh
+
 	// Create the scheduler.
 	sched := NewFromConfig(config)
+
+	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, replicationControllerInformer, replicaSetInformer, statefulSetInformer, serviceInformer, pdbInformer, storageClassInformer)
 	return sched, nil
 }
 
@@ -263,11 +265,10 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 	sched.config.Error(pod, err)
 	sched.config.Recorder.Event(pod, v1.EventTypeWarning, "FailedScheduling", message)
 	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-		Type:          v1.PodScheduled,
-		Status:        v1.ConditionFalse,
-		LastProbeTime: metav1.Now(),
-		Reason:        reason,
-		Message:       err.Error(),
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  reason,
+		Message: err.Error(),
 	})
 }
 
@@ -425,6 +426,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	metrics.BindingLatency.Observe(metrics.SinceInSeconds(bindingStart))
 	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
+	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
 }
@@ -469,6 +471,7 @@ func (sched *Scheduler) scheduleOne() {
 				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 				metrics.DeprecatedSchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 				metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+				metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
 			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption
 			// succeeds, the pod should get counted as a success the next time we try to

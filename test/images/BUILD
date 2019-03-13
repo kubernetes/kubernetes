@@ -12,6 +12,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/images/apparmor-loader:all-srcs",
+        "//test/images/audit-proxy:all-srcs",
         "//test/images/crd-conversion-webhook:all-srcs",
         "//test/images/echoserver:all-srcs",
         "//test/images/entrypoint-tester:all-srcs",
@@ -31,6 +32,7 @@ filegroup(
         "//test/images/porter:all-srcs",
         "//test/images/resource-consumer:all-srcs",
         "//test/images/sample-apiserver:all-srcs",
+        "//test/images/sample-device-plugin:all-srcs",
         "//test/images/serve-hostname:all-srcs",
         "//test/images/test-webserver:all-srcs",
         "//test/images/webhook:all-srcs",

@@ -25,7 +25,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
@@ -57,7 +57,7 @@ declare -a resources=(
 )
 
 # Find all the namespaces.
-namespaces=( $("${KUBECTL}" get namespaces -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
+IFS=" " read -r -a namespaces <<< "$("${KUBECTL}" get namespaces -o go-template="{{range.items}}{{.metadata.name}} {{end}}")"
 if [ -z "${namespaces:-}" ]
 then
   echo "Unexpected: No namespace found. Nothing to do."
@@ -74,7 +74,7 @@ do
     # TODO hopefully we can remove this once we use dynamic discovery of gettable/updateable
     # resources.
     set +e
-    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
+    IFS=" " read -r -a instances <<< "$("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}")"
     result=$?
     set -e
 

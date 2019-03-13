@@ -22,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

@@ -26,10 +26,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -119,7 +120,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[kubeletapis.LabelZoneFailureDomain] = "nova"
+	labels[v1.LabelZoneFailureDomain] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -234,7 +235,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != kubeletapis.LabelZoneFailureDomain {
+	if req.Key != v1.LabelZoneFailureDomain {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 
@@ -255,4 +256,77 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)
 	}
+}
+
+func TestGetVolumeLimit(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+
+	cloud, err := getOpenstackCloudProvider()
+	if err != nil {
+		t.Fatalf("can not instantiate openstack cloudprovider : %v", err)
+	}
+
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	volumeHost := volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	if err != nil {
+		t.Fatalf("Can't find the plugin by name")
+	}
+	attachablePlugin, ok := plug.(volume.VolumePluginWithAttachLimits)
+	if !ok {
+		t.Fatalf("plugin %s is not of attachable type", plug.GetPluginName())
+	}
+
+	limits, err := attachablePlugin.GetVolumeLimits()
+	if err != nil {
+		t.Errorf("error fetching limits : %v", err)
+	}
+	if len(limits) == 0 {
+		t.Fatalf("expecting limit from openstack got none")
+	}
+	limit, _ := limits[util.CinderVolumeLimitKey]
+	if limit != 10 {
+		t.Fatalf("expected volume limit to be 10 got %d", limit)
+	}
+}
+
+func getOpenstackCloudProvider() (*openstack.OpenStack, error) {
+	cfg := getOpenstackConfig()
+	return openstack.NewFakeOpenStackCloud(cfg)
+}
+
+func getOpenstackConfig() openstack.Config {
+	cfg := openstack.Config{
+		Global: struct {
+			AuthURL    string `gcfg:"auth-url"`
+			Username   string
+			UserID     string `gcfg:"user-id"`
+			Password   string
+			TenantID   string `gcfg:"tenant-id"`
+			TenantName string `gcfg:"tenant-name"`
+			TrustID    string `gcfg:"trust-id"`
+			DomainID   string `gcfg:"domain-id"`
+			DomainName string `gcfg:"domain-name"`
+			Region     string
+			CAFile     string `gcfg:"ca-file"`
+		}{
+			Username:   "user",
+			Password:   "pass",
+			TenantID:   "foobar",
+			DomainID:   "2a73b8f597c04551a0fdc8e95544be8a",
+			DomainName: "local",
+			AuthURL:    "http://auth.url",
+			UserID:     "user",
+		},
+		BlockStorage: openstack.BlockStorageOpts{
+			NodeVolumeAttachLimit: 10,
+		},
+	}
+	return cfg
 }

@@ -141,7 +141,7 @@ type genericScheduler struct {
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
-	cachedNodeInfoMap        map[string]*schedulernodeinfo.NodeInfo
+	nodeInfoSnapshot         schedulerinternalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister
@@ -153,7 +153,7 @@ type genericScheduler struct {
 // functions.
 func (g *genericScheduler) snapshot() error {
 	// Used for all fit and priority funcs.
-	return g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
+	return g.cache.UpdateNodeInfoSnapshot(&g.nodeInfoSnapshot)
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -196,6 +196,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
+	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 
 	trace.Step("Prioritizing")
 	startPriorityEvalTime := time.Now()
@@ -210,14 +211,15 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		}, nil
 	}
 
-	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
+	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
 		return result, err
 	}
 	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
+	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	trace.Step("Selecting host")
 
@@ -290,7 +292,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
 	}
-	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
+	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfoMap) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
@@ -311,7 +313,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nodeToVictims, err := selectNodesForPreemption(pod, g.cachedNodeInfoMap, potentialNodes, g.predicates,
+	nodeToVictims, err := selectNodesForPreemption(pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
 		g.predicateMetaProducer, g.schedulingQueue, pdbs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -335,7 +337,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
 	nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)
-	if nodeInfo, ok := g.cachedNodeInfoMap[candidateNode.Name]; ok {
+	if nodeInfo, ok := g.nodeInfoSnapshot.NodeInfoMap[candidateNode.Name]; ok {
 		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, nil
 	}
 
@@ -355,7 +357,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 				newNodeToVictims, err := extender.ProcessPreemption(
 					pod,
 					nodeToVictims,
-					g.cachedNodeInfoMap,
+					g.nodeInfoSnapshot.NodeInfoMap,
 				)
 				if err != nil {
 					if extender.IsIgnorable() {
@@ -452,14 +454,14 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// We can use the same metadata producer for all nodes.
-		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
+		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
 
 		checkNode := func(i int) {
 			nodeName := g.cache.NodeTree().Next()
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
-				g.cachedNodeInfoMap[nodeName],
+				g.nodeInfoSnapshot.NodeInfoMap[nodeName],
 				g.predicates,
 				g.schedulingQueue,
 				g.alwaysCheckAllPredicates,
@@ -476,7 +478,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 					cancel()
 					atomic.AddInt32(&filteredLen, -1)
 				} else {
-					filtered[length-1] = g.cachedNodeInfoMap[nodeName].Node()
+					filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
 				}
 			} else {
 				predicateResultLock.Lock()
@@ -500,7 +502,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 			if !extender.IsInterested(pod) {
 				continue
 			}
-			filteredList, failedMap, err := extender.Filter(pod, filtered, g.cachedNodeInfoMap)
+			filteredList, failedMap, err := extender.Filter(pod, filtered, g.nodeInfoSnapshot.NodeInfoMap)
 			if err != nil {
 				if extender.IsIgnorable() {
 					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
@@ -1193,7 +1195,7 @@ func NewGenericScheduler(
 		priorityMetaProducer:     priorityMetaProducer,
 		pluginSet:                pluginSet,
 		extenders:                extenders,
-		cachedNodeInfoMap:        make(map[string]*schedulernodeinfo.NodeInfo),
+		nodeInfoSnapshot:         schedulerinternalcache.NewNodeInfoSnapshot(),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,

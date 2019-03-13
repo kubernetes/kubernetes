@@ -135,7 +135,10 @@ type TokenRequestSpec struct {
 	ExpirationSeconds int64
 
 	// BoundObjectRef is a reference to an object that the token will be bound to.
-	// The token will only be valid for as long as the bound objet exists.
+	// The token will only be valid for as long as the bound object exists.
+	// NOTE: The API server's TokenReview endpoint will validate the
+	// BoundObjectRef, but other audiences may not. Keep ExpirationSeconds
+	// small if you want prompt revocation.
 	BoundObjectRef *BoundObjectReference
 }
 

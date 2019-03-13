@@ -127,6 +127,8 @@ push() {
 
   kube::util::ensure-gnu-sed
 
+  # The manifest command is still experimental as of Docker 18.09.2
+  export DOCKER_CLI_EXPERIMENTAL="enabled"
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo $archs | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
   docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}

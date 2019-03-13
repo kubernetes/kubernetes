@@ -7,12 +7,12 @@ This directory contains the source for a soak test `serve_hostnames` which perfo
 The pods are created individually (i.e. not with a replication controller).
 * A service is created which maps to these pods.
 * The program makes *I* iterations (default 1) where it issues *QxNxM* queries (*Q* default is 10) via the service proxy interface at the master.
-* The program verifies that every pod (and thus every node) responded to at least one query (the average should be about *Q*). 
+* The program verifies that every pod (and thus every node) responded to at least one query (the average should be about *Q*).
 * The time taken to perform various operations is reported and some operations are re-tried if they failed.
 
 Here is some representative output.
 ```
-$ ./serve_hostnames 
+$ ./serve_hostnames
 I0326 14:21:04.179893   11434 serve_hostnames.go:60] Starting serve_hostnames soak test with queries=10 and podsPerNode=1 upTo=1
 I0326 14:21:04.507252   11434 serve_hostnames.go:85] Nodes found on this cluster:
 I0326 14:21:04.507282   11434 serve_hostnames.go:87] 0: kubernetes-node-5h4m.c.kubernetes-satnam.internal
@@ -158,9 +158,9 @@ I0326 14:35:05.475834   12099 serve_hostnames.go:249] Proxy call in namespace se
 I0326 14:35:05.519373   12099 serve_hostnames.go:249] Proxy call in namespace serve-hostnames-1631 took 43.501574ms
 I0326 14:35:05.563584   12099 serve_hostnames.go:249] Proxy call in namespace serve-hostnames-1631 took 44.162687ms
 I0326 14:35:05.607126   12099 serve_hostnames.go:249] Proxy call in namespace serve-hostnames-1631 took 43.478674ms
-I0326 14:35:05.607164   12099 serve_hostnames.go:258] serve-hostname-3-0: 12  
-I0326 14:35:05.607176   12099 serve_hostnames.go:258] serve-hostname-1-0: 10  
-I0326 14:35:05.607186   12099 serve_hostnames.go:258] serve-hostname-0-0: 18  
+I0326 14:35:05.607164   12099 serve_hostnames.go:258] serve-hostname-3-0: 12
+I0326 14:35:05.607176   12099 serve_hostnames.go:258] serve-hostname-1-0: 10
+I0326 14:35:05.607186   12099 serve_hostnames.go:258] serve-hostname-0-0: 18
 W0326 14:35:05.607199   12099 serve_hostnames.go:265] No response from pod serve-hostname-2-0 on node kubernetes-node-d0yo.c.kubernetes-satnam.internal at iteration 0
 I0326 14:35:05.607211   12099 serve_hostnames.go:269] Iteration 0 took 1.774856469s for 40 queries (22.54 QPS)
 I0326 14:35:05.607236   12099 serve_hostnames.go:182] Cleaning up pods

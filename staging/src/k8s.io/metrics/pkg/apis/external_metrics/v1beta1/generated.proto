@@ -29,7 +29,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
-// a metric value for external metric
+// ExternalMetricValue is a metric value for external metric
 // A single metric value is identified by metric name and a set of string labels.
 // For one metric there can be multiple values with different sets of labels.
 message ExternalMetricValue {
@@ -52,7 +52,7 @@ message ExternalMetricValue {
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;
 }
 
-// a list of values for a given metric for some set labels
+// ExternalMetricValueList is a list of values for a given metric for some set labels
 message ExternalMetricValueList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

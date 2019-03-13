@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	"time"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -90,12 +92,7 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 }
 
 func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
-	if spec.PersistentVolume != nil &&
-		spec.PersistentVolume.Spec.CSI != nil {
-		return spec.PersistentVolume.Spec.CSI, nil
-	}
-
-	return nil, fmt.Errorf("CSIPersistentVolumeSource not defined in spec")
+	return getPVSourceFromSpec(spec)
 }
 
 func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
@@ -109,23 +106,23 @@ func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
 
 // log prepends log string with `kubernetes.io/csi`
 func log(msg string, parts ...interface{}) string {
-	return fmt.Sprintf(fmt.Sprintf("%s: %s", csiPluginName, msg), parts...)
+	return fmt.Sprintf(fmt.Sprintf("%s: %s", CSIPluginName, msg), parts...)
 }
 
 // getVolumeDevicePluginDir returns the path where the CSI plugin keeps the
 // symlink for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/dev
 func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
-	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "dev")
+	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
+	return path.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "dev")
 }
 
 // getVolumeDeviceDataDir returns the path where the CSI plugin keeps the
 // volume data for a block device associated with a given specVolumeID.
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/data
 func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
-	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
-	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "data")
+	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(specVolID)
+	return path.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "data")
 }
 
 // hasReadWriteOnce returns true if modes contains v1.ReadWriteOnce
@@ -139,4 +136,35 @@ func hasReadWriteOnce(modes []api.PersistentVolumeAccessMode) bool {
 		}
 	}
 	return false
+}
+
+// getSourceFromSpec returns either CSIVolumeSource or CSIPersistentVolumeSource, but not both
+func getSourceFromSpec(spec *volume.Spec) (*api.CSIVolumeSource, *api.CSIPersistentVolumeSource, error) {
+	if spec == nil {
+		return nil, nil, fmt.Errorf("volume.Spec nil")
+	}
+	if spec.Volume != nil && spec.PersistentVolume != nil {
+		return nil, nil, fmt.Errorf("volume.Spec has both volume and persistent volume sources")
+	}
+	if spec.Volume != nil && spec.Volume.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		return spec.Volume.CSI, nil, nil
+	}
+	if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.CSI != nil {
+		return nil, spec.PersistentVolume.Spec.CSI, nil
+	}
+
+	return nil, nil, fmt.Errorf("volume source not found in volume.Spec")
+}
+
+// getPVSourceFromSpec ensures only CSIPersistentVolumeSource is present in volume.Spec
+func getPVSourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
+	volSrc, pvSrc, err := getSourceFromSpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if volSrc != nil {
+		return nil, fmt.Errorf("unexpected api.CSIVolumeSource found in volume.Spec")
+	}
+	return pvSrc, nil
 }

@@ -1,10 +1,10 @@
 ## Purpose
 
-This repository contains functions to be consumed by various Kubernetes and 
-out-of-tree CSI components like external provisioner to facilitate migration of 
+This repository contains functions to be consumed by various Kubernetes and
+out-of-tree CSI components like external provisioner to facilitate migration of
 code from Kubernetes In-tree plugin code to CSI plugin repositories.
 
-Consumers of this repository can make use of functions like `TranslateToCSI` and 
+Consumers of this repository can make use of functions like `TranslateToCSI` and
 `TranslateToInTree` functions to translate PV sources.
 
 ## Community, discussion, contribution, and support

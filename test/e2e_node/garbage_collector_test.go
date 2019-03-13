@@ -38,11 +38,9 @@ const (
 	maxPerPodContainer = 1
 	maxTotalContainers = -1
 
-	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
-	defaultImagePullProgressDeadline     = 1 * time.Minute
-	garbageCollectDuration               = 3 * time.Minute
-	setupDuration                        = 10 * time.Minute
-	runtimePollInterval                  = 10 * time.Second
+	garbageCollectDuration = 3 * time.Minute
+	setupDuration          = 10 * time.Minute
+	runtimePollInterval    = 10 * time.Second
 )
 
 type testPodSpec struct {

@@ -20,6 +20,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudfeatures "k8s.io/cloud-provider/features"
 )
 
 const (
@@ -86,6 +87,8 @@ const (
 
 	// owner: @msau42
 	// alpha: v1.7
+	// beta: v1.10
+	// ga: v1.14
 	//
 	// A new volume type that supports local disks on a node.
 	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
@@ -106,6 +109,11 @@ const (
 	// Ability to expand persistent volumes' file system without unmounting volumes.
 	ExpandInUsePersistentVolumes utilfeature.Feature = "ExpandInUsePersistentVolumes"
 
+	// owner: @gnufied
+	// alpha: v1.14
+	// Ability to expand CSI volumes
+	ExpandCSIVolumes utilfeature.Feature = "ExpandCSIVolumes"
+
 	// owner: @verb
 	// alpha: v1.10
 	//
@@ -121,6 +129,7 @@ const (
 	// owner: @bsalamat
 	// alpha: v1.8
 	// beta: v1.11
+	// GA: v1.14
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
@@ -131,13 +140,6 @@ const (
 	// Taint nodes based on their condition status for 'NetworkUnavailable',
 	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
-
-	// owner: @jsafrane
-	// GA: v1.12
-	//
-	// Note: This feature gate is unconditionally enabled in v1.13 and will be removed in v1.14.
-	// Enable mount propagation of volumes.
-	MountPropagation utilfeature.Feature = "MountPropagation"
 
 	// owner: @sjenning
 	// alpha: v1.11
@@ -161,6 +163,7 @@ const (
 
 	// owner: @derekwaynecarr
 	// beta: v1.10
+	// GA: v1.14
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
@@ -197,16 +200,18 @@ const (
 
 	// owner: @saad-ali
 	// alpha: v1.12
-	// Enable all logic related to the CSIDriver API object in csi.storage.k8s.io
+	// beta:  v1.14
+	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry utilfeature.Feature = "CSIDriverRegistry"
 
 	// owner: @verult
 	// alpha: v1.12
-	// Enable all logic related to the CSINodeInfo API object in csi.storage.k8s.io
+	// beta:  v1.14
+	// Enable all logic related to the CSINode API object in storage.k8s.io
 	CSINodeInfo utilfeature.Feature = "CSINodeInfo"
 
 	// owner @MrHohn
-	// beta: v1.10
+	// GA: v1.14
 	//
 	// Support configurable pod DNS parameters.
 	CustomPodDNS utilfeature.Feature = "CustomPodDNS"
@@ -281,14 +286,8 @@ const (
 	// Enable container log rotation for cri container runtime
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
 
-	// owner: @verult
-	// GA: v1.13
-	//
-	// Enables the regional PD feature on GCE.
-	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
-
 	// owner: @krmayankk
-	// alpha: v1.10
+	// beta: v1.14
 	//
 	// Enables control over the primary group ID of containers' init processes.
 	RunAsGroup utilfeature.Feature = "RunAsGroup"
@@ -316,9 +315,9 @@ const (
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 
 	// owner @freehan
-	// beta: v1.11
+	// GA: v1.14
 	//
-	// Support Pod Ready++
+	// Allow user to specify additional conditions to be evaluated for Pod readiness.
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
 	// owner: @kevtaylor
@@ -344,12 +343,20 @@ const (
 
 	// owner: @vladimirvivien
 	// alpha: v1.11
+	// beta: v1.14
 	//
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
 
+	// owner: @vladimirvivien
+	// alpha: v1.14
+	//
+	// Enables CSI Inline volumes support for pods
+	CSIInlineVolume utilfeature.Feature = "CSIInlineVolume"
+
 	// owner: @tallclair
 	// alpha: v1.12
+	// beta:  v1.14
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass utilfeature.Feature = "RuntimeClass"
@@ -408,6 +415,24 @@ const (
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
+
+	// owner: @RobertKrawitz
+	// alpha: v1.14
+	//
+	// Implement support for limiting pids in nodes
+	SupportNodePidsLimit utilfeature.Feature = "SupportNodePidsLimit"
+
+	// owner: @wk8
+	// alpha: v1.14
+	//
+	// Enables GMSA support for Windows workloads.
+	WindowsGMSA utilfeature.Feature = "WindowsGMSA"
+
+	// owner: @adisky
+	// alpha: v1.14
+	//
+	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
+	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
 )
 
 func init() {
@@ -426,58 +451,62 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TaintBasedEvictions:                         {Default: true, PreRelease: utilfeature.Beta},
 	RotateKubeletServerCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
-	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
+	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
-	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	HugePages:                                   {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
-	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.GA},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
-	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.14
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandCSIVolumes:                            {Default: false, PreRelease: utilfeature.Alpha},
 	AttachVolumeLimit:                           {Default: true, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
-	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
-	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
-	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
+	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
+	CSIDriverRegistry:                           {Default: true, PreRelease: utilfeature.Beta},
+	CSINodeInfo:                                 {Default: true, PreRelease: utilfeature.Beta},
+	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	BlockVolume:                                 {Default: true, PreRelease: utilfeature.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: true, PreRelease: utilfeature.Beta},
+	SupportNodePidsLimit:                        {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
+	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA},
 	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
-	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	RunAsGroup:                                  {Default: true, PreRelease: utilfeature.Beta},
+	CSIMigrationOpenStack:                       {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
-	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
+	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA},
+	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
-	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
-	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},
+	CSIInlineVolume:                             {Default: false, PreRelease: utilfeature.Alpha},
+	RuntimeClass:                                {Default: true, PreRelease: utilfeature.Beta},
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
+	WindowsGMSA:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -488,12 +517,14 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: utilfeature.Beta},
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: utilfeature.Beta},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: utilfeature.Alpha},
+	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: false, PreRelease: utilfeature.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

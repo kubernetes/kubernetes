@@ -17,7 +17,7 @@ limitations under the License.
 package network
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -560,7 +560,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 					Args: []string{
 						"/bin/sh",
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do curl -s -m 8 %s.%s:%d && exit 0 || sleep 1; done; exit 1",
+						fmt.Sprintf("for i in $(seq 1 5); do nc -vz -w 8 %s.%s %d && exit 0 || sleep 1; done; exit 1",
 							targetService.Name, targetService.Namespace, targetPort),
 					},
 				},

@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	utilpath "k8s.io/utils/path"
 )
 
 func newHostPathType(pathType string) *v1.HostPathType {
@@ -122,7 +122,7 @@ func TestDeleter(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-	if exists, _ := utilfile.FileExists(tempPath); exists {
+	if exists, _ := utilpath.Exists(utilpath.CheckFollowSymlink, tempPath); exists {
 		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
 	}
 }

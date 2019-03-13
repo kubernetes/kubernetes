@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - pmorie
 - saad-ali
@@ -10,4 +12,4 @@ reviewers:
 - humblec
 - jingxu97
 - msau42
-- mtanino 
+- mtanino

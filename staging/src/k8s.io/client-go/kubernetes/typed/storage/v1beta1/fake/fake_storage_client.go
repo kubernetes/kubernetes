@@ -28,6 +28,14 @@ type FakeStorageV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeStorageV1beta1) CSIDrivers() v1beta1.CSIDriverInterface {
+	return &FakeCSIDrivers{c}
+}
+
+func (c *FakeStorageV1beta1) CSINodes() v1beta1.CSINodeInterface {
+	return &FakeCSINodes{c}
+}
+
 func (c *FakeStorageV1beta1) StorageClasses() v1beta1.StorageClassInterface {
 	return &FakeStorageClasses{c}
 }

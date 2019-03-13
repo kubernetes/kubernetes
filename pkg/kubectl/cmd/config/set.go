@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -37,7 +37,7 @@ type setOptions struct {
 	configAccess  clientcmd.ConfigAccess
 	propertyName  string
 	propertyValue string
-	setRawBytes   flag.Tristate
+	setRawBytes   cliflag.Tristate
 }
 
 var (
@@ -47,7 +47,7 @@ var (
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
 
 	PROPERTY_VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.
-	
+
 	Specifying a attribute name that already exists will merge new fields on top of existing values.`)
 
 	setExample = templates.Examples(`

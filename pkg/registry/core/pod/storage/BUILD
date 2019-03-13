@@ -8,10 +8,15 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["storage_test.go"],
+    srcs = [
+        "eviction_test.go",
+        "storage_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/policy:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

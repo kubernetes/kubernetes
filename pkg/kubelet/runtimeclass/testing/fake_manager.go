@@ -17,18 +17,11 @@ limitations under the License.
 package testing
 
 import (
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
-	fakedynamic "k8s.io/client-go/dynamic/fake"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -39,64 +32,36 @@ const (
 
 	// EmptyRuntimeClass is a valid RuntimeClass without a handler pre-populated in the populated dynamic client.
 	EmptyRuntimeClass = "native"
-	// InvalidRuntimeClass is an invalid RuntimeClass pre-populated in the populated dynamic client.
-	InvalidRuntimeClass = "foo"
 )
 
-// NewPopulatedDynamicClient creates a dynamic client for use with the runtimeclass.Manager,
+// NewPopulatedClient creates a fake client for use with the runtimeclass.Manager,
 // and populates it with a few test RuntimeClass objects.
-func NewPopulatedDynamicClient() dynamic.Interface {
-	invalidRC := NewUnstructuredRuntimeClass(InvalidRuntimeClass, "")
-	invalidRC.Object["spec"].(map[string]interface{})["runtimeHandler"] = true
-
-	client := fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(),
-		NewUnstructuredRuntimeClass(EmptyRuntimeClass, ""),
-		NewUnstructuredRuntimeClass(SandboxRuntimeClass, SandboxRuntimeHandler),
-		invalidRC,
+func NewPopulatedClient() clientset.Interface {
+	return fake.NewSimpleClientset(
+		NewRuntimeClass(EmptyRuntimeClass, ""),
+		NewRuntimeClass(SandboxRuntimeClass, SandboxRuntimeHandler),
 	)
-	return client
 }
 
-// StartManagerSync runs the manager, and waits for startup by polling for the expected "native"
-// RuntimeClass to be populated. Returns a function to stop the manager, which should be called with
-// a defer:
+// StartManagerSync starts the manager, and waits for the informer cache to sync.
+// Returns a function to stop the manager, which should be called with a defer:
 //     defer StartManagerSync(t, m)()
-// Any errors are considered fatal to the test.
-func StartManagerSync(t *testing.T, m *runtimeclass.Manager) func() {
+func StartManagerSync(m *runtimeclass.Manager) func() {
 	stopCh := make(chan struct{})
-	go m.Run(stopCh)
-
-	// Wait for informer to populate.
-	err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := m.LookupRuntimeHandler(pointer.StringPtr(EmptyRuntimeClass))
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
-	require.NoError(t, err, "Failed to start manager")
-
+	m.Start(stopCh)
+	m.WaitForCacheSync(stopCh)
 	return func() {
 		close(stopCh)
 	}
 }
 
-// NewUnstructuredRuntimeClass is a helper to generate an unstructured RuntimeClass resource with
+// NewRuntimeClass is a helper to generate a RuntimeClass resource with
 // the given name & handler.
-func NewUnstructuredRuntimeClass(name, handler string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "node.k8s.io/v1alpha1",
-			"kind":       "RuntimeClass",
-			"metadata": map[string]interface{}{
-				"name": name,
-			},
-			"spec": map[string]interface{}{
-				"runtimeHandler": handler,
-			},
+func NewRuntimeClass(name, handler string) *nodev1beta1.RuntimeClass {
+	return &nodev1beta1.RuntimeClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
 		},
+		Handler: handler,
 	}
 }

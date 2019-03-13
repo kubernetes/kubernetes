@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/utils/net"
 )
 
 // BaseServiceInfo contains base information that defines a service.
@@ -79,6 +79,20 @@ func (info *BaseServiceInfo) GetNodePort() int {
 	return info.NodePort
 }
 
+// ExternalIPStrings is part of ServicePort interface.
+func (info *BaseServiceInfo) ExternalIPStrings() []string {
+	return info.ExternalIPs
+}
+
+// LoadBalancerIPStrings is part of ServicePort interface.
+func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
+	var ips []string
+	for _, ing := range info.LoadBalancerStatus.Ingress {
+		ips = append(ips, ing.IP)
+	}
+	return ips
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
@@ -111,11 +125,11 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		// If ExternalIPs and LoadBalancerSourceRanges on service contains incorrect IP versions,
 		// only filter out the incorrect ones.
 		var incorrectIPs []string
-		info.ExternalIPs, incorrectIPs = utilnet.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
+		info.ExternalIPs, incorrectIPs = utilproxy.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
 		}
-		info.LoadBalancerSourceRanges, incorrectIPs = utilnet.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
+		info.LoadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "loadBalancerSourceRanges", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
 		}

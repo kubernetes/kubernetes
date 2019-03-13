@@ -35,9 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -60,7 +60,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(awsElasticBlockStorePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(awsElasticBlockStorePluginName), volName)
 }
 
 func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) error {
@@ -317,12 +317,15 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 	return awsVolume.ResizeDisk(volumeID, oldSize, newSize)
 }
 
-func (plugin *awsElasticBlockStorePlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
-	return err
+func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-var _ volume.FSResizableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.NodeExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
@@ -490,7 +493,7 @@ func (c *awsElasticBlockStoreUnmounter) TearDown() error {
 
 // Unmounts the bind mount
 func (c *awsElasticBlockStoreUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 type awsElasticBlockStoreDeleter struct {

@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -205,7 +205,7 @@ func (o *LabelOptions) Validate() error {
 	if o.all && len(o.fieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
-	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 && !o.list {

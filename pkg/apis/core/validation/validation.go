@@ -61,8 +61,6 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
-const csiDriverNameRexpErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
-const csiDriverNameRexpFmt string = `^[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z-0-9]$`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -73,8 +71,6 @@ var BannedOwners = apimachineryvalidation.BannedOwners
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
-
-var csiDriverNameRexp = regexp.MustCompile(csiDriverNameRexpFmt)
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -415,9 +411,6 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
-		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {
@@ -631,6 +624,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
+		}
+	}
+	if source.CSI != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("csi"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateCSIVolumeSource(source.CSI, fldPath.Child("csi"))...)
 		}
 	}
 
@@ -873,6 +874,10 @@ func validateQuobyteVolumeSource(quobyte *core.QuobyteVolumeSource, fldPath *fie
 	allErrs := field.ErrorList{}
 	if len(quobyte.Registry) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("registry"), "must be a host:port pair or multiple pairs separated by commas"))
+	} else if len(quobyte.Tenant) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID provided by the configuration and may not be omitted "))
+	} else if len(quobyte.Tenant) >= 65 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("tenant"), "must be a UUID and may not exceed a length of 64 characters"))
 	} else {
 		for _, hostPortPair := range strings.Split(quobyte.Registry, ",") {
 			if _, _, err := net.SplitHostPort(hostPortPair); err != nil {
@@ -1445,9 +1450,10 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
 	}
 
-	if !csiDriverNameRexp.MatchString(driverName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, driverName, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg))
 	}
+
 	return allErrs
 }
 
@@ -1486,16 +1492,20 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		}
 	}
 
-	if csi.NodeStageSecretRef != nil {
-		if len(csi.NodeStageSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "name"), ""))
+	return allErrs
+}
+
+func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
+
+	if csi.NodePublishSecretRef != nil {
+		if len(csi.NodePublishSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
-		}
-		if len(csi.NodeStageSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
+			for _, msg := range ValidateSecretName(csi.NodePublishSecretRef.Name, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), csi.NodePublishSecretRef.Name, msg))
+			}
 		}
 	}
 
@@ -1968,8 +1978,6 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
@@ -2081,13 +2089,6 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	}
 
 	return allErrs
-}
-
-func fsResourceIsEphemeralStorage(resource string) bool {
-	if resource == "limits.ephemeral-storage" || resource == "requests.ephemeral-storage" {
-		return true
-	}
-	return false
 }
 
 func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
@@ -2270,6 +2271,14 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
+
+		if len(mnt.SubPathExpr) > 0 {
+			if len(mnt.SubPath) > 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "subPathExpr and subPath are mutually exclusive"))
+			}
+
+			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPathExpr, fldPath.Child("subPathExpr"))...)
 		}
 
 		if mnt.MountPropagation != nil {
@@ -2632,18 +2641,11 @@ func validateRestartPolicy(restartPolicy *core.RestartPolicy, fldPath *field.Pat
 func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
-	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault:
-	case core.DNSNone:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			allErrors = append(allErrors, field.Invalid(fldPath, dnsPolicy, "DNSPolicy: can not use 'None', custom pod DNS is disabled by feature gate"))
-		}
+	case core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault, core.DNSNone:
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
-		validValues := []string{string(core.DNSClusterFirstWithHostNet), string(core.DNSClusterFirst), string(core.DNSDefault)}
-		if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			validValues = append(validValues, string(core.DNSNone))
-		}
+		validValues := []string{string(core.DNSClusterFirstWithHostNet), string(core.DNSClusterFirst), string(core.DNSDefault), string(core.DNSNone)}
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors
@@ -2674,7 +2676,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 	allErrs := field.ErrorList{}
 
 	// Validate DNSNone case. Must provide at least one DNS name server.
-	if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) && dnsPolicy != nil && *dnsPolicy == core.DNSNone {
+	if dnsPolicy != nil && *dnsPolicy == core.DNSNone {
 		if dnsConfig == nil {
 			return append(allErrs, field.Required(fldPath, fmt.Sprintf("must provide `dnsConfig` when `dnsPolicy` is %s", core.DNSNone)))
 		}
@@ -2684,10 +2686,6 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 	}
 
 	if dnsConfig != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			return append(allErrs, field.Forbidden(fldPath, "DNSConfig: custom pod DNS is disabled by feature gate"))
-		}
-
 		// Validate nameservers.
 		if len(dnsConfig.Nameservers) > MaxDNSNameservers {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
@@ -2936,19 +2934,17 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-		hugePageResources := sets.NewString()
-		for i := range pod.Spec.Containers {
-			resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
-			for resourceStr := range resourceSet {
-				if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
-					hugePageResources.Insert(resourceStr)
-				}
+	hugePageResources := sets.NewString()
+	for i := range pod.Spec.Containers {
+		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+		for resourceStr := range resourceSet {
+			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+				hugePageResources.Insert(resourceStr)
 			}
 		}
-		if len(hugePageResources) > 1 {
-			allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
-		}
+	}
+	if len(hugePageResources) > 1 {
+		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
 	}
 
 	return allErrs
@@ -3736,9 +3732,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
-			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
@@ -3837,8 +3831,6 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
@@ -4032,7 +4024,7 @@ func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path)
 		vol := &volumes[i]
 		idxPath := fldPath.Index(i)
 		if vol.GCEPersistentDisk != nil {
-			if vol.GCEPersistentDisk.ReadOnly == false {
+			if !vol.GCEPersistentDisk.ReadOnly {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
 			}
 		}
@@ -4376,15 +4368,6 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		}
 	}
 	return allErrs
-}
-
-// isLocalStorageResource checks whether the resource is local ephemeral storage
-func isLocalStorageResource(name string) bool {
-	if name == string(core.ResourceEphemeralStorage) || name == string(core.ResourceRequestsEphemeralStorage) ||
-		name == string(core.ResourceLimitsEphemeralStorage) {
-		return true
-	}
-	return false
 }
 
 // Validate resource names that can go in a resource quota
@@ -4737,11 +4720,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
 		if helper.IsHugePageResourceName(resourceName) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
-				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
-			} else {
-				limContainsHugePages = true
-			}
+			limContainsHugePages = true
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
@@ -4997,10 +4976,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
-		allErrs = append(allErrs, err)
-	}
-
+	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
 	return allErrs
 }
 
@@ -5145,8 +5121,6 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}

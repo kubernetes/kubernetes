@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -260,14 +260,15 @@ func (o *SetResourcesOptions) Run() error {
 
 	for _, patch := range patches {
 		info := patch.Info
+		name := info.ObjectName()
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 
 		//no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("info: %s %q was not changed", info.Mapping.Resource, info.Name))
+			allErrs = append(allErrs, fmt.Errorf("info: %s was not changed\n", name))
 			continue
 		}
 

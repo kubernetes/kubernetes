@@ -29,8 +29,6 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,11 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -292,8 +291,8 @@ func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples", msg, cmd.CommandPath())
 }
 
-func IsFilenameSliceEmpty(filenames []string) bool {
-	return len(filenames) == 0
+func IsFilenameSliceEmpty(filenames []string, directory string) bool {
+	return len(filenames) == 0 && directory == ""
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -383,6 +382,7 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
+	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
@@ -395,9 +395,20 @@ func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 	flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }
 
+// AddKustomizeFlag adds kustomize flag to a command
+func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
+	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
+}
+
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+}
+
+func AddServerSideApplyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("experimental-server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().String("experimental-field-manager", "kubectl", "Name of the manager used to track field ownership. This is an alpha feature and flag.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -471,6 +482,18 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 		}
 	}
 	return nil
+}
+
+func GetServerSideApplyFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "experimental-server-side")
+}
+
+func GetForceConflictsFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "experimental-force-conflicts")
+}
+
+func GetFieldManagerFlag(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "experimental-field-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {

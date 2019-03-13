@@ -32,6 +32,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
 	schedulingclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
@@ -48,15 +49,36 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = p.storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = p.storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+	}
+	if apiResourceConfigSource.VersionEnabled(schedulingapiv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// priorityclasses
+	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
+	storage["priorityclasses"] = priorityClassStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// priorityclasses
+	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
+	storage["priorityclasses"] = priorityClassStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
 	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)

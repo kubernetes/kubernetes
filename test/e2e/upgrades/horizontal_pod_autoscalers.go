@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 // HPAUpgradeTest tests that HPA rescales target resource correctly before and after a cluster upgrade.
@@ -33,9 +33,10 @@ type HPAUpgradeTest struct {
 	hpa *autoscalingv1.HorizontalPodAutoscaler
 }
 
+// Name returns the tracking name of the test.
 func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
 
-// Creates a resource consumer and an HPA object that autoscales the consumer.
+// Setup creates a resource consumer and an HPA object that autoscales the consumer.
 func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 	t.rc = common.NewDynamicResourceConsumer(
 		"res-cons-upgrade",
@@ -63,7 +64,7 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 // Test waits for upgrade to complete and verifies if HPA works correctly.
 func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	// Block until upgrade is done
-	By(fmt.Sprintf("Waiting for upgrade to finish before checking HPA"))
+	ginkgo.By(fmt.Sprintf("Waiting for upgrade to finish before checking HPA"))
 	<-done
 	t.test()
 }
@@ -79,19 +80,19 @@ func (t *HPAUpgradeTest) test() {
 	const timeToWait = 15 * time.Minute
 	t.rc.Resume()
 
-	By(fmt.Sprintf("HPA scales to 1 replica: consume 10 millicores, target per pod 100 millicores, min pods 1."))
+	ginkgo.By(fmt.Sprintf("HPA scales to 1 replica: consume 10 millicores, target per pod 100 millicores, min pods 1."))
 	t.rc.ConsumeCPU(10) /* millicores */
-	By(fmt.Sprintf("HPA waits for 1 replica"))
+	ginkgo.By(fmt.Sprintf("HPA waits for 1 replica"))
 	t.rc.WaitForReplicas(1, timeToWait)
 
-	By(fmt.Sprintf("HPA scales to 3 replicas: consume 250 millicores, target per pod 100 millicores."))
+	ginkgo.By(fmt.Sprintf("HPA scales to 3 replicas: consume 250 millicores, target per pod 100 millicores."))
 	t.rc.ConsumeCPU(250) /* millicores */
-	By(fmt.Sprintf("HPA waits for 3 replicas"))
+	ginkgo.By(fmt.Sprintf("HPA waits for 3 replicas"))
 	t.rc.WaitForReplicas(3, timeToWait)
 
-	By(fmt.Sprintf("HPA scales to 5 replicas: consume 700 millicores, target per pod 100 millicores, max pods 5."))
+	ginkgo.By(fmt.Sprintf("HPA scales to 5 replicas: consume 700 millicores, target per pod 100 millicores, max pods 5."))
 	t.rc.ConsumeCPU(700) /* millicores */
-	By(fmt.Sprintf("HPA waits for 5 replicas"))
+	ginkgo.By(fmt.Sprintf("HPA waits for 5 replicas"))
 	t.rc.WaitForReplicas(5, timeToWait)
 
 	// We need to pause background goroutines as during upgrade master is unavailable and requests issued by them fail.

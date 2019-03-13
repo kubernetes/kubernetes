@@ -61,9 +61,9 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		externalConfig, err := clientcmd.BuildConfigFromFlags("", *kubemarkExternalKubeConfig)
 		externalConfig.QPS = f.Options.ClientQPS
 		externalConfig.Burst = f.Options.ClientBurst
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		externalClient, err := clientset.NewForConfig(externalConfig)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		f.KubemarkExternalClusterClientSet = externalClient
 		p.closeChannel = make(chan struct{})
 		externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
@@ -71,7 +71,7 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
 		go kubemarkNodeInformer.Informer().Run(p.closeChannel)
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
 		Expect(p.controller.WaitForCacheSync(p.closeChannel)).To(BeTrue())
 		go p.controller.Run(p.closeChannel)

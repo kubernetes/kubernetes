@@ -43,6 +43,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/client-go/util/keyutil"
 )
 
 const tmpPrivateKeyFile = "kubelet-client.key.tmp"
@@ -134,7 +135,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 	var keyData []byte
 	if cert, err := store.Current(); err == nil {
 		if cert.PrivateKey != nil {
-			keyData, err = certutil.MarshalPrivateKeyToPEM(cert.PrivateKey)
+			keyData, err = keyutil.MarshalPrivateKeyToPEM(cert.PrivateKey)
 			if err != nil {
 				keyData = nil
 			}
@@ -148,7 +149,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		klog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
 		// Note: always call LoadOrGenerateKeyFile so that private key is
 		// reused on next startup if CSR request fails.
-		keyData, _, err = certutil.LoadOrGenerateKeyFile(privKeyPath)
+		keyData, _, err = keyutil.LoadOrGenerateKeyFile(privKeyPath)
 		if err != nil {
 			return err
 		}
@@ -272,7 +273,7 @@ func verifyKeyData(data []byte) bool {
 	if len(data) == 0 {
 		return false
 	}
-	_, err := certutil.ParsePrivateKeyPEM(data)
+	_, err := keyutil.ParsePrivateKeyPEM(data)
 	return err == nil
 }
 
@@ -316,7 +317,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		CommonName:   "system:node:" + string(nodeName),
 	}
 
-	privateKey, err := certutil.ParsePrivateKeyPEM(privateKeyData)
+	privateKey, err := keyutil.ParsePrivateKeyPEM(privateKeyData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
