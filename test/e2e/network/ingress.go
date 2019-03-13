@@ -904,7 +904,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("single and multi-cluster ingresses should be able to exist together", func() {
 			By("Creating a single cluster ingress first")
 			jig.Class = ""
-			singleIngFilePath := filepath.Join(ingress.IngressManifestPath, "static-ip-2")
+			singleIngFilePath := filepath.Join(ingress.GCEIngressManifestPath, "static-ip-2")
 			jig.CreateIngress(singleIngFilePath, ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(false /*waitForNodePort*/)
 			// jig.Ingress will be overwritten when we create MCI, so keep a reference.

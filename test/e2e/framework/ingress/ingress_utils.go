@@ -86,6 +86,9 @@ const (
 	// IngressManifestPath is the parent path to yaml test manifests.
 	IngressManifestPath = "test/e2e/testing-manifests/ingress"
 
+	// GCEIngressManifestPath is the parent path to GCE-specific yaml test manifests.
+	GCEIngressManifestPath = IngressManifestPath + "/gce"
+
 	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
 
