@@ -152,7 +152,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		}
 		config := convertTestConfig(l.config)
 		var fsGroup *int64
-		if dInfo.Capabilities[CapFsGroup] {
+		if framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
@@ -185,7 +185,12 @@ func testScriptInPod(
 	)
 	suffix := generateSuffixForPodName(volumeType)
 	fileName := fmt.Sprintf("test-%s", suffix)
-	content := fmt.Sprintf("ls %s", volPath)
+	var content string
+	if framework.NodeOSDistroIs("windows") {
+		content = fmt.Sprintf("ls -n %s", volPath)
+	} else {
+		content = fmt.Sprintf("ls %s", volPath)
+	}
 	command := framework.GenerateWriteandExecuteScriptFileCmd(content, fileName, volPath)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

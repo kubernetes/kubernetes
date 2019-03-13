@@ -152,21 +152,21 @@ var (
 		Name:       "Inline-volume (ntfs)",
 		VolType:    InlineVolume,
 		FsType:     "ntfs",
-		FeatureTag: "sig-windows",
+		FeatureTag: "[sig-windows]",
 	}
 	// NtfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (ntfs)"
 	NtfsPreprovisionedPV = TestPattern{
 		Name:       "Pre-provisioned PV (ntfs)",
 		VolType:    PreprovisionedPV,
 		FsType:     "ntfs",
-		FeatureTag: "sig-windows",
+		FeatureTag: "[sig-windows]",
 	}
 	// NtfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
 	NtfsDynamicPV = TestPattern{
 		Name:       "Dynamic PV (ntfs)",
 		VolType:    DynamicPV,
 		FsType:     "ntfs",
-		FeatureTag: "sig-windows",
+		FeatureTag: "[sig-windows]",
 	}
 
 	// Definitions for Filesystem volume mode

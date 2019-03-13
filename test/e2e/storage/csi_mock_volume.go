@@ -379,7 +379,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			_, _, pod3 := createPod()
 			Expect(pod3).NotTo(BeNil(), "while creating third pod")
 			err = waitForMaxVolumeCondition(pod3, m.cs)
-			Expect(err).NotTo(HaveOccurred(), "while waiting for max volume condition")
+			Expect(err).NotTo(HaveOccurred(), "while waiting for max volume condition on pod : %+v", pod3)
 		})
 	})
 

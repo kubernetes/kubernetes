@@ -754,6 +754,10 @@ message Preconditions {
   // Specifies the target UID.
   // +optional
   optional string uid = 1;
+
+  // Specifies the target ResourceVersion
+  // +optional
+  optional string resourceVersion = 2;
 }
 
 // RootPaths lists the paths available at root.

@@ -45,17 +45,12 @@ const (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature:DevicePlugin][Serial]", func() {
-	f := framework.NewDefaultFramework("device-plugin-errors")
-	testDevicePlugin(f, false, pluginapi.DevicePluginPath)
-})
-
 var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
-	testDevicePlugin(f, true, "/var/lib/kubelet/plugins_registry")
+	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })
 
-func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSockDir string) {
+func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	Context("DevicePlugin", func() {
 		By("Enabling support for Kubelet Plugins Watcher")
@@ -63,7 +58,6 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = map[string]bool{}
 			}
-			initialConfig.FeatureGates[string(features.KubeletPluginsWatcher)] = enablePluginWatcher
 			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
 		})
 		It("Verifies the Kubelet device plugin functionality.", func() {

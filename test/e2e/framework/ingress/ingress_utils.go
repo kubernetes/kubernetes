@@ -667,9 +667,23 @@ func (j *TestJig) pollIngressWithCert(ing *extensions.Ingress, address string, k
 }
 
 // WaitForIngress waits for the Ingress to get an address.
+// WaitForIngress returns when it gets the first 200 response
 func (j *TestJig) WaitForIngress(waitForNodePort bool) {
 	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, framework.LoadBalancerPollTimeout); err != nil {
 		framework.Failf("error in waiting for ingress to get an address: %s", err)
+	}
+}
+
+// WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
+func (j *TestJig) WaitForIngressToStable() {
+	if err := wait.Poll(10*time.Second, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+		_, err := j.GetDistinctResponseFromIngress()
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		framework.Failf("error in waiting for ingress to stablize: %v", err)
 	}
 }
 

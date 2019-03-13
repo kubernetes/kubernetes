@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -306,5 +307,64 @@ func TestSubnet(t *testing.T) {
 	} {
 		real := subnet(c.service)
 		assert.Equal(t, c.expected, real, fmt.Sprintf("TestCase[%d]: %s", i, c.desc))
+	}
+}
+
+func TestEnsureLoadBalancerDeleted(t *testing.T) {
+	const vmCount = 8
+	const availabilitySetCount = 4
+	const serviceCount = 9
+
+	tests := []struct {
+		desc              string
+		service           v1.Service
+		expectCreateError bool
+	}{
+		{
+			desc:    "external service should be created and deleted successfully",
+			service: getTestService("test1", v1.ProtocolTCP, 80),
+		},
+		{
+			desc:    "internal service should be created and deleted successfully",
+			service: getInternalTestService("test2", 80),
+		},
+		{
+			desc:    "annotated service with same resourceGroup should be created and deleted successfully",
+			service: getResourceGroupTestService("test3", "rg", "", 80),
+		},
+		{
+			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
+			service:           getResourceGroupTestService("test4", "random-rg", "1.2.3.4", 80),
+			expectCreateError: true,
+		},
+	}
+
+	az := getTestCloud()
+	for i, c := range tests {
+		clusterResources := getClusterResources(az, vmCount, availabilitySetCount)
+		getTestSecurityGroup(az)
+		if c.service.Annotations[ServiceAnnotationLoadBalancerInternal] == "true" {
+			addTestSubnet(t, az, &c.service)
+		}
+
+		// create the service first.
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &c.service, clusterResources.nodes)
+		if c.expectCreateError {
+			assert.NotNil(t, err, "TestCase[%d]: %s", i, c.desc)
+		} else {
+			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+			assert.NotNil(t, lbStatus, "TestCase[%d]: %s", i, c.desc)
+			result, err := az.LoadBalancerClient.List(context.TODO(), az.Config.ResourceGroup)
+			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+			assert.Equal(t, len(result), 1, "TestCase[%d]: %s", i, c.desc)
+			assert.Equal(t, len(*result[0].LoadBalancingRules), 1, "TestCase[%d]: %s", i, c.desc)
+		}
+
+		// finally, delete it.
+		err = az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &c.service)
+		assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+		result, err := az.LoadBalancerClient.List(context.Background(), az.Config.ResourceGroup)
+		assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+		assert.Equal(t, len(result), 0, "TestCase[%d]: %s", i, c.desc)
 	}
 }

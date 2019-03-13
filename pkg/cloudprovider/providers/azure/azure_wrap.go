@@ -71,6 +71,19 @@ func ignoreStatusNotFoundFromError(err error) error {
 	return err
 }
 
+// ignoreStatusForbiddenFromError returns nil if the status code is StatusForbidden.
+// This happens when AuthorizationFailed is reported from Azure API.
+func ignoreStatusForbiddenFromError(err error) error {
+	if err == nil {
+		return nil
+	}
+	v, ok := err.(autorest.DetailedError)
+	if ok && v.StatusCode == http.StatusForbidden {
+		return nil
+	}
+	return err
+}
+
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.

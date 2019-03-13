@@ -4,6 +4,7 @@ load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
 )
+load("//build:platforms.bzl", "go_platform_constraint")
 
 go_library(
     name = "go_default_library",
@@ -15,9 +16,23 @@ go_library(
         "test_server.go",
         "util.go",
     ],
-    data = [
-        "@com_coreos_etcd//:etcd",
-    ],
+    data = select({
+        go_platform_constraint(
+            arch = "arm64",
+            os = "linux",
+        ): [
+            "@com_coreos_etcd_arm64//:etcd",
+        ],
+        go_platform_constraint(
+            arch = "ppc64le",
+            os = "linux",
+        ): [
+            "@com_coreos_etcd_ppc64le//:etcd",
+        ],
+        "//conditions:default": [
+            "@com_coreos_etcd_amd64//:etcd",
+        ],
+    }),
     importpath = "k8s.io/kubernetes/test/integration/framework",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
