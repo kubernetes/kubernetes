@@ -215,13 +215,14 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		csiClient := host.GetKubeClient()
 		if csiClient == nil {
-			return errors.New("unable to get Kubernetes client")
+			klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
+		} else {
+			// Start informer for CSIDrivers.
+			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
+			p.csiDriverInformer = factory.Storage().V1beta1().CSIDrivers()
+			p.csiDriverLister = p.csiDriverInformer.Lister()
+			go factory.Start(wait.NeverStop)
 		}
-		// Start informer for CSIDrivers.
-		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-		p.csiDriverInformer = factory.Storage().V1beta1().CSIDrivers()
-		p.csiDriverLister = p.csiDriverInformer.Lister()
-		go factory.Start(wait.NeverStop)
 	}
 
 	var migratedPlugins = map[string](func() bool){

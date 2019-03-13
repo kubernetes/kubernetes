@@ -2,15 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !go1.9
+// +build aix linux solaris
 
-package http2
+package nettest
 
-import (
-	"net/http"
-)
-
-func configureServer19(s *http.Server, conf *Server) error {
-	// not supported prior to go1.9
-	return nil
+func supportsIPv6MulticastDeliveryOnLoopback() bool {
+	return true
 }
