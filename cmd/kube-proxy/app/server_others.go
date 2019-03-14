@@ -178,12 +178,12 @@ func newProxyServer(
 		klog.V(0).Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		userspace.CleanupLeftovers(iptInterface)
-		// IPVS Proxier will generate some iptables rules, need to clean them before switching to other proxy mode.
-		// Besides, ipvs proxier will create some ipvs rules as well.  Because there is no way to tell if a given
-		// ipvs rule is created by IPVS proxier or not.  Users should explicitly specify `--clean-ipvs=true` to flush
-		// all ipvs rules when kube-proxy start up.  Users do this operation should be with caution.
-		if canUseIPVS {
-			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		// IPVS proxier will generate some iptable rules, but we should only clean up those rules if cleanupIPVS
+		// is true, otherwise we end up flushing iptable chains that are shared between the IPVS and iptables proxier.
+		// Users should explicitly specify --cleanup-ipvs=true to flush all ipvs rules when kube-proxy starts up.
+		// Users should do this operation with caution.
+		if canUseIPVS && cleanupIPVS {
+			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface)
 		}
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
@@ -247,12 +247,11 @@ func newProxyServer(
 		klog.V(0).Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		iptables.CleanupLeftovers(iptInterface)
-		// IPVS Proxier will generate some iptables rules, need to clean them before switching to other proxy mode.
-		// Besides, ipvs proxier will create some ipvs rules as well.  Because there is no way to tell if a given
-		// ipvs rule is created by IPVS proxier or not.  Users should explicitly specify `--clean-ipvs=true` to flush
-		// all ipvs rules when kube-proxy start up.  Users do this operation should be with caution.
-		if canUseIPVS {
-			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		// For userspace proxy, it's generally safe to clean up IPVS rules since
+		// there is no overlap between the two. But for consistency we only clean up
+		// IPVS rules if specified by the user with --cleanup-ipvs
+		if canUseIPVS && cleanupIPVS {
+			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface)
 		}
 	}
 
