@@ -59,6 +59,7 @@ go_library(
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/k8s.io/utils/keymutex:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
             "//vendor/k8s.io/utils/path:go_default_library",
         ],
