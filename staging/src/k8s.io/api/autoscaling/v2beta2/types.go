@@ -252,7 +252,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
 	// and indicates whether or not those conditions are met.
-	Conditions []HorizontalPodAutoscalerCondition `json:"conditions" protobuf:"bytes,6,rep,name=conditions"`
+	Conditions []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" protobuf:"bytes,6,rep,name=conditions"`
 }
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
