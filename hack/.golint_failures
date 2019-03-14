@@ -218,7 +218,6 @@ pkg/proxy/userspace
 pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
-pkg/quota/v1/evaluator/core
 pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
 pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
