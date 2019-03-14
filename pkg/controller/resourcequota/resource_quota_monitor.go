@@ -284,11 +284,13 @@ func (qm *QuotaMonitor) IsSynced() bool {
 	defer qm.monitorLock.Unlock()
 
 	if len(qm.monitors) == 0 {
+		klog.V(4).Info("quota monitor not synced: no monitors")
 		return false
 	}
 
-	for _, monitor := range qm.monitors {
+	for resource, monitor := range qm.monitors {
 		if !monitor.controller.HasSynced() {
+			klog.V(4).Infof("quota monitor not synced: %v", resource)
 			return false
 		}
 	}

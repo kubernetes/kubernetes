@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
@@ -423,14 +424,15 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 			return
 		}
 
-		// Something has changed, so track the new state and perform a sync.
-		klog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
-		oldResources = newResources
-
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
 		rq.workerLock.Lock()
 		defer rq.workerLock.Unlock()
+
+		// Something has changed, so track the new state and perform a sync.
+		if klog.V(2) {
+			klog.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
+		}
 
 		// Perform the monitor resync and wait for controllers to report cache sync.
 		if err := rq.resyncMonitors(newResources); err != nil {
@@ -440,7 +442,28 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", stopCh, rq.quotaMonitor.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
 		}
+
+		// success, remember newly synced resources
+		oldResources = newResources
+		klog.V(2).Infof("synced quota controller")
 	}, period, stopCh)
+}
+
+// printDiff returns a human-readable summary of what resources were added and removed
+func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct{}) string {
+	removed := sets.NewString()
+	for oldResource := range oldResources {
+		if _, ok := newResources[oldResource]; !ok {
+			removed.Insert(fmt.Sprintf("%+v", oldResource))
+		}
+	}
+	added := sets.NewString()
+	for newResource := range newResources {
+		if _, ok := oldResources[newResource]; !ok {
+			added.Insert(fmt.Sprintf("%+v", newResource))
+		}
+	}
+	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
 }
 
 // resyncMonitors starts or stops quota monitors as needed to ensure that all
